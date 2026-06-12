@@ -1,0 +1,40 @@
+server:
+  port: 8085
+spring:
+  application:
+    name: assignment-service
+  datasource:
+    url: ${ASSIGNMENT_DB_URL:jdbc:postgresql://localhost:5432/cf_assignment}
+    username: ${ASSIGNMENT_DB_USERNAME:courseflow}
+    password: ${ASSIGNMENT_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${LIQUIBASE_CONTEXTS:prod}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  servlet:
+    multipart:
+      max-file-size: ${ASSIGNMENT_MAX_FILE_SIZE:200MB}
+      max-request-size: ${ASSIGNMENT_MAX_REQUEST_SIZE:200MB}
+courseflow:
+  storage:
+    provider: ${STORAGE_PROVIDER:minio}
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    external-endpoint: ${STORAGE_EXTERNAL_ENDPOINT:http://localhost:9000}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    allow-demo-credentials: ${STORAGE_ALLOW_DEMO_CREDENTIALS:false}
+    bucket: ${ASSIGNMENT_STORAGE_BUCKET:courseflow-submissions}
+    presign-ttl-seconds: ${STORAGE_PRESIGN_TTL:3600}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

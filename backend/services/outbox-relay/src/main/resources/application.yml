@@ -1,0 +1,94 @@
+server:
+  port: ${OUTBOX_RELAY_PORT:8103}
+
+spring:
+  application:
+    name: outbox-relay
+  datasource:
+    url: ${OUTBOX_RELAY_DB_URL:jdbc:postgresql://localhost:5432/cf_outbox}
+    username: ${OUTBOX_RELAY_DB_USERNAME:courseflow}
+    password: ${OUTBOX_RELAY_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${LIQUIBASE_CONTEXTS:prod}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 120000
+
+# One entry per service whose outbox_events table this relay should drain. The relay connects to
+# each service's database independently and marks published_at after the broker acks. Consumers
+# dedup on eventId (at-least-once delivery).
+#
+# announcement-service is intentionally absent: it runs its own in-process relay (see
+# announcement-service OutboxRelay). Listing it here too would double-drain the same table.
+courseflow:
+  outbox:
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    services:
+      - name: enrollment
+        jdbc-url: ${ENROLLMENT_DB_URL:jdbc:postgresql://localhost:5432/cf_enrollment}
+        username: ${ENROLLMENT_DB_USERNAME:courseflow}
+        password: ${ENROLLMENT_DB_PASSWORD:courseflow}
+      - name: assignment
+        jdbc-url: ${ASSIGNMENT_DB_URL:jdbc:postgresql://localhost:5432/cf_assignment}
+        username: ${ASSIGNMENT_DB_USERNAME:courseflow}
+        password: ${ASSIGNMENT_DB_PASSWORD:courseflow}
+      - name: quiz
+        jdbc-url: ${QUIZ_DB_URL:jdbc:postgresql://localhost:5432/cf_quiz}
+        username: ${QUIZ_DB_USERNAME:courseflow}
+        password: ${QUIZ_DB_PASSWORD:courseflow}
+      - name: peer-review
+        jdbc-url: ${PEER_REVIEW_DB_URL:jdbc:postgresql://localhost:5432/cf_peer_review}
+        username: ${PEER_REVIEW_DB_USERNAME:courseflow}
+        password: ${PEER_REVIEW_DB_PASSWORD:courseflow}
+      - name: gradebook
+        jdbc-url: ${GRADEBOOK_DB_URL:jdbc:postgresql://localhost:5432/cf_gradebook}
+        username: ${GRADEBOOK_DB_USERNAME:courseflow}
+        password: ${GRADEBOOK_DB_PASSWORD:courseflow}
+      - name: certificate
+        jdbc-url: ${CERTIFICATE_DB_URL:jdbc:postgresql://localhost:5432/cf_certificate}
+        username: ${CERTIFICATE_DB_USERNAME:courseflow}
+        password: ${CERTIFICATE_DB_PASSWORD:courseflow}
+      - name: course
+        jdbc-url: ${COURSE_DB_URL:jdbc:postgresql://localhost:5432/cf_course}
+        username: ${COURSE_DB_USERNAME:courseflow}
+        password: ${COURSE_DB_PASSWORD:courseflow}
+      - name: deadline
+        jdbc-url: ${DEADLINE_DB_URL:jdbc:postgresql://localhost:5432/cf_deadline}
+        username: ${DEADLINE_DB_USERNAME:courseflow}
+        password: ${DEADLINE_DB_PASSWORD:courseflow}
+      - name: discussion
+        jdbc-url: ${DISCUSSION_DB_URL:jdbc:postgresql://localhost:5432/cf_discussion}
+        username: ${DISCUSSION_DB_USERNAME:courseflow}
+        password: ${DISCUSSION_DB_PASSWORD:courseflow}
+      - name: live-session
+        jdbc-url: ${LIVE_SESSION_DB_URL:jdbc:postgresql://localhost:5432/cf_live_session}
+        username: ${LIVE_SESSION_DB_USERNAME:courseflow}
+        password: ${LIVE_SESSION_DB_PASSWORD:courseflow}
+      - name: media
+        jdbc-url: ${MEDIA_DB_URL:jdbc:postgresql://localhost:5432/cf_media}
+        username: ${MEDIA_DB_USERNAME:courseflow}
+        password: ${MEDIA_DB_PASSWORD:courseflow}
+      - name: review
+        jdbc-url: ${REVIEW_DB_URL:jdbc:postgresql://localhost:5432/cf_review}
+        username: ${REVIEW_DB_USERNAME:courseflow}
+        password: ${REVIEW_DB_PASSWORD:courseflow}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

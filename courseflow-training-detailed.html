@@ -1,0 +1,1527 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourseFlow v2 - Step by Step Implementation Guide</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --paper: #fff;
+      --text: #172033;
+      --muted: #607086;
+      --line: #dbe3ef;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #0f766e;
+      --green-soft: #e6f6f3;
+      --orange: #ea580c;
+      --orange-soft: #fff4ed;
+      --purple: #7c3aed;
+      --purple-soft: #f3eeff;
+      --red: #b91c1c;
+      --red-soft: #ffe8e8;
+      --dark: #0f172a;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Helvetica Neue", sans-serif;
+      line-height: 1.65
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none
+    }
+
+    a:hover {
+      text-decoration: underline
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 290px minmax(0, 1fr);
+      min-height: 100vh
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--dark);
+      color: #f8fafc;
+      padding: 24px 18px
+    }
+
+    .sidebar h1 {
+      margin: 0 0 4px;
+      font-size: 18px
+    }
+
+    .sidebar p {
+      margin: 0 0 18px;
+      color: #94a3b8;
+      font-size: 13px
+    }
+
+    .nav-title {
+      margin: 18px 0 6px;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase
+    }
+
+    .sidebar a {
+      display: block;
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px
+    }
+
+    .sidebar a:hover {
+      background: #1e293b;
+      text-decoration: none
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 30px 80px
+    }
+
+    .hero {
+      background: #123761;
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 24px
+    }
+
+    .hero h2 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.2
+    }
+
+    .hero p {
+      margin: 0;
+      color: #c7ddff;
+      max-width: 820px
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 26px;
+      margin-top: 24px
+    }
+
+    section h2 {
+      margin: 0 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+      font-size: 23px
+    }
+
+    h3 {
+      margin: 22px 0 10px;
+      font-size: 18px
+    }
+
+    h4 {
+      margin: 16px 0 8px;
+      font-size: 15px
+    }
+
+    p {
+      margin: 10px 0
+    }
+
+    ul,
+    ol {
+      padding-left: 20px;
+      margin: 10px 0
+    }
+
+    li {
+      margin: 5px 0
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      background: #fbfcff
+    }
+
+    .note {
+      margin: 16px 0;
+      padding: 13px 15px;
+      background: var(--green-soft);
+      border-left: 4px solid var(--green);
+      border-radius: 0 var(--radius) var(--radius) 0
+    }
+
+    .warn {
+      margin: 16px 0;
+      padding: 13px 15px;
+      background: var(--orange-soft);
+      border-left: 4px solid var(--orange);
+      border-radius: 0 var(--radius) var(--radius) 0
+    }
+
+    .danger {
+      margin: 16px 0;
+      padding: 13px 15px;
+      background: var(--red-soft);
+      border-left: 4px solid var(--red);
+      border-radius: 0 var(--radius) var(--radius) 0
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top
+    }
+
+    th {
+      background: #eef4ff;
+      color: #1e3a8a
+    }
+
+    code {
+      background: #edf2f7;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: .9em
+    }
+
+    pre {
+      overflow: auto;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: var(--radius);
+      padding: 16px;
+      line-height: 1.55
+    }
+
+    .phase {
+      border-left: 5px solid var(--blue);
+      background: #fbfdff
+    }
+
+    .checklist {
+      list-style: none;
+      padding-left: 0
+    }
+
+    .checklist li {
+      position: relative;
+      padding-left: 26px
+    }
+
+    .checklist li:before {
+      content: "□";
+      position: absolute;
+      left: 0;
+      color: var(--blue);
+      font-weight: 700
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      vertical-align: middle;
+      margin-left: 8px
+    }
+
+    .b-done {
+      background: var(--green-soft);
+      color: #0f766e
+    }
+
+    .b-partial {
+      background: var(--orange-soft);
+      color: #c2410c
+    }
+
+    .b-todo {
+      background: var(--red-soft);
+      color: #b91c1c
+    }
+
+    .dod {
+      margin: 14px 0;
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      overflow: hidden
+    }
+
+    .dod h4 {
+      margin: 0;
+      padding: 9px 14px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 13px;
+      border-bottom: 1px solid #bbf7d0
+    }
+
+    .dod pre {
+      margin: 0;
+      border-radius: 0
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin: 10px 0;
+      font-size: 13px
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    @media(max-width:900px) {
+      .layout {
+        display: block
+      }
+
+      .sidebar {
+        position: static;
+        height: auto
+      }
+
+      main {
+        padding: 18px 14px 48px
+      }
+
+      .grid {
+        grid-template-columns: 1fr
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>CourseFlow v2</h1>
+      <p>Step by Step Guide</p>
+      <nav>
+        <div class="nav-title">Chuẩn bị</div>
+        <a href="#principles">Nguyên tắc v2</a>
+        <a href="#status">Trạng thái code thật</a>
+        <a href="#repo">Repo layout</a>
+        <a href="#layers">Service layers</a>
+        <a href="#conventions">Convention chuẩn có sẵn</a>
+        <a href="#local-infra">Local infra</a>
+        <div class="nav-title">Phase mẫu</div>
+        <a href="#sample-flow">Event flow mẫu: Announcement → Notification</a>
+        <div class="nav-title">Backend phases</div>
+        <a href="#phase0">Phase 0 - Skeleton</a>
+        <a href="#phase1">Phase 1 - Identity</a>
+        <a href="#phase2">Phase 2 - Organization/Course</a>
+        <a href="#phase3">Phase 3 - Enrollment</a>
+        <a href="#phase4">Phase 4 - Assignment/Media</a>
+        <a href="#phase5">Phase 5 - Deadline/Announcement</a>
+        <a href="#phase6">Phase 6 - Notification</a>
+        <a href="#phase7">Phase 7 - Portfolio</a>
+        <a href="#phase8">Phase 8 - Discussion</a>
+        <a href="#phase9">Phase 9 - Outbox/Dedup</a>
+        <a href="#phase10">Phase 10 - Search CDC</a>
+        <a href="#phase11">Phase 11 - Analytics</a>
+        <a href="#phase12">Phase 12 - Gateway/BFF</a>
+        <a href="#phase13">Phase 13 - Gradebook/Rubric</a>
+        <a href="#phase14">Phase 14 - Quiz/Question Bank</a>
+        <a href="#phase15">Phase 15 - Course Modules</a>
+        <a href="#phase16">Phase 16 - Certificate Verification</a>
+        <a href="#phase17">Phase 17 - Peer Review</a>
+        <div class="nav-title">Client phases</div>
+        <a href="#next">Next.js learning</a>
+        <a href="#react">React admin</a>
+        <a href="#flutter">Flutter app</a>
+        <a href="#testing">Testing/CI/CD</a>
+      </nav>
+    </aside>
+    <main>
+      <div class="hero">
+        <h2>CourseFlow v2 - Hướng dẫn triển khai chi tiết</h2>
+        <p>
+          Tài liệu này hướng dẫn xây hệ thống theo thứ tự hợp lý: dựng khung, tách service nghiệp vụ,
+          thêm feature thật, chuẩn hóa event reliability, rồi mới mở rộng search/analytics/client.
+        </p>
+        <div class="legend">
+          <span><span class="badge b-done">ĐÃ CÓ</span> code chạy được trong repo</span>
+          <span><span class="badge b-partial">MỘT PHẦN</span> có khung/schema, còn thiếu logic</span>
+          <span><span class="badge b-todo">CHƯA CÓ</span> mới chỉ là tài liệu, intern phải tự viết</span>
+        </div>
+      </div>
+
+      <section id="principles">
+        <h2>1. Nguyên tắc v2</h2>
+        <ul>
+          <li>Không còn <code>core-service</code>. Mỗi service sở hữu một bounded context.</li>
+          <li>Không service nào query database của service khác.</li>
+          <li>Common library không chứa nghiệp vụ LMS.</li>
+          <li>Event schema đặt ở <code>event-contracts</code>, không import entity của service khác.</li>
+          <li>Event producer dùng transactional outbox; consumer dùng dedup.</li>
+          <li>Next.js chỉ dùng cho learner/public/SEO; React chỉ dùng cho admin/backoffice.</li>
+          <li><code>api-gateway</code> là trust boundary: verify JWT, strip <code>X-User-*</code> giả mạo và inject
+            identity header đã xác thực.</li>
+          <li>Infra nằm trong từng repo folder, không trộn vào source service.</li>
+        </ul>
+      </section>
+
+      <section id="status">
+        <h2>1b. Trạng thái code thật trong repo (đọc trước khi bắt đầu)</h2>
+        <p>
+          Tài liệu mô tả hệ thống <em>đích</em>. Code hiện tại trong repo chưa đạt tới đó. Bảng dưới đây nói rõ
+          cái gì đã chạy, cái gì mới là khung, cái gì bạn phải tự viết — để bạn không tưởng nhầm là "chỉ cần ráp lại".
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Hạng mục</th>
+              <th>Trạng thái</th>
+              <th>Thực tế trong repo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Service CRUD (identity, course, enrollment, assignment, announcement, gradebook, quiz, peer-review...)
+              </td>
+              <td><span class="badge b-done">ĐÃ CÓ</span></td>
+              <td>Có controller/service/repository + Liquibase migration + demo seed. Dùng <strong>Spring
+                  <code>JdbcClient</code> + SQL viết tay</strong> (chỉ identity-service dùng JPA).</td>
+            </tr>
+            <tr>
+              <td>Producer ghi outbox khi có thay đổi nghiệp vụ</td>
+              <td><span class="badge b-done">ĐÃ CÓ</span></td>
+              <td><strong>8 service đã ghi <code>outbox_events</code></strong>: announcement, course, assignment,
+                deadline, discussion, certificate, peer-review, quiz (vd <code>quiz.attempt.graded</code>,
+                <code>course.published</code>, <code>peer_review.finalized</code>).
+              </td>
+            </tr>
+            <tr>
+              <td>outbox-relay (poll outbox → publish Kafka)</td>
+              <td><span class="badge b-done">ĐÃ CÓ (mẫu)</span></td>
+              <td><code>announcement-service/config/OutboxRelay.java</code> đã impl: <code>@Scheduled</code> +
+                <code>FOR UPDATE SKIP LOCKED</code> + ack-rồi-mới-mark. Các service khác <strong>chưa</strong> có relay.
+                <code>workers/outbox-relay</code> vẫn là scaffold rỗng.
+              </td>
+            </tr>
+            <tr>
+              <td>Consumer nhận event + dedup</td>
+              <td><span class="badge b-done">ĐÃ CÓ (mẫu)</span></td>
+              <td><code>notification-service/consumer/AnnouncementEventConsumer.java</code> đã impl
+                <code>@KafkaListener</code> + dedup <code>processed_events</code> trong cùng transaction. Là consumer
+                DUY NHẤT hiện có.
+              </td>
+            </tr>
+            <tr>
+              <td>Analytics nhận event</td>
+              <td><span class="badge b-todo">CHƯA CÓ</span></td>
+              <td><code>AnalyticsService</code> chỉ CRUD <code>course_metric</code> thủ công, chưa có
+                <code>@KafkaListener</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>Search CDC (Debezium → ES)</td>
+              <td><span class="badge b-partial">MỘT PHẦN</span></td>
+              <td>Có <code>CourseSearchDocument</code> + ES repository; chưa có connector config và indexer chạy thật.
+              </td>
+            </tr>
+            <tr>
+              <td>API Gateway: JWT + strip header + RBAC route gating</td>
+              <td><span class="badge b-done">ĐÃ CÓ</span></td>
+              <td><code>JwtAuthenticationGatewayFilter</code> strip <code>X-User-*</code>, verify HS256, chặn role cho
+                <code>/api/backoffice</code> &amp; <code>/api/users</code>, allowlist public + <code>/ws</code>. Có 4
+                test bảo mật.
+              </td>
+            </tr>
+            <tr>
+              <td>Cross-cutting: error contract, ApiResponse, CurrentUser, correlation id</td>
+              <td><span class="badge b-done">ĐÃ CÓ</span></td>
+              <td>common-library chuẩn hóa <code>ApiExceptionHandler</code>→<code>ErrorDto</code>,
+                <code>ApiResponse</code> envelope, <code>@CurrentUser</code> resolver,
+                <code>/internal/service-info</code>.
+              </td>
+            </tr>
+            <tr>
+              <td>BFF (learning-bff, backoffice-bff)</td>
+              <td><span class="badge b-todo">CHƯA CÓ</span></td>
+              <td>Chỉ có <code>Application.java</code>, chưa compose data.</td>
+            </tr>
+            <tr>
+              <td>Next.js learning</td>
+              <td><span class="badge b-todo">CHƯA CÓ</span></td>
+              <td>Chỉ có <code>layout.tsx</code> + <code>page.tsx</code> scaffold.</td>
+            </tr>
+            <tr>
+              <td>React admin (12 module)</td>
+              <td><span class="badge b-todo">CHƯA CÓ</span></td>
+              <td>Có <code>App.tsx</code> + <code>gateway.ts</code>; mỗi module chỉ là file README rỗng.</td>
+            </tr>
+            <tr>
+              <td>Flutter app</td>
+              <td><span class="badge b-todo">CHƯA CÓ</span></td>
+              <td>Có <code>main.dart</code> + <code>dio_client.dart</code>; mỗi feature chỉ là README placeholder.</td>
+            </tr>
+            <tr>
+              <td>Test tự động</td>
+              <td><span class="badge b-partial">MỘT PHẦN</span></td>
+              <td>Mới có test bảo mật ở api-gateway (4 assertion). Service nghiệp vụ chưa có unit/integration/E2E.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          <strong>Cập nhật:</strong> producer side (ghi outbox) thực ra đã khá đầy đủ — 8 service ghi event. Khoảng
+          trống thật nằm ở
+          <strong>relay</strong> và <strong>consumer</strong>: mới chỉ có flow mẫu announcement→notification được nối
+          dây hoàn chỉnh.
+          Các flow khác (quiz→gradebook, course→search, deadline→notification...) đã có producer nhưng <em>chưa có ai
+            consume</em>.
+        </div>
+        <div class="warn">
+          Mỗi Phase bên dưới gắn badge <span class="badge b-done">ĐÃ CÓ</span> / <span class="badge b-partial">MỘT
+            PHẦN</span> /
+          <span class="badge b-todo">CHƯA CÓ</span> để bạn biết đang đọc hướng dẫn cho code đã tồn tại hay cho code bạn
+          sắp viết.
+        </div>
+        <div class="danger">
+          Việc còn lại của tầng event: <strong>thêm relay cho từng service producer</strong> (hoặc bật Debezium) và
+          <strong>viết consumer + dedup</strong> cho analytics, gradebook, search... Phase mẫu ngay bên dưới đã nối dây
+          announcement→notification hoàn chỉnh để bạn nhân bản cho mọi flow còn lại.
+        </div>
+      </section>
+
+      <section id="repo">
+        <h2>2. Repo layout</h2>
+        <pre>v2/courseflow/
+  backend/
+    common-library/
+    event-contracts/
+    services/
+    bffs/
+    workers/
+    infra/
+    docs/
+  web/
+    next-learning/
+    react-admin/
+  app/
+    lib/
+    infra/
+    docs/</pre>
+        <div class="note">Ba folder <code>backend</code>, <code>web</code>, <code>app</code> được thiết kế như 3 repo
+          độc lập, hiện chỉ đặt chung để dễ quản lý.</div>
+      </section>
+
+      <section id="layers">
+        <h2>3. Chuẩn layer trong mỗi service</h2>
+        <pre>src/main/java/edu/courseflow/&lt;service&gt;/
+  config/          Spring config, Kafka config, security, clients
+  controller/      REST controllers, request validation
+  service/         Application use cases, transactions
+  repository/      DB access (JdbcClient + SQL), Elasticsearch/Mongo adapters
+  consumer/        @KafkaListener event consumers (khi service cần consume)
+  model/           Entity/document/domain model
+  dto/             Request/response DTOs</pre>
+        <div class="warn">Không expose entity trực tiếp ra API. Controller chỉ nhận/trả DTO.</div>
+        <div class="note">
+          <strong>Persistence thực tế:</strong> hầu hết service nghiệp vụ dùng <strong>Spring <code>JdbcClient</code> +
+            SQL viết tay</strong>
+          (không phải JPA). Chỉ <code>identity-service</code> dùng JPA/Hibernate. Vì vậy
+          <code>AbstractAuditEntity</code> (JPA <code>@MappedSuperclass</code>)
+          và <code>gatewayAuditorAware()</code> chỉ áp dụng cho identity-service; các service khác set audit field bằng
+          SQL.
+        </div>
+      </section>
+
+      <section id="conventions">
+        <h2>3b. Convention chuẩn đã có sẵn trong common-library (dùng lại, đừng viết lại)</h2>
+        <p>Các thứ dưới đây <strong>đã code và chuẩn hóa</strong> across service — intern nên dùng lại thay vì tự nghĩ
+          ra cách mới.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Convention</th>
+              <th>File</th>
+              <th>Làm gì</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Error contract thống nhất</td>
+              <td><code>common-library/.../exception/ApiExceptionHandler.java</code> → <code>ErrorDto</code></td>
+              <td>Một <code>@RestControllerAdvice</code> map <code>NotFoundException</code>→404,
+                <code>BadRequest</code>→400, <code>Conflict/Duplicated</code>→409, validation→400 (gộp
+                <code>fieldErrors</code>), còn lại→500. Mọi service trả cùng một shape JSON lỗi.
+              </td>
+            </tr>
+            <tr>
+              <td>Response envelope</td>
+              <td><code>common-library/.../api/ApiResponse.java</code></td>
+              <td><code>ApiResponse&lt;T&gt;(data, traceId, timestamp)</code> + factory <code>ok()</code>.</td>
+            </tr>
+            <tr>
+              <td>Đọc identity trong controller</td>
+              <td><code>commonlibrary/web/CurrentUser.java</code> + <code>CurrentUserArgumentResolver</code></td>
+              <td>Khai báo tham số <code>CurrentUser</code> trong controller là tự resolve từ header
+                <code>X-User-*</code>; có <code>hasRole()</code>. Không phải parse header thủ công.
+              </td>
+            </tr>
+            <tr>
+              <td>Header gateley ↔ service</td>
+              <td><code>commonlibrary/constants/GatewayHeaders.java</code></td>
+              <td>Hằng số tên header dùng chung (<code>X-User-Id/Role/Email</code>, <code>X-Correlation-Id</code>).</td>
+            </tr>
+            <tr>
+              <td>Correlation id</td>
+              <td>gateway <code>CorrelationIdGatewayFilter</code> + service <code>CorrelationIdFilter</code></td>
+              <td>Sinh ở gateway (order cao nhất, trước auth), echo lại trên response; service có filter fallback.</td>
+            </tr>
+            <tr>
+              <td>Service info endpoint</td>
+              <td><code>common-library/.../web/ServiceInfoController.java</code></td>
+              <td>Mọi service có <code>GET /internal/service-info</code> trả name/version/profile.</td>
+            </tr>
+            <tr>
+              <td>Validation</td>
+              <td>jakarta validation + <code>@Valid @RequestBody</code></td>
+              <td>DTO mang annotation ràng buộc; vi phạm tự render vào <code>ErrorDto.fieldErrors</code>.</td>
+            </tr>
+            <tr>
+              <td>Idempotent upsert</td>
+              <td>nhiều service: <code>INSERT ... ON CONFLICT (...) DO ...</code></td>
+              <td>gradebook (grade_item_id+student_id), quiz (attempt_id+question_id), course progress
+                (module_id+student_id), peer-review (submission_id). Là pattern chuẩn cho ghi lặp an toàn.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          <strong>Gateway mạnh hơn mô tả ban đầu:</strong> <code>JwtAuthenticationGatewayFilter</code> không chỉ verify
+          JWT + strip <code>X-User-*</code> giả mạo,
+          mà còn <strong>chặn role</strong> cho <code>/api/backoffice</code> &amp; <code>/api/users</code> (chỉ
+          ADMIN/PROFESSOR/TA), có allowlist public
+          (<code>/api/auth/login</code>, <code>/api/auth/refresh</code>, <code>/api/public</code>,
+          <code>/actuator</code>) và carve-out cho <code>/ws</code> (WebSocket tự auth ở STOMP CONNECT). Có 4 test bảo
+          mật.
+        </div>
+      </section>
+
+      <section id="local-infra">
+        <h2>4. Local infra</h2>
+        <pre>cd v2/courseflow/backend
+docker compose -f infra/docker/docker-compose.yml up -d</pre>
+        <table>
+          <thead>
+            <tr>
+              <th>Infra</th>
+              <th>Dùng cho</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PostgreSQL</td>
+              <td>Database per service, Liquibase schema; demo seed chạy bằng Spring profile <code>demo</code></td>
+            </tr>
+            <tr>
+              <td>MongoDB</td>
+              <td>Portfolio evidence/journal documents</td>
+            </tr>
+            <tr>
+              <td>Redis</td>
+              <td>Notification realtime/session cache</td>
+            </tr>
+            <tr>
+              <td>Kafka</td>
+              <td>Domain events</td>
+            </tr>
+            <tr>
+              <td>Kafka Connect + Debezium</td>
+              <td>Outbox CDC và Search CDC</td>
+            </tr>
+            <tr>
+              <td>Elasticsearch</td>
+              <td>Search read model</td>
+            </tr>
+            <tr>
+              <td>Keycloak</td>
+              <td>External identity option sau khi auth nội bộ ổn định</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="sample-flow">
+        <h2>5. Phase mẫu hoàn chỉnh: Announcement → Notification <span class="badge b-done">ĐÃ IMPL TRONG REPO</span>
+        </h2>
+        <p>
+          Đây là <strong>flow event-driven end-to-end đầu tiên</strong> và đã được code thật trong repo
+          (<code>OutboxRelay.java</code> ở announcement-service, <code>AnnouncementEventConsumer.java</code> ở
+          notification-service).
+          Nó là khuôn mẫu cho mọi flow khác (deadline→notification, quiz→gradebook, course→search, grade→analytics...).
+          Producer của nhiều flow này <em>đã ghi outbox sẵn</em> — bạn chỉ cần copy đúng 2 mảnh còn thiếu:
+          <em>relay</em> và <em>consumer dedup</em>.
+        </p>
+        <div class="warn">
+          <strong>Trạng thái kiểm chứng:</strong> code đã <strong>compile pass</strong>
+          (<code>mvn -pl services/announcement-service,services/notification-service -am compile</code>).
+          Chưa chạy end-to-end vì môi trường tạo tài liệu không có Docker để bật Kafka/Postgres. Phần "Definition of
+          Done" bên dưới là các lệnh để <strong>bạn tự verify runtime</strong>.
+        </div>
+        <pre>announcement-service                outbox-relay              notification-service
+  publish()                          (poll mỗi 1s)              @KafkaListener
+  ├─ UPDATE announcements            SELECT * FROM              ├─ check processed_events
+  └─ INSERT outbox_events  ───────▶  outbox_events      ──────▶ ├─ INSERT notification
+     (cùng 1 transaction)            WHERE published_at         └─ INSERT processed_events
+                                     IS NULL                       (cùng 1 transaction)
+                                     → send Kafka
+                                     → UPDATE published_at
+        topic: announcement.published</pre>
+
+        <div class="note">
+          <strong>Hai điểm lệch doc↔code đã được sửa trong repo (giữ lại đây để bạn hiểu vì sao):</strong>
+          <ul>
+            <li><strong>Relay DB:</strong> <code>workers/outbox-relay/application.yml</code> trỏ vào một DB duy nhất
+              <code>cf_outbox</code>,
+              nhưng mỗi service ghi <code>outbox_events</code> vào DB <em>riêng của nó</em> (vd
+              <code>cf_announcement</code>).
+              Cách đã chọn cho training: <strong>relay nằm chung process với service phát event, đọc đúng DB của service
+                đó</strong>
+              (xem <code>announcement-service/config/OutboxRelay.java</code>). <code>workers/outbox-relay</code> để lại
+              làm scaffold cho hướng Debezium/relay riêng sau này.
+            </li>
+            <li><strong><code>eventId</code> trong payload:</strong> <code>AnnouncementService.publish()</code> nay sinh
+              <code>eventId</code> và đưa vào payload outbox
+              để consumer dùng làm khóa dedup. Trước đây payload thiếu field này nên dedup không chạy được.
+            </li>
+          </ul>
+        </div>
+
+        <h3>Bước 0 — Bật Kafka cho đúng (đã có sẵn)</h3>
+        <p>Dependency <code>spring-kafka</code> đã có trong <code>announcement-service</code> và
+          <code>notification-service</code>.
+          Kafka broker chạy ở <code>localhost:9092</code> (xem docker-compose). Không cần thêm gì.
+        </p>
+
+        <h3>Bước 1 — Producer: sinh <code>eventId</code> trong outbox payload <span class="badge b-done">ĐÃ IMPL</span>
+        </h3>
+        <p>File: <code>announcement-service/.../service/AnnouncementService.java</code>. Method <code>publish()</code>
+          sinh <code>eventId</code> ổn định (dùng làm khóa dedup):</p>
+        <pre>@Transactional
+public AnnouncementDto publish(UUID announcementId) {
+    announcements.publish(announcementId);
+    AnnouncementDto published = get(announcementId);
+    String eventId = UUID.randomUUID().toString();          // &lt;-- đã thêm
+    announcements.outbox(announcementId, "announcement.published", toJson(Map.of(
+            "eventId", eventId,                              // &lt;-- đã thêm
+            "announcementId", announcementId.toString(),
+            "courseId", published.courseId(),
+            "title", published.title(),
+            "audience", published.audience(),
+            "publishedAt", published.publishedAt().toString())));
+    return published;
+}</pre>
+        <div class="note">Outbox INSERT và UPDATE announcement nằm trong cùng <code>@Transactional</code> → không bao
+          giờ có chuyện
+          "đã publish nhưng mất event" hay "có event nhưng chưa publish". Đây là điểm cốt lõi của outbox pattern.</div>
+
+        <h3>Bước 2 — Relay: poll outbox và đẩy lên Kafka <span class="badge b-done">ĐÃ IMPL</span></h3>
+        <p>File: <code>announcement-service/.../config/OutboxRelay.java</code> (relay đặt ngay trong service phát event,
+          đọc đúng DB của service đó).
+          Đã bật <code>@EnableScheduling</code> trên <code>AnnouncementServiceApplication</code>.</p>
+        <pre>@Component
+public class OutboxRelay {
+
+    private final JdbcClient jdbc;
+    private final KafkaTemplate&lt;String, String&gt; kafka;
+
+    public OutboxRelay(JdbcClient jdbc, KafkaTemplate&lt;String, String&gt; kafka) {
+        this.jdbc = jdbc;
+        this.kafka = kafka;
+    }
+
+    @Scheduled(fixedDelayString = "${courseflow.outbox.poll-interval-ms:1000}")
+    @Transactional
+    public void relay() {
+        var rows = jdbc.sql("""
+                SELECT id, event_type, payload::text AS payload
+                FROM outbox_events
+                WHERE published_at IS NULL
+                ORDER BY created_at
+                LIMIT 100
+                FOR UPDATE SKIP LOCKED
+                """)
+            .query((rs, n) -> Map.of(
+                "id", rs.getObject("id", UUID.class),
+                "eventType", rs.getString("event_type"),
+                "payload", rs.getString("payload")))
+            .list();
+
+        for (var row : rows) {
+            String topic = (String) row.get("eventType");          // "announcement.published"
+            kafka.send(topic, (String) row.get("payload"))
+                 .join();                                          // chờ ack trước khi mark
+            jdbc.sql("UPDATE outbox_events SET published_at = NOW() WHERE id = :id")
+                .param("id", row.get("id"))
+                .update();
+        }
+    }
+}</pre>
+        <p>Bật scheduling trong <code>AnnouncementServiceApplication</code>:</p>
+        <pre>@EnableScheduling
+@SpringBootApplication(scanBasePackages = "edu.courseflow")
+public class AnnouncementServiceApplication { ... }</pre>
+        <div class="warn"><code>FOR UPDATE SKIP LOCKED</code> cho phép chạy nhiều instance relay mà không gửi trùng.
+          <code>kafka.send().join()</code> đảm bảo chỉ mark <code>published_at</code> sau khi Kafka đã nhận — nếu gửi
+          fail, row vẫn còn để lần sau retry (at-least-once). Vì vậy <strong>consumer bắt buộc phải dedup</strong>.
+        </div>
+
+        <h3>Bước 3 — Consumer: nhận event + dedup + tạo notification <span class="badge b-done">ĐÃ IMPL</span></h3>
+        <p>File: <code>notification-service/.../consumer/AnnouncementEventConsumer.java</code>. Bảng
+          <code>processed_events</code> đã có sẵn trong migration.
+        </p>
+        <pre>@Component
+public class AnnouncementEventConsumer {
+
+    private static final String CONSUMER = "notification:announcement.published";
+    private final JdbcClient jdbc;
+    private final ObjectMapper objectMapper;
+
+    public AnnouncementEventConsumer(JdbcClient jdbc, ObjectMapper objectMapper) {
+        this.jdbc = jdbc;
+        this.objectMapper = objectMapper;
+    }
+
+    @KafkaListener(topics = "announcement.published", groupId = "notification-service")
+    @Transactional
+    public void onAnnouncementPublished(String payload) throws Exception {
+        JsonNode e = objectMapper.readTree(payload);
+        UUID eventId = UUID.fromString(e.get("eventId").asText());
+
+        // 1) Dedup: nếu đã xử lý eventId này rồi thì bỏ qua (idempotent)
+        int inserted = jdbc.sql("""
+                INSERT INTO processed_events (event_id, consumer_name)
+                VALUES (:eventId, :consumer)
+                ON CONFLICT (event_id) DO NOTHING
+                """)
+            .param("eventId", eventId)
+            .param("consumer", CONSUMER)
+            .update();
+        if (inserted == 0) {
+            return;                                  // đã xử lý → không tạo notification trùng
+        }
+
+        // 2) Business effect: tạo notification (ở đây fan-out đơn giản tới author;
+        //    thực tế sẽ resolve audience qua enrollment API/read model)
+        jdbc.sql("""
+                INSERT INTO notifications (id, user_id, notification_type, title, body)
+                VALUES (:id, :userId, 'ANNOUNCEMENT', :title, :body)
+                """)
+            .param("id", UUID.randomUUID())
+            .param("userId", e.get("courseId").asText())   // placeholder audience
+            .param("title", e.get("title").asText())
+            .param("body", "New announcement in course " + e.get("courseId").asText())
+            .update();
+    }
+}</pre>
+        <div class="danger">Dedup-insert và business-insert nằm trong <strong>cùng một transaction</strong>. Nếu tạo
+          notification fail,
+          cả <code>processed_events</code> cũng rollback → lần redeliver sau sẽ xử lý lại. Nếu tách 2 transaction, bạn
+          sẽ có bug "đã đánh dấu processed nhưng notification chưa tạo".</div>
+        <p>Cấu hình consumer trong <code>notification-service/application.yml</code>:</p>
+        <pre>spring:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+    listener:
+      ack-mode: record</pre>
+
+        <h3>Bước 4 — Event contract (tùy chọn nhưng nên có) <span class="badge b-done">ĐÃ CÓ</span></h3>
+        <p><code>event-contracts</code> đã có <code>AnnouncementPublishedEvent</code>. Khi muốn typed payload thay vì
+          <code>JsonNode</code>, producer serialize record này và consumer deserialize nó — schema dùng chung, không
+          service nào import entity của service khác.
+        </p>
+
+        <div class="dod">
+          <h4>✅ Definition of Done — chạy được, không chỉ là checklist</h4>
+          <pre># 0. Hạ tầng + 2 service
+docker compose -f infra/docker/docker-compose.yml up -d
+mvn -pl services/announcement-service -am spring-boot:run    # cổng 8087
+mvn -pl services/notification-service -am spring-boot:run    # cổng 8090
+
+# 1. Tạo announcement (DRAFT)
+curl -s -X POST localhost:8087/internal/announcements \
+  -H 'Content-Type: application/json' \
+  -d '{"courseId":"11111111-1111-1111-1111-111111111111",
+       "authorId":"prof-1","title":"Mid-term moved","body":"See syllabus","audience":"ENROLLED"}'
+# → copy "id" trả về, đặt là $AID
+
+# 2. Publish → ghi outbox (cùng transaction)
+curl -s -X POST localhost:8087/internal/announcements/$AID/publish
+
+# 3. Quan sát Kafka nhận event (mở terminal khác)
+docker exec courseflow-kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic announcement.published --from-beginning --timeout-ms 5000
+# → phải thấy 1 JSON có "eventId" và "title":"Mid-term moved"
+
+# 4. Notification đã được tạo từ event
+curl -s "localhost:8090/internal/notifications?userId=11111111-1111-1111-1111-111111111111"
+# → phải thấy 1 notification type ANNOUNCEMENT
+
+# 5. KIỂM TRA DEDUP: publish lại cùng announcement KHÔNG được tạo notification trùng
+#    (hoặc gửi lại đúng eventId vào topic) → số notification giữ nguyên
+
+# 6. KIỂM TRA OUTBOX: row trong outbox_events đã có published_at
+docker exec courseflow-postgres psql -U courseflow -d cf_announcement \
+  -c "SELECT event_type, published_at FROM outbox_events ORDER BY created_at DESC LIMIT 3;"
+# → published_at KHÔNG còn NULL</pre>
+        </div>
+        <div class="note">Khi 6 bước trên pass, bạn đã có flow event-driven thật đầu tiên. Mọi flow event khác trong tài
+          liệu
+          (Phase 5, 6, 7, 11, 13, 14, 17) chỉ là <strong>lặp lại đúng khuôn này</strong> với tên topic và business
+          effect khác.</div>
+      </section>
+
+      <section class="phase" id="phase0">
+        <h2>Phase 0 - Backend skeleton <span class="badge b-done">ĐÃ CÓ</span></h2>
+        <h3>Mục tiêu</h3>
+        <p>Dựng parent Maven, common-library, event-contracts, các service module, BFF và worker.</p>
+        <h3>Cần có</h3>
+        <ul class="checklist">
+          <li><code>mvn -DskipTests compile</code> pass.</li>
+          <li>Mỗi service có <code>Application.java</code> và <code>application.yml</code>.</li>
+          <li>Mỗi service theo layer <code>controller/service/repository/model/dto/config</code>.</li>
+          <li>Local infra có Postgres/Mongo/Redis/Kafka/Elasticsearch/Keycloak.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase1">
+        <h2>Phase 1 - Identity service <span class="badge b-done">ĐÃ CÓ</span></h2>
+        <h3>Service ownership</h3>
+        <p><code>identity-service</code> sở hữu user, credential, role, refresh token và auth audit.</p>
+        <h3>Implementation steps</h3>
+        <ol>
+          <li>Tạo entity <code>User</code>, <code>RefreshToken</code>, <code>AuthAuditLog</code>.</li>
+          <li>Tạo API <code>POST /api/auth/login</code>, <code>POST /api/auth/refresh</code>,
+            <code>POST /api/auth/logout</code>.
+          </li>
+          <li>Hash password bằng BCrypt, không log token/password.</li>
+          <li>Seed demo accounts: admin, professor, TA, student trong <code>db.changelog-demo.yaml</code>, không nằm
+            trong schema changelog production.</li>
+          <li>Thêm method-level security cho admin APIs.</li>
+        </ol>
+        <h3>Done khi</h3>
+        <ul class="checklist">
+          <li>Login trả access token và refresh token.</li>
+          <li>Refresh token rotation hoạt động.</li>
+          <li>Role ADMIN/PROFESSOR/TA/STUDENT được enforce ở backend.</li>
+        </ul>
+        <div class="dod">
+          <h4>✅ Definition of Done — chạy được</h4>
+          <pre># Chạy với profile demo để có seed account (admin/professor/student@courseflow.local)
+mvn -pl services/identity-service -am spring-boot:run -Dspring-boot.run.profiles=demo   # cổng 8081
+
+# Login (password demo nằm trong changelog-demo seed của bạn)
+curl -s -X POST localhost:8081/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"professor@courseflow.local","password":"<demo-password>"}'
+# → phải trả về accessToken + refreshToken
+
+# Refresh rotation: gọi /auth/refresh với refreshToken vừa nhận
+curl -s -X POST localhost:8081/auth/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"refreshToken":"<token>"}'
+# → trả token mới; refreshToken cũ không dùng lại được nữa</pre>
+        </div>
+      </section>
+
+      <section class="phase" id="phase2">
+        <h2>Phase 2 - Organization và Course <span class="badge b-done">ĐÃ CÓ</span></h2>
+        <h3>Organization-service</h3>
+        <ul>
+          <li>Quản lý department, academic term, program, course section.</li>
+          <li>Không quản lý course content và không quản lý user credential.</li>
+        </ul>
+        <h3>Course-service</h3>
+        <ul>
+          <li>Quản lý catalog, syllabus, outcomes, prerequisites, material metadata.</li>
+          <li>Publish course phát event hoặc ghi outbox để Search/Analytics dùng về sau.</li>
+        </ul>
+        <h3>API gợi ý</h3>
+        <pre>GET  /internal/organizations/departments
+GET  /internal/terms
+POST /internal/sections
+POST /internal/courses
+POST /internal/courses/{id}/publish
+GET  /public/courses
+GET  /public/courses/{slug}</pre>
+      </section>
+
+      <section class="phase" id="phase3">
+        <h2>Phase 3 - Enrollment service <span class="badge b-done">ĐÃ CÓ</span></h2>
+        <p><code>enrollment-service</code> sở hữu roster, waitlist, enrollment status và capacity policy.</p>
+        <h3>Quan trọng</h3>
+        <ul>
+          <li>Dùng transaction và lock khi check capacity.</li>
+          <li>Không update trực tiếp course DB.</li>
+          <li>Phát <code>enrollment.created</code>, <code>waitlist.joined</code> bằng outbox.</li>
+        </ul>
+        <pre>@Transactional
+enroll(studentId, courseId):
+  capacity = capacityRepository.lockByCourseId(courseId)
+  if capacity.full -> waitlist
+  else insert enrollment
+  save outbox event</pre>
+        <div class="dod">
+          <h4>✅ Definition of Done — chạy được</h4>
+          <pre>mvn -pl services/enrollment-service -am spring-boot:run -Dspring-boot.run.profiles=demo
+
+# Enroll cho tới khi đầy chỗ → student tiếp theo phải rơi vào WAITLIST, không vượt capacity
+curl -s -X POST localhost:<port>/internal/enrollments \
+  -H 'Content-Type: application/json' \
+  -d '{"studentId":"student-1","courseId":"<courseId>"}'
+# → lặp lại tới khi vượt capacity; response status chuyển ENROLLED → WAITLISTED
+
+# Kiểm tra không bao giờ enroll quá capacity (race-safe nhờ FOR UPDATE lock)
+curl -s "localhost:<port>/internal/enrollments?courseId=<courseId>"</pre>
+        </div>
+      </section>
+
+      <section class="phase" id="phase4">
+        <h2>Phase 4 - Assignment và Media <span class="badge b-done">ĐÃ CÓ</span></h2>
+        <h3>Assignment-service</h3>
+        <ul>
+          <li>Assignment definition, rubric, submission metadata.</li>
+          <li>Submission chỉ lưu metadata và link media/evidence, không lưu file bytes.</li>
+          <li>Phát <code>submission.created</code> cho Portfolio/Notification/Analytics.</li>
+        </ul>
+        <h3>Media-service</h3>
+        <ul>
+          <li>Upload policy, file metadata, signed URL.</li>
+          <li>Chuẩn bị cho object storage sau này.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase5">
+        <h2>Phase 5 - Deadline Reminder và Announcement <span class="badge b-done">CRUD + OUTBOX ĐÃ CÓ</span></h2>
+        <h3>Deadline-service</h3>
+        <p>Deadline không đặt trong Assignment để tránh assignment-service ôm scheduler và delivery logic.</p>
+        <ol>
+          <li>Nhận due date từ assignment event hoặc assignment API snapshot.</li>
+          <li>Tạo reminder policy: 24h, 2h, custom.</li>
+          <li>Scheduled job scan reminder runs đến hạn.</li>
+          <li>Ghi outbox event <code>deadline.reminder.due</code>.</li>
+        </ol>
+        <h3>Announcement-service</h3>
+        <ol>
+          <li>Professor tạo draft announcement.</li>
+          <li>Validate course ownership qua Course/Enrollment APIs.</li>
+          <li>Schedule hoặc publish ngay.</li>
+          <li>Ghi outbox event <code>announcement.published</code>.</li>
+        </ol>
+      </section>
+
+      <section class="phase" id="phase6">
+        <h2>Phase 6 - Notification service <span class="badge b-partial">CRUD ĐÃ CÓ · CONSUMER CHƯA CÓ</span></h2>
+        <p>Notification là delivery service, không quyết định nghiệp vụ nguồn.</p>
+        <h3>Consumers</h3>
+        <ul>
+          <li><code>announcement.published</code></li>
+          <li><code>deadline.reminder.due</code></li>
+          <li><code>submission.created</code></li>
+          <li><code>grade.published</code></li>
+          <li><code>discussion.comment.created</code></li>
+        </ul>
+        <h3>Done khi</h3>
+        <ul class="checklist">
+          <li>Notification inbox lưu lịch sử.</li>
+          <li>User preferences bật/tắt channel.</li>
+          <li>WebSocket push realtime cho React/Next/Flutter.</li>
+          <li>Dedup consumer không tạo notification trùng.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase7">
+        <h2>Phase 7 - Portfolio service <span class="badge b-partial">CRUD ĐÃ CÓ · EVENT CHƯA CÓ</span></h2>
+        <p>Portfolio dùng MongoDB vì evidence/journal/feedback linh hoạt theo assignment type.</p>
+        <h3>Documents</h3>
+        <pre>evidence_document:
+  submissionId
+  studentId
+  assignmentType
+  evidence: { githubUrl, demoUrl, files, notes }
+  feedbackSnapshots[]
+  gradeSnapshot</pre>
+        <h3>Events</h3>
+        <ul>
+          <li>Consume <code>submission.created</code> để tạo evidence placeholder.</li>
+          <li>Publish <code>grade.published</code> khi professor/TA publish điểm.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase8">
+        <h2>Phase 8 - Discussion service <span class="badge b-done">CRUD + OUTBOX ĐÃ CÓ · CONSUMER CHƯA CÓ</span></h2>
+        <p>Discussion là append-heavy domain, có moderation rule riêng nên phải là service riêng.</p>
+        <h3>Use cases</h3>
+        <ul>
+          <li>Thread theo course hoặc assignment.</li>
+          <li>Comment, reply, reaction.</li>
+          <li>TA/Professor mark accepted answer.</li>
+          <li>Moderation queue cho React admin.</li>
+        </ul>
+        <h3>Events</h3>
+        <ul>
+          <li><code>discussion.thread.created</code></li>
+          <li><code>discussion.comment.created</code></li>
+          <li><code>discussion.answer.accepted</code></li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase9">
+        <h2>Phase 9 - Outbox/Dedup chuẩn hóa <span class="badge b-partial">CÓ FLOW MẪU · CẦN NHÂN BẢN</span></h2>
+        <div class="note">Code mẫu đầy đủ (relay + consumer + dedup) đã impl cho flow announcement→notification — xem
+          mục <a href="#sample-flow">Phase mẫu</a>. Việc còn lại: nhân bản relay/consumer cho các flow producer khác đã
+          có sẵn outbox.</div>
+        <p>Đặt phase này sau khi đã có event thật từ Announcement, Deadline, Assignment, Portfolio và Discussion.</p>
+        <h3>Producer pattern</h3>
+        <pre>@Transactional
+businessUseCase():
+  save domain change
+  save outbox_events(eventId, aggregateId, eventType, payload)
+
+Debezium hoặc outbox-relay:
+  publish event to Kafka
+  mark publishedAt nếu dùng relay</pre>
+        <h3>Consumer pattern</h3>
+        <pre>onEvent(event):
+  if processed_events contains eventId + consumerName:
+    return
+  process business effect
+  insert processed_events</pre>
+        <div class="danger">Không gửi Kafka trực tiếp trong transaction nghiệp vụ nếu chưa có outbox. Đó là dual-write
+          anti-pattern.</div>
+      </section>
+
+      <section class="phase" id="phase10">
+        <h2>Phase 10 - Search CDC + Elasticsearch <span class="badge b-partial">MODEL ĐÃ CÓ · CDC CHƯA CÓ</span></h2>
+        <p>Search-service không sở hữu course gốc. Nó sở hữu read model trong Elasticsearch.</p>
+        <h3>Flow</h3>
+        <pre>course-service PostgreSQL WAL
+  -> Debezium connector
+  -> Kafka topic
+  -> search-service indexer
+  -> Elasticsearch index
+  -> learning-bff
+  -> Next.js search page</pre>
+        <h3>Search features</h3>
+        <ul>
+          <li>Fuzzy search theo title/code/summary.</li>
+          <li>Facet theo department, term, level, instructor.</li>
+          <li>Public SEO course listing trong Next.js.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase11">
+        <h2>Phase 11 - Analytics service <span class="badge b-partial">CRUD ĐÃ CÓ · EVENT CHƯA CÓ</span></h2>
+        <p>Analytics là read-model service. Nó nhận event, không query DB của domain service.</p>
+        <h3>Metrics ban đầu</h3>
+        <ul>
+          <li>Enrollment count, completion rate.</li>
+          <li>Submission on-time/late rate.</li>
+          <li>Average score và grade distribution.</li>
+          <li>Discussion engagement.</li>
+          <li>Student-at-risk signals.</li>
+        </ul>
+        <h3>Admin UI</h3>
+        <p>React admin hiển thị dashboard vì đây là workflow vận hành, không cần SEO.</p>
+      </section>
+
+      <section class="phase" id="phase12">
+        <h2>Phase 12 - Gateway và BFF <span class="badge b-partial">GATEWAY ĐÃ CÓ · BFF CHƯA CÓ</span></h2>
+        <h3>API Gateway</h3>
+        <ul>
+          <li>Route `/api/learning/**` đến learning-bff.</li>
+          <li>Route `/api/backoffice/**` đến backoffice-bff.</li>
+          <li>Route `/api/auth/**` đến identity-service.</li>
+          <li>CORS, rate limit, auth delegation.</li>
+        </ul>
+        <h3>Learning BFF</h3>
+        <p>Compose data cho Next.js và Flutter: course catalog, learner dashboard, search, notifications.</p>
+        <h3>Backoffice BFF</h3>
+        <p>Compose data cho React admin: users, organization, courses, announcements, discussions, analytics.</p>
+      </section>
+
+      <section class="phase" id="phase13">
+        <h2>Phase 13 - Gradebook + Rubric <span class="badge b-done">CRUD + WEIGHTED CALC ĐÃ CÓ · CONSUMER CHƯA
+            CÓ</span></h2>
+        <p>
+          Đây là feature nâng cao đầu tiên nên làm sau Analytics. Gradebook biến các điểm rời rạc từ Assignment,
+          Quiz và Peer Review thành điểm tổng kết có rule rõ ràng, audit được và dùng được cho certificate.
+        </p>
+        <h3>Service/module owner</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Ownership</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>gradebook-service</code></td>
+              <td>Grade items, categories, weights, final score, overrides, grade audit.</td>
+            </tr>
+            <tr>
+              <td><code>assignment-service</code></td>
+              <td>Rubric definition attached to assignment.</td>
+            </tr>
+            <tr>
+              <td><code>portfolio-service</code></td>
+              <td>Rubric feedback snapshot and evidence-linked grading notes.</td>
+            </tr>
+            <tr>
+              <td><code>analytics-service</code></td>
+              <td>Grade distribution and student-at-risk signals.</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Schema gợi ý</h3>
+        <pre>grade_categories(id, course_id, name, weight_percent, position)
+grade_items(id, course_id, category_id, source_type, source_id, title, max_score, weight_percent)
+grade_entries(id, grade_item_id, student_id, raw_score, adjusted_score, status, graded_at)
+grade_overrides(id, grade_entry_id, old_score, new_score, reason, actor_id, created_at)
+rubric_templates(id, assignment_id, title, max_score)
+rubric_criteria(id, rubric_template_id, name, description, max_points, position)</pre>
+        <h3>Events</h3>
+        <ul>
+          <li>Consume <code>grade.published</code> từ portfolio-service.</li>
+          <li>Consume <code>quiz.attempt.graded</code> từ quiz-service sau Phase 14.</li>
+          <li>Consume <code>peer_review.finalized</code> từ peer-review-service sau Phase 17.</li>
+          <li>Publish <code>gradebook.final_grade.updated</code> cho analytics và certificate-service.</li>
+        </ul>
+        <h3>UI cần có</h3>
+        <ul>
+          <li>React admin/professor: gradebook table, category weight editor, grade override modal.</li>
+          <li>Next/Flutter learner: xem điểm, rubric feedback, trạng thái pass/fail.</li>
+        </ul>
+        <h3>Checklist pass</h3>
+        <ul class="checklist">
+          <li>Final score tính đúng khi category weight thay đổi.</li>
+          <li>Override có audit log và không mất raw score.</li>
+          <li>Rubric snapshot không đổi khi professor sửa rubric sau khi đã chấm.</li>
+          <li>Analytics nhận được event final grade update.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase14">
+        <h2>Phase 14 - Quiz + Question Bank <span class="badge b-done">CRUD + OUTBOX ĐÃ CÓ · CONSUMER CHƯA CÓ</span>
+        </h2>
+        <p>
+          Quiz là feature LMS thật và rất tốt cho training vì có modeling phức tạp, timed attempt,
+          idempotent submit, auto grading và tích hợp gradebook.
+        </p>
+        <h3>Service owner</h3>
+        <p><code>quiz-service</code> sở hữu question bank, quiz definition, quiz attempt, answer snapshot và auto-grade
+          result.</p>
+        <h3>Schema gợi ý</h3>
+        <pre>question_banks(id, course_id, title)
+questions(id, bank_id, type, stem, difficulty, points, status)
+question_options(id, question_id, label, content, correct)
+quizzes(id, course_id, title, open_at, close_at, duration_minutes, attempts_allowed)
+quiz_questions(id, quiz_id, question_id, points, position)
+quiz_attempts(id, quiz_id, student_id, attempt_no, started_at, submitted_at, status, score)
+quiz_answers(id, attempt_id, question_id, answer_payload, score, graded_at)</pre>
+        <h3>Implementation steps</h3>
+        <ol>
+          <li>Professor tạo question bank và câu hỏi: multiple choice, true/false, short answer.</li>
+          <li>Tạo quiz từ bank, chọn policy: duration, attempts allowed, randomize questions/options.</li>
+          <li>Student start attempt: server tạo snapshot câu hỏi để không bị thay đổi giữa lúc làm.</li>
+          <li>Student submit: API idempotent theo <code>attemptId</code>, auto-grade câu hỏi khách quan.</li>
+          <li>Publish <code>quiz.attempt.submitted</code> và <code>quiz.attempt.graded</code>.</li>
+          <li>Gradebook-service tạo/update grade item tương ứng.</li>
+        </ol>
+        <h3>Checklist pass</h3>
+        <ul class="checklist">
+          <li>Submit lại cùng attempt không tạo điểm trùng.</li>
+          <li>Hết giờ thì attempt chuyển trạng thái đúng.</li>
+          <li>Question snapshot giữ nguyên dù professor sửa bank.</li>
+          <li>Gradebook nhận điểm quiz và tính vào final score.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase15">
+        <h2>Phase 15 - Course Modules / Learning Path <span class="badge b-done">CRUD + PROGRESS + OUTBOX ĐÃ CÓ</span>
+        </h2>
+        <p>
+          Course Modules biến course catalog thành trải nghiệm học có cấu trúc như Canvas/Open edX:
+          module, lesson, prerequisite, progress và unlock rule.
+        </p>
+        <h3>Service/module owner</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Module</th>
+              <th>Ownership</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>course-service</code></td>
+              <td>Module, lesson, module item, ordering, prerequisite rule.</td>
+            </tr>
+            <tr>
+              <td><code>enrollment-service</code></td>
+              <td>Learner membership and access eligibility.</td>
+            </tr>
+            <tr>
+              <td><code>analytics-service</code></td>
+              <td>Progress read model and drop-off metrics.</td>
+            </tr>
+            <tr>
+              <td><code>next-learning</code></td>
+              <td>SEO/public syllabus and authenticated learning path UI.</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Schema gợi ý</h3>
+        <pre>course_modules(id, course_id, title, description, position, status)
+module_items(id, module_id, item_type, item_id, title, position, required)
+module_prerequisites(id, module_id, required_module_id, rule_type)
+learner_module_progress(id, course_id, module_id, student_id, status, completed_at)</pre>
+        <h3>Implementation steps</h3>
+        <ol>
+          <li>Professor tạo module và kéo thả lesson/assignment/quiz vào module.</li>
+          <li>Định nghĩa prerequisite: hoàn thành module trước, đạt quiz minimum score, xem lesson bắt buộc.</li>
+          <li>Learning BFF trả learning path đã resolve quyền truy cập cho learner.</li>
+          <li>Next.js hiển thị public syllabus; authenticated page hiển thị progress và locked/unlocked state.</li>
+          <li>Publish <code>module.completed</code>, <code>learning_path.progress.updated</code> cho analytics.</li>
+        </ol>
+        <h3>Checklist pass</h3>
+        <ul class="checklist">
+          <li>Learner không mở được module bị lock.</li>
+          <li>Progress không bị mất khi professor reorder module.</li>
+          <li>Next.js course detail có module outline public.</li>
+          <li>Analytics biết module nào có drop-off cao.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase16">
+        <h2>Phase 16 - Certificate Verification <span class="badge b-partial">CRUD + OUTBOX ĐÃ CÓ · PDF/CONSUMER CHƯA
+            CÓ</span></h2>
+        <p>
+          Certificate Verification là use case rất hợp cho Next.js: public, SEO-friendly, shareable và cần bảo mật.
+          Đây cũng là feature nối trực tiếp với Gradebook vì phải dựa trên final grade/course completion.
+        </p>
+        <h3>Service owner</h3>
+        <p><code>certificate-service</code> sở hữu certificate issue, verification code, status, audit và PDF metadata.
+        </p>
+        <h3>Schema gợi ý</h3>
+        <pre>certificates(id, student_id, course_id, final_grade, issued_at, expires_at, status)
+certificate_verifications(id, certificate_id, verification_code, signature, public_slug)
+certificate_audit_logs(id, certificate_id, action, actor_id, reason, created_at)</pre>
+        <h3>Implementation steps</h3>
+        <ol>
+          <li>Consume <code>gradebook.final_grade.updated</code>.</li>
+          <li>Kiểm tra completion rule: đủ module, pass minimum score, không bị hold.</li>
+          <li>Issue certificate với verification code không đoán được.</li>
+          <li>Tạo public route Next.js: <code>/certificates/verify/[code]</code>.</li>
+          <li>Thêm revoke/reissue workflow trong React admin.</li>
+        </ol>
+        <h3>Security checklist</h3>
+        <ul class="checklist">
+          <li>Verification code không chứa user id/course id thô.</li>
+          <li>Public API chỉ trả dữ liệu được phép công khai.</li>
+          <li>Certificate revoked không còn pass verify.</li>
+          <li>Reissue/revoke có audit log.</li>
+        </ul>
+      </section>
+
+      <section class="phase" id="phase17">
+        <h2>Phase 17 - Peer Review / Workshop <span class="badge b-done">CRUD + OUTBOX ĐÃ CÓ · CONSUMER CHƯA CÓ</span>
+        </h2>
+        <p>
+          Peer Review là feature workflow nâng cao: nhiều bước, nhiều actor, deadline riêng, anonymous policy,
+          dispute và finalize grade. Đây là bài training rất tốt cho state machine và event orchestration.
+        </p>
+        <h3>Service owner</h3>
+        <p><code>peer-review-service</code> sở hữu reviewer assignment, review form, review submission, dispute và
+          finalize workflow.</p>
+        <h3>Schema gợi ý</h3>
+        <pre>peer_review_settings(id, assignment_id, reviewers_per_submission, anonymous, review_due_at)
+review_assignments(id, assignment_id, submission_id, reviewer_id, status)
+review_forms(id, assignment_id, rubric_template_id, instructions)
+review_submissions(id, review_assignment_id, score, comment, submitted_at, status)
+review_disputes(id, review_submission_id, opened_by, reason, status)
+peer_review_results(id, submission_id, final_score, finalized_by, finalized_at)</pre>
+        <h3>Implementation steps</h3>
+        <ol>
+          <li>Professor bật peer review cho assignment và chọn rubric.</li>
+          <li>Sau deadline nộp bài, service tự assign reviewer theo policy.</li>
+          <li>Notification-service gửi <code>peer_review.assigned</code>.</li>
+          <li>Student review bài được giao; reviewer có thể anonymous.</li>
+          <li>Professor/TA xử lý dispute và finalize score.</li>
+          <li>Publish <code>peer_review.finalized</code> cho gradebook-service.</li>
+        </ol>
+        <h3>Checklist pass</h3>
+        <ul class="checklist">
+          <li>Reviewer không được review bài của chính mình.</li>
+          <li>Anonymous mode không leak reviewer identity cho student.</li>
+          <li>Late review được đánh dấu đúng và notification nhắc deadline.</li>
+          <li>Finalized score sync sang Gradebook, không tạo grade trùng.</li>
+        </ul>
+      </section>
+
+      <section id="next">
+        <h2>Next.js learning repo</h2>
+        <h3>Khi dùng Next.js</h3>
+        <ul>
+          <li>Public course catalog: SEO + revalidate.</li>
+          <li>Course detail: share link, syllabus, outcomes.</li>
+          <li>Course modules public outline: hiển thị learning path ở trang course detail.</li>
+          <li>Certificate verification: public and indexable.</li>
+        </ul>
+        <h3>Không dùng Next.js cho</h3>
+        <ul>
+          <li>Admin table dày, form nội bộ, moderation queue.</li>
+          <li>Dashboard vận hành chỉ authenticated staff xem.</li>
+        </ul>
+      </section>
+
+      <section id="react">
+        <h2>React admin repo</h2>
+        <h3>Module phát triển</h3>
+        <ol>
+          <li>Identity: user/role/status.</li>
+          <li>Organization: departments/terms/sections.</li>
+          <li>Courses: publish/archive, material metadata.</li>
+          <li>Enrollments: roster/waitlist/capacity.</li>
+          <li>Announcements: schedule/publish/archive.</li>
+          <li>Discussions: moderation/accepted answer.</li>
+          <li>Analytics: course overview/students-at-risk.</li>
+          <li>Gradebook: category weights, final score, grade override audit.</li>
+          <li>Quiz authoring: question bank, quiz policy, attempt monitoring.</li>
+          <li>Course modules: reorder modules, prerequisite rules, publish outline.</li>
+          <li>Certificates: issue/revoke/reissue and verification audit.</li>
+          <li>Peer review: reviewer assignment, dispute queue, finalize score.</li>
+        </ol>
+      </section>
+
+      <section id="flutter">
+        <h2>Flutter app</h2>
+        <h3>Recommended stack</h3>
+        <ul>
+          <li>Dio + Retrofit cho typed API clients.</li>
+          <li>Riverpod cho state management.</li>
+          <li>freezed/json_serializable cho DTO immutable.</li>
+          <li>go_router cho navigation.</li>
+          <li>flutter_secure_storage cho access/refresh token.</li>
+        </ul>
+        <h3>Mobile features</h3>
+        <ul>
+          <li>My courses.</li>
+          <li>Assignments and deadline reminders.</li>
+          <li>Quiz attempts and gradebook feedback.</li>
+          <li>Notification inbox and realtime push.</li>
+          <li>Portfolio journal.</li>
+          <li>Discussion participation.</li>
+        </ul>
+      </section>
+
+      <section id="testing">
+        <h2>Testing, CI/CD và hardening</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Kiểm thử</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Unit</td>
+              <td>Service use cases, validation, policy.</td>
+            </tr>
+            <tr>
+              <td>Integration</td>
+              <td>PostgreSQL/Mongo/Redis/Kafka bằng Testcontainers.</td>
+            </tr>
+            <tr>
+              <td>Contract</td>
+              <td>BFF ↔ service APIs, event schema compatibility.</td>
+            </tr>
+            <tr>
+              <td>E2E</td>
+              <td>Course publish -> search -> enroll -> module progress -> assignment/quiz -> gradebook ->
+                certificate/peer review -> analytics.</td>
+            </tr>
+            <tr>
+              <td>Observability</td>
+              <td>Correlation ID, metrics, logs, traces, dashboards.</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Production checklist</h3>
+        <ul class="checklist">
+          <li>Every service has health/info/metrics endpoints.</li>
+          <li>Every service has migration and seed data for local test.</li>
+          <li>Every event producer uses outbox.</li>
+          <li>Every event consumer uses dedup.</li>
+          <li>No service queries another service database.</li>
+          <li>Frontend routes map to real use cases, not technology demos.</li>
+          <li>Advanced features publish events into Gradebook/Analytics instead of recalculating across databases.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</body>
+
+</html>

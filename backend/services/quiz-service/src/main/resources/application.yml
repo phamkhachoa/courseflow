@@ -1,0 +1,26 @@
+server:
+  port: 8095
+spring:
+  application:
+    name: quiz-service
+  datasource:
+    url: ${QUIZ_DB_URL:jdbc:postgresql://localhost:5432/cf_quiz}
+    username: ${QUIZ_DB_USERNAME:courseflow}
+    password: ${QUIZ_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${LIQUIBASE_CONTEXTS:prod}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

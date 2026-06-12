@@ -1,0 +1,324 @@
+name: courseflow-v2-backend
+
+x-build-common: &build-common
+  context: ../..
+  dockerfile: infra/docker/service.Dockerfile
+
+x-service-env: &service-env
+  COURSEFLOW_JWT_SECRET: ${COURSEFLOW_JWT_SECRET:-courseflow-local-cluster-jwt-secret-change-me-32}
+  COURSEFLOW_SECURITY_SERVICE_TOKEN: ${COURSEFLOW_SERVICE_TOKEN:-courseflow-local-service-token-change-me}
+  COURSEFLOW_ENTITLEMENT_ENROLLMENT_SERVICE_URL: http://enrollment-service:8084
+  LIQUIBASE_CONTEXTS: ${LIQUIBASE_CONTEXTS:-prod,demo}
+  DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-3}
+  DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-1}
+  KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  REDIS_HOST: redis
+  ELASTICSEARCH_URIS: http://elasticsearch:9200
+  PORTFOLIO_MONGO_URI: mongodb://mongo:27017/cf_portfolio
+  CHAT_MONGO_URI: mongodb://mongo:27017/cf_chat
+  COURSEFLOW_STORAGE_PROVIDER: minio
+  COURSEFLOW_STORAGE_ENDPOINT: http://minio:9000
+  COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT: http://localhost:9000
+  COURSEFLOW_STORAGE_ACCESS_KEY: courseflow
+  COURSEFLOW_STORAGE_SECRET_KEY: courseflow
+  COURSEFLOW_STORAGE_ALLOW_DEMO_CREDENTIALS: "true"
+  STORAGE_PROVIDER: minio
+  STORAGE_ENDPOINT: http://minio:9000
+  STORAGE_EXTERNAL_ENDPOINT: http://localhost:9000
+  STORAGE_ACCESS_KEY: courseflow
+  STORAGE_SECRET_KEY: courseflow
+  STORAGE_ALLOW_DEMO_CREDENTIALS: "true"
+  IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/cf_identity
+  ORGANIZATION_DB_URL: jdbc:postgresql://postgres:5432/cf_organization
+  COURSE_DB_URL: jdbc:postgresql://postgres:5432/cf_course
+  ENROLLMENT_DB_URL: jdbc:postgresql://postgres:5432/cf_enrollment
+  ASSIGNMENT_DB_URL: jdbc:postgresql://postgres:5432/cf_assignment
+  DEADLINE_DB_URL: jdbc:postgresql://postgres:5432/cf_deadline
+  ANNOUNCEMENT_DB_URL: jdbc:postgresql://postgres:5432/cf_announcement
+  DISCUSSION_DB_URL: jdbc:postgresql://postgres:5432/cf_discussion
+  NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/cf_notification
+  MEDIA_DB_URL: jdbc:postgresql://postgres:5432/cf_media
+  ANALYTICS_DB_URL: jdbc:postgresql://postgres:5432/cf_analytics
+  GRADEBOOK_DB_URL: jdbc:postgresql://postgres:5432/cf_gradebook
+  QUIZ_DB_URL: jdbc:postgresql://postgres:5432/cf_quiz
+  CERTIFICATE_DB_URL: jdbc:postgresql://postgres:5432/cf_certificate
+  PEER_REVIEW_DB_URL: jdbc:postgresql://postgres:5432/cf_peer_review
+  LIVE_SESSION_DB_URL: jdbc:postgresql://postgres:5432/cf_live_session
+  REVIEW_DB_URL: jdbc:postgresql://postgres:5432/cf_review
+  OUTBOX_RELAY_DB_URL: jdbc:postgresql://postgres:5432/cf_outbox
+  IDENTITY_DB_USERNAME: courseflow
+  IDENTITY_DB_PASSWORD: courseflow
+  ORGANIZATION_DB_USERNAME: courseflow
+  ORGANIZATION_DB_PASSWORD: courseflow
+  COURSE_DB_USERNAME: courseflow
+  COURSE_DB_PASSWORD: courseflow
+  ENROLLMENT_DB_USERNAME: courseflow
+  ENROLLMENT_DB_PASSWORD: courseflow
+  ASSIGNMENT_DB_USERNAME: courseflow
+  ASSIGNMENT_DB_PASSWORD: courseflow
+  DEADLINE_DB_USERNAME: courseflow
+  DEADLINE_DB_PASSWORD: courseflow
+  ANNOUNCEMENT_DB_USERNAME: courseflow
+  ANNOUNCEMENT_DB_PASSWORD: courseflow
+  DISCUSSION_DB_USERNAME: courseflow
+  DISCUSSION_DB_PASSWORD: courseflow
+  NOTIFICATION_DB_USERNAME: courseflow
+  NOTIFICATION_DB_PASSWORD: courseflow
+  MEDIA_DB_USERNAME: courseflow
+  MEDIA_DB_PASSWORD: courseflow
+  ANALYTICS_DB_USERNAME: courseflow
+  ANALYTICS_DB_PASSWORD: courseflow
+  GRADEBOOK_DB_USERNAME: courseflow
+  GRADEBOOK_DB_PASSWORD: courseflow
+  QUIZ_DB_USERNAME: courseflow
+  QUIZ_DB_PASSWORD: courseflow
+  CERTIFICATE_DB_USERNAME: courseflow
+  CERTIFICATE_DB_PASSWORD: courseflow
+  PEER_REVIEW_DB_USERNAME: courseflow
+  PEER_REVIEW_DB_PASSWORD: courseflow
+  LIVE_SESSION_DB_USERNAME: courseflow
+  LIVE_SESSION_DB_PASSWORD: courseflow
+  REVIEW_DB_USERNAME: courseflow
+  REVIEW_DB_PASSWORD: courseflow
+  OUTBOX_RELAY_DB_USERNAME: courseflow
+  OUTBOX_RELAY_DB_PASSWORD: courseflow
+
+x-service-common: &service-common
+  restart: unless-stopped
+  environment:
+    <<: *service-env
+  depends_on:
+    postgres:
+      condition: service_healthy
+    kafka:
+      condition: service_started
+    mongo:
+      condition: service_started
+    redis:
+      condition: service_started
+    elasticsearch:
+      condition: service_started
+    minio-setup:
+      condition: service_completed_successfully
+
+services:
+  api-gateway:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/api-gateway
+    environment:
+      <<: *service-env
+      IDENTITY_SERVICE_URI: http://identity-service:8081
+      ORGANIZATION_SERVICE_URI: http://organization-service:8082
+      COURSE_SERVICE_URI: http://course-service:8083
+      ENROLLMENT_SERVICE_URI: http://enrollment-service:8084
+      ASSIGNMENT_SERVICE_URI: http://assignment-service:8085
+      DEADLINE_SERVICE_URI: http://deadline-service:8086
+      ANNOUNCEMENT_SERVICE_URI: http://announcement-service:8087
+      PORTFOLIO_SERVICE_URI: http://portfolio-service:8088
+      DISCUSSION_SERVICE_URI: http://discussion-service:8089
+      NOTIFICATION_SERVICE_URI: http://notification-service:8090
+      CHAT_SERVICE_URI: http://chat-service:8104
+      CHAT_SERVICE_WS_URI: ws://chat-service:8104
+      MEDIA_SERVICE_URI: http://media-service:8091
+      SEARCH_SERVICE_URI: http://search-service:8092
+      ANALYTICS_SERVICE_URI: http://analytics-service:8093
+      GRADEBOOK_SERVICE_URI: http://gradebook-service:8094
+      QUIZ_SERVICE_URI: http://quiz-service:8095
+      CERTIFICATE_SERVICE_URI: http://certificate-service:8096
+      PEER_REVIEW_SERVICE_URI: http://peer-review-service:8097
+      LIVE_SESSION_SERVICE_URI: http://live-session-service:8101
+      REVIEW_SERVICE_URI: http://review-service:8102
+    ports:
+      - "${API_GATEWAY_PORT:-28080}:8080"
+
+  identity-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/identity-service
+    ports:
+      - "8081:8081"
+
+  organization-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/organization-service
+    ports:
+      - "8082:8082"
+
+  course-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/course-service
+    ports:
+      - "8083:8083"
+
+  enrollment-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/enrollment-service
+    ports:
+      - "8084:8084"
+
+  assignment-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/assignment-service
+    ports:
+      - "8085:8085"
+
+  deadline-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/deadline-service
+    ports:
+      - "8086:8086"
+
+  announcement-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/announcement-service
+    ports:
+      - "8087:8087"
+
+  portfolio-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/portfolio-service
+    ports:
+      - "8088:8088"
+
+  discussion-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/discussion-service
+    ports:
+      - "8089:8089"
+
+  notification-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/notification-service
+    ports:
+      - "8090:8090"
+
+  chat-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/chat-service
+    ports:
+      - "8104:8104"
+
+  media-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/media-service
+    ports:
+      - "8091:8091"
+
+  search-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/search-service
+    ports:
+      - "8092:8092"
+
+  analytics-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/analytics-service
+    ports:
+      - "8093:8093"
+
+  gradebook-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/gradebook-service
+    ports:
+      - "8094:8094"
+
+  quiz-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/quiz-service
+    ports:
+      - "8095:8095"
+
+  certificate-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/certificate-service
+    ports:
+      - "8096:8096"
+
+  peer-review-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/peer-review-service
+    ports:
+      - "8097:8097"
+
+  live-session-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/live-session-service
+    ports:
+      - "8101:8101"
+
+  review-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/review-service
+    ports:
+      - "8102:8102"
+
+  outbox-relay:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/outbox-relay
+    ports:
+      - "8103:8103"

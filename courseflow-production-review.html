@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CourseFlow LMS - Production Re-Review</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --ink: #17202a;
+    --muted: #5f6b7a;
+    --line: #d8dee6;
+    --brand: #1f5fbf;
+    --good: #1d7f4f;
+    --warn: #9a6700;
+    --bad: #b42318;
+    --info: #344054;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    line-height: 1.58;
+  }
+  header {
+    background: #14213d;
+    color: #fff;
+    border-bottom: 4px solid var(--brand);
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 22px; }
+  header .wrap { padding-top: 34px; padding-bottom: 34px; }
+  h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.2; }
+  h2 { margin: 34px 0 12px; padding-bottom: 7px; border-bottom: 2px solid var(--line); font-size: 22px; }
+  h3 { margin: 24px 0 8px; font-size: 17px; }
+  p { margin: 8px 0; }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: #eef2f6;
+    border: 1px solid #e4e8ee;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+    font-size: 12.5px;
+  }
+  .lead { max-width: 980px; color: #d9e2f2; }
+  .meta { color: #b8c7dd; font-size: 13px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin: 14px 0;
+  }
+  .toc { columns: 2; }
+  .toc li { break-inside: avoid; margin: 4px 0; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .stat strong { display: block; font-size: 24px; line-height: 1.1; }
+  .stat span { color: var(--muted); font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; background: var(--surface); font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 9px 10px; vertical-align: top; text-align: left; }
+  th { background: #eef2f6; }
+  tr:nth-child(even) td { background: #fbfcfe; }
+  ul, ol { margin-top: 8px; }
+  li { margin: 4px 0; }
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .2px;
+    padding: 2px 8px;
+    white-space: nowrap;
+  }
+  .done { background: var(--good); }
+  .partial { background: var(--warn); }
+  .open { background: var(--bad); }
+  .info { background: var(--info); }
+  .finding { border-left: 5px solid var(--line); }
+  .finding.done { border-left-color: var(--good); background: #f3fbf7; color: var(--ink); }
+  .finding.partial { border-left-color: var(--warn); background: #fff9e8; color: var(--ink); }
+  .finding.open { border-left-color: var(--bad); background: #fff5f4; color: var(--ink); }
+  .small { color: var(--muted); font-size: 12.5px; }
+  .score-good { color: var(--good); font-weight: 800; }
+  .score-warn { color: var(--warn); font-weight: 800; }
+  .score-bad { color: var(--bad); font-weight: 800; }
+  footer { margin-top: 42px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>CourseFlow LMS - Production Re-Review</h1>
+    <p class="lead">Bản cập nhật sau khi codebase đã được refactor JPA/MapStruct và hardening nhiều luồng auth/domain. Tài liệu này thay thế kết luận cũ trong file SA review: hệ thống không còn ở mức scaffold trống, nhưng vẫn chưa đủ điều kiện production cho LMS cạnh tranh với Moodle, Canvas LMS hoặc Open edX.</p>
+    <p class="meta">Ngày kiểm tra lại: 11/06/2026 | Phạm vi: <code>v2/courseflow/backend</code> và tài liệu SA hiện tại | Backend: Spring Boot 3.3.5, Java 21, Postgres, Kafka, MinIO, Gateway</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2 id="toc">Mục lục</h2>
+  <div class="card toc">
+    <ol>
+      <li><a href="#verdict">Kết luận hiện tại</a></li>
+      <li><a href="#changed">Những điểm đã được sửa so với review cũ</a></li>
+      <li><a href="#status">Bảng trạng thái theo khối</a></li>
+      <li><a href="#p0">P0 còn chặn production</a></li>
+      <li><a href="#services">Review các service chính</a></li>
+      <li><a href="#architecture">Kiến trúc cần hoàn thiện</a></li>
+      <li><a href="#roadmap">Roadmap ưu tiên</a></li>
+      <li><a href="#verification">Kiểm chứng đã chạy</a></li>
+    </ol>
+  </div>
+
+  <h2 id="verdict">1. Kết luận hiện tại</h2>
+  <div class="card finding partial">
+    <p><strong>Verdict: Chưa production-ready, nhưng đã qua giai đoạn prototype thô.</strong> Các lỗi P0 lớn nhất trong bản review cũ đã được xử lý một phần lớn: domain service đã chuyển sang Spring Data JPA + MapStruct, API Gateway đã tồn tại, JWT secret đã fail-fast, nhiều endpoint đã dùng <code>CurrentUser</code> thay vì tin <code>userId/studentId/actorId</code> từ body, quiz không còn leak đáp án cho student, gradebook có weight/category thật, enrollment có state machine/capacity, outbox relay đã bao phủ nhiều service hơn.</p>
+    <p>Điểm còn thiếu để đạt chuẩn production là lớp vận hành và kiểm chứng: service-to-service security, test coverage, CI/CD, Docker/K8s, observability, rate limit, DLQ, entitlement theo enrollment/course membership, và các workflow LMS nâng cao như content authoring, certificate lifecycle, learning analytics chuẩn xAPI/Caliper.</p>
+  </div>
+
+  <div class="grid">
+    <div class="stat"><strong class="score-warn">55-60%</strong><span>Production readiness backend core</span></div>
+    <div class="stat"><strong class="score-good">18</strong><span>MapStruct mapper trong domain services</span></div>
+    <div class="stat"><strong class="score-good">0</strong><span><code>JdbcTemplate/JdbcClient/nativeQuery</code> trong domain services</span></div>
+    <div class="stat"><strong class="score-warn">4</strong><span>Java test class hiện có</span></div>
+    <div class="stat"><strong class="score-bad">0</strong><span>Dockerfile/K8s/CI production</span></div>
+  </div>
+
+  <h2 id="changed">2. Những điểm đã được sửa so với review cũ</h2>
+  <table>
+    <tr><th>Hạng mục cũ</th><th>Trạng thái mới</th><th>Bằng chứng code</th></tr>
+    <tr>
+      <td>Chưa có API Gateway thật</td>
+      <td><span class="badge done">Đã có</span> Gateway route toàn bộ public/internal, strip header giả mạo, forward identity verified.</td>
+      <td><code>backend/services/api-gateway</code>, <code>JwtAuthenticationGatewayFilter</code></td>
+    </tr>
+    <tr>
+      <td>JWT secret hardcode fallback</td>
+      <td><span class="badge done">Đã sửa</span> Gateway và identity fail-fast nếu thiếu secret, secret quá ngắn hoặc dùng lại secret dev cũ.</td>
+      <td><code>JwtSecretProperties</code>, <code>JwtProperties</code>, <code>application.yml</code></td>
+    </tr>
+    <tr>
+      <td>Identity-service tin header giả mạo</td>
+      <td><span class="badge done">Đã harden</span> Identity-service tự verify JWT bằng filter riêng trước khi xử lý internal/backoffice.</td>
+      <td><code>identity/config/JwtIdentityFilter.java</code>, <code>SecurityConfig.java</code></td>
+    </tr>
+    <tr>
+      <td>Authorization gần như bằng 0 dưới gateway</td>
+      <td><span class="badge partial">Đã cải thiện mạnh</span> Nhiều controller dùng <code>CurrentUser</code>, role/ownership guard, không lấy caller identity từ body. Vẫn cần entitlement theo enrollment/course membership và service-to-service policy.</td>
+      <td><code>common-library/web/CurrentUser*</code>, controller của assignment, quiz, gradebook, enrollment, media, analytics, notification...</td>
+    </tr>
+    <tr>
+      <td>JDBC/native query trong domain services</td>
+      <td><span class="badge done">Đã refactor</span> Domain services dùng Spring Data JPA repository + JPQL <code>@Query</code> khi cần; không còn <code>JdbcTemplate/JdbcClient/nativeQuery</code> trong domain service. <code>outbox-relay</code> còn <code>JdbcClient</code> vì là poller hạ tầng đọc nhiều DB, có thể chấp nhận.</td>
+      <td>18 mapper MapStruct, nhiều <code>*JpaRepository</code>, scan không thấy native query trong services nghiệp vụ</td>
+    </tr>
+    <tr>
+      <td>Map thủ công DTO phổ biến</td>
+      <td><span class="badge partial">Đã giảm đáng kể</span> Các entity-to-DTO chính đã qua MapStruct. Một số DTO tổng hợp/tổng quan vẫn build thủ công trong service vì có logic tính toán.</td>
+      <td><code>*/mapper/*Mapper.java</code></td>
+    </tr>
+    <tr>
+      <td>Quiz leak đáp án đúng</td>
+      <td><span class="badge done">Đã chặn view đọc</span> Staff nhận full view, student nhận <code>StudentQuizDto</code> sanitized; chỉ reveal sau attempt graded và bật <code>showCorrectAnswers</code>.</td>
+      <td><code>QuizController#getQuiz</code>, <code>QuizMapper#toStudentView</code></td>
+    </tr>
+    <tr>
+      <td>Gradebook final score luôn 0</td>
+      <td><span class="badge done">Đã có nền</span> Category/weight/grading scheme API, aggregation có test. Vẫn cần UI/seed/default category và test integration event-to-final-grade.</td>
+      <td><code>GradebookService</code>, <code>GradebookAggregationTest</code></td>
+    </tr>
+    <tr>
+      <td>Enrollment không capacity/state machine</td>
+      <td><span class="badge done">Đã có</span> Enforce capacity, transition hợp lệ, waitlist promotion, audit/outbox tốt hơn.</td>
+      <td><code>EnrollmentService</code>, <code>EnrollmentServiceTest</code></td>
+    </tr>
+    <tr>
+      <td>Outbox mồ côi</td>
+      <td><span class="badge partial">Đã mở rộng relay</span> Relay đã liệt kê enrollment, assignment, quiz, peer-review, gradebook, certificate, course, deadline, discussion, live-session, media, review; announcement có in-process relay. Vẫn thiếu DLQ, metrics lag, purge, HA claim.</td>
+      <td><code>services/outbox-relay/application.yml</code></td>
+    </tr>
+    <tr>
+      <td>Media signed URL forge được</td>
+      <td><span class="badge done">Đã sửa core</span> Non-MinIO playback URL dùng HMAC-SHA256 với secret server-side; media asset có owner check và whitelist content-type.</td>
+      <td><code>VideoService#signToken</code>, <code>MediaService#downloadUrl</code></td>
+    </tr>
+  </table>
+
+  <h2 id="status">3. Bảng trạng thái theo khối</h2>
+  <table>
+    <tr><th>Khối</th><th>Điểm hiện tại</th><th>Nhận xét</th></tr>
+    <tr><td>Domain decomposition</td><td class="score-good">8/10</td><td>Bounded context rõ, DB riêng per service, service chính khá đầy đủ cho LMS core.</td></tr>
+    <tr><td>Persistence quality</td><td class="score-good">7/10</td><td>Đã qua JPA/MapStruct. Cần rà lại transaction boundary, pagination, index, optimistic/locking test.</td></tr>
+    <tr><td>Authentication</td><td class="score-warn">6/10</td><td>JWT/refresh rotation/lockout đã tốt hơn. Thiếu RS256/JWKS, MFA, password reset, verify email, session/device management.</td></tr>
+    <tr><td>Authorization</td><td class="score-warn">5/10</td><td>Đã có role/ownership guard ở nhiều API. Còn thiếu policy theo course enrollment, org/department scope, service-to-service trust boundary.</td></tr>
+    <tr><td>Assessment core</td><td class="score-warn">6/10</td><td>Quiz/assignment/gradebook/peer-review đã có logic cơ bản. Cần attempt snapshot, autosave, late policy, regrade audit, rubric workflow sâu hơn.</td></tr>
+    <tr><td>Event backbone</td><td class="score-warn">5/10</td><td>Outbox pattern đúng hướng. Cần DLQ, retry budget, idempotency contract chuẩn, event schema versioning, lag metrics.</td></tr>
+    <tr><td>Infra/DevOps</td><td class="score-bad">2/10</td><td>Có docker-compose local. Chưa có Dockerfile service, K8s/Helm, CI/CD, image scan, secrets management.</td></tr>
+    <tr><td>Observability</td><td class="score-bad">2/10</td><td>Actuator expose. Cần Prometheus registry, structured logs, trace HTTP/Kafka, correlation-id vào MDC, dashboard/alert.</td></tr>
+    <tr><td>Testing</td><td class="score-bad">2/10</td><td>Hiện có 4 test class. Cần controller security tests, integration Testcontainers, contract tests, concurrency tests.</td></tr>
+  </table>
+
+  <h2 id="p0">4. P0 còn chặn production</h2>
+  <div class="card finding open">
+    <h3><span class="badge open">P0</span> Chưa có service-to-service security và network isolation</h3>
+    <p>Các service nghiệp vụ hiện dựa vào <code>CurrentUser</code> từ header gateway. Nếu service bị gọi trực tiếp trong network nội bộ với header tự dựng, nhiều service vẫn sẽ tin header. Identity-service đã tự verify JWT, nhưng các service còn lại chưa có JWT verification filter, mTLS, internal network policy, hoặc shared gateway-only ingress enforcement.</p>
+    <p><strong>Cần làm:</strong> chỉ expose service qua gateway trong K8s NetworkPolicy; thêm service-level JWT verification hoặc mTLS; tách public user token và internal service token; deny direct traffic không qua gateway.</p>
+  </div>
+
+  <div class="card finding open">
+    <h3><span class="badge open">P0</span> Authorization còn thiếu entitlement theo course/org</h3>
+    <p>Role/ownership đã tốt hơn, nhưng nhiều endpoint vẫn chỉ cần "authenticated user": đọc quiz/course material/live session/video manifest có thể chưa kiểm tra user đã enroll course hay thuộc org/section đó. LMS production phải kiểm tra ít nhất: enrollment active, section membership, instructor owns course/section, org/dept scope, paid access/license.</p>
+    <p><strong>Cần làm:</strong> chuẩn hóa policy engine gọi identity/authz + enrollment/course scope; mọi read nội dung khóa học phải check <code>canAccessCourse(user, courseId)</code>.</p>
+  </div>
+
+  <div class="card finding open">
+    <h3><span class="badge open">P0</span> Test coverage chưa đủ để tin production</h3>
+    <p>Mới có 4 test class: gateway JWT, enrollment service, gradebook aggregation, peer-review aggregate. Đây là tiến bộ so với bản cũ, nhưng còn rất xa chuẩn production. Chưa có controller security tests cho các endpoint vừa harden, chưa có Testcontainers, chưa có Kafka/outbox integration, chưa có migration smoke test.</p>
+    <p><strong>Cần làm:</strong> bắt buộc thêm test cho authz matrix, quiz timing/reveal answers, enrollment concurrency, gradebook event-to-final-grade, media permission, outbox retry/idempotency.</p>
+  </div>
+
+  <div class="card finding open">
+    <h3><span class="badge open">P0</span> Chưa có pipeline triển khai production</h3>
+    <p>Repo hiện có <code>backend/infra/docker/docker-compose.yml</code> cho local infra, nhưng chưa có Dockerfile cho từng service, chưa có K8s/Helm, chưa có CI/CD, chưa có image scanning, migration pipeline, rollback plan, secret manager.</p>
+    <p><strong>Cần làm:</strong> multi-stage Dockerfile non-root cho service; GitHub Actions/GitLab CI build-test-scan; Helm chart; probes, limits, HPA/PDB; Liquibase migrate job; separate dev/staging/prod config.</p>
+  </div>
+
+  <div class="card finding open">
+    <h3><span class="badge open">P0</span> Event backbone chưa có DLQ/observability</h3>
+    <p>Outbox relay đã rộng hơn, nhưng production cần biết event nào kẹt, consumer lag bao nhiêu, retry đến đâu, message độc bị đưa sang đâu. Hiện chưa thấy DLQ/parking-lot, retry budget theo loại lỗi, schema registry/versioning bắt buộc, metric/alert cho outbox lag.</p>
+    <p><strong>Cần làm:</strong> Kafka DLQ per consumer, relay parking-lot, outbox partial index + purge, idempotency key chuẩn, event-contracts dùng thật trong producer/consumer, dashboard lag.</p>
+  </div>
+
+  <h2 id="services">5. Review các service chính</h2>
+
+  <h3>Identity Service + API Gateway</h3>
+  <table>
+    <tr><th>Đã ổn</th><th>Cần làm tiếp</th></tr>
+    <tr>
+      <td>Gateway tồn tại, route đầy đủ, strip <code>X-User-*</code>, forward verified identity. Identity tự verify JWT, fail-fast secret, refresh reuse revoke-all, login lockout cơ bản.</td>
+      <td>Chuyển HS256 sang RS256/ES256 + JWKS/kid rotation; password reset, email verification, MFA/WebAuthn; device/session management; rate limit login; audit log security; security headers; token revocation strategy cho access token.</td>
+    </tr>
+  </table>
+
+  <h3>Course / Authoring / Enrollment / Organization</h3>
+  <table>
+    <tr><th>Đã ổn</th><th>Cần làm tiếp</th></tr>
+    <tr>
+      <td>Course CRUD và authoring workflow đã có owner/admin guard; enrollment có capacity, state machine, waitlist promotion, audit/outbox; organization read đã yêu cầu authenticated, create section admin/operator.</td>
+      <td>Course access policy theo enrollment/section; prerequisite enforcement; content authoring API đủ giàu (module item type, publishing snapshot immutable, rollback version); course completion event; enrollment concurrency test bằng Postgres lock thật.</td>
+    </tr>
+  </table>
+
+  <h3>Assignment / Quiz / Gradebook / Peer Review</h3>
+  <table>
+    <tr><th>Đã ổn</th><th>Cần làm tiếp</th></tr>
+    <tr>
+      <td>Student không tự chấm điểm; submission/gradebook có self-or-staff; quiz student view sanitized; manual grade staff-only; gradebook weight/category/grading scheme; peer-review final score server-side; MapStruct đã thay mapping chính.</td>
+      <td>Quiz attempt snapshot thật khi start, autosave endpoint, auto-submit khi timeout/grace period, lock attempt concurrent submit; assignment late policy/rubric audit; grade override audit và regrade history; question bank/tag/random draw; plagiarism/LTI/proctoring integration nếu cạnh tranh hệ lớn.</td>
+    </tr>
+  </table>
+
+  <h3>Media / Notification / Analytics / Review / Discussion / Live Session</h3>
+  <table>
+    <tr><th>Đã ổn</th><th>Cần làm tiếp</th></tr>
+    <tr>
+      <td>Media asset owner check, upload content-type whitelist, HMAC playback token; notification self-only inbox/preferences; analytics self-or-staff; discussion/review authorId lấy từ caller; live-session host/register lấy từ caller.</td>
+      <td>Video/content entitlement theo enrollment/course; notification fan-out theo enrollment/role và retry; analytics privacy/aggregation threshold; review abuse/rate limit/moderation queue; live-session provider webhook verification và attendance reconciliation.</td>
+    </tr>
+  </table>
+
+  <h2 id="architecture">6. Kiến trúc cần hoàn thiện để cạnh tranh LMS lớn</h2>
+  <div class="card">
+    <h3>So với Moodle / Canvas / Open edX</h3>
+    <ul>
+      <li><strong>Content authoring:</strong> cần rich content blocks, quiz question bank, reusable learning objects, import/export chuẩn IMS Common Cartridge/SCORM/xAPI/LTI.</li>
+      <li><strong>Learning delivery:</strong> cần enrollment/section/cohort/group policy xuyên service, prerequisites, drip schedule, completion rules, transcript.</li>
+      <li><strong>Assessment:</strong> cần rubric versioning, grade override audit, moderation workflow, accommodations, question randomization theo bank/tag, attempt snapshot immutable.</li>
+      <li><strong>Integrations:</strong> LTI 1.3, SSO/OIDC/SAML, SIS sync, calendar/email integration, webhooks/public API, SCIM nếu đi enterprise.</li>
+      <li><strong>Operations:</strong> multi-tenant isolation, backup/restore, audit trail đầy đủ, data retention, FERPA/GDPR controls, accessibility WCAG 2.2 AA.</li>
+    </ul>
+  </div>
+
+  <h2 id="roadmap">7. Roadmap ưu tiên</h2>
+  <table>
+    <tr><th>Giai đoạn</th><th>Mục tiêu</th><th>Việc cần làm</th></tr>
+    <tr>
+      <td><strong>Tuần 1-2</strong></td>
+      <td>Khóa bảo mật production tối thiểu</td>
+      <td>Service-level JWT/mTLS hoặc NetworkPolicy gateway-only; authz matrix test cho mọi controller; rate limit login/review/quiz submit; deny direct internal headers; video/course entitlement.</td>
+    </tr>
+    <tr>
+      <td><strong>Tuần 2-4</strong></td>
+      <td>Độ tin cậy domain core</td>
+      <td>Quiz snapshot/autosave/timeout; enrollment concurrency Testcontainers; gradebook event integration; outbox DLQ/parking-lot; event schema versioning; database indexes/pagination.</td>
+    </tr>
+    <tr>
+      <td><strong>Tháng 2</strong></td>
+      <td>DevOps/Observability</td>
+      <td>Dockerfile non-root; CI build/test/scan; Helm/K8s; probes/limits/HPA; Prometheus registry; OpenTelemetry trace; JSON logs + MDC correlation-id; dashboards/alerts.</td>
+    </tr>
+    <tr>
+      <td><strong>Tháng 3+</strong></td>
+      <td>Cạnh tranh LMS lớn</td>
+      <td>SCORM/xAPI/LTI, SIS sync, MFA/OIDC/SAML, content authoring nâng cao, reporting warehouse, certificate template/lifecycle, compliance/audit/data retention.</td>
+    </tr>
+  </table>
+
+  <h2 id="verification">8. Kiểm chứng đã chạy</h2>
+  <div class="card">
+    <ul>
+      <li>Scan persistence: không thấy <code>JdbcTemplate</code>, <code>NamedParameterJdbcTemplate</code>, <code>JdbcClient</code>, <code>nativeQuery=true</code>, <code>createNativeQuery</code> trong domain services. Ngoại lệ còn lại là <code>outbox-relay</code>, hợp lý vì đây là poller hạ tầng đọc nhiều DB.</li>
+      <li>Scan mapper: 18 <code>@Mapper(componentModel = "spring")</code> trong service mapper.</li>
+      <li>Module test đã chạy xanh sau các hardening mới: <code>mvn test -q -pl services/course-service,services/enrollment-service,services/announcement-service,services/analytics-service,services/deadline-service,services/notification-service,services/organization-service -am</code>.</li>
+      <li>Full backend test suite cũng đã chạy xanh từ <code>backend</code>: <code>mvn test -q</code>.</li>
+      <li>Test hiện có trong repo: gateway JWT, enrollment service, gradebook aggregation, peer-review aggregate.</li>
+    </ul>
+  </div>
+
+  <footer>
+    <p>Tài liệu này được cập nhật dựa trên code hiện tại trong repo ngày 11/06/2026. Kết luận cũ trong bản SA review đã được thay thế vì nhiều P0 đã được sửa trong code; các mục P0 còn lại là những điểm vẫn cần hoàn thiện trước production thật.</p>
+  </footer>
+</main>
+</body>
+</html>

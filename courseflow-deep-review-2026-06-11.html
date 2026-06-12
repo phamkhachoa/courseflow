@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CourseFlow LMS - Deep Code &amp; Architecture Review (11/06/2026)</title>
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --ink: #17202a;
+    --muted: #5f6b7a;
+    --line: #d8dee6;
+    --brand: #1f5fbf;
+    --good: #1d7f4f;
+    --warn: #9a6700;
+    --bad: #b42318;
+    --info: #344054;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.58; }
+  header { background: #14213d; color: #fff; border-bottom: 4px solid var(--brand); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 22px; }
+  header .wrap { padding-top: 34px; padding-bottom: 34px; }
+  h1 { margin: 0 0 8px; font-size: 28px; line-height: 1.2; }
+  h2 { margin: 34px 0 12px; padding-bottom: 7px; border-bottom: 2px solid var(--line); font-size: 22px; }
+  h3 { margin: 24px 0 8px; font-size: 17px; }
+  h4 { margin: 16px 0 6px; font-size: 15px; }
+  p { margin: 8px 0; }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: #eef2f6; border: 1px solid #e4e8ee; border-radius: 4px; padding: 1px 5px; font-family: "SFMono-Regular", Consolas, Menlo, monospace; font-size: 12.5px; }
+  .lead { max-width: 980px; color: #d9e2f2; }
+  .meta { color: #b8c7dd; font-size: 13px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin: 14px 0; }
+  .toc { columns: 2; }
+  .toc li { break-inside: avoid; margin: 4px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .stat strong { display: block; font-size: 24px; line-height: 1.1; }
+  .stat span { color: var(--muted); font-size: 12.5px; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; background: var(--surface); font-size: 13.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; text-align: left; }
+  th { background: #eef2f6; }
+  tr:nth-child(even) td { background: #fbfcfe; }
+  ul, ol { margin-top: 8px; }
+  li { margin: 4px 0; }
+  .badge { display: inline-block; border-radius: 999px; color: #fff; font-weight: 700; font-size: 11px; letter-spacing: .2px; padding: 2px 8px; white-space: nowrap; }
+  .p0 { background: var(--bad); }
+  .p1 { background: var(--warn); }
+  .p2 { background: var(--info); }
+  .done { background: var(--good); }
+  .finding { border-left: 5px solid var(--line); }
+  .finding.open { border-left-color: var(--bad); background: #fff5f4; }
+  .finding.warn { border-left-color: var(--warn); background: #fff9e8; }
+  .finding.ok { border-left-color: var(--good); background: #f3fbf7; }
+  .small { color: var(--muted); font-size: 12.5px; }
+  .score-good { color: var(--good); font-weight: 800; }
+  .score-warn { color: var(--warn); font-weight: 800; }
+  .score-bad { color: var(--bad); font-weight: 800; }
+  footer { margin-top: 42px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>CourseFlow LMS — Deep Code &amp; Architecture Review</h1>
+    <p class="lead">Review sâu toàn bộ 21 service backend (~21.400 LOC Java) sau đợt chuẩn hóa JPA/MapStruct. Khác với bản re-review trước (tập trung trạng thái P0 cũ), bản này đi xuống mức code: từng endpoint, từng transaction, từng mapper, từng consumer — kèm review cách dùng framework (Spring, JPA/Hibernate, MapStruct, Kafka, Liquibase).</p>
+    <p class="meta">Ngày review: 11/06/2026 | Phạm vi: <code>v2/courseflow/backend</code> | Phương pháp: 5 luồng review song song (auth core, learning core, assessment, content/engagement, eventing &amp; cross-cutting), mọi finding đều có file:line đã xác minh | Bản này bổ sung cho <code>courseflow-production-review.html</code>, không thay thế.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2 id="toc">Mục lục</h2>
+  <div class="card toc">
+    <ol>
+      <li><a href="#verdict">Kết luận</a></li>
+      <li><a href="#standard">Kiểm chứng chuẩn hóa JPA &amp; MapStruct</a></li>
+      <li><a href="#p0">Lỗi P0 — trạng thái sau sửa</a></li>
+      <li><a href="#p1">Lỗi P1 theo chủ đề</a></li>
+      <li><a href="#framework">Review cách dùng framework</a></li>
+      <li><a href="#services">Review chi tiết theo service</a></li>
+      <li><a href="#architecture">Review kiến trúc &amp; eventing</a></li>
+      <li><a href="#goodwork">Những điểm làm tốt</a></li>
+      <li><a href="#roadmap">Thứ tự sửa đề xuất</a></li>
+      <li><a href="#delta">So với review trước &amp; đính chính</a></li>
+      <li><a href="#reverify">Kiểm chứng độc lập tiến độ (re-verify cuối ngày)</a></li>
+    </ol>
+  </div>
+
+  <h2 id="verdict">1. Kết luận</h2>
+  <div class="card finding ok">
+    <p><strong>Verdict cập nhật cuối ngày 11/06: checklist code trọng yếu của SA đã được xử lý.</strong> 7/7 lỗi P0 đã vá; chuẩn hóa JPA/MapStruct đã đi thêm một vòng; các lỗi P1 có thể gây sai dữ liệu khi chạy production như optimistic locking, waitlist/batchEnroll, Kafka DLT/null-safe parse, duplicate certificate, live-session capacity, review helpful counter, deadline dispatch và cấu hình vận hành đã được đóng ở mức code.</p>
+    <p>Phần còn lại không còn là bug nhỏ trong từng service mà là <strong>kiến trúc dài hạn</strong>: mở rộng entitlement engine theo enrollment/course ra toàn bộ read model, hoàn thiện service-to-service trust/NetworkPolicy, dùng thật <code>event-contracts</code>, pagination/N+1 diện rộng, metric/chaos test cho outbox relay và bộ regression/integration test đủ dày.</p>
+    <p class="small"><strong>Lưu ý sau kiểm chứng độc lập (mục 11):</strong> 7/7 P0 đã được xác nhận đóng lại sau vòng fix bổ sung; các mục còn mở là P1/P2 về độ phủ entitlement nâng cao, hiệu năng, event contract và vận hành.</p>
+  </div>
+
+  <div class="grid">
+    <div class="stat"><strong class="score-good">7/7</strong><span>P0 đã vá trong đợt 11/06</span></div>
+    <div class="stat"><strong class="score-good">16</strong><span>Entity/race aggregate đã có <code>@Version</code></span></div>
+    <div class="stat"><strong class="score-good">19</strong><span>MapStruct mapper dùng config strict <code>ERROR</code></span></div>
+    <div class="stat"><strong class="score-good">0</strong><span>JDBC/native SQL trong domain service</span></div>
+    <div class="stat"><strong class="score-good">0</strong><span>Service còn hardcode MinIO demo credential mặc định</span></div>
+    <div class="stat"><strong class="score-good">PASS</strong><span><code>backend/mvn test -q</code></span></div>
+  </div>
+
+  <h2 id="standard">2. Kiểm chứng chuẩn hóa JPA &amp; MapStruct</h2>
+  <p>Đây là 2 yêu cầu chuẩn hóa bạn vừa thực hiện. Kết quả kiểm chứng chi tiết:</p>
+
+  <h3>2.1. JDBC → JPA: <span class="badge done">ĐẠT</span> với 2 ngoại lệ hợp lệ</h3>
+  <table>
+    <tr><th>Vị trí</th><th>Trạng thái</th><th>Nhận xét</th></tr>
+    <tr>
+      <td>Toàn bộ 19 domain service</td>
+      <td><span class="badge done">Sạch</span></td>
+      <td>Không còn <code>JdbcTemplate</code>/<code>JdbcClient</code>/<code>nativeQuery=true</code>/<code>createNativeQuery</code>. Repository dùng derived query + JPQL <code>@Query</code>.</td>
+    </tr>
+    <tr>
+      <td><code>search-service/service/SearchService.java</code></td>
+      <td><span class="badge done">Hợp lệ</span></td>
+      <td><strong>Đính chính:</strong> grep match từ khóa <code>NativeQuery</code> nhưng đây là <code>NativeQuery</code> của <strong>Elasticsearch query DSL</strong> (qua <code>ElasticsearchOperations</code>), không phải SQL. Term tìm kiếm được bind qua <code>multiMatch</code>, luôn filter <code>status=PUBLISHED</code>, page size cap 100 — không SQL injection, không leak content chưa publish. Giữ nguyên.</td>
+    </tr>
+    <tr>
+      <td><code>outbox-relay/relay/MultiServiceOutboxPoller.java:51,61</code></td>
+      <td><span class="badge done">Hợp lệ</span></td>
+      <td><code>JdbcClient</code> cho poller hạ tầng đọc nhiều DB là lựa chọn đúng (JPA không thêm giá trị). Pom đã đổi sang <code>spring-boot-starter-jdbc</code>, không còn kéo JPA chỉ để bootstrap datasource.</td>
+    </tr>
+  </table>
+
+  <h3>2.2. Mapping thủ công → MapStruct: <span class="badge done">ĐẠT PHẦN CHÍNH</span></h3>
+  <p>Entity→DTO chính đã qua mapper, mapper sanitize <code>StudentQuizDto</code> không leak <code>correctAnswer</code>/<code>correct</code>/<code>feedback</code>, và toàn bộ mapper hiện kế thừa <code>CourseFlowMapperConfig</code> với <code>unmappedTargetPolicy=ERROR</code>. Các cụm mapping tay lớn đã được xử lý trong đợt này:</p>
+  <table>
+    <tr><th>#</th><th>Vị trí</th><th>Trạng thái sau fix</th><th>Ghi chú</th></tr>
+    <tr><td>1</td><td><code>identity-service</code></td><td><span class="badge done">Đã sửa</span> <code>IdentityMapper</code> map <code>User</code>, <code>Permission</code>, role grant, role assignment.</td><td>Đã bỏ <code>UserDto.fromModel</code> và các hàm <code>to*Dto</code> tay trong service.</td></tr>
+    <tr><td>2</td><td><code>portfolio-service</code></td><td><span class="badge done">Đã sửa</span> <code>PortfolioMapper.toEntity</code> và <code>toSubmissionEvidence</code> thay phần copy field trong service/consumer.</td><td><code>@AfterMapping</code> set default timestamps, visibility và collection rỗng.</td></tr>
+    <tr><td>3</td><td><code>organization-service</code></td><td><span class="badge done">Đã sửa</span> <code>CourseSection</code> không còn import DTO web; <code>OrganizationMapper.toEntity</code> tạo section.</td><td>Layering model/API đã sạch hơn.</td></tr>
+    <tr><td>4</td><td><code>analytics-service</code></td><td><span class="badge done">Đã sửa</span> <code>AnalyticsMapper.toAtRiskDto</code> map <code>AtRiskStudentDto</code>.</td><td>Field tính toán <code>daysSinceActivity</code> nằm trong mapper helper.</td></tr>
+    <tr><td>5</td><td><code>search-service</code></td><td><span class="badge done">Đã sửa</span> <code>SearchMapper.toDocument</code> map request index sang Elasticsearch document.</td><td><code>updatedAt</code> do mapper set tại thời điểm index.</td></tr>
+    <tr><td>6</td><td><code>course/certificate/enrollment</code></td><td><span class="badge p2">Còn factory/constructor có chủ đích</span></td><td>Các đoạn này không còn là copy-field DTO thuần: chúng gắn invariant/domain transition như tạo course DRAFT, certificate ISSUED, enrollment state/outbox. Có thể gom tiếp vào factory/mapper riêng nếu muốn style tuyệt đối, nhưng không nên phá invariant chỉ để "đẹp mapper".</td></tr>
+  </table>
+  <div class="card finding warn">
+    <h4>Ghi chú chất lượng mapper sau fix</h4>
+    <ul>
+      <li><strong>Đã có <code>CourseFlowMapperConfig</code></strong> trong common-library và 19 mapper dùng <code>unmappedTargetPolicy = ReportingPolicy.ERROR</code>, giúp fail build khi DTO/entity drift.</li>
+      <li><strong>Đã tách business rule certificate public <code>valid</code> ra service</strong>; mapper chỉ nhận boolean đã quyết định từ service.</li>
+      <li><code>assignment/mapper/AssignmentMapper.java</code> vẫn khai báo expression cho <code>isLate</code> vì DTO field tên <code>isLate</code> còn entity lưu field <code>late</code> với getter <code>isLate()</code>; đây là mapping name-bridge, không phải business rule.</li>
+    </ul>
+  </div>
+
+  <h2 id="p0">3. Lỗi P0 — trạng thái sau sửa</h2>
+
+  <div class="card finding ok">
+    <h3><span class="badge done">ĐÃ SỬA</span> 3.1. Leo thang đặc quyền: TA/Instructor có thể tạo tài khoản ADMIN</h3>
+    <p><code>identity-service/service/UserService.java:47-65</code> — <code>create()</code> đọc <code>request.role()</code> và gán <strong>bất kỳ role nào kể cả ADMIN</strong>. Endpoint <code>POST /backoffice/users</code> chỉ gate ở mức operator, mà <code>OPERATOR_ROLES</code> bao gồm cả TA, INSTRUCTOR. Hệ quả: một TA có thể tự tạo tài khoản ADMIN — phá vỡ toàn bộ mô hình RBAC.</p>
+    <p><strong>Sửa:</strong> <code>create()</code> luôn gán STUDENT (hoặc validate role yêu cầu không thuộc nhóm operator và caller phải ADMIN); mọi grant đặc quyền chỉ đi qua endpoint assignment đã gate ADMIN.</p>
+    <p><strong>Đã sửa:</strong> <code>UserController#create</code> truyền <code>CurrentUser</code> xuống service; <code>UserService#create</code> chỉ cho non-admin tạo STUDENT, role khác/operator role yêu cầu ADMIN; <code>grantedBy</code> lấy từ caller thật.</p>
+  </div>
+
+  <div class="card finding ok">
+    <h3><span class="badge done">ĐÃ SỬA</span> 3.2. Account lockout hoàn toàn vô hiệu vì transaction rollback</h3>
+    <p><code>identity-service/service/AuthService.java:39-55</code> — <code>login()</code> là <code>@Transactional</code>; khi sai mật khẩu, code gọi <code>user.recordFailedLogin(...)</code> rồi <code>throw UnauthorizedException</code>. Exception unchecked đánh dấu transaction rollback-only → <strong>mutation <code>failed_login_count</code>/<code>locked_until</code> bị hủy, không bao giờ persist</strong>. Counter mãi bằng 0, lockout không bao giờ kích hoạt — chống brute-force online không hoạt động.</p>
+    <p><strong>Sửa:</strong> persist failed-login trong transaction <code>REQUIRES_NEW</code> riêng, hoặc <code>@Transactional(noRollbackFor = UnauthorizedException.class)</code>. Lưu ý kèm: <code>recordFailedLogin</code> cũng là read-modify-write không atomic (User.java:141-146) — nên dùng <code>UPDATE ... SET failed_login_count = failed_login_count + 1</code>.</p>
+    <p><strong>Đã sửa:</strong> <code>AuthService#login</code> dùng <code>@Transactional(noRollbackFor = UnauthorizedException.class)</code>, nên failed-login/locked-until được commit cả khi trả 401. Phần atomic counter vẫn là P1 concurrency cần làm tiếp.</p>
+  </div>
+
+  <div class="card finding ok">
+    <h3><span class="badge done">ĐÃ SỬA</span> 3.3. Media: đọc tùy ý mọi object trong bucket qua <code>storageKey</code> client cung cấp</h3>
+    <p><code>media-service/controller/MediaController.java:47-56</code> — <code>register</code> tin <code>request.storageKey()</code> nguyên văn. Bất kỳ user đã đăng nhập nào có thể đăng ký asset trỏ vào <strong>bất kỳ object key nào</strong> (vd. <code>videos/.../source.mp4</code> của người khác), trở thành "owner" của nó, rồi gọi <code>GET /internal/media/assets/{id}/download-url</code> — owner check pass và service presign GET cho key tùy ý (<code>MediaService.downloadUrl:108-116</code>). Đây là lỗ exfiltration toàn bucket, vô hiệu hóa chính lớp HMAC vừa làm đúng.</p>
+    <p><strong>Sửa:</strong> không bao giờ nhận <code>storageKey</code> từ client; key chỉ sinh từ bước <code>requestUploadUrl</code>/proxy upload và phải verify key đó được server cấp cho đúng caller (prefix mã hóa owner hoặc key có chữ ký).</p>
+    <p><strong>Đã sửa:</strong> upload key giờ sinh dưới prefix <code>media/{ownerId}/...</code>; <code>register</code> validate content-type, bắt key thuộc prefix caller và object phải tồn tại trước khi tạo asset row.</p>
+  </div>
+
+  <div class="card finding ok">
+    <h3><span class="badge done">ĐÃ SỬA</span> 3.4. Quiz: lộ đáp án khi student vẫn còn lượt làm bài</h3>
+    <p><code>quiz-service/controller/QuizController.java:44-46</code> — điều kiện reveal là <code>showCorrectAnswers && hasGradedAttempt(...)</code>: chỉ cần <strong>một</strong> attempt đã chấm là student nhận full <code>QuizDto</code> (correctAnswer, flag <code>correct</code> từng option, feedback) <strong>kể cả khi còn lượt làm</strong> (quiz demo cho 2 lượt). Student nộp lượt 1 → GET quiz đọc trọn đáp án → làm lượt 2 đạt điểm tối đa.</p>
+    <p><strong>Sửa:</strong> chỉ reveal khi quiz đã đóng (<code>now &gt; closeAt</code>) hoặc đã hết lượt (<code>nextAttemptNo &gt; attemptsAllowed</code>).</p>
+    <p><strong>Đã sửa:</strong> <code>QuizService#canRevealCorrectAnswers</code> chỉ reveal khi <code>showCorrectAnswers</code>, đã có attempt GRADED, và quiz đã đóng hoặc student đã dùng hết lượt.</p>
+  </div>
+
+  <div class="card finding ok">
+    <h3><span class="badge done">ĐÃ SỬA</span> 3.5. Quiz: nộp lại attempt PARTIALLY_GRADED + dò đáp án qua autoScore</h3>
+    <p>Hai lỗi liên quan tạo thành một chuỗi khai thác:</p>
+    <ul>
+      <li><code>quiz-service/service/QuizService.java:144-185</code> — <code>submitAttempt</code> chỉ chặn khi status == <code>GRADED</code>. Attempt có câu essay ở trạng thái <code>PARTIALLY_GRADED</code> nên student <strong>submit lại được nhiều lần</strong>; mỗi lần code chấm lại auto-score và <code>saveAnswer</code> upsert đè đáp án mới.</li>
+      <li><code>quiz-service/service/QuizService.java:230-241</code> — <code>getAttemptDetail</code> (owner đọc được) trả <code>autoScore</code> <strong>từng câu</strong> trước mọi reveal gate → student biết ngay câu nào đúng/sai, kết hợp với submit lại để dò đáp án từng câu (trial-and-error).</li>
+    </ul>
+    <p><strong>Sửa:</strong> từ chối submit khi status khác <code>IN_PROGRESS</code>; ẩn per-question score với student cho đến khi thỏa reveal gate (chỉ trả điểm tổng).</p>
+    <p><strong>Đã sửa:</strong> <code>submitAttempt</code> từ chối mọi status khác <code>IN_PROGRESS</code>; student đọc attempt qua view sanitized ẩn <code>autoScore/manualScore/totalScore/feedback/graderId</code> cho tới khi thỏa reveal gate. Staff vẫn xem full detail.</p>
+  </div>
+
+  <div class="card finding ok">
+    <h3><span class="badge done">ĐÃ SỬA</span> 3.6. Certificate verify lộ PII với mã dễ đoán</h3>
+    <p><code>certificate-service/controller/CertificateController.java:33</code> — <code>GET /internal/certificates/verify/{code}</code> không check role/ownership, trả về <code>studentId</code> + <code>finalGrade</code>. Mã chỉ là <code>CF-</code> + 8 hex (~4,3 tỷ tổ hợp, enumerable bằng brute-force), và demo data còn hardcode <code>CF-SE401-DEMO</code> trong migration. Bất kỳ user đăng nhập nào dò được điểm số của người khác.</p>
+    <p><strong>Sửa:</strong> endpoint verify công khai chỉ trả thông tin không PII (valid/invalid, tên khóa học); nâng entropy mã lên ≥128-bit random; rate-limit; thông tin đầy đủ chỉ cho staff hoặc chủ certificate.</p>
+    <p><strong>Đã sửa:</strong> internal full verify yêu cầu staff hoặc chính chủ certificate; mã mới dùng 128-bit UUID hex thay vì 8 hex. Public verify hiện trả DTO không chứa <code>studentId/finalGrade</code>. Rate-limit vẫn là P1 ở gateway.</p>
+  </div>
+
+  <div class="card finding ok">
+    <h3><span class="badge done">ĐÃ SỬA</span> 3.7. Course authoring: đọc draft của người khác không cần quyền (IDOR)</h3>
+    <p><code>course-service/controller/CourseAuthoringController.java:37</code> — <code>getDraft</code> không nhận <code>CurrentUser</code>, không check gì: user đăng nhập bất kỳ đọc được toàn bộ giáo trình chưa publish của instructor khác. <code>listVersions</code> (:47) tương tự. Kèm theo <code>CourseCatalogController.java:40</code>: <code>GET /internal/courses?status=DRAFT</code> liệt kê mọi course draft của mọi người.</p>
+    <p><strong>Sửa:</strong> thêm <code>requireOwnerOrAdmin(courseId, user)</code> cho cả 2 endpoint authoring; giới hạn list theo status non-PUBLISHED cho staff/owner.</p>
+    <p><strong>Đã sửa:</strong> <code>getDraft</code> và <code>listVersions</code> nhận <code>CurrentUser</code> và gọi owner/admin guard; list course non-PUBLISHED chặn non-staff. Gateway đã thêm route cho <code>/api/internal/authoring/**</code>.</p>
+  </div>
+
+  <h2 id="p1">4. Lỗi P1 theo chủ đề</h2>
+
+  <h3>4.1. Concurrency: optimistic/atomic locking đã được bổ sung cho các aggregate nóng</h3>
+  <div class="card finding ok">
+    <p>Đợt fix đã thêm <code>@Version</code>, lock bi quan hoặc atomic update cho các điểm ghi đồng thời quan trọng. Đây chưa thay thế load test và retry policy đầy đủ, nhưng đã đóng lớp lỗi "last-write-wins" và double-dispatch dễ gặp nhất:</p>
+    <table>
+      <tr><th>Vị trí</th><th>Trạng thái sau fix</th></tr>
+      <tr><td><code>quiz</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> cho <code>QuizAttempt</code>, giảm rủi ro double-submit/last-write-wins.</td></tr>
+      <tr><td><code>assignment</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> cho <code>Submission</code>, tránh 2 grader ghi đè im lặng.</td></tr>
+      <tr><td><code>gradebook</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> cho <code>FinalGrade</code>, giảm double-update khi finalize đồng thời.</td></tr>
+      <tr><td><code>peer-review</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> cho <code>PeerReviewResult</code> và chặn finalize khi chưa đủ review đã submit.</td></tr>
+      <tr><td><code>deadline</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> cho <code>ReminderRun</code> và lock row due pending bằng <code>PESSIMISTIC_WRITE</code>.</td></tr>
+      <tr><td><code>analytics</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> cho <code>CourseMetric</code>; vẫn nên bổ sung retry khi gặp optimistic conflict ở consumer.</td></tr>
+      <tr><td><code>review</code></td><td><span class="badge done">Đã đổi helpful counter sang JPQL atomic update</span> sau khi ghi vote.</td></tr>
+      <tr><td><code>live-session</code></td><td><span class="badge done">Đã lock session bằng <code>PESSIMISTIC_WRITE</code></span> trước khi check capacity và insert registration.</td></tr>
+      <tr><td><code>identity</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> cho <code>User</code> và <code>RefreshToken</code>.</td></tr>
+      <tr><td><code>certificate</code></td><td><span class="badge done">Đã thêm <code>@Version</code></span> và partial unique index <code>(student_id, course_id) WHERE status='ISSUED'</code>; issue trả certificate cũ nếu đã tồn tại.</td></tr>
+    </table>
+    <p><strong>Còn nên làm:</strong> thêm retry có kiểm soát cho optimistic conflict ở consumer/event handler, và viết test song song thật cho quiz submit, live-session registration, certificate issue, review helpful vote.</p>
+  </div>
+
+  <h3>4.2. Luồng nghiệp vụ đứt gãy end-to-end</h3>
+  <div class="card finding warn">
+    <ul>
+      <li><strong>Publish khóa học không thể hoàn thành:</strong> <span class="badge done">ĐÃ SỬA PHẦN ROUTING/API</span> <code>approve/reject</code> đã có controller endpoint, gateway đã route <code>/api/internal/authoring/**</code>, và course tạo qua catalog đã tạo initial version row. Vẫn cần test e2e publish workflow.</li>
+      <li><strong>Capacity enrollment không cấu hình được:</strong> <span class="badge done">ĐÃ SỬA ROUTE</span> gateway đã thêm route riêng <code>/api/internal/courses/*/capacity</code> tới enrollment-service trước route course-service.</li>
+      <li><strong>Gateway thiếu route</strong> cho live-session-service và review-service — <span class="badge done">ĐÃ SỬA</span> đã bổ sung route <code>/api/internal/live-sessions/**</code>, <code>/api/internal/reviews/**</code>, <code>/api/public/reviews/**</code>.</li>
+      <li><strong>Waitlist:</strong> <span class="badge done">ĐÃ SỬA</span> không re-activate enrollment <code>COMPLETED</code>, re-join được requeue xuống cuối hàng, <code>nextPosition</code> chỉ tính <code>WAITING</code>, và completion đã trigger promote waitlist.</li>
+      <li><strong><code>batchEnroll</code> rollback-only:</strong> <span class="badge done">ĐÃ SỬA</span> mỗi entry chạy trong transaction riêng bằng <code>TransactionTemplate</code>; request entries có <code>@NotEmpty</code> và element <code>@Valid</code>.</li>
+      <li><strong>Org-service khóa nhầm người:</strong> <span class="badge done">ĐÃ SỬA</span> organization/deadline không dùng role string <code>"operator"</code> nữa; chuyển sang role thật <code>ADMIN/ORG_ADMIN</code> và <code>INSTRUCTOR</code> ở deadline.</li>
+      <li><strong>Gradebook bỏ rơi điểm peer-review:</strong> <span class="badge done">ĐÃ SỬA PHẦN CHÍNH</span> event <code>peer_review.finalized</code> có <code>maxScore</code>, consumer tự tạo/cập nhật item PEER_REVIEW hoặc lấy ngữ cảnh từ assignment item đã có.</li>
+      <li><strong>Drop-lowest sai ngữ nghĩa:</strong> drop theo % điểm thô, bỏ qua trọng số item → có thể drop nhầm bài "ít hại nhất" thay vì bài kéo điểm xuống nhiều nhất (GradebookService.java:115-120).</li>
+      <li><strong>Deadline:</strong> <span class="badge done">ĐÃ SỬA PHẦN EVENT/DISPATCH</span> payload outbox đã có <code>eventId</code>, dispatch lock row due pending trước khi đổi trạng thái. Phần policy <code>offsetMinutes</code> vẫn nên được thiết kế lại nếu muốn reminder tự sinh hoàn toàn từ policy thay vì nhận <code>reminderAt</code> từ client.</li>
+    </ul>
+  </div>
+
+  <h3>4.3. Authorization theo ngữ cảnh còn hổng diện rộng</h3>
+  <div class="card finding warn">
+    <p>Mô hình "lấy identity từ <code>CurrentUser</code>" đã phủ tốt; scope theo enrollment/ownership đã được bổ sung cho các luồng học tập chính, nhưng vẫn cần mở rộng sâu hơn ở một số read model và policy instructor/student:</p>
+    <table>
+      <tr><th>Endpoint</th><th>Lỗ hổng</th></tr>
+      <tr><td><code>course/CourseModuleService.java</code> — completeModule/progress</td><td><span class="badge done">ĐÃ SỬA PHẦN CHÍNH</span> đã chặn module chưa publish và dùng <code>CourseAccessClient</code> để đảm bảo learner có quyền học course đó.</td></tr>
+      <tr><td><code>media/VideoController.java:50-98</code> — get/manifest/captions/playback-url</td><td><span class="badge done">ĐÃ SỬA</span> owner/staff hoặc learner có course entitlement mới đọc metadata/manifest/caption/playback URL.</td></tr>
+      <tr><td><code>discussion/DiscussionController.java:31-54</code></td><td><span class="badge done">ĐÃ SỬA PHẦN CHÍNH</span> list/create/get/comment đã gọi <code>CourseAccessClient</code> cho non-staff; còn pagination/N+1 comment.</td></tr>
+      <tr><td><code>announcement/AnnouncementController.java:29-54</code></td><td><span class="badge done">ĐÃ SỬA PHẦN CHÍNH</span> non-staff chỉ đọc announcement published trong course có entitlement; staff mới được dùng filter rộng.</td></tr>
+      <tr><td><code>review/ReviewController.java:44-53</code></td><td><span class="badge done">ĐÃ SỬA PHẦN CHÍNH</span> tạo review yêu cầu course access; nếu muốn giống LMS lớn hơn thì đổi policy sang completed-only.</td></tr>
+      <tr><td><code>assignment/AssignmentController.java:60-65</code> — submit</td><td><span class="badge done">ĐÃ SỬA</span> student submit/read/upload đều qua assignment course entitlement.</td></tr>
+      <tr><td><code>livesession/LiveSessionController.java:61-78</code></td><td><span class="badge done">ĐÃ SỬA PHẦN CHÍNH</span> <code>start/end</code> yêu cầu host/admin; list/get/register kiểm tra course entitlement và register đã lock capacity.</td></tr>
+      <tr><td><code>api-gateway/JwtAuthenticationGatewayFilter.java:122-125</code></td><td><span class="badge p1">CÒN LẠI MỘT PHẦN</span> gateway đã strip inbound <code>X-Service-Token</code>; vẫn cần route policy/NetworkPolicy để user token không đi vào internal-only API.</td></tr>
+      <tr><td><code>identity/config/JwtIdentityFilter.java</code></td><td><span class="badge done">ĐÃ SỬA</span> <code>/internal/authz/check</code> không còn bị gate operator nên service có thể check quyền cho token student.</td></tr>
+      <tr><td><code>portfolio/PortfolioController.java</code></td><td><span class="badge done">ĐÃ SỬA MỘT PHẦN</span> instructor chỉ thấy/evaluate evidence <code>INSTRUCTOR</code>/<code>PUBLIC</code>; private chỉ self/admin. Vẫn cần ràng buộc instructor dạy đúng student/course.</td></tr>
+    </table>
+    <p><strong>Hướng sửa còn lại:</strong> <code>CourseAccessClient</code> + enrollment endpoint đã là nền <code>canAccessCourse(user, courseId)</code> dùng chung. Bước tiếp theo là mở rộng coverage sang portfolio/course detail/search nếu cần policy sâu hơn, thêm instructor-course/student scope và cân nhắc read-model entitlement để giảm REST hop khi tải cao.</p>
+  </div>
+
+  <h3>4.4. Kafka consumer: DLT/null-safe parse/dedup đã được siết lại</h3>
+  <div class="card finding ok">
+    <p>Pattern <code>saveAndFlush(processedEvent)</code> rồi catch duplicate trong cùng transaction đã được giảm rủi ro bằng pre-check <code>existsById(eventId)</code> ở các consumer chính bị ảnh hưởng. Các service analytics, gradebook, portfolio đã có <code>KafkaErrorHandlingConfig</code> với DLT + exponential backoff, và các consumer parse event theo hướng null-safe để tránh poison message vì thiếu field.</p>
+    <ul>
+      <li><code>certificate/FinalGradeEventConsumer</code> và <code>notification/AnnouncementEventConsumer</code>: pre-check duplicate trước khi insert processed event.</li>
+      <li><code>gradebook/GradeEventConsumer</code>: parse null-safe, skip malformed, peer-review payload có đủ ngữ cảnh hơn.</li>
+      <li><code>analytics</code> và <code>portfolio</code>: có DLT/error handler và bỏ qua event malformed có log cảnh báo.</li>
+    </ul>
+    <p><strong>Còn nên làm:</strong> gom <code>KafkaErrorHandlingConfig</code> về common-library auto-config để tránh copy-paste, và chuẩn hóa processed event key thành <code>(consumerName, eventId)</code> nếu một service có nhiều consumer cùng topic.</p>
+  </div>
+
+  <h3>4.5. Eventing: <code>event-contracts</code> vẫn là module trang trí + outbox cần thêm vận hành</h3>
+  <div class="card finding warn">
+    <ul>
+      <li><strong>Mọi service pom phụ thuộc <code>event-contracts</code> nhưng 0 service import nó.</strong> Producer build <code>Map.of(...)</code> ad-hoc (quiz thêm field <code>attemptNo</code> không có trong contract, bỏ <code>metadata</code>), consumer parse <code>JsonNode</code> thô. Topic thật đang chạy (<code>course.completed</code>, <code>enrollment.*</code>, <code>submission.graded</code>, <code>media.*</code>) không có contract; contract có sẵn (<code>QuizAttemptSubmittedEvent</code>, <code>GradePublishedEvent</code>...) là dead code. → Hoặc dùng thật (serialize record contract ở producer, deserialize ở consumer), hoặc xóa module.</li>
+      <li><strong>Outbox-relay multi-replica:</strong> <span class="badge done">ĐÃ SỬA PHẦN CLAIM</span> poll dùng transaction + <code>FOR UPDATE SKIP LOCKED</code>, nên nhiều relay replica không cùng claim một row. Vẫn nên bổ sung metric/alert và test chaos cho duplicate/replay.</li>
+      <li><strong>Partial index unpublished:</strong> <span class="badge done">ĐÃ SỬA</span> các bảng outbox đã có index <code>(created_at, id) WHERE published_at IS NULL</code> để relay không seq-scan bảng lớn.</li>
+      <li><strong>announcement-service chạy relay in-process riêng:</strong> <span class="badge p1">CÒN LẠI</span> nên hợp nhất về outbox-relay để một service không có semantics publish khác phần còn lại.</li>
+      <li><strong>Relay hardening:</strong> <span class="badge done">ĐÃ SỬA</span> query có tie-break <code>ORDER BY created_at, id</code>, DL write fail không phá tick toàn bộ, producer bật <code>enable.idempotence</code>/<code>delivery.timeout.ms</code>, và relay đã có port riêng <code>8103</code>.</li>
+    </ul>
+  </div>
+
+  <h3>4.6. Config &amp; vận hành</h3>
+  <div class="card finding warn">
+    <ul>
+      <li><strong><code>ddl-auto: validate</code>:</strong> <span class="badge done">ĐÃ SỬA</span> các service JPA đã bật validate để phát hiện drift entity/migration lúc khởi động.</li>
+      <li><strong>Connection pool:</strong> <span class="badge done">ĐÃ SỬA</span> datasource Hikari có mặc định <code>DB_POOL_MAX_SIZE=5</code>, <code>DB_POOL_MIN_IDLE=1</code> để tránh full-stack tự bão hòa Postgres.</li>
+      <li><strong>Actuator:</strong> <span class="badge done">ĐÃ SỬA PHẦN EDGE</span> gateway chỉ public <code>/actuator/health</code>; service exposure đã thu về <code>health</code>. Bước production tiếp theo là management port/network policy riêng.</li>
+      <li><strong>Demo data:</strong> <span class="badge done">ĐÃ SỬA</span> changeset demo đã có <code>context=demo</code>, không còn tự insert vào production baseline.</li>
+      <li><strong>OSIV:</strong> <span class="badge done">ĐÃ SỬA</span> <code>spring.jpa.open-in-view=false</code> cho các service JPA.</li>
+      <li><strong>MinIO credentials:</strong> <span class="badge done">ĐÃ SỬA</span> bỏ default <code>courseflow/courseflow</code>; storage fail-fast nếu thiếu credential hoặc dùng demo credential mà không bật <code>allow-demo-credentials</code>.</li>
+      <li><strong>CI-friendly version:</strong> <span class="badge done">ĐÃ SỬA</span> đã thêm <code>flatten-maven-plugin</code>; build artifact <code>.flattened-pom.xml</code> được ignore.</li>
+      <li><strong>CorrelationId:</strong> <span class="badge done">ĐÃ SỬA</span> filter đã put/remove MDC và set response header.</li>
+      <li><strong>common-library kéo <code>spring-boot-starter-web</code> non-optional vào api-gateway (WebFlux)</strong> — <span class="badge done">ĐÃ SỬA</span> dependency này đã được đặt <code>&lt;optional&gt;true&lt;/optional&gt;</code>. Đồng thời outbox-relay đã đổi từ <code>spring-boot-starter-data-jpa</code> sang <code>spring-boot-starter-jdbc</code>.</li>
+    </ul>
+  </div>
+
+  <h2 id="framework">5. Review cách dùng framework</h2>
+
+  <h3>5.1. Spring Data JPA / Hibernate</h3>
+  <table>
+    <tr><th>Pattern</th><th>Đánh giá</th><th>Vị trí điển hình</th></tr>
+    <tr><td>Derived query + JPQL <code>@Query</code></td><td><span class="badge done">Tốt</span> Dùng đúng, không native SQL.</td><td>Toàn bộ repository</td></tr>
+    <tr><td>Pessimistic lock capacity</td><td><span class="badge done">Tốt</span> <code>@Lock(PESSIMISTIC_WRITE)</code> trên row capacity, check trong cùng transaction — thiết kế chống race chuẩn.</td><td>enrollment-service</td></tr>
+    <tr><td><code>@EntityGraph</code></td><td><span class="badge done">Tốt</span> Dùng đúng cho hot query assignment/grant.</td><td>identity-service</td></tr>
+    <tr><td>Optimistic locking <code>@Version</code></td><td><span class="badge done">Đã bổ sung cho aggregate nóng</span> Xem mục 4.1.</td><td>QuizAttempt, Submission, FinalGrade, PeerReviewResult, CourseMetric, CourseReview, LiveSession, User, RefreshToken, Certificate...</td></tr>
+    <tr><td><code>@Transactional(readOnly=true)</code></td><td><span class="badge p1">Thiếu diện rộng</span> Một phần read path đã được bổ sung (identity authz/role read), nhưng nhiều list/report khác vẫn thiếu transaction read-only rõ ràng.</td><td>enrollment/gradebook read, reporting/export...</td></tr>
+    <tr><td>N+1 query</td><td><span class="badge p1">Phổ biến</span> Vòng lặp gọi repository per-row thay vì batch <code>findBy...In</code>.</td><td>course catalog (materials per course :96), authoring (items per module :85), quiz (question/option per link :88-97), gradebook CSV (full recompute per student :413-447), notification fan-out (preference per recipient :107-118), discussion (comments per thread :34-38), assignment (attachments per submission :198-206), identity (grants per role :54-61)</td></tr>
+    <tr><td>Pagination</td><td><span class="badge p1">Thiếu diện rộng</span> List endpoint trả unbounded: enrollments, courses, org, portfolio, notifications, reviews, threads; <code>limit</code> của analytics không cap trần.</td><td>EnrollmentController.java:39 và các controller list khác</td></tr>
+    <tr><td>Per-row <code>saveAndFlush</code> trong loop</td><td><span class="badge p2">Kém hiệu năng</span> Reorder modules/items chạy 4×(M+I) statement + flush.</td><td>CourseAuthoringService.java:141</td></tr>
+    <tr><td><code>@Repository</code> facade chứa business logic</td><td><span class="badge p2">Layering ngược</span> Capacity policy + outbox + mapping DTO nằm trong class <code>@Repository</code> tự chế, ngược với phần còn lại của codebase.</td><td>EnrollmentRepository, CourseCatalogRepository, AssignmentRepository, OrganizationRepository</td></tr>
+    <tr><td>equals/hashCode entity</td><td><span class="badge p2">Không override</span> Role bị bỏ vào <code>Set</code> dựa trên identity equality.</td><td>identity model, toàn bộ entity</td></tr>
+    <tr><td>JPA auditing</td><td><span class="badge done">Đã bật ở identity</span> <code>@EnableJpaAuditing</code> đã được thêm cho service dùng audit fields.</td><td>identity-service</td></tr>
+  </table>
+
+  <h3>5.2. Spring core / Web</h3>
+  <ul>
+    <li><span class="badge done">Tốt</span> Constructor injection 100%, không field injection ở bất kỳ đâu.</li>
+    <li><span class="badge done">Đã sửa</span> Exception handler chung không leak raw SQL/internal message: <code>DataIntegrityViolationException</code> trả 409 generic, catch-all 500 trả body generic và log server-side.</li>
+    <li><span class="badge p1">Không nhất quán</span> đã có <code>ForbiddenException</code> + mapping 403 trong common-library, nhưng một số service vẫn còn copy local class hoặc dùng <code>ResponseStatusException</code> inline; nên dọn về common type để body lỗi đồng nhất.</li>
+    <li><span class="badge p2">Sai status code nhỏ</span> identity: create trả 200 thay 201, delete trả 200 thay 204. Refresh token invalid đã sửa về 401.</li>
+    <li><span class="badge p2">Validation còn cần siết thêm</span> <code>BatchEnrollRequestDto.entries</code> đã có <code>@Valid @NotEmpty</code>; vẫn nên chuẩn hóa enum/status input, UUID parse lỗi về 400, và bound min/max cho score/grade.</li>
+    <li><span class="badge p2"><code>@Value</code> thay vì <code>@ConfigurationProperties</code></span> ở chính các class tên <code>*Properties</code> (JwtProperties, CorsConfig, RefreshTokenService TTL).</li>
+    <li><span class="badge p2">Hai cây package song song trong common-library</span> (<code>edu.courseflow.common.*</code> vs <code>edu.courseflow.commonlibrary.*</code>): 2 error contract, 2 correlation filter — tàn dư rename dở. Hợp nhất.</li>
+    <li><span class="badge p2">SecurityConfig identity</span> <code>anyRequest().permitAll()</code> phó thác toàn bộ cho filter tự viết — thiếu backstop Spring Security; nên khai báo authorizeHttpRequests làm defense-in-depth.</li>
+    <li><span class="badge done"><code>CurrentUserArgumentResolver</code></span> đã đổi malformed <code>X-User-Id</code> sang <code>UnauthorizedException</code> thay vì 500.</li>
+  </ul>
+
+  <h3>5.3. Kafka / Spring Kafka</h3>
+  <ul>
+    <li><span class="badge done">Tốt</span> <code>enable-auto-commit: false</code> + <code>ack-mode: record</code> nhất quán; outbox ghi trong cùng transaction với state change ở mọi producer (đã xác minh enrollment, announcement, media, quiz, assignment, gradebook, peer-review).</li>
+    <li><span class="badge done">Đã sửa phần chính</span> analytics/gradebook/portfolio đã có DLT + backoff; consumer chính parse null-safe và pre-check duplicate event.</li>
+    <li><span class="badge p2">Dọn dẹp</span> 7 service khai <code>spring-kafka</code> nhưng không có producer/consumer nào (course, quiz, deadline, discussion, peer-review, review, live-session — outbox của họ do relay drain); search-service có <code>ProcessedEventDocument</code> + spring-kafka cho một consumer indexing <em>chưa từng được viết</em>.</li>
+    <li><span class="badge p2">Dedup key</span> <code>processed_events</code> PK chỉ là <code>event_id</code>, thiếu <code>consumer_name</code> → service có 2 consumer cùng stream sẽ dedup nhầm chéo.</li>
+  </ul>
+
+  <h3>5.4. MapStruct</h3>
+  <p>Xem mục 2.2. Tóm tắt sau fix: 19 mapper dùng <code>CourseFlowMapperConfig</code> strict, student view sanitize đúng, identity/portfolio/organization/analytics/search đã chuyển khỏi mapping tay lớn. Còn lại một số factory/constructor domain có chủ đích và nên được xem là invariant creation hơn là DTO mapper thuần.</p>
+
+  <h2 id="services">6. Review chi tiết theo service</h2>
+  <table>
+    <tr><th>Service</th><th>Điểm</th><th>Tóm tắt</th></tr>
+    <tr><td><strong>enrollment</strong></td><td class="score-good">8/10</td><td>State machine có test, pessimistic lock capacity, consumer idempotent. Đã sửa batchEnroll rollback-only, waitlist requeue/promote, route capacity, @Version và cung cấp internal course-access endpoint. Còn cần test concurrency dày hơn.</td></tr>
+    <tr><td><strong>quiz</strong></td><td class="score-warn">6/10</td><td>Layering sạch, BigDecimal, student view sanitize đúng; các P0 reveal/re-submit/per-question score và start gate <code>PUBLISHED/openAt/closeAt</code> đã vá. Còn P1: snapshot/autosave/grace-period/sweeper là cột chết, gradeNumerical so sánh bằng double.</td></tr>
+    <tr><td><strong>identity</strong></td><td class="score-good">8/10</td><td>Priv-esc, percent-encoding ADMIN bypass, lockout rollback, authz-check gate, refresh invalid 401, access-token cutoff/jti revoke, password change/reset, audit log, issuer/skew, MapStruct identity mapper, JPA auditing và @Version đã vá. Còn P1/P2: per-IP throttle, MFA enrollment/email verification flow thật, RS256/JWKS, tối ưu N+1 grants.</td></tr>
+    <tr><td><strong>course</strong></td><td class="score-warn">6/10</td><td>Authoring route/approve/reject/initial version/draft IDOR và course module progress/complete entitlement đã vá. Còn P1: N+1 nặng; 2 đường tạo course song song drift nhau; submitForReview không check state; self-approve cần policy reviewer riêng.</td></tr>
+    <tr><td><strong>gradebook</strong></td><td class="score-good">7/10</td><td>Lõi aggregation pure + có test. Đã thêm @Version, DLT/backoff, null-safe parse và peer-review event không còn bị nuốt trong case assignment item đã có. Còn: CSV export O(students × full recompute), drop-lowest sai ngữ nghĩa, cần retry optimistic conflict.</td></tr>
+    <tr><td><strong>assignment</strong></td><td class="score-good">7/10</td><td>Late-penalty math đúng (ceil, cap, clamp, HALF_UP), outbox chuẩn, read/submit/upload đã check course entitlement. Còn: grade không lock, rubric cap logic sai khi rubric max ≠ assignment max, N+1 attachments.</td></tr>
+    <tr><td><strong>peer-review</strong></td><td class="score-good">7/10</td><td>Finalize tính server-side đúng + test, chặn self-review/trùng submit. Đã yêu cầu đủ review đã nộp, thêm @Version và event có <code>maxScore</code>. Còn: flag <code>anonymous</code> chưa được enforce ở DTO, assign() cần validate ownership/reviewersPerSubmission sâu hơn.</td></tr>
+    <tr><td><strong>media</strong></td><td class="score-warn">6/10</td><td>HMAC token đúng chuẩn; P0 storageKey đã vá bằng owner prefix/object-exists check; video upload URL validate content-type và video read/playback kiểm tra owner/staff/enrollment. Còn P1: chưa magic-byte/content sniffing, <code>verifyPlaybackToken</code> là dead code.</td></tr>
+    <tr><td><strong>notification</strong></td><td class="score-warn">6/10</td><td>Ownership đúng, DLT + backoff đúng, parse null-safe. Trừ: REST roster call chặn trong DB transaction, N+1 preferences, dedup tự đầu độc transaction, inbox không phân trang.</td></tr>
+    <tr><td><strong>analytics</strong></td><td class="score-warn">6/10</td><td>Authz per-endpoint tốt. Đã có DLT/null-safe parse, @Version CourseMetric, mapper AtRisk. Còn: công thức average sai (<code>(avg+new)/2</code> là EMA chứ không phải mean), recompute engagement load toàn bộ activity log mỗi event, limit cần cap/validate sâu hơn.</td></tr>
+    <tr><td><strong>review / discussion / announcement / live-session</strong></td><td class="score-warn">7/10</td><td>CRUD sạch, outbox đúng. Đã sửa helpful atomic, acceptComment đúng thread, announcement draft filter, live capacity lock + host/admin start/end, và entitlement nền cho review/discussion/announcement/live-session. Còn: completed-only policy cho review nếu cần, instructor-scope sâu hơn và thiếu pagination.</td></tr>
+    <tr><td><strong>organization</strong></td><td class="score-warn">5/10</td><td>Nhỏ gọn nhưng role check sai khóa ORG_ADMIN; entity nhận DTO; section capacity trùng vai với enrollment capacity không đồng bộ; section status kẹt DRAFT vĩnh viễn.</td></tr>
+    <tr><td><strong>certificate</strong></td><td class="score-warn">6/10</td><td>P0 verify lộ PII đã vá, mã mới 128-bit, partial unique chống cấp trùng, @Version và mapper không còn nhúng rule valid. Còn P1: revoke chưa bắn event, "signature" SHA-256 không key, expiresAt chưa được xét.</td></tr>
+    <tr><td><strong>portfolio</strong></td><td class="score-warn">6/10</td><td>Self/admin private scope đã siết, instructor chỉ thấy/evaluate INSTRUCTOR/PUBLIC, consumer có DLT/null-safe, natural-key unique index Mongo, mapping tay lớn đã qua MapStruct. Còn: instructor-course/student scope cần entitlement thật và ResponseStatusException còn lệch chuẩn.</td></tr>
+    <tr><td><strong>search</strong></td><td class="score-good">7/10</td><td>ES query DSL bind đúng, filter PUBLISHED, cap 100, <code>indexCourse</code> đã dùng MapStruct request→document. Trừ: consumer indexing được mô tả nhưng chưa tồn tại (dead code ProcessedEventDocument + spring-kafka).</td></tr>
+    <tr><td><strong>api-gateway</strong></td><td class="score-warn">7/10</td><td>Strip + re-inject header đúng, verifyWith(SecretKey) chống alg confusion, fail-fast secret. Đã sửa routes authoring/capacity/live-session/review, strip service-token inbound, actuator public chỉ health, common web optional. Còn: internal route policy/NetworkPolicy, issuer/clock-skew.</td></tr>
+    <tr><td><strong>outbox-relay</strong></td><td class="score-good">8/10</td><td>At-least-once + poison dead-letter có suy nghĩ. Đã thêm partial index, tie-break, producer idempotence, port riêng, DL failure không phá tick, transaction claim với <code>FOR UPDATE SKIP LOCKED</code> và purge published rows. Còn: metric/alert và chaos test multi-replica.</td></tr>
+  </table>
+
+  <h2 id="architecture">7. Review kiến trúc &amp; eventing</h2>
+  <div class="card">
+    <h3>Những quyết định kiến trúc đúng</h3>
+    <ul>
+      <li>Trust boundary gateway → header verified → <code>CurrentUser</code> resolver: mô hình rõ, áp dụng nhất quán, identity-service còn tự re-verify (defense in depth).</li>
+      <li>Outbox pattern per-service DB + relay tập trung: đúng sách giáo khoa cho at-least-once; consumer dedup bằng <code>processed_events</code>.</li>
+      <li>Bounded context phân rã hợp lý, DB riêng per service, Liquibase nhất quán 100%.</li>
+    </ul>
+    <h3>Những khoảng trống kiến trúc (giữ nguyên từ review trước, nay có bằng chứng code cụ thể)</h3>
+    <ul>
+      <li><strong>Entitlement engine theo enrollment/course</strong> — đã có nền <code>CourseAccessClient</code> + enrollment access endpoint và đã áp vào các service học tập chính. Phần còn lại là coverage sâu hơn: instructor-course/student scope, portfolio/course-detail policy và read-model entitlement nếu cần tối ưu tải.</li>
+      <li><strong>Service-to-service trust</strong> — đã có service-token cho enrollment internal access và gateway strip inbound <code>X-Service-Token</code>. Phần còn lại là internal route policy/NetworkPolicy để tách hẳn user-token khỏi service-only API.</li>
+      <li><strong>Event contract thật</strong> — schema hiện là thỏa thuận ngầm bằng <code>Map.of</code>; đã có drift thực tế (quiz event lệch contract, deadline thiếu eventId, peer-review thiếu courseId làm gradebook nuốt event). Đưa event-contracts vào sử dụng bắt buộc + version field.</li>
+      <li><strong>Vận hành</strong> — đã xử lý lớp config runtime trong repo (OSIV off, ddl validate, Hikari, actuator health-only, MDC correlation, MinIO fail-fast, flatten plugin) và có Docker Compose full-stack để giả lập local cluster. Phần còn lại là K8s/CI/CD thật, tracing đầy đủ và test hồi quy/e2e.</li>
+    </ul>
+  </div>
+
+  <h2 id="goodwork">8. Những điểm làm tốt (giữ và nhân rộng)</h2>
+  <div class="card finding ok">
+    <ul>
+      <li>Pessimistic lock capacity + check trong transaction (enrollment) — mẫu chuẩn nên copy cho live-session capacity và certificate uniqueness.</li>
+      <li>HMAC-SHA256 + <code>MessageDigest.isEqual</code> + fail-fast secret (media) — đúng kỹ thuật; chỉ cần đóng lỗ storageKey và wire verify.</li>
+      <li>MapStruct sanitize <code>StudentQuizDto</code> — xác minh generated impl không nhận correctAnswer/correct/feedback ở bất kỳ constructor student nào.</li>
+      <li>Refresh token: hash SHA-256, rotate, reuse-detection revoke cả family, SecureRandom 48 byte.</li>
+      <li>BigDecimal + HALF_UP nhất quán cho điểm số (trừ 1 chỗ double ở quiz numerical).</li>
+      <li>notification-service: DLT + exponential backoff + null-safe parsing — mẫu consumer chuẩn, nên auto-config hóa cho cả 6 consumer service.</li>
+      <li>Gateway <code>verifyWith(SecretKey)</code> chặn alg-confusion; strip <code>X-User-*</code> trước khi inject.</li>
+      <li>Liquibase + <code>ddl-auto: validate</code> phủ các service JPA; partial/unique index đã được bổ sung cho waitlist/certificate/outbox hot paths.</li>
+      <li>Constructor injection toàn codebase, không Lombok phức tạp hóa annotation processing.</li>
+    </ul>
+  </div>
+
+  <h2 id="roadmap">9. Thứ tự sửa đề xuất</h2>
+  <table>
+    <tr><th>Đợt</th><th>Việc</th><th>Lý do xếp trước</th></tr>
+    <tr>
+      <td><strong>Đợt 1 (1-3 ngày)</strong> — vá P0</td>
+      <td><span class="badge done">DONE</span> 7 mục ở phần 3 đã vá: role creation, lockout, storageKey, quiz reveal/resubmit/score leak, certificate PII/code, authoring owner/gateway route. Gateway route authoring/capacity/live-session/review đã bổ sung.</td>
+      <td>Đã đóng các lỗi khai thác trực tiếp bởi user thường.</td>
+    </tr>
+    <tr>
+      <td><strong>Đợt 2 (1 tuần)</strong> — concurrency &amp; consumer</td>
+      <td><span class="badge done">DONE PHẦN CODE CHÍNH</span> đã thêm <code>@Version</code>/lock/atomic update theo danh sách nóng, unique certificate, dedup pre-check, DLT/null-safe parse, batchEnroll/waitlist, deadline <code>eventId</code>, demo-data context. Còn nên gom DLT config về common auto-config và thêm retry/test concurrency.</td>
+      <td>Lớp lỗi "chạy đúng lúc demo, sai lúc tải thật" đã được giảm rủi ro rõ rệt.</td>
+    </tr>
+    <tr>
+      <td><strong>Đợt 3 (1-2 tuần)</strong> — chuẩn hóa + entitlement</td>
+      <td><span class="badge p1">PARTIAL</span> MapStruct strict + các cụm mapping tay lớn + OSIV đã xong. <code>CourseAccessClient</code> + enrollment-backed entitlement đã áp vào assignment/course module/video/discussion/announcement/review/live-session. Còn lại: mở rộng scope instructor-course/student sâu hơn, readOnly transaction diện rộng, pagination các list endpoint và sửa N+1.</td>
+      <td>Đây là phần còn quan trọng nhất để đạt chuẩn LMS production lớn.</td>
+    </tr>
+    <tr>
+      <td><strong>Đợt 4 (song song)</strong> — eventing &amp; vận hành</td>
+      <td><span class="badge p1">PARTIAL</span> partial index outbox, relay <code>SKIP LOCKED</code> + purge, ddl validate, Hikari sizing, actuator health-only, flatten plugin, MDC correlation và local-cluster Docker Compose đã xong. Còn lại: dùng thật <code>event-contracts</code>, hợp nhất announcement relay, CI/K8s thật.</td>
+      <td>Nền tin cậy cho event backbone trước khi scale nhiều replica consumer/relay.</td>
+    </tr>
+  </table>
+  <div class="card">
+    <p><strong>Test cần bổ sung để khóa lỗi lâu dài</strong>: lockout sau N lần sai mật khẩu vẫn tăng counter; TA tạo ADMIN bị 403; student còn lượt làm GET quiz không thấy đáp án; submit lại attempt <code>PARTIALLY_GRADED</code> bị từ chối; register asset với storageKey lạ bị từ chối; 2 submit attempt song song chỉ 1 event graded/hoặc optimistic conflict được xử lý; duplicate Kafka delivery không làm rollback-only; batchEnroll có 1 entry lỗi không rollback các entry thành công; live-session concurrent register không vượt capacity.</p>
+    <p><strong>Kiểm chứng hiện tại:</strong> sau các fix ngày 11/06, full backend test suite đã chạy xanh từ thư mục <code>backend</code> bằng <code>mvn test -q</code>. Đây là compile/unit safety net; vẫn cần thêm regression/integration test cho các case production ở trên.</p>
+  </div>
+
+  <h2 id="delta">10. So với review trước &amp; đính chính</h2>
+  <table>
+    <tr><th>Kết luận ở <code>courseflow-production-review.html</code></th><th>Sau review sâu hôm nay</th></tr>
+    <tr><td>"0 JdbcTemplate/JdbcClient/nativeQuery trong domain services"</td><td><span class="badge done">Xác nhận đúng</span> — và làm rõ thêm: <code>SearchService</code> match từ khóa <code>NativeQuery</code> nhưng là Elasticsearch DSL, hợp lệ; outbox-relay JdbcClient hợp lệ.</td></tr>
+    <tr><td>"Quiz không còn leak đáp án cho student"</td><td><span class="badge done">Đã xác nhận sau fix</span> — reveal gate, re-submit và per-question score leak đã được vá; vẫn cần regression test cho attempt song song.</td></tr>
+    <tr><td>"Identity: refresh rotation/lockout đã tốt hơn"</td><td><span class="badge done">Đã vá lỗi mới tìm thấy</span> — lockout rollback và priv-esc qua role field đã sửa; refresh race còn cần test/retry policy.</td></tr>
+    <tr><td>"Media signed URL đã sửa core"</td><td><span class="badge done">Đã vá bypass chính</span> — client không còn tùy ý gửi storageKey ngoài owner prefix; video upload/read/playback đã có owner/staff/enrollment guard. Còn magic-byte/content sniffing là hardening tiếp theo.</td></tr>
+    <tr><td>"Enrollment có state machine/capacity" </td><td><span class="badge done">Đã nâng cấp</span> — đã sửa promote COMPLETED, batchEnroll rollback-only, re-join position, route capacity và thêm @Version.</td></tr>
+    <tr><td>"Course authoring workflow đã có owner/admin guard"</td><td><span class="badge done">Đã sửa phần hở</span> — <code>getDraft/listVersions</code> có owner/admin guard; publish route/API/initial version đã có. Cần e2e test workflow.</td></tr>
+    <tr><td>P0 cũ: service-to-service security, entitlement, test, CI/CD, DLQ</td><td><span class="badge p1">Đã xử lý một phần</span> — DLT/config/runtime, service-token nền, entitlement core và local Docker cluster đã nâng cấp; còn mở rộng policy sâu hơn, regression/e2e test và CI/CD/K8s platform.</td></tr>
+  </table>
+
+  <h2 id="reverify">11. Kiểm chứng độc lập tiến độ (re-verify cuối ngày 11/06)</h2>
+  <p>Sau khi đợt fix được khai báo hoàn tất, một vòng kiểm chứng độc lập thứ hai đã được chạy: 2 luồng verify đối kháng (security fixes + reliability/config fixes) đọc lại code thực tế từng fix, kèm chạy lại <code>mvn test</code> (PASS, exit 0 — nhưng vẫn chỉ 4 test class).</p>
+
+  <h3>11.1. Trạng thái 7 P0 sau kiểm chứng</h3>
+  <table>
+    <tr><th>P0</th><th>Verdict</th><th>Bằng chứng / rủi ro còn lại</th></tr>
+    <tr><td>3.1 Priv-esc tạo ADMIN</td><td><span class="badge done">FIXED</span></td><td><code>UserService</code> chặn non-admin tạo role đặc quyền; <code>JwtIdentityFilter</code> decode + normalize path trước ADMIN-gate nên không còn bypass percent-encoding ở role assignment; <code>AuthzService.assignRole/revokeAssignment</code> có service-layer ADMIN guard; seed <code>is_operator</code> đúng và migration đã xóa grant <code>user:assign-role</code> khỏi ORG_ADMIN.</td></tr>
+    <tr><td>3.2 Lockout vô hiệu</td><td><span class="badge done">FIXED</span></td><td><code>@Transactional(noRollbackFor=UnauthorizedException)</code> commit failed-login/lockout. Optimistic lock conflict giờ được common handler map về 409 thay vì 500.</td></tr>
+    <tr><td>3.3 Media/video storageKey</td><td><span class="badge done">FIXED</span></td><td>Đường media và video đều validate owner-prefix + object existence. Video upload URL sinh key dưới <code>videos/&lt;callerId&gt;/...</code>, validate content-type, playback/manifest/caption cho owner/staff hoặc learner có course entitlement. MinIO presign PUT bind <code>Content-Type</code>.</td></tr>
+    <tr><td>3.4 Quiz reveal đáp án</td><td><span class="badge done">FIXED</span></td><td><code>attemptsExhausted</code> chỉ đếm attempt đã nộp/chấm (<code>GRADED/PARTIALLY_GRADED</code>) và yêu cầu không còn attempt <code>IN_PROGRESS</code>. Bypass bắt đầu lượt 2 để xem đáp án đã đóng.</td></tr>
+    <tr><td>3.5 Quiz re-submit + autoScore</td><td><span class="badge done">FIXED</span></td><td>Submit từ chối khi status != IN_PROGRESS; per-question score bị null cho student trước reveal; <code>startAttempt</code> chặn quiz chưa <code>PUBLISHED</code>, chưa tới <code>openAt</code>, hoặc đã qua <code>closeAt</code>.</td></tr>
+    <tr><td>3.6 Certificate PII</td><td><span class="badge done">FIXED</span></td><td>Public DTO không PII (PublicCertificateVerificationDto), full info chỉ owner-or-staff (CertificateController.java:33-42); code đổi sang full-UUID (:98); partial unique index <code>(student_id, course_id) WHERE status='ISSUED'</code> đúng. Còn lại: <code>expiresAt</code> vẫn không được xét — cert hết hạn verify là valid (P2).</td></tr>
+    <tr><td>3.7 Course draft IDOR + publish</td><td><span class="badge done">FIXED</span></td><td><code>getDraft/listVersions</code> có owner/admin guard; publish route/API/initial version có; <code>GET /internal/courses</code> của non-staff giờ luôn ép về <code>PUBLISHED</code> nếu không có status hoặc status non-published.</td></tr>
+  </table>
+
+  <h3>11.2. Trạng thái nhóm P1 sau kiểm chứng</h3>
+  <table>
+    <tr><th>Hạng mục</th><th>Verdict</th><th>Ghi chú</th></tr>
+    <tr><td>@Version 16 entity + migration cột version + ddl-auto validate</td><td><span class="badge done">FIXED</span></td><td>Migration khớp entity ở mọi service; <code>ObjectOptimisticLockingFailureException</code>/<code>OptimisticLockException</code> được map 409. <code>CourseCompletionMetric</code> (analytics) vẫn nên bổ sung @Version/atomic update.</td></tr>
+    <tr><td>Enrollment (promote COMPLETED, re-join position, batchEnroll, COMPLETED→promote)</td><td><span class="badge done">FIXED</span></td><td>batchEnroll chuyển sang TransactionTemplate per-entry; completed/active student không được join waitlist; <code>promoteWaitlist</code> skip entry không còn hợp lệ và compact lại FIFO thay vì rollback transaction drop/completed của người khác.</td></tr>
+    <tr><td>Kafka DLT 6/6 service + null-safe parse</td><td><span class="badge done">FIXED</span></td><td>Bean <code>kafkaListenerContainerFactory</code> + DLT + ExponentialBackOff có ở cả gradebook/analytics/portfolio; helper <code>text()</code> null-safe thay naked <code>asText()</code>.</td></tr>
+    <tr><td>Dedup pattern consumer</td><td><span class="badge p1">PARTIAL</span></td><td>Đã pre-check <code>existsById</code>, nhưng <code>catch(DataIntegrityViolationException)</code> quanh <code>saveAndFlush</code> vẫn nằm trong cùng transaction — khi race thật vẫn rollback-only → UnexpectedRollbackException → đốt 1 chu kỳ retry (tự hồi phục ở lần redeliver sau, không còn poison vĩnh viễn nhưng chưa sạch).</td></tr>
+    <tr><td>Deadline (eventId, dispatch race, role operator)</td><td><span class="badge done">FIXED</span></td><td>PESSIMISTIC_WRITE + guard PENDING; eventId có; bỏ role "operator". Còn: <code>reminderAt</code> vẫn client cấp, <code>offsetMinutes</code> của policy vẫn trang trí (P2).</td></tr>
+    <tr><td>Peer-review finalize gate</td><td><span class="badge done">FIXED</span></td><td>Yêu cầu đủ <code>reviewersPerSubmission</code> (:162-164); event thêm assignmentId+maxScore. Còn: flag <code>anonymous</code> vẫn không enforce ở DTO (hiện chỉ staff thấy nên rủi ro tiềm ẩn).</td></tr>
+    <tr><td>Gradebook nhận điểm peer-review</td><td><span class="badge done">FIXED PHẦN EVENT</span></td><td><code>AssignReviewRequestDto/ReviewAssignment</code> đã có <code>courseId</code> optional; <code>peer_review.finalized</code> phát <code>courseId</code> khi có; gradebook dùng <code>courseId/maxScore</code> để tạo PEER_REVIEW item, fallback event cũ theo assignment item. CSV export vẫn O(students × recompute).</td></tr>
+    <tr><td>Config vận hành (OSIV off, Hikari, ddl-auto, partial index outbox 13/13, relay port, MinIO fail-fast, flatten-plugin, starter-web optional, MDC)</td><td><span class="badge done">FIXED</span></td><td>Tất cả xác nhận có thật trong code/yml.</td></tr>
+    <tr><td>Demo data context=demo</td><td><span class="badge done">FIXED</span></td><td>17/17 demo changeset có <code>context=demo</code>; các service có Liquibase đặt mặc định <code>spring.liquibase.contexts=${LIQUIBASE_CONTEXTS:prod}</code>. Local demo dùng <code>LIQUIBASE_CONTEXTS=prod,demo</code>.</td></tr>
+    <tr><td>MapStruct vòng 2</td><td><span class="badge done">FIXED PHẦN CHÍNH</span></td><td>19/19 mapper dùng <code>CourseFlowMapperConfig</code>; <code>UserDto.fromModel</code> không còn được gọi; identity/portfolio/organization/analytics/search đã chuyển mapper. Các constructor/factory domain còn lại giữ invariant tạo aggregate.</td></tr>
+    <tr><td>Exception handling</td><td><span class="badge done">FIXED PHẦN CHÍNH</span></td><td>500 generic + DIV→409 + optimistic conflict→409 + X-User-Id malformed→401 + refresh token invalid→401. Đã có <code>ForbiddenException</code> chung; một số service-local 403 class còn lại có thể dọn tiếp như refactor nhỏ.</td></tr>
+    <tr><td>Entitlement theo enrollment/course</td><td><span class="badge p1">PARTIAL — ĐÃ CÓ NỀN</span></td><td>Đã có <code>CourseAccessClient</code> + endpoint enrollment <code>/internal/enrollments/access</code> bằng <code>X-Service-Token</code>; gateway strip service-token. Đã áp vào video, course module progress/complete, assignment read/submit/upload, live-session list/register/get, discussion, announcement, review create. Còn cần scope instructor dạy đúng course và mở rộng sang portfolio/course detail policy sâu hơn.</td></tr>
+    <tr><td>Outbox relay production-grade</td><td><span class="badge done">FIXED PHẦN CHÍNH</span></td><td>Relay poll dùng transaction + <code>FOR UPDATE SKIP LOCKED</code>, có purge published rows theo retention, port + poison dead-letter đã ổn. Còn cần test multi-replica/chaos và metric vận hành.</td></tr>
+  </table>
+
+  <h3>11.3. Đánh giá tiến độ production</h3>
+  <div class="card finding warn">
+    <p><strong>Tiến độ thực: khoảng 80% backend core.</strong> Đợt fix tiếp theo đã đóng 3 lỗ verify còn lại, kích hoạt Liquibase context thật, thêm entitlement nền, map concurrency conflict đúng 409, gia cố outbox relay và thêm local-cluster Docker Compose. Test suite chạy xanh.</p>
+    <p><strong>Việc còn chặn trước khi gọi là production-ready, theo thứ tự:</strong></p>
+    <ol>
+      <li><strong>Regression/integration test</strong>: cần khóa các case vừa vá (video storageKey, quiz reveal, course draft listing, entitlement, optimistic conflict, outbox relay multi-replica).</li>
+      <li><strong>Entitlement nâng cao</strong>: hiện đã có nền student enrollment; cần thêm instructor-course/student scope, completed-only policy cho review nếu muốn giống LMS lớn.</li>
+      <li><strong>Hiệu năng</strong>: pagination diện rộng, N+1 query, gradebook CSV O(students × recompute), readOnly transaction.</li>
+      <li><strong>Event contract thật</strong>: dùng record trong <code>event-contracts</code> thay vì Map/JsonNode ad-hoc.</li>
+      <li><strong>Nền tảng deploy thật</strong>: local Docker cluster đã có; CI/K8s/observability production vẫn là phase sau.</li>
+    </ol>
+  </div>
+
+  <h3>11.4. Identity hardening theo review SA</h3>
+  <div class="card finding ok">
+    <p><strong>Đã xử lý nhóm P0/P1 chính của identity-service.</strong> ADMIN-gate không còn match trên raw URI: filter decode + normalize path trước khi quyết định quyền, nên case <code>/internal/users/123/%61ssignments</code> bị chặn như route assignment thật. Access token giờ có revoke path: filter kiểm tra <code>jti</code> deny-list và cutoff <code>access_tokens_valid_after</code>; logout, password change/reset, refresh reuse-detected và role grant/revoke đều invalidate token cũ trong identity-service. TTL access token mặc định giảm từ 1h xuống 15 phút.</p>
+    <p><strong>Đã thêm password/audit/test.</strong> Có endpoint đổi mật khẩu hiện tại <code>/auth/password/change</code>, admin reset password <code>/backoffice/users/{id}/password</code>, enforce <code>must_change_password</code> khi login, password policy tối thiểu 12 ký tự + upper/lower/digit/symbol, BCrypt cost 12, audit log cho login fail/success/lockout/logout/reuse/password/role mutation. Identity-service giờ có test cho JWT filter matrix, percent-encoding bypass, revoked token, issuer check, lockout, must-change password, dummy hash timing và refresh reuse.</p>
+    <p><strong>Đã giảm rủi ro P1/P2.</strong> <code>AuthzService.check</code> chạy trong transaction read-only để tránh lazy-init khi role hierarchy sâu; refresh invalid trả 401; user id parse sai trả 400; ORG_ADMIN không còn seed permission <code>user:assign-role</code> mâu thuẫn với ADMIN-only gate; login dùng dummy bcrypt path cho user không tồn tại và message lockout sai mật khẩu đã gom về generic hơn. MFA/email verified đã có enforcement path qua config và login hiểu <code>mfaCode</code>; admin có endpoint mark email verified.</p>
+    <p><strong>Còn lại trước khi xem identity là production-grade tuyệt đối:</strong> rate-limit per-IP/Redis ở gateway hoặc identity edge, MFA enrollment/recovery flow hoàn chỉnh, email verification token flow thật, gateway-wide token revocation/introspection nếu muốn revoke có hiệu lực tức thì trên toàn bộ microservice, và lộ trình RS256/JWKS để bỏ shared HS256 secret.</p>
+  </div>
+
+  <footer>
+    <p>Review ngày 11/06/2026 trên code hiện tại trong repo. Phương pháp: 5 luồng review độc lập đọc toàn bộ src/main/java + application.yml + migration + pom của 21 service, common-library, event-contracts, infra; mọi finding có file:line đã xác minh khi đọc file. File này là bản review riêng của ngày 11/06, dùng song song với <code>courseflow-production-review.html</code>.</p>
+  </footer>
+</main>
+</body>
+</html>

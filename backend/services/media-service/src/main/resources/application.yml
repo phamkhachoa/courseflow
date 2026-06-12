@@ -1,0 +1,52 @@
+server:
+  port: 8091
+spring:
+  application:
+    name: media-service
+  datasource:
+    url: ${MEDIA_DB_URL:jdbc:postgresql://localhost:5432/cf_media}
+    username: ${MEDIA_DB_USERNAME:courseflow}
+    password: ${MEDIA_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${LIQUIBASE_CONTEXTS:prod}
+  servlet:
+    multipart:
+      max-file-size: ${MEDIA_MAX_FILE_SIZE:512MB}
+      max-request-size: ${MEDIA_MAX_REQUEST_SIZE:512MB}
+courseflow:
+  storage:
+    provider: ${STORAGE_PROVIDER:minio}
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    external-endpoint: ${STORAGE_EXTERNAL_ENDPOINT:http://localhost:9000}
+    access-key: ${STORAGE_ACCESS_KEY:}
+    secret-key: ${STORAGE_SECRET_KEY:}
+    allow-demo-credentials: ${STORAGE_ALLOW_DEMO_CREDENTIALS:false}
+    bucket: ${STORAGE_BUCKET:courseflow-media}
+    presign-ttl-seconds: ${STORAGE_PRESIGN_TTL:3600}
+  media:
+    storage-provider: ${MEDIA_STORAGE_PROVIDER:local}
+    local-root: ${MEDIA_LOCAL_ROOT:./.courseflow-media}
+    cdn-base-url: ${MEDIA_CDN_BASE_URL:https://cdn.local/media}
+    signed-url-ttl-seconds: ${MEDIA_SIGNED_URL_TTL:3600}
+    # HMAC secret used to sign/verify playback URLs on the non-MinIO (CDN) provider path. Empty by
+    # default for local dev; the service fails fast at startup if this is blank while the provider is
+    # not 'minio' (see VideoService#validateSigningSecret). Set MEDIA_SIGNING_SECRET in prod.
+    signing-secret: ${MEDIA_SIGNING_SECRET:}
+    # Local/dev shortcut: allow browser-playable source objects such as MP4/WebM to be served directly
+    # as READY while the real HLS/DASH transcode worker is not available.
+    direct-source-playback-enabled: ${MEDIA_DIRECT_SOURCE_PLAYBACK_ENABLED:true}
+    # Hard cap for proxied multipart uploads (bytes); defaults to 512MB to match the multipart limit.
+    max-upload-bytes: ${MEDIA_MAX_UPLOAD_BYTES:536870912}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

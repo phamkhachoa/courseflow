@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourseFlow - Hướng dẫn phát triển</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --paper: #fff;
+      --text: #172033;
+      --muted: #607086;
+      --line: #dbe3ef;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #0f766e;
+      --green-soft: #e6f6f3;
+      --orange: #ea580c;
+      --orange-soft: #fff4ed;
+      --purple: #7c3aed;
+      --purple-soft: #f3eeff;
+      --red: #b91c1c;
+      --red-soft: #ffe8e8;
+      --dark: #0f172a;
+      --gray-soft: #f1f5f9;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Helvetica Neue", sans-serif;
+      line-height: 1.65;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--dark);
+      color: #f8fafc;
+      padding: 24px 18px;
+    }
+
+    .sidebar h1 {
+      margin: 0 0 4px;
+      font-size: 18px;
+    }
+
+    .sidebar p {
+      margin: 0 0 18px;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    .nav-title {
+      margin: 18px 0 6px;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .sidebar a {
+      display: block;
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    .sidebar a:hover {
+      background: #1e293b;
+      text-decoration: none;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 30px 80px;
+    }
+
+    .hero {
+      background: #123761;
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 34px;
+      margin-bottom: 24px;
+    }
+
+    .hero h2 {
+      margin: 0 0 10px;
+      font-size: 32px;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      margin: 0;
+      color: #c7ddff;
+      max-width: 880px;
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 26px;
+      margin-top: 24px;
+    }
+
+    section h2 {
+      margin: 0 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+      font-size: 23px;
+    }
+
+    h3 {
+      margin: 22px 0 10px;
+      font-size: 18px;
+    }
+
+    h4 {
+      margin: 16px 0 8px;
+      font-size: 15px;
+    }
+
+    p {
+      margin: 10px 0;
+    }
+
+    ul,
+    ol {
+      padding-left: 20px;
+      margin: 10px 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eef4ff;
+      color: #1e3a8a;
+    }
+
+    code {
+      background: #edf2f7;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: .9em;
+    }
+
+    pre {
+      overflow: auto;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: var(--radius);
+      padding: 16px;
+      line-height: 1.55;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      background: #fbfcff;
+    }
+
+    .box h3,
+    .box h4 {
+      margin-top: 0;
+    }
+
+    .blue {
+      background: var(--blue-soft);
+      border-color: #bfdbfe;
+    }
+
+    .green {
+      background: var(--green-soft);
+      border-color: #99f6e4;
+    }
+
+    .orange {
+      background: var(--orange-soft);
+      border-color: #fed7aa;
+    }
+
+    .purple {
+      background: var(--purple-soft);
+      border-color: #ddd6fe;
+    }
+
+    .note,
+    .warn,
+    .danger {
+      margin: 16px 0;
+      padding: 13px 15px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    .note {
+      background: var(--green-soft);
+      border-left: 4px solid var(--green);
+    }
+
+    .warn {
+      background: var(--orange-soft);
+      border-left: 4px solid var(--orange);
+    }
+
+    .danger {
+      background: var(--red-soft);
+      border-left: 4px solid var(--red);
+    }
+
+    .stage {
+      border-left: 5px solid var(--blue);
+      background: #fbfdff;
+    }
+
+    .stage.feature {
+      border-left-color: var(--green);
+    }
+
+    .stage.production {
+      border-left-color: var(--purple);
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      vertical-align: baseline;
+      margin-left: 8px;
+    }
+
+    .b-start {
+      background: var(--blue-soft);
+      color: #1d4ed8;
+    }
+
+    .b-build {
+      background: var(--green-soft);
+      color: #0f766e;
+    }
+
+    .b-prod {
+      background: var(--purple-soft);
+      color: #6d28d9;
+    }
+
+    .b-risk {
+      background: var(--red-soft);
+      color: #b91c1c;
+    }
+
+    .checklist {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .checklist li {
+      position: relative;
+      padding-left: 26px;
+    }
+
+    .checklist li:before {
+      content: "\2610";
+      position: absolute;
+      left: 0;
+      color: var(--blue);
+      font-weight: 700;
+    }
+
+    .deliverable {
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      margin: 14px 0;
+      overflow: hidden;
+    }
+
+    .deliverable h4 {
+      margin: 0;
+      padding: 9px 14px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 13px;
+      border-bottom: 1px solid #bbf7d0;
+    }
+
+    .deliverable ul,
+    .deliverable ol {
+      margin: 10px 14px;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 10px 14px;
+      margin-top: 12px;
+    }
+
+    .timeline .time {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .timeline .task {
+      border-left: 3px solid var(--line);
+      padding-left: 12px;
+    }
+
+    @media(max-width:900px) {
+      .layout {
+        display: block;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+      }
+
+      main {
+        padding: 18px 14px 48px;
+      }
+
+      .grid,
+      .grid3 {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>CourseFlow</h1>
+      <p>Hướng dẫn phát triển từng bước</p>
+      <nav>
+        <div class="nav-title">Cách dùng</div>
+        <a href="#intro">Mục tiêu tài liệu</a>
+        <a href="#levels">Mốc năng lực</a>
+        <a href="#learning-rules">Nguyên tắc làm việc</a>
+        <a href="#system-map">Bản đồ hệ thống</a>
+        <a href="#problem-breakdown">Từ bài toán đến việc làm</a>
+        <a href="#quality-bar">Tiêu chuẩn chất lượng</a>
+
+        <div class="nav-title">Nền tảng</div>
+        <a href="#week0">Bước 0 - Setup</a>
+        <a href="#stage1">Bước 1 - Đọc code</a>
+        <a href="#stage2">Bước 2 - CRUD đầu tiên</a>
+        <a href="#stage3">Bước 3 - API, DTO, validation</a>
+        <a href="#stage4">Bước 4 - Database &amp; migration</a>
+
+        <div class="nav-title">Phát triển tính năng</div>
+        <a href="#stage5">Bước 5 - Một tính năng trong service</a>
+        <a href="#stage6">Bước 6 - Auth &amp; gateway</a>
+        <a href="#stage7">Bước 7 - Event outbox</a>
+        <a href="#stage8">Bước 8 - Consumer &amp; dedup</a>
+        <a href="#stage9">Bước 9 - Web/app thật</a>
+
+        <div class="nav-title">Production</div>
+        <a href="#stage10">Bước 10 - Search &amp; analytics</a>
+        <a href="#stage11">Bước 11 - BFF composition</a>
+        <a href="#stage12">Bước 12 - Tính năng LMS nâng cao</a>
+        <a href="#stage13">Bước 13 - Test &amp; CI</a>
+        <a href="#stage14">Bước 14 - Gia cố production</a>
+
+        <div class="nav-title">Đánh giá</div>
+        <a href="#rubric">Rubric năng lực</a>
+        <a href="#review-template">PR checklist</a>
+        <a href="#capstone">Bài tổng hợp</a>
+        <a href="#pitfalls">Lỗi thường gặp</a>
+      </nav>
+    </aside>
+
+    <main>
+      <div class="hero" id="intro">
+        <h2>CourseFlow Roadmap: hướng dẫn phát triển từng bước</h2>
+        <p>
+          Tài liệu này chuyển mô tả tổng quát của CourseFlow thành các bài làm cụ thể. Người làm đi từ việc chạy được
+          hệ thống, đọc đúng service, thêm API nhỏ, đến tự thiết kế một luồng nghiệp vụ sẵn sàng chạy production có gateway, BFF,
+          database, event, search, analytics, web/app và test.
+        </p>
+      </div>
+
+      <section id="levels">
+        <h2>1. Cách đọc lộ trình</h2>
+        <p>
+          Lộ trình chia theo năng lực, không chia cứng theo số tuần. Mỗi bước đều có sản phẩm cụ thể, cách kiểm chứng
+          và tiêu chí review. Nếu một bước chưa chắc, hãy lặp lại bằng một service khác trước khi đi tiếp.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Mốc</th>
+              <th>Dấu hiệu đạt</th>
+              <th>Bài làm phù hợp</th>
+              <th>Cách review</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge b-start">Nền tảng</span></td>
+              <td>Đọc hiểu code có mẫu, chạy được project, thêm/sửa endpoint nhỏ, biết báo cáo lỗi bằng log và request.</td>
+              <td>CRUD nhỏ, DTO, validation, migration đơn giản, sửa bug rõ nguyên nhân.</td>
+              <td>Review theo checklist, nhắc convention, kiểm tra command/curl.</td>
+            </tr>
+            <tr>
+              <td><span class="badge b-build">Làm tính năng</span></td>
+              <td>Tự hoàn thành một phần tính năng end-to-end, tự viết test, biết transaction và edge case cơ bản.</td>
+              <td>Một tính năng trong một service, consumer event đơn giản, màn hình admin/người học nhỏ.</td>
+              <td>Review thiết kế, bảo mật, idempotency, test gap.</td>
+            </tr>
+            <tr>
+              <td><span class="badge b-prod">Production</span></td>
+              <td>Tự thiết kế tính năng đi qua nhiều service, cân nhắc consistency, event, BFF, observability, migration và rollout.</td>
+              <td>Luồng nghiệp vụ nhiều service, BFF aggregation, search/analytics read model, gia cố production.</td>
+              <td>Review trade-off, compatibility, rollout plan và rủi ro vận hành.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="learning-rules">
+        <h2>2. Nguyên tắc làm việc trong dự án</h2>
+        <div class="grid">
+          <div class="box blue">
+            <h4>Đọc trước khi code</h4>
+            <p>Luôn đọc một service đã có pattern tương tự trước khi thêm code. Ví dụ muốn làm CRUD thì đọc
+              <code>media-service</code> hoặc <code>enrollment-service</code>; muốn event thì đọc
+              <code>announcement-service</code>.
+            </p>
+          </div>
+          <div class="box green">
+            <h4>Một PR, một mục tiêu</h4>
+            <p>Mỗi PR chỉ nên có một mục tiêu rõ ràng: migration + DTO + repository + service + controller + test. Không
+              trộn refactor, đổi UI và sửa infra trong cùng PR.</p>
+          </div>
+          <div class="box orange">
+            <h4>Không đoán mò</h4>
+            <p>Khi lỗi, ghi lại request, response, log, stack trace, câu SQL hoặc payload event. Tự hỏi lỗi nằm ở
+              boundary nào: gateway, controller, service, DB, Kafka hay frontend.</p>
+          </div>
+          <div class="box purple">
+            <h4>Done là chạy được</h4>
+            <p>Done không phải là "đã viết code". Done là build pass, test pass, có data demo hoặc curl để kiểm chứng,
+              tài liệu/API được cập nhật nếu thay đổi contract.</p>
+          </div>
+        </div>
+        <div class="warn">
+          Khi bị kẹt, hãy ghi 4 dòng trước khi hỏi: mục tiêu đang làm, lỗi đang gặp, đã thử gì, nghi ngờ hiện tại là gì.
+          Cách này giúp người review hiểu vấn đề nhanh và giúp bạn tự tìm ra lỗi tốt hơn.
+        </div>
+      </section>
+
+      <section id="system-map">
+        <h2>3. Bản đồ hệ thống CourseFlow v2 cần nắm</h2>
+        <pre>Client
+  Next.js public/learning     React admin/backoffice       Flutter app cho người học
+             |                         |                         |
+             +-------------------------+-------------------------+
+                                       |
+                                api-gateway
+                                       |
+             +-------------------------+-------------------------+
+             |                         |                         |
+       learning-bff             backoffice-bff             internal domain APIs
+             |                         |                         |
+             +-------------------------+-------------------------+
+                                       |
+ identity  organization  course  enrollment  assignment  deadline  announcement
+ portfolio discussion notification media search analytics gradebook quiz certificate peer-review</pre>
+        <table>
+          <thead>
+            <tr>
+              <th>Khối</th>
+              <th>Cần hiểu trước</th>
+              <th>Cần tự quyết khi thiết kế</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>API Gateway</td>
+              <td>Route, JWT, strip <code>X-User-*</code>, public/internal path.</td>
+              <td>Trust boundary, role gating, rate limit, rollout route mới.</td>
+            </tr>
+            <tr>
+              <td>Domain service</td>
+              <td>Controller → DTO → Service → Repository → DB.</td>
+              <td>Bounded context, transaction boundary, idempotency, schema evolution.</td>
+            </tr>
+            <tr>
+              <td>Event/outbox</td>
+              <td>Ghi event vào <code>outbox_events</code> cùng transaction.</td>
+              <td>At-least-once delivery, dedup, retry, replay, consumer lag.</td>
+            </tr>
+            <tr>
+              <td>BFF</td>
+              <td>BFF gom dữ liệu cho một màn hình, không giữ business rule lõi.</td>
+              <td>Chọn endpoint aggregate, timeout, fallback, cache, version contract.</td>
+            </tr>
+            <tr>
+              <td>Client</td>
+              <td>Gọi gateway bằng client API, render loading/error/data.</td>
+              <td>Phân ranh Next SEO, React admin, Flutter offline/session.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="problem-breakdown">
+        <h2>4. Từ bài toán tổng quát đến việc làm thực tế</h2>
+        <p>
+          CourseFlow là hệ thống LMS nhiều module. Khi nhận một yêu cầu, đừng bắt đầu bằng cách tìm chỗ sửa ngẫu nhiên.
+          Hãy xác định trước: người dùng là ai, service nào sở hữu nghiệp vụ, dữ liệu nằm ở đâu, client nào cần màn hình,
+          và có cần event/read model hay không.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Bài toán sản phẩm</th>
+              <th>Service chính</th>
+              <th>Client liên quan</th>
+              <th>Việc nên làm trước</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Danh mục khóa học và lộ trình học</td>
+              <td>course-service</td>
+              <td>Next.js, Flutter, React admin</td>
+              <td>Tạo/sửa course module, public course detail, tiến độ học theo module.</td>
+            </tr>
+            <tr>
+              <td>Ghi danh và danh sách lớp</td>
+              <td>enrollment-service, organization-service</td>
+              <td>React admin, Flutter</td>
+              <td>Ghi danh người học, kiểm tra capacity, chuyển sang waitlist khi lớp đầy.</td>
+            </tr>
+            <tr>
+              <td>Bài tập, hạn nộp và nhắc hạn</td>
+              <td>assignment-service, deadline-service, notification-service</td>
+              <td>Flutter, React admin</td>
+              <td>Tạo assignment, sinh deadline reminder, gửi notification qua event.</td>
+            </tr>
+            <tr>
+              <td>Thông báo và thảo luận lớp học</td>
+              <td>announcement-service, discussion-service, notification-service</td>
+              <td>Next.js, Flutter, React admin</td>
+              <td>Publish announcement, tạo discussion thread, moderation và accepted answer.</td>
+            </tr>
+            <tr>
+              <td>Quiz, sổ điểm và đánh giá đồng cấp</td>
+              <td>quiz-service, gradebook-service, peer-review-service</td>
+              <td>Flutter, React admin</td>
+              <td>Submit quiz attempt, auto-grade, sync gradebook, phân công peer review.</td>
+            </tr>
+            <tr>
+              <td>Chứng chỉ, tìm kiếm và phân tích</td>
+              <td>certificate-service, search-service, analytics-service</td>
+              <td>Next.js, React admin</td>
+              <td>Xác minh chứng chỉ public, index course vào Elasticsearch, dashboard cảnh báo rủi ro.</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Cách bóc một yêu cầu mới</h3>
+        <ol>
+          <li>Viết lại yêu cầu bằng một câu: actor nào làm gì để đạt kết quả gì.</li>
+          <li>Chọn service sở hữu nghiệp vụ. Nếu cần nhiều service, xác định service nào là source of truth.</li>
+          <li>Liệt kê dữ liệu cần lưu, dữ liệu chỉ để hiển thị, dữ liệu đến từ event hoặc BFF.</li>
+          <li>Thiết kế API command/query trước, sau đó mới viết migration và code.</li>
+          <li>Chọn cách kiểm chứng: test, curl, màn hình UI, hoặc event replay.</li>
+        </ol>
+        <div class="note">
+          Ví dụ yêu cầu "nhắc học viên sắp trễ hạn" không chỉ là một API gửi thông báo. Nó gồm assignment/deadline làm
+          source of truth, outbox event để báo reminder due, notification-service tạo inbox item, analytics-service cập
+          nhật risk signal và React admin hiển thị dashboard.
+        </div>
+      </section>
+
+      <section id="quality-bar">
+        <h2>5. Tiêu chuẩn chất lượng cho mọi thay đổi</h2>
+        <ul class="checklist">
+          <li>Không expose entity/model trực tiếp ra API; chỉ trả DTO.</li>
+          <li>Không service nào query database của service khác.</li>
+          <li>Migration production chỉ tạo schema; demo data nằm ở profile <code>demo</code>.</li>
+          <li>Controller validate input bằng annotation và <code>@Valid</code>.</li>
+          <li>Service chứa use case/transaction; repository chỉ làm data access.</li>
+          <li>Nếu ghi event, event phải nằm trong cùng transaction với thay đổi domain.</li>
+          <li>Nếu consume event, phải có dedup bằng <code>processed_events</code>.</li>
+          <li>Gateway là nơi duy nhất tin JWT từ client; downstream chỉ tin header do gateway inject.</li>
+          <li>Mỗi thay đổi có test hoặc ít nhất command/curl chứng minh chạy được.</li>
+        </ul>
+      </section>
+
+      <section class="stage" id="week0">
+        <h2>Bước 0 - Setup môi trường <span class="badge b-start">Nền tảng</span></h2>
+        <p>Mục tiêu: chạy được project và biết các command tối thiểu để tự kiểm chứng.</p>
+        <h3>Cài đặt</h3>
+        <ul>
+          <li>Java 21, Maven 3.9+, Docker Desktop, Node.js LTS, npm.</li>
+          <li>Flutter SDK nếu làm app mobile.</li>
+          <li>IDE có Java, TypeScript, Flutter plugin.</li>
+        </ul>
+        <h3>Command bắt buộc</h3>
+        <pre>cd v2/courseflow/backend
+mvn test
+
+cd ../web/next-learning
+npm install
+npm run build
+
+cd ../react-admin
+npm install
+npm run build</pre>
+        <div class="deliverable">
+          <h4>Kết quả cần có</h4>
+          <ul>
+            <li>Screenshot/lệnh build backend pass.</li>
+            <li>Screenshot/lệnh build Next và React pass.</li>
+            <li>Ghi chú lỗi setup gặp phải và cách xử lý.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage" id="stage1">
+        <h2>Bước 1 - Đọc code theo luồng request <span class="badge b-start">Nền tảng</span></h2>
+        <p>Mục tiêu: hiểu một request đi qua những lớp nào, không còn nhìn project như một đống folder rời rạc.</p>
+        <h3>Đọc theo thứ tự</h3>
+        <ol>
+          <li><code>backend/docs/architecture/backend-architecture.md</code>: hiểu service ownership.</li>
+          <li><code>services/api-gateway/application.yml</code>: hiểu route public/internal.</li>
+          <li><code>services/course-service</code>: đọc catalog + module APIs.</li>
+          <li><code>services/identity-service</code>: đọc login, JWT, refresh token.</li>
+          <li><code>common-library</code>: đọc error, CurrentUser, GatewayHeaders.</li>
+        </ol>
+        <h3>Bài tập</h3>
+        <ul>
+          <li>Vẽ sơ đồ request <code>GET /api/public/courses</code> từ client tới DB.</li>
+          <li>Vẽ sơ đồ request <code>POST /api/auth/login</code>.</li>
+          <li>Giải thích vì sao client không được tự gửi <code>X-User-Id</code>.</li>
+        </ul>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Trả lời được controller/service/repository/dto/model khác nhau thế nào.</li>
+            <li>Biết file nào định nghĩa route gateway.</li>
+            <li>Biết service nào dùng PostgreSQL, MongoDB, Elasticsearch.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage" id="stage2">
+        <h2>Bước 2 - CRUD đầu tiên <span class="badge b-start">Nền tảng</span></h2>
+        <p>Mục tiêu: thêm một API nhỏ theo pattern có sẵn, không phá kiến trúc.</p>
+        <h3>Bài làm mẫu: thêm endpoint list theo filter trong media-service</h3>
+        <ol>
+          <li>Đọc <code>media-service/controller/MediaController.java</code>.</li>
+          <li>Đọc DTO trong <code>MediaDtos.java</code>.</li>
+          <li>Đọc SQL trong <code>MediaRepository.java</code>.</li>
+          <li>Thêm filter mới, ví dụ <code>contentType</code>.</li>
+          <li>Chạy compile và test.</li>
+        </ol>
+        <pre>GET /internal/media/assets?ownerId=2&amp;contentType=application/pdf</pre>
+        <div class="warn">
+          Không thêm field vào entity/model nếu DB chưa có column. Nếu cần column mới, phải viết migration.
+        </div>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>API trả đúng DTO.</li>
+            <li>Không thay đổi business service khác.</li>
+            <li><code>mvn -pl services/media-service -am test</code> pass.</li>
+            <li>Có curl minh họa request/response.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage" id="stage3">
+        <h2>Bước 3 - API, DTO, validation và error <span class="badge b-start">Nền tảng</span></h2>
+        <p>Mục tiêu: hiểu API contract và biết bảo vệ input trước khi vào business logic.</p>
+        <h3>Bài làm mẫu: tạo request DTO đúng chuẩn</h3>
+        <ul>
+          <li>Dùng record DTO cho request/response.</li>
+          <li>Thêm annotation như <code>@NotBlank</code>, <code>@NotNull</code>, <code>@Positive</code>.</li>
+          <li>Controller nhận <code>@Valid @RequestBody</code>.</li>
+          <li>Không trả raw map nếu có thể tạo DTO rõ ràng.</li>
+        </ul>
+        <h3>Bài tập</h3>
+        <p>Thêm endpoint tạo notification preference nếu chưa có, hoặc mở rộng preference theo channel.</p>
+        <pre>POST /internal/notifications/preferences
+{
+  "userId": "4",
+  "channel": "IN_APP",
+  "enabled": true
+}</pre>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Request thiếu field trả 400 qua <code>ApiExceptionHandler</code>.</li>
+            <li>Response không lộ column/field thừa.</li>
+            <li>Tên DTO kết thúc bằng <code>Dto</code>, không dùng <code>Vm</code>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage" id="stage4">
+        <h2>Bước 4 - Database và Liquibase <span class="badge b-start">Nền tảng</span></h2>
+        <p>Mục tiêu: biết thay đổi schema an toàn và không lẫn demo data vào production migration.</p>
+        <h3>Quy tắc migration</h3>
+        <ul>
+          <li><code>db.changelog-master.yaml</code> chỉ include schema.</li>
+          <li><code>db.changelog-demo.yaml</code> include schema + demo data.</li>
+          <li>Không viết <code>INSERT</code> demo vào file schema production.</li>
+          <li>Không xóa/đổi changeset đã chạy; thêm changeset mới.</li>
+        </ul>
+        <h3>Bài làm mẫu</h3>
+        <p>Thêm column <code>description</code> cho một bảng nhỏ, ví dụ <code>notification_preferences</code> hoặc
+          <code>media_assets</code>.</p>
+        <pre>-- liquibase formatted sql
+-- changeset courseflow:media-002-add-description
+ALTER TABLE media_assets ADD COLUMN IF NOT EXISTS description TEXT;</pre>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Migration chạy với DB sạch.</li>
+            <li>Code compile sau khi thêm field.</li>
+            <li>Demo data nếu có phải ở file <code>900-demo-data.sql</code> hoặc changeset demo riêng.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage feature" id="stage5">
+        <h2>Bước 5 - Xây một tính năng trong service <span class="badge b-build">Mở rộng</span></h2>
+        <p>Mục tiêu: tự làm một tính năng trong một service từ DB đến API.</p>
+        <h3>Chọn một bài làm</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Bài làm</th>
+              <th>Service</th>
+              <th>Giá trị học được</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Course section capacity</td>
+              <td>organization-service / enrollment-service</td>
+              <td>Transaction, capacity, waitlist.</td>
+            </tr>
+            <tr>
+              <td>Announcement scheduling</td>
+              <td>announcement-service</td>
+              <td>Status lifecycle, publish time, outbox.</td>
+            </tr>
+            <tr>
+              <td>Discussion moderation</td>
+              <td>discussion-service</td>
+              <td>State change, accepted comment, audit thinking.</td>
+            </tr>
+            <tr>
+              <td>Media signed upload policy</td>
+              <td>media-service</td>
+              <td>Storage abstraction, metadata, security boundary.</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Trình tự triển khai</h3>
+        <ol>
+          <li>Viết use case bằng lời: actor, input, output, rule.</li>
+          <li>Thiết kế DTO request/response.</li>
+          <li>Thêm migration nếu cần.</li>
+          <li>Viết repository SQL.</li>
+          <li>Viết service transaction.</li>
+          <li>Viết controller.</li>
+          <li>Viết test hoặc curl verify.</li>
+          <li>Cập nhật API doc nếu contract mới.</li>
+        </ol>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Người review có thể gọi API mà không cần đọc code trước.</li>
+            <li>Edge case chính được xử lý: not found, conflict, invalid input.</li>
+            <li>Không có logic nghiệp vụ trong controller.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage feature" id="stage6">
+        <h2>Bước 6 - Auth, gateway và CurrentUser <span class="badge b-build">Mở rộng</span></h2>
+        <p>Mục tiêu: hiểu trust boundary và không tạo lỗ hổng bằng cách tin header từ client.</p>
+        <h3>Đọc kỹ</h3>
+        <ul>
+          <li><code>JwtAuthenticationGatewayFilter.java</code></li>
+          <li><code>GatewayHeaders.java</code></li>
+          <li><code>CurrentUserArgumentResolver.java</code></li>
+          <li><code>JwtAuthenticationGatewayFilterTest.java</code></li>
+        </ul>
+        <h3>Bài tập</h3>
+        <p>Thêm một endpoint chỉ operator được gọi, ví dụ publish announcement hoặc archive course, dùng
+          <code>CurrentUser</code> để lấy actor.</p>
+        <pre>POST /internal/courses/{courseId}/archive
+Authorization: Bearer &lt;token&gt;</pre>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Endpoint không đọc <code>X-User-Id</code> thủ công.</li>
+            <li>Token của người học không gọi được route backoffice/user-management.</li>
+            <li>Gateway test vẫn pass.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage feature" id="stage7">
+        <h2>Bước 7 - Transactional outbox <span class="badge b-build">Mở rộng</span></h2>
+        <p>Mục tiêu: hiểu vì sao không publish Kafka trực tiếp trong cùng method ghi DB.</p>
+        <h3>Luồng mẫu</h3>
+        <pre>Domain action
+  ├─ update domain table
+  └─ insert outbox_events
+        same DB transaction
+
+Relay/Debezium
+  └─ publish Kafka later
+
+Consumer
+  └─ process event with dedup</pre>
+        <h3>Bài tập</h3>
+        <p>Chọn một producer đã có outbox, ví dụ <code>assignment-service</code> với <code>submission.created</code>,
+          rồi chuẩn hóa payload có đủ <code>eventId</code>, <code>aggregateId</code>, <code>occurredAt</code>,
+          <code>actorId</code> nếu cần.</p>
+        <div class="warn">
+          Outbox payload phải đủ để consumer xử lý mà không query database producer. Nếu thiếu dữ liệu, consumer sẽ
+          buộc gọi ngược service hoặc đọc DB sai nguyên tắc.
+        </div>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Domain change và outbox insert nằm cùng transaction.</li>
+            <li>Payload có event id duy nhất để dedup.</li>
+            <li>Không publish Kafka trực tiếp từ service method nghiệp vụ.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage feature" id="stage8">
+        <h2>Bước 8 - Consumer và dedup <span class="badge b-build">Mở rộng</span></h2>
+        <p>Mục tiêu: viết consumer an toàn với Kafka at-least-once delivery.</p>
+        <h3>Đọc luồng mẫu</h3>
+        <ul>
+          <li><code>announcement-service/config/OutboxRelay.java</code> nếu có relay mẫu trong repo.</li>
+          <li><code>notification-service/consumer/AnnouncementEventConsumer.java</code> nếu có consumer mẫu.</li>
+          <li>Bảng <code>processed_events</code> trong changelog consumer service.</li>
+        </ul>
+        <h3>Bài tập đề xuất</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Producer event</th>
+              <th>Consumer cần viết</th>
+              <th>Kết quả</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>deadline.reminder.due</code></td>
+              <td>notification-service</td>
+              <td>Tạo notification reminder.</td>
+            </tr>
+            <tr>
+              <td><code>discussion.comment.created</code></td>
+              <td>analytics-service</td>
+              <td>Tăng discussion count.</td>
+            </tr>
+            <tr>
+              <td><code>quiz.attempt.graded</code></td>
+              <td>gradebook-service</td>
+              <td>Upsert grade entry.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Consumer check <code>processed_events</code> trước khi xử lý.</li>
+            <li>Insert domain/read-model update và insert processed event cùng transaction.</li>
+            <li>Gửi lại cùng event 2 lần không tạo dữ liệu trùng.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage feature" id="stage9">
+        <h2>Bước 9 - Một luồng web/app thật <span class="badge b-build">Mở rộng</span></h2>
+        <p>Mục tiêu: client gọi gateway thật, hiển thị loading/error/data, không chỉ là placeholder.</p>
+        <h3>Next.js public/learning</h3>
+        <ul>
+          <li>Dùng cho public catalog, course detail, certificate verification.</li>
+          <li>Gọi <code>/api/public/courses</code>, <code>/api/public/search/courses</code>,
+            <code>/api/public/certificates/verify/{code}</code>.</li>
+          <li>Ưu tiên SEO, metadata, route theo slug.</li>
+        </ul>
+        <h3>React admin</h3>
+        <ul>
+          <li>Dùng cho quy trình vận hành: course, users, announcement, analytics, moderation.</li>
+          <li>Login qua <code>/api/auth/login</code>, lưu token an toàn, gọi internal APIs qua gateway.</li>
+          <li>Ưu tiên bảng, filter, form, trạng thái lỗi rõ ràng.</li>
+        </ul>
+        <h3>Flutter app</h3>
+        <ul>
+          <li>Dùng cho mobile người học: course, deadline, notification, quiz attempt.</li>
+          <li>Dio base URL trỏ <code>http://localhost:8080/api</code>.</li>
+          <li>Repository layer tách khỏi UI widget.</li>
+        </ul>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Web build pass: <code>npm run build</code>.</li>
+            <li>UI có loading/error/data state.</li>
+            <li>Không gọi trực tiếp domain service port từ frontend; đi qua gateway.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage production" id="stage10">
+        <h2>Bước 10 - Search và analytics read model <span class="badge b-prod">Production</span></h2>
+        <p>Mục tiêu: hiểu hệ thống đọc nhanh bằng read model, không query chéo DB service khác.</p>
+        <h3>Search</h3>
+        <ol>
+          <li>Course-service publish hoặc thay đổi course.</li>
+          <li>Event/CDC đưa dữ liệu sang search-service.</li>
+          <li>Search-service index Elasticsearch.</li>
+          <li>Next.js gọi <code>/api/public/search/courses?q=...</code>.</li>
+        </ol>
+        <h3>Analytics</h3>
+        <ol>
+          <li>Consumer nhận event từ enrollment, submission, discussion, quiz, certificate.</li>
+          <li>Update bảng metrics riêng của analytics-service.</li>
+          <li>React admin gọi dashboard từ analytics API.</li>
+        </ol>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Search không đọc DB course-service trực tiếp.</li>
+            <li>Analytics update idempotent khi event bị gửi lại.</li>
+            <li>Có cách rebuild/replay read model từ event hoặc CDC.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage production" id="stage11">
+        <h2>Bước 11 - BFF composition <span class="badge b-prod">Production</span></h2>
+        <p>Mục tiêu: biết khi nào cần BFF và không biến gateway thành BFF trá hình.</p>
+        <h3>Trường hợp nên làm BFF</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>BFF endpoint</th>
+              <th>Gọi service nào</th>
+              <th>Client dùng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>GET /api/learning/me/dashboard</code></td>
+              <td>course, enrollment, deadline, notification, gradebook</td>
+              <td>Flutter, Next cho người học đã đăng nhập.</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/backoffice/courses/{id}/operations</code></td>
+              <td>course, enrollment, announcement, discussion, analytics</td>
+              <td>React admin.</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/backoffice/students/{id}/risk</code></td>
+              <td>analytics, gradebook, quiz, deadline</td>
+              <td>React admin/advisor.</td>
+            </tr>
+          </tbody>
+        </table>
+        <h3>Quy tắc</h3>
+        <ul>
+          <li>Gateway route/auth/rate-limit; BFF compose data; domain service giữ business rule.</li>
+          <li>BFF không sở hữu DB nghiệp vụ.</li>
+          <li>BFF DTO được thiết kế theo màn hình, không mirror DTO của từng service y nguyên.</li>
+        </ul>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Một màn hình client gọi một BFF endpoint thay vì gọi 5 service.</li>
+            <li>BFF có timeout/fallback rõ ràng cho downstream.</li>
+            <li>BFF không mutate dữ liệu ngoài việc gọi command API của domain service.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage production" id="stage12">
+        <h2>Bước 12 - Tính năng LMS nâng cao <span class="badge b-prod">Production</span></h2>
+        <p>Mục tiêu: triển khai tính năng nghiệp vụ phức tạp có state, audit, event và UI.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Tính năng</th>
+              <th>Service chính</th>
+              <th>Điểm khó cần học</th>
+              <th>Kết quả</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Gradebook/Rubric</td>
+              <td>gradebook-service</td>
+              <td>Weighted score, override audit, rubric snapshot.</td>
+              <td>React admin gradebook screen + APIs.</td>
+            </tr>
+            <tr>
+              <td>Quiz/Question Bank</td>
+              <td>quiz-service</td>
+              <td>Attempt lifecycle, timer, randomization, auto-grade idempotent submit.</td>
+              <td>Màn hình làm quiz + đồng bộ gradebook.</td>
+            </tr>
+            <tr>
+              <td>Course Modules</td>
+              <td>course-service</td>
+              <td>Ordering, prerequisite rule, progress event.</td>
+              <td>Learning path API + Next/Flutter UI.</td>
+            </tr>
+            <tr>
+              <td>Xác minh chứng chỉ</td>
+              <td>certificate-service</td>
+              <td>Public verify, signed code, revoke audit.</td>
+              <td>SEO verify page + public API.</td>
+            </tr>
+            <tr>
+              <td>Peer Review</td>
+              <td>peer-review-service</td>
+              <td>Reviewer assignment, luồng ẩn danh, disputes, finalized score.</td>
+              <td>Luồng nhiều bước + notification + gradebook event.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="stage production" id="stage13">
+        <h2>Bước 13 - Test, contract và CI <span class="badge b-prod">Production</span></h2>
+        <p>Mục tiêu: tính năng không chỉ chạy trên máy dev mà có thể được bảo vệ bằng test và CI.</p>
+        <h3>Thứ tự test nên học</h3>
+        <ol>
+          <li>Unit test service method thuần logic.</li>
+          <li>Repository/integration test với Testcontainers cho SQL quan trọng.</li>
+          <li>Controller test cho validation/error contract.</li>
+          <li>Gateway security test cho auth/role/header.</li>
+          <li>Consumer test cho idempotency.</li>
+          <li>E2E smoke test cho login → course → submit/quiz.</li>
+        </ol>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>PR mới có test tương ứng với rủi ro.</li>
+            <li>CI chạy backend test và web build.</li>
+            <li>Test không phụ thuộc vào data demo production.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="stage production" id="stage14">
+        <h2>Bước 14 - Gia cố production <span class="badge b-prod">Production</span></h2>
+        <p>Mục tiêu: nhìn hệ thống bằng con mắt vận hành: fail ở đâu, quan sát thế nào, rollback ra sao.</p>
+        <div class="grid">
+          <div class="box blue">
+            <h4>Observability</h4>
+            <ul>
+              <li>Correlation id end-to-end.</li>
+              <li>Structured logs.</li>
+              <li>Metrics: latency, error rate, consumer lag.</li>
+            </ul>
+          </div>
+          <div class="box green">
+            <h4>Reliability</h4>
+            <ul>
+              <li>Timeout/retry/circuit breaker cho service call.</li>
+              <li>Outbox retry và dead-letter topic.</li>
+              <li>Idempotency key cho command nguy hiểm.</li>
+            </ul>
+          </div>
+          <div class="box orange">
+            <h4>Security</h4>
+            <ul>
+              <li>JWT secret không hardcode prod.</li>
+              <li>Role/permission theo use case.</li>
+              <li>Không log token/password/PII.</li>
+            </ul>
+          </div>
+          <div class="box purple">
+            <h4>Release</h4>
+            <ul>
+              <li>Backward-compatible migration.</li>
+              <li>Feature flag nếu thay đổi lớn.</li>
+              <li>Rollback plan cho schema/API/event.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="rubric">
+        <h2>Rubric tự đánh giá năng lực</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Kỹ năng</th>
+              <th>Mức 1 - Nắm nền tảng</th>
+              <th>Mức 2 - Làm độc lập</th>
+              <th>Mức 3 - Thiết kế production</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Đọc code</td>
+              <td>Tìm được file cần sửa.</td>
+              <td>Hiểu luồng request/transaction.</td>
+              <td>Nhìn ra coupling, gap, edge case.</td>
+            </tr>
+            <tr>
+              <td>API design</td>
+              <td>Thêm endpoint theo mẫu.</td>
+              <td>Thiết kế DTO/validation hợp lý.</td>
+              <td>Versioning, compatibility, BFF contract.</td>
+            </tr>
+            <tr>
+              <td>Database</td>
+              <td>Viết migration nhỏ.</td>
+              <td>Thiết kế bảng/index/constraint.</td>
+              <td>Plan migration an toàn khi production có data.</td>
+            </tr>
+            <tr>
+              <td>Event</td>
+              <td>Hiểu outbox là gì.</td>
+              <td>Viết producer/consumer dedup.</td>
+              <td>Thiết kế event schema, retry, replay, DLQ.</td>
+            </tr>
+            <tr>
+              <td>Frontend</td>
+              <td>Render data từ API.</td>
+              <td>Loading/error/form state tốt.</td>
+              <td>Chọn Next/React/Flutter đúng use case.</td>
+            </tr>
+            <tr>
+              <td>Testing</td>
+              <td>Chạy test và viết test đơn giản.</td>
+              <td>Test service/repository/controller.</td>
+              <td>Test strategy theo risk, contract, E2E smoke.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="review-template">
+        <h2>PR checklist thực hành</h2>
+        <p>Trước khi gửi PR, tự điền checklist này. Người review sẽ dựa vào đây để kiểm tra nhanh chất lượng thay đổi.</p>
+        <ul class="checklist">
+          <li>Yêu cầu này thuộc bounded context nào?</li>
+          <li>Có thay đổi API contract không? Nếu có, docs đã cập nhật chưa?</li>
+          <li>Có thay đổi DB không? Migration có production-safe không?</li>
+          <li>DTO có validation chưa?</li>
+          <li>Controller có chỉ gọi service, không chứa business logic không?</li>
+          <li>Repository có query DB service khác không? Nếu có là sai.</li>
+          <li>Có event không? Nếu có outbox/dedup đã đúng chưa?</li>
+          <li>Có test hoặc curl chứng minh không?</li>
+          <li>Build command nào đã chạy và kết quả là gì?</li>
+        </ul>
+        <pre>Tiêu đề PR:
+[service-name] Add &lt;ten-tinh-nang&gt;
+
+Tóm tắt:
+- Thay đổi gì
+- Vì sao service này sở hữu nghiệp vụ
+- Ví dụ API
+
+Kiểm chứng:
+- mvn -pl services/&lt;service&gt; -am test
+- curl ...
+
+Rủi ro:
+- Tương thích migration/API/event
+- Test còn thiếu nếu có</pre>
+      </section>
+
+      <section id="capstone">
+        <h2>Bài tổng hợp production</h2>
+        <p>Đây là bài dùng để kiểm tra khả năng ghép nhiều phần của hệ thống thành một luồng nghiệp vụ có thể vận hành thật.</p>
+        <h3>Đề bài: Learner Deadline Risk Dashboard</h3>
+        <p>Xây một luồng cho admin/professor xem học viên có rủi ro trễ hạn.</p>
+        <h3>Phạm vi</h3>
+        <ol>
+          <li>Assignment-service phát event khi assignment được tạo/published.</li>
+          <li>Deadline-service tạo reminder runs.</li>
+          <li>Notification-service nhận reminder due và tạo inbox notification.</li>
+          <li>Analytics-service consume submission/reminder events để tính risk.</li>
+          <li>Backoffice-bff expose <code>GET /api/backoffice/courses/{id}/deadline-risk</code>.</li>
+          <li>React admin hiển thị bảng risk, filter theo course/section/status.</li>
+        </ol>
+        <h3>Cách triển khai theo từng phần</h3>
+        <ol>
+          <li>
+            Bắt đầu ở backend: thêm command publish assignment và đảm bảo assignment có deadline, courseId, sectionId,
+            phạm vi người học.
+          </li>
+          <li>
+            Thêm outbox event <code>assignment.published</code> hoặc <code>deadline.reminder.due</code>; payload phải đủ
+            để consumer xử lý mà không đọc DB của service phát event.
+          </li>
+          <li>
+            Ở notification-service, tạo inbox item idempotent theo <code>eventId</code>. Gửi lại cùng event hai lần
+            không được tạo hai notification.
+          </li>
+          <li>
+            Ở analytics-service, tính risk đơn giản trước: quá hạn, gần đến hạn, chưa nộp, điểm quiz thấp. Sau đó mới
+            mở rộng rule phức tạp hơn.
+          </li>
+          <li>
+            Ở backoffice-bff, gom dữ liệu course, deadline và risk thành một DTO đúng nhu cầu màn hình. Không để React
+            admin gọi nhiều service trực tiếp.
+          </li>
+          <li>
+            Ở React admin, làm bảng có filter, empty state, loading state, error state và link về người học/course detail.
+          </li>
+        </ol>
+        <div class="warn">
+          Không làm quá rộng ngay lần đầu. Phiên bản đầu chỉ cần một course, một section, một loại deadline và một công
+          thức risk đơn giản. Khi luồng đã chạy đúng, mới thêm nhiều loại reminder hoặc rule phân tích nâng cao.
+        </div>
+        <div class="deliverable">
+          <h4>Kết quả cần đạt</h4>
+          <ul>
+            <li>Có thiết kế ngắn 1-2 trang: service ownership, API, event, DB, failure cases.</li>
+            <li>Có migration, DTO, service, repository, controller, consumer, BFF và UI.</li>
+            <li>Có test cho gateway/BFF hoặc consumer idempotency.</li>
+            <li>Có demo data profile local.</li>
+            <li>Có observability tối thiểu: correlation id/log rõ cho request và event.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="pitfalls">
+        <h2>Lỗi thường gặp và cách tránh</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Lỗi</th>
+              <th>Vì sao nguy hiểm</th>
+              <th>Cách đúng</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Frontend gọi thẳng port service</td>
+              <td>Client dính vào topology microservice, bypass gateway security.</td>
+              <td>Đi qua <code>api-gateway</code>, sau đó BFF hoặc public/internal route.</td>
+            </tr>
+            <tr>
+              <td>Service đọc DB service khác</td>
+              <td>Phá DB-per-service, khó scale và đổi schema.</td>
+              <td>Gọi API, consume event, hoặc dùng read model.</td>
+            </tr>
+            <tr>
+              <td>Nhét logic màn hình vào gateway</td>
+              <td>Gateway phình thành BFF trá hình.</td>
+              <td>Gateway mỏng; BFF compose data theo màn hình.</td>
+            </tr>
+            <tr>
+              <td>Gửi Kafka trực tiếp sau khi update DB</td>
+              <td>Dễ dual-write: DB thành công nhưng Kafka fail hoặc ngược lại.</td>
+              <td>Transactional outbox.</td>
+            </tr>
+            <tr>
+              <td>Consumer không dedup</td>
+              <td>Kafka có thể gửi lại event, gây duplicate notification/grade/metric.</td>
+              <td>Bảng <code>processed_events</code> trong transaction.</td>
+            </tr>
+            <tr>
+              <td>Demo data nằm trong schema changelog</td>
+              <td>Production có thể bị insert data mẫu.</td>
+              <td>Tách <code>db.changelog-demo.yaml</code> và profile <code>demo</code>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+</body>
+
+</html>

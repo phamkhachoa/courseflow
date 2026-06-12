@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CourseFlow - Product &amp; Architecture Spec</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --paper: #fff;
+      --text: #172033;
+      --muted: #607086;
+      --line: #dbe3ef;
+      --blue: #2563eb;
+      --blue-soft: #eaf1ff;
+      --green: #0f766e;
+      --green-soft: #e6f6f3;
+      --orange: #ea580c;
+      --orange-soft: #fff4ed;
+      --purple: #7c3aed;
+      --purple-soft: #f3eeff;
+      --red: #b91c1c;
+      --red-soft: #ffe8e8;
+      --dark: #0f172a;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    html {
+      scroll-behavior: smooth
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, "Helvetica Neue", sans-serif;
+      line-height: 1.65
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none
+    }
+
+    a:hover {
+      text-decoration: underline
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      background: var(--dark);
+      color: #f8fafc;
+      padding: 26px 20px
+    }
+
+    .sidebar h1 {
+      margin: 0 0 4px;
+      font-size: 18px
+    }
+
+    .sidebar p {
+      margin: 0 0 18px;
+      color: #94a3b8;
+      font-size: 13px
+    }
+
+    .nav-title {
+      margin: 18px 0 6px;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase
+    }
+
+    .sidebar a {
+      display: block;
+      color: #e2e8f0;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 13px
+    }
+
+    .sidebar a:hover {
+      background: #1e293b;
+      text-decoration: none
+    }
+
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 34px 30px 80px
+    }
+
+    .hero {
+      background: #123761;
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 34px;
+      margin-bottom: 26px
+    }
+
+    .hero h2 {
+      margin: 0 0 10px;
+      font-size: 34px;
+      line-height: 1.2
+    }
+
+    .hero p {
+      margin: 0;
+      color: #c7ddff;
+      max-width: 820px
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 18px
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, .14)
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 26px;
+      margin-top: 24px
+    }
+
+    section h2 {
+      margin: 0 0 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+      font-size: 23px
+    }
+
+    h3 {
+      margin: 22px 0 10px;
+      font-size: 18px
+    }
+
+    h4 {
+      margin: 16px 0 8px;
+      font-size: 15px
+    }
+
+    p {
+      margin: 10px 0
+    }
+
+    ul,
+    ol {
+      padding-left: 20px;
+      margin: 10px 0
+    }
+
+    li {
+      margin: 5px 0
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px
+    }
+
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px
+    }
+
+    .grid4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 14px
+    }
+
+    .box {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      background: #fbfcff
+    }
+
+    .box h3,
+    .box h4 {
+      margin-top: 0
+    }
+
+    .blue {
+      background: var(--blue-soft);
+      border-color: #bfdbfe
+    }
+
+    .green {
+      background: var(--green-soft);
+      border-color: #99f6e4
+    }
+
+    .orange {
+      background: var(--orange-soft);
+      border-color: #fed7aa
+    }
+
+    .purple {
+      background: var(--purple-soft);
+      border-color: #ddd6fe
+    }
+
+    .note {
+      margin: 16px 0;
+      padding: 13px 15px;
+      background: var(--green-soft);
+      border-left: 4px solid var(--green);
+      border-radius: 0 var(--radius) var(--radius) 0
+    }
+
+    .warn {
+      margin: 16px 0;
+      padding: 13px 15px;
+      background: var(--orange-soft);
+      border-left: 4px solid var(--orange);
+      border-radius: 0 var(--radius) var(--radius) 0
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top
+    }
+
+    th {
+      background: #eef4ff;
+      color: #1e3a8a
+    }
+
+    code {
+      background: #edf2f7;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: .9em
+    }
+
+    pre {
+      overflow: auto;
+      background: #111827;
+      color: #e5e7eb;
+      border-radius: var(--radius);
+      padding: 16px;
+      line-height: 1.55
+    }
+
+    .pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 700
+    }
+
+    .pblue {
+      background: var(--blue-soft);
+      color: #1d4ed8
+    }
+
+    .pgreen {
+      background: var(--green-soft);
+      color: #0f766e
+    }
+
+    .porange {
+      background: var(--orange-soft);
+      color: #c2410c
+    }
+
+    .ppurple {
+      background: var(--purple-soft);
+      color: #6d28d9
+    }
+
+    @media(max-width:900px) {
+      .layout {
+        display: block
+      }
+
+      .sidebar {
+        position: static;
+        height: auto
+      }
+
+      main {
+        padding: 20px 14px 48px
+      }
+
+      .grid,
+      .grid3,
+      .grid4 {
+        grid-template-columns: 1fr
+      }
+
+      .hero h2 {
+        font-size: 27px
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h1>CourseFlow</h1>
+      <p>Product &amp; Architecture Spec</p>
+      <nav>
+        <div class="nav-title">Tổng quan</div>
+        <a href="#vision">Tầm nhìn</a>
+        <a href="#reference">Nguồn tham khảo</a>
+        <a href="#actors">Actors</a>
+        <a href="#architecture">Kiến trúc</a>
+        <div class="nav-title">Bounded Contexts</div>
+        <a href="#backend-services">Backend services</a>
+        <a href="#web-app">Web: Next.js và React</a>
+        <a href="#mobile-app">Flutter app</a>
+        <a href="#events">Events</a>
+        <a href="#data">Data ownership</a>
+        <div class="nav-title">Tính năng</div>
+        <a href="#feature-map">Feature map</a>
+        <a href="#training-feature-roadmap">Feature training nâng cao</a>
+        <a href="#production-flow">Production flow</a>
+        <a href="#production-gaps">Thiếu gì để thành product</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#links">Tài liệu</a>
+      </nav>
+    </aside>
+    <main>
+      <div class="hero" id="vision">
+        <h2>CourseFlow - LMS microservices theo nghiệp vụ</h2>
+        <p>
+          CourseFlow là hệ thống LMS được thiết kế theo hướng production. Mỗi service đảm nhận đúng một
+          bounded context nghiệp vụ, có BFF riêng cho learner/backoffice, có data ownership rõ ràng,
+          outbox/dedup, CDC search và analytics.
+        </p>
+        <div class="tags">
+          <span class="tag">Domain microservices</span>
+          <span class="tag">Learning BFF</span>
+          <span class="tag">Backoffice BFF</span>
+          <span class="tag">Kafka + Outbox</span>
+          <span class="tag">Debezium + Elasticsearch</span>
+        </div>
+      </div>
+
+      <section id="reference">
+        <h2>Nguồn tham khảo kiến trúc</h2>
+        <p>
+          YAS được dùng làm mẫu kiến trúc chính: nhiều service độc lập, BFF cho storefront/backoffice,
+          search service riêng, Kafka, Keycloak, Elasticsearch, Docker/K8s và observability nằm ngoài domain service.
+        </p>
+        <div class="grid3">
+          <div class="box blue">
+            <h4>YAS</h4>
+            <p>Học cách chia module: service nghiệp vụ, BFF, frontend riêng, infra riêng.</p>
+          </div>
+          <div class="box green">
+            <h4>Open edX / Moodle / Canvas</h4>
+            <p>Học use case LMS thật: course authoring, discussion, gradebook, certificates, analytics.</p>
+          </div>
+          <div class="box orange">
+            <h4>CourseFlow adaptation</h4>
+            <p>Không copy domain e-commerce; chuyển tư duy service ownership sang LMS.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="actors">
+        <h2>Actors trong hệ thống</h2>
+        <div class="grid4">
+          <div class="box blue">
+            <h4>Admin</h4>
+            <ul>
+              <li>Quản lý tổ chức</li>
+              <li>Quản lý user/role</li>
+              <li>Vận hành course</li>
+              <li>Xem analytics</li>
+            </ul>
+          </div>
+          <div class="box green">
+            <h4>Professor</h4>
+            <ul>
+              <li>Quản lý course</li>
+              <li>Tạo assignment</li>
+              <li>Đăng announcement</li>
+              <li>Chấm bài</li>
+            </ul>
+          </div>
+          <div class="box purple">
+            <h4>TA</h4>
+            <ul>
+              <li>Hỗ trợ grading</li>
+              <li>Moderate discussion</li>
+              <li>Trả lời câu hỏi</li>
+              <li>Theo dõi deadline</li>
+            </ul>
+          </div>
+          <div class="box orange">
+            <h4>Student</h4>
+            <ul>
+              <li>Tìm course</li>
+              <li>Enroll</li>
+              <li>Nộp bài</li>
+              <li>Nhận reminder</li>
+              <li>Thảo luận</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <h2>Kiến trúc tổng thể</h2>
+        <pre>courseflow/
+  backend/
+    common-library
+    event-contracts
+    services/
+      identity-service
+      organization-service
+      course-service
+      enrollment-service
+      assignment-service
+      deadline-service
+      announcement-service
+      portfolio-service
+      discussion-service
+      notification-service
+      media-service
+      search-service
+      analytics-service
+      api-gateway
+    bffs/
+      learning-bff
+      backoffice-bff
+    workers/
+      outbox-relay
+    infra/
+      docker
+      k8s
+      observability
+  web/
+    next-learning
+    react-admin
+  app/
+    flutter learner app</pre>
+
+        <h3>Request flow</h3>
+        <pre>Next.js learner/public  -> API Gateway -> learning-bff   -> course/search/enrollment/notification
+React admin/backoffice -> API Gateway -> backoffice-bff -> identity/org/course/announcement/discussion/analytics
+Flutter learner app    -> API Gateway -> learning-bff   -> learner use cases</pre>
+        <div class="note">
+          <code>api-gateway</code> là trust boundary: strip mọi <code>X-User-*</code> do client gửi, verify JWT,
+          rồi inject identity header đã xác thực cho BFF/domain service. BFF chỉ compose dữ liệu theo màn hình,
+          không chứa business rule lõi.
+        </div>
+      </section>
+
+      <section id="backend-services">
+        <h2>Backend services</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Ownership</th>
+              <th>Use case chính</th>
+              <th>Tech</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="pill pblue">identity-service</span></td>
+              <td>User, auth, roles, refresh token</td>
+              <td>Login, RBAC, user status</td>
+              <td>Spring Security, PostgreSQL</td>
+            </tr>
+            <tr>
+              <td><span class="pill pgreen">organization-service</span></td>
+              <td>Department, term, program, section</td>
+              <td>Admin setup học kỳ/khoa/lớp</td>
+              <td>PostgreSQL, Liquibase</td>
+            </tr>
+            <tr>
+              <td><span class="pill pblue">course-service</span></td>
+              <td>Course catalog, syllabus, outcomes, material metadata</td>
+              <td>Professor publish course, learner browse</td>
+              <td>PostgreSQL, Kafka outbox</td>
+            </tr>
+            <tr>
+              <td><span class="pill pgreen">enrollment-service</span></td>
+              <td>Enrollment, roster, waitlist, capacity</td>
+              <td>Student enroll, admin xử lý waitlist</td>
+              <td>PostgreSQL lock, Kafka</td>
+            </tr>
+            <tr>
+              <td><span class="pill porange">assignment-service</span></td>
+              <td>Assignment, rubric, submission metadata</td>
+              <td>Tạo bài tập, nộp bài, phát event</td>
+              <td>PostgreSQL, Kafka</td>
+            </tr>
+            <tr>
+              <td><span class="pill porange">deadline-service</span></td>
+              <td>Calendar, due window, reminder policy</td>
+              <td>Nhắc deadline 24h/2h trước hạn</td>
+              <td>Quartz, PostgreSQL, Kafka</td>
+            </tr>
+            <tr>
+              <td><span class="pill porange">announcement-service</span></td>
+              <td>Announcement draft/schedule/publish</td>
+              <td>Professor gửi thông báo course</td>
+              <td>PostgreSQL, Kafka outbox</td>
+            </tr>
+            <tr>
+              <td><span class="pill pgreen">portfolio-service</span></td>
+              <td>Evidence, journal, feedback, grade snapshot</td>
+              <td>Learning portfolio linh hoạt theo evidence</td>
+              <td>MongoDB, Kafka</td>
+            </tr>
+            <tr>
+              <td><span class="pill ppurple">discussion-service</span></td>
+              <td>Threads, comments, moderation, accepted answer</td>
+              <td>Forum course/assignment</td>
+              <td>PostgreSQL, Kafka</td>
+            </tr>
+            <tr>
+              <td><span class="pill ppurple">notification-service</span></td>
+              <td>Inbox, preferences, realtime delivery</td>
+              <td>Push announcement/reminder/grade/discussion</td>
+              <td>Redis, WebSocket, PostgreSQL</td>
+            </tr>
+            <tr>
+              <td><span class="pill pblue">media-service</span></td>
+              <td>Upload policy, file metadata, signed URLs</td>
+              <td>Lecture materials, submission attachments</td>
+              <td>PostgreSQL, object storage</td>
+            </tr>
+            <tr>
+              <td><span class="pill pblue">search-service</span></td>
+              <td>Elasticsearch read model</td>
+              <td>Fuzzy/facet search course</td>
+              <td>Debezium, Kafka, Elasticsearch</td>
+            </tr>
+            <tr>
+              <td><span class="pill pgreen">analytics-service</span></td>
+              <td>Reporting read models</td>
+              <td>Completion, engagement, students-at-risk</td>
+              <td>Kafka, PostgreSQL</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Advanced services</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Ownership</th>
+              <th>Không nên nhét vào</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>gradebook-service</code></td>
+              <td>Grade items, categories, weights, final grade, overrides, audit.</td>
+              <td>Không nhét final grade calculation vào Portfolio.</td>
+            </tr>
+            <tr>
+              <td><code>quiz-service</code></td>
+              <td>Question bank, quiz definition, attempts, answer snapshots, auto-grading.</td>
+              <td>Không biến Assignment thành service quá rộng.</td>
+            </tr>
+            <tr>
+              <td><code>certificate-service</code></td>
+              <td>Certificate issue, revoke, verification code, public verify audit.</td>
+              <td>Không đặt certificate trong Next.js hoặc Analytics.</td>
+            </tr>
+            <tr>
+              <td><code>peer-review-service</code></td>
+              <td>Reviewer assignment, review workflow, dispute, finalized peer score.</td>
+              <td>Không trộn workflow review chéo vào Assignment.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="web-app">
+        <h2>Web: Next.js và ReactJS đúng use case</h2>
+        <div class="grid">
+          <div class="box blue">
+            <h3>Next.js: <code>web/next-learning</code></h3>
+            <ul>
+              <li>Public course catalog cần SEO.</li>
+              <li>Course detail/syllabus cần share link đẹp.</li>
+              <li>Certificate verification public.</li>
+              <li>Learner dashboard có thể SSR/stream để load nhanh.</li>
+            </ul>
+          </div>
+          <div class="box orange">
+            <h3>ReactJS: <code>web/react-admin</code></h3>
+            <ul>
+              <li>Admin vận hành không cần SEO.</li>
+              <li>Data table, filter, bulk actions, moderation queue.</li>
+              <li>Announcement scheduling, gradebook, quiz authoring, peer review queue và analytics dashboard.</li>
+              <li>Fast client-side navigation cho staff dùng hằng ngày.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="mobile-app">
+        <h2>Flutter app</h2>
+        <p>
+          Flutter phục vụ learner mobile: my courses, assignments, quizzes, deadline reminders, notifications,
+          portfolio journal, gradebook feedback và discussion. API stack dùng Dio + Retrofit, state dùng Riverpod, route
+          dùng go_router.
+        </p>
+      </section>
+
+      <section id="events">
+        <h2>Events và reliability</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Producer</th>
+              <th>Event</th>
+              <th>Consumers</th>
+              <th>Lý do cần</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>announcement-service</td>
+              <td><code>announcement.published</code></td>
+              <td>notification, analytics</td>
+              <td>Thông báo đến đúng audience và đo engagement.</td>
+            </tr>
+            <tr>
+              <td>deadline-service</td>
+              <td><code>deadline.reminder.due</code></td>
+              <td>notification</td>
+              <td>Nhắc hạn nộp bài không phụ thuộc assignment service.</td>
+            </tr>
+            <tr>
+              <td>assignment-service</td>
+              <td><code>submission.created</code></td>
+              <td>portfolio, notification, analytics</td>
+              <td>Tạo evidence và cập nhật progress.</td>
+            </tr>
+            <tr>
+              <td>portfolio-service</td>
+              <td><code>grade.published</code></td>
+              <td>notification, analytics</td>
+              <td>Student nhận điểm, analytics cập nhật phân phối điểm.</td>
+            </tr>
+            <tr>
+              <td>discussion-service</td>
+              <td><code>discussion.comment.created</code></td>
+              <td>notification, analytics</td>
+              <td>Realtime forum và engagement metrics.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          Transactional outbox nằm trong service phát event. Dedup nằm trong service consume event. Đây là phase bắt
+          buộc trước Search CDC và Analytics.
+        </div>
+      </section>
+
+      <section id="data">
+        <h2>Data ownership</h2>
+        <p>Quy tắc bất biến: không service nào query DB của service khác. Muốn dùng dữ liệu thì gọi API, đọc event hoặc
+          dùng read model.</p>
+        <pre>PostgreSQL per service:
+  cf_identity, cf_organization, cf_course, cf_enrollment, cf_assignment,
+  cf_deadline, cf_announcement, cf_discussion, cf_notification, cf_media, cf_analytics
+
+Advanced training databases:
+  cf_gradebook, cf_quiz, cf_certificate, cf_peer_review
+
+MongoDB:
+  cf_portfolio
+
+Elasticsearch:
+  courseflow-course-search, courseflow-content-search</pre>
+        <div class="warn">
+          Changelog production mặc định chỉ tạo schema. Data mẫu local/demo nằm trong
+          <code>db.changelog-demo.yaml</code> và chỉ chạy khi bật Spring profile <code>demo</code>.
+        </div>
+      </section>
+
+      <section id="feature-map">
+        <h2>Feature map production</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Thứ tự</th>
+              <th>Tính năng</th>
+              <th>Module đúng</th>
+              <th>Techstack được áp dụng</th>
+              <th>Use case thực tế</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Announcement</td>
+              <td>announcement-service, notification-service</td>
+              <td>PostgreSQL, Kafka, Redis/WebSocket</td>
+              <td>Professor publish thông báo, student nhận realtime.</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Deadline Reminder</td>
+              <td>deadline-service, notification-service</td>
+              <td>Quartz, PostgreSQL, Kafka, WebSocket</td>
+              <td>Nhắc deadline theo policy của course.</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Discussion Forum</td>
+              <td>discussion-service</td>
+              <td>PostgreSQL, Kafka, moderation workflow</td>
+              <td>Student hỏi bài, TA/Professor trả lời, accepted answer.</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>Outbox/Dedup</td>
+              <td>Tất cả producer/consumer</td>
+              <td>Transactional outbox, Debezium hoặc relay worker</td>
+              <td>Không mất/trùng event khi service crash.</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>Search CDC + Elasticsearch</td>
+              <td>search-service</td>
+              <td>Debezium, Kafka Connect, Elasticsearch</td>
+              <td>Search course nhanh, fuzzy, facet theo khoa/kỳ/level.</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>Analytics</td>
+              <td>analytics-service, react-admin</td>
+              <td>Kafka read model, PostgreSQL, chart UI</td>
+              <td>Admin/professor xem completion, engagement, risk signals.</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>Gradebook + Rubric</td>
+              <td>gradebook-service, assignment-service, portfolio-service</td>
+              <td>PostgreSQL, Kafka, audit log, React admin</td>
+              <td>Tính điểm có trọng số, rubric feedback, grade override có lịch sử.</td>
+            </tr>
+            <tr>
+              <td>8</td>
+              <td>Quiz + Question Bank</td>
+              <td>quiz-service, gradebook-service</td>
+              <td>PostgreSQL, transaction, timer, auto-grading events</td>
+              <td>Professor tạo quiz, student làm timed attempt, hệ thống tự chấm.</td>
+            </tr>
+            <tr>
+              <td>9</td>
+              <td>Course Modules / Learning Path</td>
+              <td>course-service, enrollment-service, analytics-service</td>
+              <td>PostgreSQL, ordering, prerequisite rules, progress events</td>
+              <td>Học theo module/lesson có thứ tự, khóa bài sau đến khi hoàn thành bài trước.</td>
+            </tr>
+            <tr>
+              <td>10</td>
+              <td>Certificate Verification</td>
+              <td>certificate-service, next-learning</td>
+              <td>Next.js SSR/SEO, signed verification code, PDF generation</td>
+              <td>Public verify chứng chỉ sau khi course completed.</td>
+            </tr>
+            <tr>
+              <td>11</td>
+              <td>Peer Review / Workshop</td>
+              <td>peer-review-service, assignment-service, notification-service</td>
+              <td>Workflow state machine, Kafka, rubric review, moderation queue</td>
+              <td>Student review chéo bài nhau, professor finalize điểm công bằng.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="training-feature-roadmap">
+        <h2>Roadmap tính năng training nâng cao</h2>
+        <p>
+          Các tính năng dưới đây lấy cảm hứng từ Open edX, Moodle và Canvas, nhưng được sắp lại theo thứ tự học tốt nhất
+          cho CourseFlow. Mỗi feature có một giá trị training riêng, không chỉ là thêm màn hình.
+        </p>
+        <table>
+          <thead>
+            <tr>
+              <th>Thứ tự</th>
+              <th>Feature</th>
+              <th>Service/module owner</th>
+              <th>Training value</th>
+              <th>Điều kiện trước khi làm</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td><strong>Gradebook + Rubric</strong></td>
+              <td><code>gradebook-service</code>, <code>assignment-service</code>, <code>portfolio-service</code></td>
+              <td>Aggregate calculation, weighted score, rubric snapshot, audit trail, grade override, event-driven
+                grade sync.</td>
+              <td>Assignment, Portfolio, Analytics và Outbox/Dedup đã ổn.</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td><strong>Quiz + Question Bank</strong></td>
+              <td><code>quiz-service</code>, <code>gradebook-service</code></td>
+              <td>Question modeling, attempt lifecycle, timer, randomization, auto-grading, idempotent submit.</td>
+              <td>Gradebook đã có grade item và final score contract.</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td><strong>Course Modules / Learning Path</strong></td>
+              <td><code>course-service</code>, <code>enrollment-service</code>, <code>analytics-service</code></td>
+              <td>Content ordering, prerequisites, progress tracking, learner UX, Next.js route structure.</td>
+              <td>Course catalog, enrollment và search đã chạy.</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td><strong>Certificate Verification</strong></td>
+              <td><code>certificate-service</code>, <code>next-learning</code></td>
+              <td>Public verification, signed code, PDF generation, SEO route, security/audit.</td>
+              <td>Gradebook final grade và course completion đã xác định.</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td><strong>Peer Review / Workshop</strong></td>
+              <td><code>peer-review-service</code>, <code>assignment-service</code>, <code>notification-service</code>
+              </td>
+              <td>Multi-step workflow, reviewer assignment, anonymous review, dispute/finalize flow, state machine.</td>
+              <td>Rubric, notification và gradebook đã ổn.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="production-flow">
+        <h2>Luồng production tiêu biểu</h2>
+        <pre>1. Admin tạo term/department/section trong organization-service.
+2. Professor tạo course trong course-service và publish.
+3. Search-service nhận CDC từ course DB, index vào Elasticsearch.
+4. Student tìm course trên Next.js catalog và enroll qua enrollment-service.
+5. Professor tạo assignment; deadline-service tạo reminder runs.
+6. Announcement-service publish thông báo; notification-service push realtime.
+7. Student nộp bài; assignment-service phát submission.created.
+8. Portfolio-service tạo evidence; professor chấm và publish grade.
+9. Discussion-service ghi thread/comment; notification + analytics nhận event.
+10. Analytics-service cập nhật dashboard trong React admin.</pre>
+      </section>
+
+      <section id="roadmap">
+        <h2>Roadmap phát triển</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Phase</th>
+              <th>Trọng tâm</th>
+              <th>Kết quả cần có</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>0</td>
+              <td>Repo skeleton và local infra</td>
+              <td>Backend/web/app tách độc lập; Docker infra chạy được.</td>
+            </tr>
+            <tr>
+              <td>1</td>
+              <td>Identity + Organization</td>
+              <td>Login/RBAC, user seed, department/term setup.</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Course + Enrollment</td>
+              <td>Course catalog, section, roster, capacity/waitlist.</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Assignment + Media</td>
+              <td>Assignment/rubric/submission metadata, upload policy.</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>Deadline + Announcement + Notification</td>
+              <td>Reminder policy, scheduled announcement, realtime inbox.</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>Portfolio + Discussion</td>
+              <td>Evidence/journal/grade, forum/comment/moderation.</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>Outbox/Dedup</td>
+              <td>Event reliability chuẩn trước khi scale consumer.</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>Search CDC</td>
+              <td>Debezium connector, ES index, Next.js search page.</td>
+            </tr>
+            <tr>
+              <td>8</td>
+              <td>Analytics</td>
+              <td>Admin/professor dashboards, risk signals.</td>
+            </tr>
+            <tr>
+              <td>9</td>
+              <td>Gradebook + Rubric</td>
+              <td>Grade categories, weighted score, rubric snapshot, grade audit.</td>
+            </tr>
+            <tr>
+              <td>10</td>
+              <td>Quiz + Question Bank</td>
+              <td>Question bank, timed attempt, auto-grade, gradebook sync.</td>
+            </tr>
+            <tr>
+              <td>11</td>
+              <td>Course Modules / Learning Path</td>
+              <td>Module ordering, prerequisite rules, progress tracking.</td>
+            </tr>
+            <tr>
+              <td>12</td>
+              <td>Certificate Verification</td>
+              <td>Certificate issue/verify, public Next.js page, signed code.</td>
+            </tr>
+            <tr>
+              <td>13</td>
+              <td>Peer Review / Workshop</td>
+              <td>Reviewer assignment, peer rubric review, finalize grade workflow.</td>
+            </tr>
+            <tr>
+              <td>14</td>
+              <td>Hardening</td>
+              <td>Tests, contract tests, observability, CI/CD, K8s.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="production-gaps">
+        <h2>Còn thiếu gì để thành product thật (đối chiếu LMS lớn)</h2>
+        <p>
+          Phần kiến trúc và domain học thuật của CourseFlow đã ở mức production-grade — event-driven outbox, CDC
+          search,
+          data ownership per service, multi-client — thậm chí nhỉnh hơn nhiều repo open-source. Nhưng để thành
+          <strong>sản phẩm bán được</strong>,
+          còn thiếu lớp "biến LMS engine thành product". Bảng dưới đối chiếu với Open edX, Moodle, Canvas, Frappe LMS và
+          các nền tảng Trung Quốc
+          (PlayEdu 3.2k★, roncoo-education 领课教育 1.5k★, 学堂在线, 网易云课堂).
+        </p>
+
+        <h3>Phải có (không có thì không ship được product thương mại)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Tính năng thiếu</th>
+              <th>Nền tảng có</th>
+              <th>Vì sao cần</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Payment / Billing / Monetization</strong></td>
+              <td>Open edX (e-commerce, paid cert), Frappe (<code>frappe/payments</code>), roncoo (知识付费),
+                Udemy/Coursera/网易云课堂</td>
+              <td>Order, thanh toán (Stripe/PayPal/支付宝/微信), coupon, refund, hóa đơn, revenue-share. Hiện không service
+                nào chạm tới tiền — đây là gap lớn nhất.</td>
+            </tr>
+            <tr>
+              <td><strong>Video streaming / transcoding / bảo vệ nội dung</strong></td>
+              <td>PlayEdu (transcode + mã hóa + anti-leeching), roncoo (VOD), Open edX</td>
+              <td><code>media-service</code> mới chỉ có upload policy + signed URL. Cần HLS/DASH adaptive bitrate,
+                transcoding, phụ đề, resume vị trí xem, chống leech. Video là sản phẩm cốt lõi và là chi phí/lạm dụng
+                lớn nhất.</td>
+            </tr>
+            <tr>
+              <td><strong>Chuẩn e-learning: SCORM / xAPI / LTI 1.3</strong></td>
+              <td>Moodle (SCORM/AICC/IMS CC/LTI), Open edX (LTI provider, SCORM XBlock), Canvas, ILIAS</td>
+              <td>Doanh nghiệp/trường học yêu cầu import gói SCORM/xAPI và tích hợp tool ngoài qua LTI 1.3. Không có
+                chuẩn thì không bán được vào corporate L&amp;D và academia.</td>
+            </tr>
+            <tr>
+              <td><strong>Accessibility (WCAG 2.1 AA)</strong></td>
+              <td>Canvas (axe CI), Open edX, Moodle</td>
+              <td>Bắt buộc pháp lý cho khu vực công và giáo dục (Section 508/ADA/EN 301 549). Ảnh hưởng cả Next.js,
+                React admin, Flutter. Validation đầy đủ cần test thủ công với assistive tech + chuyên gia.</td>
+            </tr>
+            <tr>
+              <td><strong>Compliance: GDPR / FERPA, data export &amp; xóa</strong></td>
+              <td>Moodle (GDPR tooling), Open edX, Canvas (FERPA)</td>
+              <td>Có gradebook audit (tốt) nhưng thiếu data export cho learner, quyền được xóa (erasure), consent,
+                retention. Là yêu cầu pháp lý khi giữ dữ liệu sinh viên.</td>
+            </tr>
+            <tr>
+              <td><strong>Multi-tenancy</strong></td>
+              <td>Open edX (org/site), Canvas (accounts/sub-accounts)</td>
+              <td><code>organization-service</code> model department/term trong MỘT trường, nhưng SaaS cần cô lập tenant
+                (nhiều khách hàng, branding riêng, phân vùng dữ liệu). Khó bolt-on sau với Postgres-per-service.</td>
+            </tr>
+            <tr>
+              <td><strong>Email / SMS / Push delivery thật</strong></td>
+              <td>Mọi nền tảng</td>
+              <td>Có inbox + WebSocket nhưng chưa có gửi email/SMS/push thật (provider, template, bounce, unsubscribe,
+                deliverability). Reminder/announcement vô nghĩa nếu không rời khỏi hệ thống.</td>
+            </tr>
+            <tr>
+              <td><strong>Observability / SLO + Backup/DR</strong></td>
+              <td>Mọi deployment production</td>
+              <td>Hệ Kafka/CDC/microservices không vận hành được nếu thiếu tracing, metrics, log có cấu trúc, alert, DLQ
+                monitor. Nhiều stateful store (Postgres×N, Mongo, ES, Kafka) cần backup/PITR/DR có runbook.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Nên có (đối thủ đều có, thiếu sẽ thấy rõ)</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Tính năng</th>
+              <th>Nền tảng có</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Live class / webinar</td>
+              <td>Frappe (Zoom), roncoo (直播), PlayEdu, 网易云课堂</td>
+              <td>Dạy đồng bộ (Zoom/BBB/WebRTC), lịch, điểm danh, ghi hình → VOD.</td>
+            </tr>
+            <tr>
+              <td>Proctoring / anti-cheat</td>
+              <td>Open edX (<code>edx-proctoring</code>)</td>
+              <td>Quiz có timed attempt nhưng thi high-stakes cần lockdown browser, xác thực danh tính, giám sát. Thiết
+                kế phải kèm consent &amp; privacy.</td>
+            </tr>
+            <tr>
+              <td>Content authoring studio</td>
+              <td>Open edX (Studio/OLX, H5P), Moodle (content bank)</td>
+              <td>Có data model module/syllabus nhưng chưa có UI tạo nội dung tương tác, thư viện tái dùng,
+                versioning/draft.</td>
+            </tr>
+            <tr>
+              <td>Plagiarism / originality</td>
+              <td>Canvas (Turnitin LTI), Moodle</td>
+              <td>Assignment chưa có kiểm tra đạo văn (Turnitin/Copyleaks hoặc similarity nội bộ).</td>
+            </tr>
+            <tr>
+              <td>Gamification (badge/point/leaderboard)</td>
+              <td>Moodle (Open Badges), nhiều nền tảng TQ (积分/勋章)</td>
+              <td>Có certificate nhưng chưa có badge chuẩn IMS Open Badges, điểm, streak, bảng xếp hạng → tăng
+                completion.</td>
+            </tr>
+            <tr>
+              <td>Recommendation engine</td>
+              <td>Coursera, Udemy, 网易云课堂</td>
+              <td>Có ES search + analytics (nền tốt) nhưng chưa có gợi ý cá nhân hóa.</td>
+            </tr>
+            <tr>
+              <td>Admin reporting &amp; data export</td>
+              <td>Open edX (Aspects), Moodle (report builder)</td>
+              <td>Cần report cấu hình được, export CSV/Excel theo lịch, báo cáo completion/compliance.</td>
+            </tr>
+            <tr>
+              <td>i18n / l10n</td>
+              <td>Moodle (100+ ngôn ngữ), Open edX</td>
+              <td>Chưa thấy framework i18n, RTL, locale date/number, đa tiền tệ. Khó retrofit qua 3 frontend + nhiều
+                service.</td>
+            </tr>
+            <tr>
+              <td>Rate limit / chống lạm dụng</td>
+              <td>Mọi nền tảng public</td>
+              <td>Gateway có JWT nhưng chưa có rate limit, chống brute-force login, chống scraping. Endpoint public
+                (search/media/auth) là mục tiêu tấn công.</td>
+            </tr>
+            <tr>
+              <td>Mobile offline</td>
+              <td>Moodle Mobile, Open edX, Udemy/Coursera</td>
+              <td>Có Flutter app nhưng chưa có tải nội dung offline + sync progress — tính năng top được yêu cầu.</td>
+            </tr>
+            <tr>
+              <td>Content moderation ở quy mô</td>
+              <td>Nền tảng có UGC lớn</td>
+              <td>Có forum/portfolio/peer-review (UGC) → cần report/flag, moderation queue, lọc tự động (spam/toxic),
+                takedown.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Có thì hơn (khác biệt / trưởng thành)</h3>
+        <ul>
+          <li><strong>AI</strong>: auto-grade tự luận, AI tutor/chat, tóm tắt, sinh câu hỏi từ nội dung (roncoo có sinh
+            syllabus AI; Coursera Coach; Khanmigo). Đang dịch chuyển từ "nên có" sang kỳ vọng.</li>
+          <li><strong>Feature flags</strong>: rollout dần, A/B, kill switch, gate theo tenant (Open edX waffle).</li>
+          <li><strong>Public/Developer API có versioning</strong>: OpenAPI, deprecation policy, API key, webhook
+            (Canvas/Moodle web services).</li>
+          <li><strong>SSO/SCIM/SIS integration</strong>: SAML/OIDC, SCIM provisioning, roster sync; tích hợp
+            DingTalk/WeWork/Feishu như PlayEdu cho thị trường TQ.</li>
+          <li><strong>Competency / skills mapping</strong>: map nội dung/assessment vào khung kỹ năng, mastery tracking
+            (Moodle competencies, Canvas outcomes).</li>
+          <li><strong>Review / rating</strong>: đánh giá khóa học, social proof cho mô hình marketplace.</li>
+        </ul>
+
+        <div class="warn">
+          <strong>Kết luận:</strong> hạ tầng và domain học thuật đã production-grade. Để thành product cần ưu tiên 5 gap
+          "phải có" theo thứ tự:
+          (1) thanh toán, (2) video đúng nghĩa, (3) chuẩn SCORM/xAPI/LTI 1.3, (4) compliance GDPR/FERPA/WCAG, (5)
+          delivery thật + observability/backup.
+          Nhánh accreditation/enterprise (LTI 1.3, SSO/SCIM, proctoring, SIS) mở khóa nhóm khách hàng giá trị cao nhất.
+          <br><em>Nguồn: GitHub openedx/edx-platform, moodle/moodle, instructure/canvas-lms, frappe/lms,
+            PlayEdu/PlayEdu, roncoo/roncoo-education (star count xác minh qua GitHub tại thời điểm research).</em>
+        </div>
+      </section>
+
+      <section id="links">
+        <h2>Tài liệu liên quan</h2>
+        <ul>
+          <li><code>courseflow/backend/docs/architecture/backend-architecture.md</code></li>
+          <li><code>courseflow/backend/docs/api/courseflow-api.md</code></li>
+          <li><code>courseflow/docs/open-source-research.md</code></li>
+          <li><code>courseflow-training-detailed.html</code></li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</body>
+
+</html>

@@ -1,0 +1,11 @@
+package edu.courseflow.course;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication(scanBasePackages = "edu.courseflow")
+public class CourseServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(CourseServiceApplication.class, args);
+    }
+}

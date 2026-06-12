@@ -1,0 +1,26 @@
+server:
+  port: 8089
+spring:
+  application:
+    name: discussion-service
+  datasource:
+    url: ${DISCUSSION_DB_URL:jdbc:postgresql://localhost:5432/cf_discussion}
+    username: ${DISCUSSION_DB_USERNAME:courseflow}
+    password: ${DISCUSSION_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${LIQUIBASE_CONTEXTS:prod}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

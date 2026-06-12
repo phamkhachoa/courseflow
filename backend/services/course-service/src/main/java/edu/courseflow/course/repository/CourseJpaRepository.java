@@ -1,0 +1,16 @@
+package edu.courseflow.course.repository;
+
+import edu.courseflow.course.model.Course;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface CourseJpaRepository extends JpaRepository<Course, UUID> {
+
+    List<Course> findAllByOrderByCreatedAtDescTitleAsc();
+
+    List<Course> findByStatusOrderByCreatedAtDescTitleAsc(String status);
+
+    Optional<Course> findBySlugAndStatus(String slug, String status);
+}

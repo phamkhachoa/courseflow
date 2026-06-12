@@ -1,0 +1,22 @@
+server:
+  port: 8104
+spring:
+  application:
+    name: chat-service
+  data:
+    mongodb:
+      uri: ${CHAT_MONGO_URI:mongodb://localhost:27017/cf_chat}
+      auto-index-creation: true
+courseflow:
+  security:
+    jwt:
+      secret: ${COURSEFLOW_JWT_SECRET:}
+      issuer: ${COURSEFLOW_JWT_ISSUER:courseflow-identity}
+  chat:
+    websocket:
+      allowed-origins: ${CHAT_WS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:28080,http://localhost:8080}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
