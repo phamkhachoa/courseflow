@@ -3,8 +3,8 @@ package edu.courseflow.commonlibrary.constants;
 /**
  * Identity headers injected by the API gateway after it verifies the JWT. Downstream services
  * trust these because the gateway strips any client-supplied copies first and services are only
- * reachable through the gateway (network isolation). When {@link #SERVICE_TOKEN} is configured,
- * downstream services also require it before accepting any propagated identity header.
+ * reachable through the gateway (network isolation). Downstream services require a short-lived
+ * internal JWT before accepting gateway-propagated identity headers or internal endpoints.
  */
 public final class GatewayHeaders {
 
@@ -20,8 +20,8 @@ public final class GatewayHeaders {
     public static final String USER_ROLE_SCOPES = "X-User-Role-Scopes";
     public static final String USER_EMAIL = "X-User-Email";
     public static final String CORRELATION_ID = "X-Correlation-Id";
-    /** Shared gateway-to-service attestation header. Clients must never be allowed to supply it. */
-    public static final String SERVICE_TOKEN = "X-Service-Token";
+    /** Short-lived internal JWT minted by identity-token-converter-service. */
+    public static final String INTERNAL_AUTHORIZATION = "X-Internal-Authorization";
 
     private GatewayHeaders() {
     }

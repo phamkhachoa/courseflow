@@ -117,6 +117,30 @@ class QuizServiceAttemptLifecycleTest {
         verify(attempts, times(2)).save(any(QuizAttempt.class));
     }
 
+    @Test
+    void learnerStatusesExposeOverdueOpenAttemptDeadline() {
+        Instant startedAt = Instant.parse("2000-01-01T00:00:00Z");
+        Instant deadlineAt = Instant.parse("2000-01-01T00:20:00Z");
+        QuizAttempt openAttempt = new QuizAttempt(
+                UUID.fromString("c3000000-0000-0000-0000-000000000002"),
+                QUIZ_ID,
+                STUDENT_ID,
+                1,
+                startedAt,
+                deadlineAt);
+        when(quizzes.findByCourseIdOrderByTitleAsc(COURSE_ID)).thenReturn(List.of(publishedQuiz()));
+        when(attempts.findByQuizIdInAndStudentIdOrderByStartedAtDesc(List.of(QUIZ_ID), STUDENT_ID))
+                .thenReturn(List.of(openAttempt));
+
+        var result = service.learnerStatuses(COURSE_ID, STUDENT_ID, List.of(QUIZ_ID));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().sourceStatus()).isEqualTo("OVERDUE");
+        assertThat(result.getFirst().latestProgressStatus()).isEqualTo("IN_PROGRESS");
+        assertThat(result.getFirst().dueAt()).isEqualTo(deadlineAt);
+        assertThat(result.getFirst().attemptsUsed()).isEqualTo(1);
+    }
+
     private static Quiz publishedQuiz() {
         return new Quiz(
                 QUIZ_ID,

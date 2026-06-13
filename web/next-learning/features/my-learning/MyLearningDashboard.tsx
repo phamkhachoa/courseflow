@@ -4,13 +4,17 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
+  ArrowRight,
   Bell,
   BookOpen,
   CalendarClock,
   Compass,
+  ClipboardCheck,
   GraduationCap,
   Layers3,
+  ListTodo,
   PlayCircle,
+  RefreshCw,
   Route,
   Search,
   ShieldCheck,
@@ -39,6 +43,13 @@ import {
   SectionHeader,
   cn
 } from "@/shared/ui";
+import {
+  emptyNextAction,
+  getLearnerNextAction,
+  nextActionBadgeLabel,
+  nextActionTitle,
+  type LearnerNextAction
+} from "./next-action";
 
 type MyLearningDashboardProps = {
   initialCourses: CatalogCourse[];
@@ -86,6 +97,15 @@ const quickActions = [
 ];
 
 const ACTIVE_ENROLLMENT_STATUSES = new Set(["ACTIVE", "ENROLLED", "COMPLETED"]);
+const CERTIFICATE_NEXT_ACTIONS = new Set(["CERTIFICATE_ELIGIBLE", "CERTIFICATE_ISSUED"]);
+const BLOCKED_NEXT_ACTIONS = new Set([
+  "LEARNER_CONTEXT_UNAVAILABLE",
+  "LOCKED_BY_PREREQUISITE",
+  "NOT_AVAILABLE_YET",
+  "SOURCE_LOCKED",
+  "SOURCE_STATUS_UNAVAILABLE",
+  "SOURCE_UNAVAILABLE"
+]);
 
 function isActiveEnrollment(status?: string) {
   return ACTIVE_ENROLLMENT_STATUSES.has((status ?? "ACTIVE").toUpperCase());
@@ -99,6 +119,18 @@ function formatDate(value?: string): string {
     day: "2-digit",
     month: "2-digit",
     year: "numeric"
+  }).format(date);
+}
+
+function formatDueAt(value?: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
   }).format(date);
 }
 
@@ -125,6 +157,109 @@ function statusLabel(status?: string) {
 
 async function getCourseProgress(courseId: string): Promise<CourseProgress> {
   return clientFetch<CourseProgress>(`/v1/courses/${courseId}/modules/progress`);
+}
+
+function nextActionTone(action: LearnerNextAction) {
+  if (CERTIFICATE_NEXT_ACTIONS.has(action.kind)) return "bg-signal-50 text-signal-600";
+  if (action.kind === "AWAITING_GRADE" || action.kind === "OVERDUE_ITEM") return "bg-accent-50 text-accent-600";
+  if (BLOCKED_NEXT_ACTIONS.has(action.kind)) return "bg-coral-50 text-coral-600";
+  if (action.kind === "SOURCE_SYNC_PENDING") return "bg-brand-50 text-brand-700";
+  if (action.kind === "COURSE_COMPLETE") return "bg-signal-50 text-signal-600";
+  if (action.kind === "START_COURSE") return "bg-brand-50 text-brand-700";
+  if (action.item?.type === "QUIZ" || action.item?.type === "ASSIGNMENT") return "bg-accent-50 text-accent-600";
+  if (action.item?.type === "VIDEO") return "bg-signal-50 text-signal-600";
+  return "bg-signal-50 text-signal-600";
+}
+
+function nextActionBadgeTone(action: LearnerNextAction): "neutral" | "brand" | "amber" | "sky" | "coral" {
+  if (CERTIFICATE_NEXT_ACTIONS.has(action.kind)) return "sky";
+  if (action.kind === "AWAITING_GRADE" || action.kind === "OVERDUE_ITEM") return "amber";
+  if (BLOCKED_NEXT_ACTIONS.has(action.kind)) return "coral";
+  if (action.kind === "SOURCE_SYNC_PENDING") return "brand";
+  if (action.kind === "COURSE_COMPLETE") return "sky";
+  if (action.kind === "START_COURSE") return "brand";
+  if (action.item?.type === "QUIZ" || action.item?.type === "ASSIGNMENT") return "amber";
+  return action.kind === "EMPTY" ? "neutral" : "brand";
+}
+
+function nextActionIcon(action: LearnerNextAction, loading: boolean) {
+  if (loading) return RefreshCw;
+  if (CERTIFICATE_NEXT_ACTIONS.has(action.kind)) return ShieldCheck;
+  if (action.kind === "AWAITING_GRADE") return ClipboardCheck;
+  if (action.kind === "OVERDUE_ITEM") return CalendarClock;
+  if (action.kind === "SOURCE_SYNC_PENDING") return RefreshCw;
+  if (BLOCKED_NEXT_ACTIONS.has(action.kind)) return Bell;
+  if (action.kind === "COURSE_COMPLETE") return Trophy;
+  if (action.item?.type === "QUIZ") return ClipboardCheck;
+  if (action.item?.type === "ASSIGNMENT") return ListTodo;
+  if (action.kind === "CONTINUE_ITEM" || action.kind === "START_COURSE") return PlayCircle;
+  return BookOpen;
+}
+
+function NextBestActionCard({
+  action,
+  loading
+}: {
+  action: LearnerNextAction;
+  loading: boolean;
+}) {
+  const title = loading ? "Đang tìm việc nên làm tiếp theo" : nextActionTitle(action);
+  const reason = loading
+    ? "CourseFlow đang đồng bộ ghi danh và tiến độ để đưa bạn tới đúng bài tiếp theo."
+    : action.reason;
+  const Icon = nextActionIcon(action, loading);
+  const dueAtLabel = formatDueAt(action.dueAt);
+
+  return (
+    <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-brand-600">Việc nên làm ngay</p>
+          <h3 className="mt-1 line-clamp-2 text-lg font-bold leading-6 text-ink-900">
+            {title}
+          </h3>
+        </div>
+        <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", nextActionTone(action))}>
+          <Icon className={cn("size-5", loading && "animate-spin")} />
+        </span>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Badge tone={nextActionBadgeTone(action)}>{nextActionBadgeLabel(action)}</Badge>
+        {action.course?.title && <Badge tone="neutral">{action.course.title}</Badge>}
+        {action.module?.title && <Badge tone="neutral">{action.module.title}</Badge>}
+        {typeof action.course?.progressPercent === "number" && (
+          <Badge tone="neutral">{action.course.progressPercent}% hoàn thành</Badge>
+        )}
+        {dueAtLabel && (
+          <Badge tone={action.kind === "OVERDUE_ITEM" ? "amber" : "neutral"}>Hạn {dueAtLabel}</Badge>
+        )}
+        {loading && (
+          <Badge tone="neutral">
+            <RefreshCw className="mr-1 size-3 animate-spin" />
+            Đang cập nhật
+          </Badge>
+        )}
+      </div>
+
+      <p className="mt-3 text-sm leading-6 text-ink-500">{reason}</p>
+
+      {typeof action.course?.progressPercent === "number" && action.kind !== "EMPTY" && (
+        <div className="mt-4">
+          <ProgressBar value={action.course.progressPercent} />
+        </div>
+      )}
+
+      <Button asChild className="mt-4 w-full">
+        <Link href={action.href}>
+          <span className="inline-flex items-center gap-2">
+            {action.ctaLabel}
+            <ArrowRight className="size-4" />
+          </span>
+        </Link>
+      </Button>
+    </div>
+  );
 }
 
 function DashboardSkeleton() {
@@ -186,6 +321,11 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
     () => (enrollmentsQuery.data ?? []).filter((enrollment) => isActiveEnrollment(enrollment.status)),
     [enrollmentsQuery.data]
   );
+  const enrolledCourseIds = useMemo(
+    () => activeEnrollments.map((enrollment) => enrollment.courseId),
+    [activeEnrollments]
+  );
+  const dashboardCourseIds = useMemo(() => enrolledCourseIds.slice(0, 8), [enrolledCourseIds]);
   const enrolledCourses = useMemo<EnrolledCourseView[]>(
     () =>
       activeEnrollments.flatMap((enrollment) => {
@@ -194,9 +334,8 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
       }),
     [activeEnrollments, courseById]
   );
-  const enrolledCourseIds = activeEnrollments.map((enrollment) => enrollment.courseId);
   const progressQueries = useQueries({
-    queries: enrolledCourseIds.slice(0, 8).map((courseId) => ({
+    queries: dashboardCourseIds.map((courseId) => ({
       queryKey: ["course-progress", courseId],
       queryFn: () => getCourseProgress(courseId),
       enabled: Boolean(session?.accessToken && courseId),
@@ -206,18 +345,31 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
 
   const progressByCourseId = useMemo(() => {
     const map = new Map<string, number>();
-    enrolledCourseIds.slice(0, 8).forEach((courseId, index) => {
+    dashboardCourseIds.forEach((courseId, index) => {
       const progress = progressQueries[index]?.data as CourseProgress | undefined;
       if (progress) map.set(courseId, progress.percentComplete);
     });
     return map;
-  }, [enrolledCourseIds, progressQueries]);
+  }, [dashboardCourseIds, progressQueries]);
+
+  const nextActionQuery = useQuery({
+    queryKey: ["learner-next-action", session?.user.id],
+    queryFn: getLearnerNextAction,
+    enabled: Boolean(session?.accessToken),
+    retry: 0
+  });
+  const nextAction = nextActionQuery.data ?? emptyNextAction(
+    session?.accessToken && nextActionQuery.isError
+      ? "Chưa tải được gợi ý tiếp theo. Bạn vẫn có thể mở catalog hoặc khóa học đang học."
+      : undefined
+  );
+  const isNextActionLoading = Boolean(session?.accessToken) && nextActionQuery.isLoading;
 
   const heroCourse = enrolledCourses[0]?.course ?? courses[0];
-  const averageProgress = enrolledCourseIds.length
+  const averageProgress = dashboardCourseIds.length
     ? Math.round(
-        enrolledCourseIds.reduce((sum, courseId) => sum + (progressByCourseId.get(courseId) ?? 0), 0) /
-          enrolledCourseIds.length
+        dashboardCourseIds.reduce((sum, courseId) => sum + (progressByCourseId.get(courseId) ?? 0), 0) /
+          dashboardCourseIds.length
       )
     : 0;
   const recommendedCourses = courses
@@ -297,7 +449,7 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/8 p-4 backdrop-blur">
                   <p className="text-sm text-white/60">Khuyến nghị tiếp theo</p>
-                  <p className="mt-2 text-3xl font-bold">{recommendedCourses.length || 3}</p>
+                  <p className="mt-2 text-3xl font-bold">{recommendedCourses.length}</p>
                   <p className="mt-1 text-sm text-white/70">Dựa trên catalog hiện tại</p>
                 </div>
               </div>
@@ -328,30 +480,12 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
               </p>
             </div>
 
+            <NextBestActionCard action={nextAction} loading={isNextActionLoading} />
+
             <div className="mt-5 grid gap-3">
               {quickActions.map((item) => (
                 <WorkspaceLink key={item.href} {...item} />
               ))}
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-bold text-brand-600">Tiếp theo</p>
-                  <h3 className="mt-1 text-lg font-bold text-ink-900">
-                    {heroCourse?.title ?? "Mở catalog để bắt đầu"}
-                  </h3>
-                </div>
-                <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-700">
-                  <PlayCircle className="size-5" />
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-ink-500">
-                {session ? "Đi thẳng vào chapter đang học hoặc chuyển qua lộ trình để đổi nhịp." : "Catalog công khai vẫn cho phép xem trước trước khi ghi danh."}
-              </p>
-              <Button asChild className="mt-4 w-full">
-                <Link href={courseModuleHref(heroCourse)}>Mở learner flow</Link>
-              </Button>
             </div>
           </Card>
         </div>

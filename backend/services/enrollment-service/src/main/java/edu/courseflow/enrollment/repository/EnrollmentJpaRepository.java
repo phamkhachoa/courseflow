@@ -15,6 +15,11 @@ public interface EnrollmentJpaRepository extends JpaRepository<Enrollment, UUID>
 
     List<Enrollment> findByCourseIdAndStudentIdOrderByEnrolledAtDesc(UUID courseId, String studentId);
 
+    List<Enrollment> findByCourseIdAndStatusOrderByEnrolledAtDesc(UUID courseId, String status);
+
+    List<Enrollment> findByCourseIdAndSectionIdAndStatusOrderByEnrolledAtDesc(
+            UUID courseId, UUID sectionId, String status);
+
     Optional<Enrollment> findByStudentIdAndCourseId(String studentId, UUID courseId);
 
     Optional<Enrollment> findFirstByStudentIdAndCourseIdAndStatusIn(

@@ -7,9 +7,11 @@ import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentReadinessDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.AttachmentRef;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.LearnerSourceStatusDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedDownloadDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedUploadDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RequestUploadUrlDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.RubricCriterionDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RubricDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmissionDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmitAssignmentRequestDto;
@@ -27,9 +29,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,17 +49,20 @@ public class AssignmentService {
     private final ObjectStorageClient storage;
     private final ObjectMapper objectMapper;
     private final CourseAccessClient courseAccess;
+    private final LearningAccessClient learningAccess;
     private final AttachmentUploadGrantJpaRepository uploadGrants;
 
     public AssignmentService(AssignmentRepository assignments,
             ObjectStorageClient storage,
             ObjectMapper objectMapper,
             CourseAccessClient courseAccess,
+            LearningAccessClient learningAccess,
             AttachmentUploadGrantJpaRepository uploadGrants) {
         this.assignments = assignments;
         this.storage = storage;
         this.objectMapper = objectMapper;
         this.courseAccess = courseAccess;
+        this.learningAccess = learningAccess;
         this.uploadGrants = uploadGrants;
     }
 
@@ -69,6 +76,33 @@ public class AssignmentService {
         Instant now = Instant.now();
         return assignments.listByCourse(courseId).stream()
                 .filter(assignment -> isLearnerVisible(assignment, now))
+                .toList();
+    }
+
+    public List<LearnerSourceStatusDto> learnerStatuses(UUID courseId, String studentId, List<UUID> sourceIds) {
+        if (studentId == null || studentId.isBlank()) {
+            throw new BadRequestException("studentId is required");
+        }
+        Set<UUID> requestedSourceIds = sourceIds == null ? Set.of() : new HashSet<>(sourceIds);
+        List<AssignmentDto> courseAssignments = assignments.listByCourse(courseId).stream()
+                .filter(assignment -> requestedSourceIds.isEmpty()
+                        || requestedSourceIds.contains(UUID.fromString(assignment.id())))
+                .toList();
+        if (courseAssignments.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> assignmentIds = courseAssignments.stream()
+                .map(assignment -> UUID.fromString(assignment.id()))
+                .toList();
+        Map<String, List<SubmissionDto>> submissionsByAssignment = assignments
+                .listSubmissionAttemptsForStudent(assignmentIds, studentId.trim()).stream()
+                .collect(java.util.stream.Collectors.groupingBy(SubmissionDto::assignmentId));
+        Instant now = Instant.now();
+        return courseAssignments.stream()
+                .map(assignment -> learnerStatus(
+                        assignment,
+                        submissionsByAssignment.getOrDefault(assignment.id(), List.of()),
+                        now))
                 .toList();
     }
 
@@ -120,9 +154,11 @@ public class AssignmentService {
     @Transactional
     public SubmissionDto submit(UUID assignmentId, String studentId, SubmitAssignmentRequestDto request) {
         AssignmentDto assignment = get(assignmentId);
-        courseAccess.requireStudentCourseAccess(studentId, UUID.fromString(assignment.courseId()));
+        UUID courseId = UUID.fromString(assignment.courseId());
+        courseAccess.requireStudentCourseAccess(studentId, courseId);
         Instant now = Instant.now();
         requireLearnerOpen(assignment, now);
+        learningAccess.requireSourceAccess(courseId, studentId, "ASSIGNMENT", assignmentId);
         List<AttachmentRef> trustedAttachments = validateSubmissionPayload(assignment, studentId, request);
 
         int nextAttempt = assignments.nextAttemptNo(assignmentId, studentId);
@@ -185,6 +221,61 @@ public class AssignmentService {
         return "PUBLISHED".equalsIgnoreCase(status) || "ACTIVE".equalsIgnoreCase(status);
     }
 
+    private LearnerSourceStatusDto learnerStatus(AssignmentDto assignment,
+                                                 List<SubmissionDto> learnerSubmissions,
+                                                 Instant now) {
+        SubmissionDto latest = learnerSubmissions.isEmpty() ? null : learnerSubmissions.getFirst();
+        boolean completed = learnerSubmissions.stream()
+                .anyMatch(submission -> "GRADED".equalsIgnoreCase(submission.status()));
+        boolean hasSubmission = latest != null;
+        boolean overdue = !completed
+                && !hasSubmission
+                && assignment.dueAt() != null
+                && now.isAfter(assignment.dueAt());
+        String sourceStatus = assignmentSourceStatus(assignment, latest, completed, overdue, now);
+        return new LearnerSourceStatusDto(
+                "ASSIGNMENT",
+                assignment.id(),
+                assignment.courseId(),
+                assignment.title(),
+                sourceStatus,
+                assignment.availableAt(),
+                assignment.dueAt(),
+                assignment.lockAt(),
+                latest == null ? null : latest.status(),
+                latest == null ? null : latest.id(),
+                learnerSubmissions.size(),
+                assignment.maxAttempts(),
+                completed,
+                overdue);
+    }
+
+    private String assignmentSourceStatus(AssignmentDto assignment,
+                                          SubmissionDto latest,
+                                          boolean completed,
+                                          boolean overdue,
+                                          Instant now) {
+        if (!isPublishedOrActive(assignment.status())) {
+            return "UNAVAILABLE";
+        }
+        if (completed) {
+            return "COMPLETED";
+        }
+        if (latest != null && latest.status() != null && !latest.status().isBlank()) {
+            return latest.status().trim().toUpperCase();
+        }
+        if (assignment.availableAt() != null && now.isBefore(assignment.availableAt())) {
+            return "NOT_AVAILABLE";
+        }
+        if (assignment.lockAt() != null && now.isAfter(assignment.lockAt())) {
+            return "LOCKED";
+        }
+        if (overdue) {
+            return "OVERDUE";
+        }
+        return "READY";
+    }
+
     @Transactional
     public SubmissionDto grade(UUID submissionId, String graderId, GradeSubmissionRequestDto request) {
         SubmissionDto submission = getSubmission(submissionId);
@@ -240,6 +331,7 @@ public class AssignmentService {
     public PresignedUploadDto presignUpload(UUID assignmentId, String studentId, RequestUploadUrlDto req) {
         AssignmentDto assignment = get(assignmentId);
         requireLearnerOpen(assignment, Instant.now());
+        learningAccess.requireSourceAccess(UUID.fromString(assignment.courseId()), studentId, "ASSIGNMENT", assignmentId);
         String fileName = safeFileName(req.fileName());
         String contentType = normalizeContentType(req.contentType());
         String key = storage.buildKey(STORAGE_PREFIX + "/" + assignmentId + "/" + studentId, fileName);
@@ -258,6 +350,7 @@ public class AssignmentService {
     public AttachmentRef proxyUpload(UUID assignmentId, String studentId, MultipartFile file) {
         AssignmentDto assignment = get(assignmentId);
         requireLearnerOpen(assignment, Instant.now());
+        learningAccess.requireSourceAccess(UUID.fromString(assignment.courseId()), studentId, "ASSIGNMENT", assignmentId);
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("Uploaded file is empty");
         }
@@ -371,6 +464,7 @@ public class AssignmentService {
             GradeSubmissionRequestDto req) {
         BigDecimal score;
         if (req.rubricScores() != null && !req.rubricScores().isEmpty()) {
+            validateRubricScores(assignment, req);
             score = req.rubricScores().stream()
                     .map(s -> s.points() == null ? BigDecimal.ZERO : s.points())
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -387,6 +481,30 @@ public class AssignmentService {
             throw new BadRequestException("SCORE_EXCEEDS_MAX");
         }
         return score;
+    }
+
+    private void validateRubricScores(AssignmentDto assignment, GradeSubmissionRequestDto req) {
+        RubricDto rubric = assignments.findRubricByAssignment(UUID.fromString(assignment.id()))
+                .orElseThrow(() -> new BadRequestException("RUBRIC_NOT_SET"));
+        List<RubricCriterionDto> criteria = rubric.criteria() == null ? List.of() : rubric.criteria();
+        Map<String, BigDecimal> maxPointsByCriterion = criteria.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        criterion -> criterion.id(),
+                        criterion -> criterion.maxPoints()));
+        Set<String> seenCriterionIds = new HashSet<>();
+        for (var score : req.rubricScores()) {
+            if (!seenCriterionIds.add(score.criterionId())) {
+                throw new BadRequestException("DUPLICATE_RUBRIC_CRITERION_SCORE");
+            }
+            BigDecimal maxPoints = maxPointsByCriterion.get(score.criterionId());
+            if (maxPoints == null) {
+                throw new BadRequestException("RUBRIC_CRITERION_NOT_ON_ASSIGNMENT");
+            }
+            BigDecimal points = score.points() == null ? BigDecimal.ZERO : score.points();
+            if (points.compareTo(maxPoints) > 0) {
+                throw new BadRequestException("RUBRIC_SCORE_EXCEEDS_CRITERION_MAX");
+            }
+        }
     }
 
     private BigDecimal computeLatePenaltyPercent(AssignmentDto assignment, SubmissionDto submission) {

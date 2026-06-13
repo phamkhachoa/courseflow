@@ -1,0 +1,6 @@
+name: courseflow-v2-backend
+
+services:
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required when exposing Grafana in the prod profile}

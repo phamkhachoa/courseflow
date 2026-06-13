@@ -2,6 +2,7 @@ package edu.courseflow.quiz.controller;
 
 import edu.courseflow.quiz.dto.QuizDtos.EffectiveScoreDto;
 import edu.courseflow.quiz.dto.QuizDtos.CreateQuizRequestDto;
+import edu.courseflow.quiz.dto.QuizDtos.LearnerSourceStatusDto;
 import edu.courseflow.quiz.dto.QuizDtos.ManualGradeAnswerRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptDetailDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptDto;
@@ -13,6 +14,7 @@ import edu.courseflow.quiz.dto.QuizDtos.StartAttemptRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.SubmitAttemptRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.UpdateQuizRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.UpsertQuizQuestionRequestDto;
+import edu.courseflow.quiz.service.LearningAccessClient;
 import edu.courseflow.quiz.service.QuizService;
 import edu.courseflow.quiz.web.Authz;
 import edu.courseflow.quiz.web.ForbiddenException;
@@ -21,14 +23,12 @@ import edu.courseflow.commonlibrary.web.CurrentUser;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,14 +39,14 @@ public class QuizController {
 
     private final QuizService quizzes;
     private final CourseAccessClient courseAccess;
-    private final String serviceToken;
+    private final LearningAccessClient learningAccess;
 
     public QuizController(QuizService quizzes,
             CourseAccessClient courseAccess,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+            LearningAccessClient learningAccess) {
         this.quizzes = quizzes;
         this.courseAccess = courseAccess;
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
+        this.learningAccess = learningAccess;
     }
 
     @GetMapping
@@ -79,10 +79,15 @@ public class QuizController {
     }
 
     @GetMapping("/{quizId}/readiness")
-    public QuizReadinessDto readiness(@PathVariable UUID quizId,
-            @RequestHeader(value = CourseAccessClient.SERVICE_TOKEN_HEADER, required = false) String token) {
-        requireServiceToken(token);
+    public QuizReadinessDto readiness(@PathVariable UUID quizId) {
         return quizzes.readiness(quizId);
+    }
+
+    @GetMapping("/status")
+    public List<LearnerSourceStatusDto> learnerStatuses(@RequestParam UUID courseId,
+            @RequestParam String studentId,
+            @RequestParam(required = false) List<UUID> sourceIds) {
+        return quizzes.learnerStatuses(courseId, studentId, sourceIds);
     }
 
     @GetMapping("/{quizId}/attempts")
@@ -93,6 +98,7 @@ public class QuizController {
 
     @GetMapping("/{quizId}/attempts/me")
     public List<QuizAttemptDto> listMyAttempts(@PathVariable UUID quizId, CurrentUser user) {
+        courseAccess.requireCourseAccess(user, quizzes.quizCourseId(quizId));
         return quizzes.listMyAttempts(quizId, Authz.callerId(user));
     }
 
@@ -139,6 +145,7 @@ public class QuizController {
         if (!"PUBLISHED".equals(quiz.status())) {
             throw new ForbiddenException("QUIZ_NOT_PUBLISHED");
         }
+        learningAccess.requireSourceAccess(UUID.fromString(quiz.courseId()), Authz.callerId(user), "QUIZ", quizId);
         boolean reveal = quizzes.canRevealCorrectAnswers(quiz, Authz.callerId(user));
         return reveal ? quiz : quizzes.toStudentView(quiz);
     }
@@ -147,7 +154,9 @@ public class QuizController {
     public StartAttemptResponseDto startAttempt(@PathVariable UUID quizId,
             @Valid @RequestBody(required = false) StartAttemptRequestDto request, CurrentUser user) {
         // studentId is the authenticated caller, never trusted from the body.
-        courseAccess.requireCourseAccess(user, quizzes.quizCourseId(quizId));
+        UUID courseId = quizzes.quizCourseId(quizId);
+        courseAccess.requireCourseAccess(user, courseId);
+        learningAccess.requireSourceAccess(courseId, Authz.callerId(user), "QUIZ", quizId);
         return quizzes.startAttempt(quizId, Authz.callerId(user));
     }
 
@@ -209,9 +218,4 @@ public class QuizController {
         courseAccess.requireCourseAccess(user, courseId);
     }
 
-    private void requireServiceToken(String token) {
-        if (serviceToken.isBlank() || token == null || !serviceToken.equals(token.trim())) {
-            throw new ForbiddenException("Service token required");
-        }
-    }
 }

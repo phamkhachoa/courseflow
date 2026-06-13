@@ -9,6 +9,7 @@ import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.quiz.dto.QuizDtos.CreateQuizRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.EffectiveScoreDto;
+import edu.courseflow.quiz.dto.QuizDtos.LearnerSourceStatusDto;
 import edu.courseflow.quiz.dto.QuizDtos.ManualGradeAnswerRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuestionOptionDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptAnswerDto;
@@ -142,6 +143,29 @@ public class QuizService {
         }
         return attempts.findByQuizIdAndStudentIdOrderByAttemptNoDesc(quizId, studentId).stream()
                 .map(mapper::toDto)
+                .toList();
+    }
+
+    public List<LearnerSourceStatusDto> learnerStatuses(UUID courseId, String studentId, List<UUID> sourceIds) {
+        if (studentId == null || studentId.isBlank()) {
+            throw new BadRequestException("studentId is required");
+        }
+        Set<UUID> requestedSourceIds = sourceIds == null ? Set.of() : new HashSet<>(sourceIds);
+        List<Quiz> courseQuizzes = quizzes.findByCourseIdOrderByTitleAsc(courseId).stream()
+                .filter(quiz -> requestedSourceIds.isEmpty() || requestedSourceIds.contains(quiz.getId()))
+                .toList();
+        if (courseQuizzes.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> quizIds = courseQuizzes.stream()
+                .map(Quiz::getId)
+                .toList();
+        Map<UUID, List<QuizAttempt>> attemptsByQuiz = attempts
+                .findByQuizIdInAndStudentIdOrderByStartedAtDesc(quizIds, studentId.trim()).stream()
+                .collect(java.util.stream.Collectors.groupingBy(QuizAttempt::getQuizId));
+        Instant now = Instant.now();
+        return courseQuizzes.stream()
+                .map(quiz -> learnerStatus(quiz, attemptsByQuiz.getOrDefault(quiz.getId(), List.of()), now))
                 .toList();
     }
 
@@ -362,6 +386,76 @@ public class QuizService {
                 && attempts.countByQuizIdAndStudentIdAndStatusIn(quizId, studentId, SUBMITTED_ATTEMPT_STATUSES)
                 >= quiz.attemptsAllowed();
         return closed || attemptsExhausted;
+    }
+
+    private LearnerSourceStatusDto learnerStatus(Quiz quiz, List<QuizAttempt> learnerAttempts, Instant now) {
+        QuizAttempt latest = learnerAttempts.isEmpty() ? null : learnerAttempts.getFirst();
+        QuizAttempt openAttempt = learnerAttempts.stream()
+                .filter(attempt -> "IN_PROGRESS".equalsIgnoreCase(attempt.getStatus()))
+                .findFirst()
+                .orElse(null);
+        boolean hasCompletedAttempt = learnerAttempts.stream()
+                .anyMatch(attempt -> "GRADED".equalsIgnoreCase(attempt.getStatus()));
+        boolean hasPendingManualGrade = learnerAttempts.stream()
+                .anyMatch(attempt -> "PARTIALLY_GRADED".equalsIgnoreCase(attempt.getStatus()));
+        Instant dueAt = openAttempt != null && openAttempt.getDeadlineAt() != null
+                ? openAttempt.getDeadlineAt()
+                : quiz.getCloseAt();
+        boolean overdue = !hasCompletedAttempt && dueAt != null && now.isAfter(dueAt);
+        String sourceStatus = quizSourceStatus(
+                quiz,
+                learnerAttempts.size(),
+                openAttempt,
+                hasCompletedAttempt,
+                hasPendingManualGrade,
+                overdue,
+                now);
+        return new LearnerSourceStatusDto(
+                "QUIZ",
+                quiz.getId().toString(),
+                quiz.getCourseId().toString(),
+                quiz.getTitle(),
+                sourceStatus,
+                quiz.getOpenAt(),
+                dueAt,
+                quiz.getCloseAt(),
+                latest == null ? null : latest.getStatus(),
+                latest == null ? null : latest.getId().toString(),
+                learnerAttempts.size(),
+                quiz.getAttemptsAllowed(),
+                hasCompletedAttempt,
+                overdue);
+    }
+
+    private String quizSourceStatus(Quiz quiz,
+                                    int attemptsUsed,
+                                    QuizAttempt openAttempt,
+                                    boolean hasCompletedAttempt,
+                                    boolean hasPendingManualGrade,
+                                    boolean overdue,
+                                    Instant now) {
+        if (!"PUBLISHED".equalsIgnoreCase(quiz.getStatus())) {
+            return "UNAVAILABLE";
+        }
+        if (hasCompletedAttempt) {
+            return "COMPLETED";
+        }
+        if (hasPendingManualGrade) {
+            return "PENDING_GRADE";
+        }
+        if (openAttempt != null) {
+            return overdue ? "OVERDUE" : "IN_PROGRESS";
+        }
+        if (quiz.getOpenAt() != null && now.isBefore(quiz.getOpenAt())) {
+            return "NOT_AVAILABLE";
+        }
+        if (quiz.getCloseAt() != null && now.isAfter(quiz.getCloseAt())) {
+            return "OVERDUE";
+        }
+        if (quiz.getAttemptsAllowed() > 0 && attemptsUsed >= quiz.getAttemptsAllowed()) {
+            return "ATTEMPTS_EXHAUSTED";
+        }
+        return "READY";
     }
 
     private void validateQuizCanStart(Quiz quiz) {

@@ -1,0 +1,191 @@
+name: courseflow-v2-backend
+
+x-prod-service-env: &prod-service-env
+  COURSEFLOW_JWT_SECRET: ${COURSEFLOW_JWT_SECRET:?COURSEFLOW_JWT_SECRET is required for the prod profile}
+  COURSEFLOW_INTERNAL_JWT_SECRET: ${COURSEFLOW_INTERNAL_JWT_SECRET:?COURSEFLOW_INTERNAL_JWT_SECRET is required for the prod profile}
+  COURSEFLOW_INTERNAL_JWT_AUDIENCE: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:-courseflow-services}
+  CERTIFICATE_SIGNING_SECRET: ${CERTIFICATE_SIGNING_SECRET:?CERTIFICATE_SIGNING_SECRET is required for the prod profile}
+  SPRING_LIQUIBASE_CONTEXTS: ${SPRING_LIQUIBASE_CONTEXTS:-prod}
+  COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT: ${COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT:?COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT is required for the prod profile}
+  COURSEFLOW_STORAGE_ACCESS_KEY: ${COURSEFLOW_STORAGE_ACCESS_KEY:?COURSEFLOW_STORAGE_ACCESS_KEY is required for the prod profile}
+  COURSEFLOW_STORAGE_SECRET_KEY: ${COURSEFLOW_STORAGE_SECRET_KEY:?COURSEFLOW_STORAGE_SECRET_KEY is required for the prod profile}
+  COURSEFLOW_STORAGE_ALLOW_DEMO_CREDENTIALS: "false"
+  STORAGE_EXTERNAL_ENDPOINT: ${COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT:?COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT is required for the prod profile}
+  STORAGE_ACCESS_KEY: ${COURSEFLOW_STORAGE_ACCESS_KEY:?COURSEFLOW_STORAGE_ACCESS_KEY is required for the prod profile}
+  STORAGE_SECRET_KEY: ${COURSEFLOW_STORAGE_SECRET_KEY:?COURSEFLOW_STORAGE_SECRET_KEY is required for the prod profile}
+  STORAGE_ALLOW_DEMO_CREDENTIALS: "false"
+  IDENTITY_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  ORGANIZATION_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  COURSE_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  ENROLLMENT_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  ASSIGNMENT_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  DEADLINE_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  ANNOUNCEMENT_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  DISCUSSION_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  NOTIFICATION_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  MEDIA_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  ANALYTICS_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  GRADEBOOK_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  QUIZ_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  CERTIFICATE_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  PEER_REVIEW_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  LIVE_SESSION_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  REVIEW_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  OUTBOX_RELAY_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+
+x-prod-internal-service: &prod-internal-service
+  environment:
+    <<: *prod-service-env
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+    ports: !reset []
+
+  mongo:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  zookeeper:
+    ports: !reset []
+
+  kafka:
+    ports: !reset []
+
+  kafka-connect:
+    ports: !reset []
+
+  debezium-course-search-setup:
+    environment:
+      COURSEFLOW_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+    volumes: !override
+      - ./debezium/register-course-search-cdc.sh:/register-course-search-cdc.sh:ro
+    entrypoint: ["/bin/sh", "/register-course-search-cdc.sh"]
+
+  elasticsearch:
+    ports: !reset []
+
+  keycloak:
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required for the prod profile}
+    ports: !reset []
+
+  minio:
+    environment:
+      MINIO_ROOT_USER: ${COURSEFLOW_STORAGE_ACCESS_KEY:?COURSEFLOW_STORAGE_ACCESS_KEY is required for the prod profile}
+      MINIO_ROOT_PASSWORD: ${COURSEFLOW_STORAGE_SECRET_KEY:?COURSEFLOW_STORAGE_SECRET_KEY is required for the prod profile}
+    ports: !reset []
+
+  minio-setup:
+    environment:
+      COURSEFLOW_STORAGE_ACCESS_KEY: ${COURSEFLOW_STORAGE_ACCESS_KEY:?COURSEFLOW_STORAGE_ACCESS_KEY is required for the prod profile}
+      COURSEFLOW_STORAGE_SECRET_KEY: ${COURSEFLOW_STORAGE_SECRET_KEY:?COURSEFLOW_STORAGE_SECRET_KEY is required for the prod profile}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 \"$${COURSEFLOW_STORAGE_ACCESS_KEY}\" \"$${COURSEFLOW_STORAGE_SECRET_KEY}\"; do
+        echo 'waiting for minio...'; sleep 2;
+      done &&
+      mc mb --ignore-existing local/courseflow-media &&
+      mc mb --ignore-existing local/courseflow-recordings &&
+      mc mb --ignore-existing local/courseflow-submissions &&
+      mc mb --ignore-existing local/courseflow-portfolio &&
+      echo 'MinIO buckets ready: courseflow-media, courseflow-recordings, courseflow-submissions, courseflow-portfolio'
+      "
+
+  api-gateway:
+    environment:
+      <<: *prod-service-env
+      TOKEN_CONVERTER_URI: http://identity-token-converter-service:8105
+      TOKEN_CONVERTER_MODE: ${TOKEN_CONVERTER_MODE:-required}
+
+  identity-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  identity-token-converter-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  organization-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  course-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  enrollment-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  assignment-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  deadline-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  announcement-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  portfolio-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  discussion-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  notification-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  chat-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  media-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  search-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  analytics-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  gradebook-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  quiz-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  certificate-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  peer-review-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  live-session-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  review-service:
+    <<: *prod-internal-service
+    ports: !reset []
+
+  outbox-relay:
+    <<: *prod-internal-service
+    ports: !reset []

@@ -33,6 +33,68 @@ Grafana: `http://localhost:13000` (default local user/password `admin` / `admin`
 See `infra/docker/LOCAL_CLUSTER.md` for details. Demo data is behind the Liquibase `demo` context; set
 `SPRING_LIQUIBASE_CONTEXTS=prod,demo` only for local/demo environments.
 
+## Production Compose security profile
+
+Local Compose is intentionally convenient for development and exposes service ports on the host. For
+a production-shaped Compose render, add `docker-compose.prod.yml` after the local files. The prod
+override keeps the gateway published, removes direct host port mappings for databases, brokers,
+object storage and backend services, disables demo storage credentials and requires non-default
+secrets.
+
+Validate the prod profile without starting containers:
+
+```bash
+COURSEFLOW_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
+COURSEFLOW_INTERNAL_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
+CERTIFICATE_SIGNING_SECRET="replace-with-generated-32-byte-minimum-secret" \
+COURSEFLOW_DB_PASSWORD="replace-with-generated-db-password" \
+COURSEFLOW_STORAGE_ACCESS_KEY="replace-with-object-storage-access-key" \
+COURSEFLOW_STORAGE_SECRET_KEY="replace-with-object-storage-secret-key" \
+COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.com \
+KEYCLOAK_ADMIN_PASSWORD="replace-with-generated-keycloak-admin-password" \
+  scripts/validate-prod-profile.sh --compose
+```
+
+Render or start the prod-shaped backend cluster from `backend/`:
+
+The Compose commands below assume the same prod variables are exported in the shell or injected by
+CI/secret management.
+
+```bash
+docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.services.yml \
+  -f infra/docker/docker-compose.prod.yml \
+  config
+```
+
+```bash
+API_GATEWAY_PORT=8080 docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.services.yml \
+  -f infra/docker/docker-compose.prod.yml \
+  up --build
+```
+
+Optional observability for the prod profile is explicit. Add the local observability file and the prod
+observability guard, then provide a non-default Grafana admin password along with the same prod
+variables above:
+
+```bash
+GRAFANA_ADMIN_PASSWORD="replace-with-generated-grafana-admin-password" \
+docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.services.yml \
+  -f infra/docker/docker-compose.observability.yml \
+  -f infra/docker/docker-compose.prod.yml \
+  -f infra/docker/docker-compose.prod.observability.yml \
+  config
+```
+
+This profile is a Compose hardening baseline, not a full production platform. Public deployment still
+needs TLS termination, external secret management and rotation, managed service credentials,
+network policy/firewalls and backup/restore operations.
+
 ## Object storage (MinIO)
 
 MinIO is the S3-compatible object store used for uploaded files, video sources/renditions, submission attachments and session recordings.
@@ -99,9 +161,12 @@ scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_i
 
 ## Trust boundary
 
-The gateway strips client-supplied `X-User-*` and `X-Service-Token` headers. After JWT validation it
-adds verified identity headers plus the shared service token; downstream services reject forged
-identity headers unless that token matches `COURSEFLOW_SERVICE_TOKEN`.
+The gateway strips client-supplied identity/internal headers. After JWT validation it exchanges the
+external user JWT with `identity-token-converter-service`, forwards verified `X-User-*` identity
+headers, and attaches a short-lived internal JWT in `X-Internal-Authorization`. Downstream services
+reject `/internal/**` requests and propagated identity headers unless that internal JWT validates
+with `COURSEFLOW_INTERNAL_JWT_SECRET`. Direct service clients use `InternalJwtService` from
+`common-library` to mint the same internal JWT proof.
 
 When `SPRING_LIQUIBASE_CONTEXTS=prod,demo` is enabled, demo accounts are seeded in `identity-service` with password `password`:
 

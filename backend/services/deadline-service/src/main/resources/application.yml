@@ -19,10 +19,7 @@ spring:
     contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-courseflow:
-  security:
-    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
-  deadline:
+courseflow:  deadline:
     reminders:
       auto-dispatch-enabled: ${DEADLINE_REMINDER_AUTO_DISPATCH_ENABLED:true}
       dispatch-interval-ms: ${DEADLINE_REMINDER_DISPATCH_INTERVAL_MS:60000}

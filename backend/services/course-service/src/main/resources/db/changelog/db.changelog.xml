@@ -15,4 +15,6 @@
     <include file="db/changelog/changes/003-item-progress.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/004-optimistic-lock-columns.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/005-backfill-published-course-snapshots.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/006-course-review-audit.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/007-module-item-status.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

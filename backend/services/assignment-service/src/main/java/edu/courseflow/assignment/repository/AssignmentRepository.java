@@ -133,6 +133,15 @@ public class AssignmentRepository {
                 .toList();
     }
 
+    public List<SubmissionDto> listSubmissionAttemptsForStudent(List<UUID> assignmentIds, String studentId) {
+        if (assignmentIds == null || assignmentIds.isEmpty()) {
+            return List.of();
+        }
+        return submissions.findByAssignmentIdInAndStudentIdOrderBySubmittedAtDesc(assignmentIds, studentId).stream()
+                .map(submission -> mapper.toDto(submission, List.of()))
+                .toList();
+    }
+
     public Optional<SubmissionDto> findSubmissionById(UUID submissionId) {
         return submissions.findById(submissionId).map(this::toSubmissionDto);
     }

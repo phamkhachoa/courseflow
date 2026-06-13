@@ -6,9 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.security.CourseAccessClient;
+import edu.courseflow.commonlibrary.security.InternalJwtService;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.course.dto.AuthoringDtos.ItemOutlineDto;
 import edu.courseflow.course.dto.AuthoringDtos.ModuleOutlineDto;
+import edu.courseflow.course.dto.AuthoringDtos.ModulePrerequisiteOutlineDto;
 import edu.courseflow.course.dto.CompleteItemProgressRequestDto;
 import edu.courseflow.course.dto.CourseModuleDto;
 import edu.courseflow.course.dto.CourseDtos.PresignedDownloadDto;
@@ -17,6 +19,18 @@ import edu.courseflow.course.dto.CourseProgressDto.ItemProgressDto;
 import edu.courseflow.course.dto.CourseProgressDto.MissingRequirementDto;
 import edu.courseflow.course.dto.CourseProgressDto.ModuleProgressSummaryDto;
 import edu.courseflow.course.dto.CourseProgressDto.ProgressBreakdownDto;
+import edu.courseflow.course.dto.LearningDtos.CertificateEligibilityDto;
+import edu.courseflow.course.dto.LearningDtos.CertificateMissingRequirementDto;
+import edu.courseflow.course.dto.LearningDtos.CoursePlayerItemStateDto;
+import edu.courseflow.course.dto.LearningDtos.CoursePlayerModuleStateDto;
+import edu.courseflow.course.dto.LearningDtos.CoursePlayerNextActionDto;
+import edu.courseflow.course.dto.LearningDtos.CoursePlayerPrerequisiteDto;
+import edu.courseflow.course.dto.LearningDtos.LearnerCoursePlayerDto;
+import edu.courseflow.course.dto.LearningDtos.LearningSourceStatusDto;
+import edu.courseflow.course.dto.LearningDtos.LearningAccessCheckDto;
+import edu.courseflow.course.dto.LearningDtos.LearningAccessCheckRequestDto;
+import edu.courseflow.course.service.LearningSourceStatusClient.SourceKey;
+import edu.courseflow.course.service.LearningSourceStatusClient.SourceRef;
 import edu.courseflow.course.dto.ModuleItemDto;
 import edu.courseflow.course.dto.ModuleProgressDto;
 import edu.courseflow.course.dto.RecordItemCompletionRequestDto;
@@ -41,6 +55,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -62,8 +77,10 @@ public class CourseModuleService {
     private final ObjectMapper objectMapper;
     private final CourseMapper mapper;
     private final CourseAccessClient courseAccess;
+    private final CertificateEligibilityClient certificateEligibilityClient;
+    private final LearningSourceStatusClient sourceStatusClient;
     private final RestClient mediaClient;
-    private final String serviceToken;
+    private final InternalJwtService internalJwt;
 
     public CourseModuleService(CourseModuleJpaRepository modules,
             ModuleItemJpaRepository items,
@@ -75,9 +92,11 @@ public class CourseModuleService {
             ObjectMapper objectMapper,
             CourseMapper mapper,
             CourseAccessClient courseAccess,
+            CertificateEligibilityClient certificateEligibilityClient,
+            LearningSourceStatusClient sourceStatusClient,
             RestClient.Builder restClientBuilder,
             @Value("${courseflow.content.media-service-url:http://localhost:8091}") String mediaServiceUrl,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+            InternalJwtService internalJwt) {
         this.modules = modules;
         this.items = items;
         this.versions = versions;
@@ -88,31 +107,173 @@ public class CourseModuleService {
         this.objectMapper = objectMapper;
         this.mapper = mapper;
         this.courseAccess = courseAccess;
+        this.certificateEligibilityClient = certificateEligibilityClient;
+        this.sourceStatusClient = sourceStatusClient;
         this.mediaClient = restClientBuilder.baseUrl(mediaServiceUrl).build();
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
+        this.internalJwt = internalJwt;
     }
 
     public List<CourseModuleDto> listModules(UUID courseId, CurrentUser user) {
         courseAccess.requireCourseAccess(user, courseId);
+        return publishedModules(courseId);
+    }
+
+    List<CourseModuleDto> publishedModules(UUID courseId) {
         return publishedCurriculum(courseId).modules().stream()
                 .map(this::toCourseModuleDto)
                 .toList();
     }
 
+    public LearnerCoursePlayerDto player(UUID courseId, CurrentUser user) {
+        return player(courseId, user, true);
+    }
+
+    public LearnerCoursePlayerDto nextActionSnapshot(UUID courseId, CurrentUser user) {
+        return player(courseId, user, false);
+    }
+
+    private LearnerCoursePlayerDto player(UUID courseId, CurrentUser user, boolean includeCertificateEligibility) {
+        if (user == null || user.id() == null) {
+            throw new ForbiddenException("Authentication required");
+        }
+        courseAccess.requireCourseAccess(user, courseId);
+        String studentId = String.valueOf(user.id());
+        PublishedCurriculum curriculum = publishedCurriculum(courseId);
+        Map<UUID, LearnerItemProgress> progressByItemId = itemProgressRepository
+                .findByCourseIdAndStudentId(courseId, studentId).stream()
+                .collect(Collectors.toMap(LearnerItemProgress::getItemId, Function.identity(), (a, b) -> a));
+        CourseProgressDto progress = toCourseProgressDto(courseId, studentId, curriculum, progressByItemId);
+        List<CoursePlayerModuleStateDto> moduleStates = moduleStates(curriculum, studentId, progressByItemId);
+        Map<UUID, CoursePlayerModuleStateDto> moduleStateById = moduleStates.stream()
+                .collect(Collectors.toMap(state -> UUID.fromString(state.moduleId()), Function.identity(), (a, b) -> a));
+        Map<SourceKey, LearningSourceStatusDto> sourceStatuses = loadSourceStatuses(courseId, studentId, curriculum);
+        List<CoursePlayerItemStateDto> itemStates = itemStates(curriculum, progressByItemId, moduleStateById,
+                sourceStatuses);
+        CertificateEligibilityDto certificateEligibility = includeCertificateEligibility || progress.completed()
+                ? certificateEligibility(courseId, studentId, user, progress, itemStates)
+                : null;
+
+        return new LearnerCoursePlayerDto(
+                Instant.now(),
+                courseId.toString(),
+                curriculum.modules().stream().map(this::toCourseModuleDto).toList(),
+                progress,
+                certificateEligibility,
+                nextAction(curriculum, progress, itemStates),
+                moduleStates,
+                itemStates);
+    }
+
     public PresignedDownloadDto downloadPublishedMedia(UUID courseId, UUID mediaId, CurrentUser user) {
+        if (user == null || user.id() == null) {
+            throw new ForbiddenException("Authentication required");
+        }
         courseAccess.requireCourseAccess(user, courseId);
         PublishedCurriculum curriculum = publishedCurriculum(courseId);
-        if (!curriculum.containsDocumentMedia(mediaId)) {
-            throw new ForbiddenException("Media asset is not part of the published course curriculum");
-        }
-        if (serviceToken.isBlank()) {
-            throw new IllegalStateException("Media download service token is not configured");
+        PublishedItem item = curriculum.findItemByDocumentMedia(mediaId)
+                .orElseThrow(() -> new ForbiddenException("Media asset is not part of the published course curriculum"));
+        String studentId = String.valueOf(user.id());
+        Map<UUID, LearnerItemProgress> progressByItemId = itemProgressRepository
+                .findByCourseIdAndStudentId(courseId, studentId).stream()
+                .collect(Collectors.toMap(LearnerItemProgress::getItemId, Function.identity(), (a, b) -> a));
+        List<CoursePlayerPrerequisiteDto> unmetPrerequisites = unmetPrerequisites(
+                curriculum,
+                item.moduleId(),
+                studentId,
+                progressByItemId);
+        if (!unmetPrerequisites.isEmpty()) {
+            throw new ForbiddenException("Media asset is locked until module prerequisites are completed");
         }
         return mediaClient.get()
                 .uri("/internal/media/assets/{mediaId}/download-url/trusted", mediaId)
-                .header(CourseAccessClient.SERVICE_TOKEN_HEADER, serviceToken)
+                .headers(internalJwt::applyServiceToken)
                 .retrieve()
                 .body(PresignedDownloadDto.class);
+    }
+
+    public LearningAccessCheckDto checkLearningAccess(UUID courseId, LearningAccessCheckRequestDto request) {
+        if (request == null || isBlank(request.studentId())) {
+            throw new BadRequestException("studentId is required");
+        }
+        if (isBlank(request.sourceType())) {
+            throw new BadRequestException("sourceType is required");
+        }
+        if (isBlank(request.sourceId())) {
+            throw new BadRequestException("sourceId is required");
+        }
+        String studentId = request.studentId().trim();
+        String sourceType = request.sourceType().trim().toUpperCase();
+        String sourceId = request.sourceId().trim();
+        try {
+            courseAccess.requirePublishedCourse(courseId);
+            courseAccess.requireStudentCourseAccess(studentId, courseId);
+        } catch (RuntimeException ex) {
+            return deniedLearningAccess(
+                    courseId,
+                    studentId,
+                    sourceType,
+                    sourceId,
+                    "COURSE_ACCESS_DENIED",
+                    "Học viên chưa có quyền học khóa này.",
+                    null);
+        }
+        PublishedCurriculum curriculum = publishedCurriculum(courseId);
+        Optional<PublishedItem> item = findPublishedItemByVerifiedSource(curriculum, sourceType, sourceId);
+        if (item.isEmpty()) {
+            return deniedLearningAccess(
+                    courseId,
+                    studentId,
+                    sourceType,
+                    sourceId,
+                    "SOURCE_NOT_IN_PUBLISHED_CURRICULUM",
+                    "Hoạt động này không nằm trong phiên bản khóa học đã publish.",
+                    null);
+        }
+        Map<UUID, LearnerItemProgress> progressByItemId = itemProgressRepository
+                .findByCourseIdAndStudentId(courseId, studentId).stream()
+                .collect(Collectors.toMap(LearnerItemProgress::getItemId, Function.identity(), (a, b) -> a));
+        List<CoursePlayerPrerequisiteDto> unmetPrerequisites = unmetPrerequisites(
+                curriculum,
+                item.get().moduleId(),
+                studentId,
+                progressByItemId);
+        if (!unmetPrerequisites.isEmpty()) {
+            return deniedLearningAccess(
+                    courseId,
+                    studentId,
+                    sourceType,
+                    sourceId,
+                    "PREREQUISITE_MODULE_INCOMPLETE",
+                    lockedReason(unmetPrerequisites),
+                    item.get());
+        }
+        return new LearningAccessCheckDto(
+                Instant.now(),
+                courseId.toString(),
+                studentId,
+                sourceType,
+                sourceId,
+                true,
+                null,
+                null,
+                item.get().moduleId().toString(),
+                item.get().id().toString());
+    }
+
+    private LearningAccessCheckDto deniedLearningAccess(UUID courseId, String studentId, String sourceType,
+                                                        String sourceId, String reasonCode, String reasonText,
+                                                        PublishedItem item) {
+        return new LearningAccessCheckDto(
+                Instant.now(),
+                courseId.toString(),
+                studentId,
+                sourceType,
+                sourceId,
+                false,
+                reasonCode,
+                reasonText,
+                item == null ? null : item.moduleId().toString(),
+                item == null ? null : item.id().toString());
     }
 
     @Transactional
@@ -128,11 +289,10 @@ public class CourseModuleService {
         PublishedModule module = curriculum.findModule(moduleId)
                 .orElseThrow(() -> new NotFoundException("Published module not found: " + moduleId));
 
-        requireModulePrerequisites(courseId, moduleId, studentId);
-
         Map<UUID, LearnerItemProgress> progressByItemId = itemProgressRepository
                 .findByCourseIdAndStudentId(courseId, studentId).stream()
                 .collect(Collectors.toMap(LearnerItemProgress::getItemId, Function.identity(), (a, b) -> a));
+        requireModulePrerequisites(curriculum, moduleId, studentId, progressByItemId);
         List<String> missingItems = module.items().stream()
                 .filter(PublishedItem::required)
                 .filter(item -> !isItemCompleted(item.id(), progressByItemId))
@@ -169,14 +329,15 @@ public class CourseModuleService {
         courseAccess.requireCourseAccess(user, courseId);
         String studentId = String.valueOf(user.id());
 
-        PublishedItem item = publishedCurriculum(courseId).findItem(moduleId, itemId)
+        PublishedCurriculum curriculum = publishedCurriculum(courseId);
+        PublishedItem item = curriculum.findItem(moduleId, itemId)
                 .orElseThrow(() -> new NotFoundException("Published module item not found: " + itemId));
 
         if (!isLearnerSelfCompletable(item)) {
             throw new BadRequestException("Item type " + normalizeItemType(item)
                     + " requires verified completion from its source service");
         }
-        return recordItemCompletion(courseId, moduleId, item, studentId, learnerProgressType(item), Instant.now());
+        return recordItemCompletion(curriculum, courseId, moduleId, item, studentId, learnerProgressType(item), Instant.now());
     }
 
     @Transactional
@@ -186,11 +347,12 @@ public class CourseModuleService {
             throw new BadRequestException("studentId is required");
         }
         String studentId = request.studentId().trim();
-        PublishedItem item = publishedCurriculum(courseId).findItem(moduleId, itemId)
+        PublishedCurriculum curriculum = publishedCurriculum(courseId);
+        PublishedItem item = curriculum.findItem(moduleId, itemId)
                 .orElseThrow(() -> new NotFoundException("Published module item not found: " + itemId));
         validateVerifiedSource(item, request);
         Instant completedAt = request.completedAt() == null ? Instant.now() : request.completedAt();
-        return recordItemCompletion(courseId, moduleId, item, studentId, verifiedProgressType(item), completedAt);
+        return recordItemCompletion(curriculum, courseId, moduleId, item, studentId, verifiedProgressType(item), completedAt);
     }
 
     @Transactional
@@ -204,28 +366,33 @@ public class CourseModuleService {
         if (isBlank(request.sourceType())) {
             throw new BadRequestException("sourceType is required");
         }
+        PublishedCurriculum curriculum = publishedCurriculum(courseId);
         PublishedItem item = findPublishedItemByVerifiedSource(
-                courseId,
+                curriculum,
                 request.sourceType().trim().toUpperCase(),
                 request.sourceId().trim())
                 .orElseThrow(() -> new NotFoundException("Published module item not found for source: "
                         + request.sourceType() + "/" + request.sourceId()));
         validateVerifiedSource(item, request);
         Instant completedAt = request.completedAt() == null ? Instant.now() : request.completedAt();
-        return recordItemCompletion(courseId, item.moduleId(), item, request.studentId().trim(),
+        return recordItemCompletion(curriculum, courseId, item.moduleId(), item, request.studentId().trim(),
                 verifiedProgressType(item), completedAt);
     }
 
-    private ItemProgressDto recordItemCompletion(UUID courseId, UUID moduleId, PublishedItem item,
+    private ItemProgressDto recordItemCompletion(PublishedCurriculum curriculum, UUID courseId, UUID moduleId, PublishedItem item,
                                                  String studentId, String progressType, Instant completedAt) {
-        requireModulePrerequisites(courseId, moduleId, studentId);
+        Map<UUID, LearnerItemProgress> progressByItemId = itemProgressRepository
+                .findByCourseIdAndStudentId(courseId, studentId).stream()
+                .collect(Collectors.toMap(LearnerItemProgress::getItemId, Function.identity(), (a, b) -> a));
+        requireModulePrerequisites(curriculum, moduleId, studentId, progressByItemId);
         boolean alreadyComplete = computeProgress(courseId, studentId).completed();
         LearnerItemProgress progress = itemProgressRepository.findByItemIdAndStudentId(item.id(), studentId)
                 .orElseGet(() -> new LearnerItemProgress(UUID.randomUUID(), courseId, moduleId, item.id(), studentId));
         progress.complete(progressType, completedAt);
         progress = itemProgressRepository.save(progress);
+        progressByItemId.put(item.id(), progress);
 
-        if (isModuleCompleteByItems(courseId, moduleId, studentId)) {
+        if (isModuleCompleteByItems(curriculum, moduleId, studentId, progressByItemId)) {
             saveModuleCompletion(courseId, moduleId, studentId, completedAt);
         }
 
@@ -254,13 +421,26 @@ public class CourseModuleService {
         return computeProgress(courseId, String.valueOf(user.id()));
     }
 
+    public CourseProgressDto progressForStudent(UUID courseId, String studentId) {
+        if (isBlank(studentId)) {
+            throw new BadRequestException("studentId is required");
+        }
+        courseAccess.requirePublishedCourse(courseId);
+        return computeProgress(courseId, studentId.trim());
+    }
+
     CourseProgressDto computeProgress(UUID courseId, String studentId) {
         PublishedCurriculum curriculum = publishedCurriculum(courseId);
-        List<PublishedModule> courseModules = curriculum.modules();
-        List<PublishedItem> courseItems = curriculum.items();
         Map<UUID, LearnerItemProgress> progressByItemId = itemProgressRepository
                 .findByCourseIdAndStudentId(courseId, studentId).stream()
                 .collect(Collectors.toMap(LearnerItemProgress::getItemId, Function.identity(), (a, b) -> a));
+        return toCourseProgressDto(courseId, studentId, curriculum, progressByItemId);
+    }
+
+    private CourseProgressDto toCourseProgressDto(UUID courseId, String studentId, PublishedCurriculum curriculum,
+                                                  Map<UUID, LearnerItemProgress> progressByItemId) {
+        List<PublishedModule> courseModules = curriculum.modules();
+        List<PublishedItem> courseItems = curriculum.items();
 
         List<ModuleProgressSummaryDto> moduleSummaries = courseModules.stream()
                 .map(module -> toModuleSummary(module, courseItems, progressByItemId))
@@ -312,12 +492,438 @@ public class CourseModuleService {
                 missingRequirements);
     }
 
+    private List<CoursePlayerModuleStateDto> moduleStates(PublishedCurriculum curriculum, String studentId,
+                                                          Map<UUID, LearnerItemProgress> progressByItemId) {
+        Map<UUID, List<UUID>> prerequisiteModuleIds = prerequisiteModuleIds(curriculum);
+        return curriculum.modules().stream()
+                .map(module -> {
+                    List<CoursePlayerPrerequisiteDto> unmet = unmetPrerequisites(
+                            curriculum,
+                            prerequisiteModuleIds.getOrDefault(module.id(), List.of()),
+                            studentId,
+                            progressByItemId);
+                    boolean locked = !unmet.isEmpty();
+                    return new CoursePlayerModuleStateDto(
+                            module.id().toString(),
+                            locked,
+                            locked ? "PREREQUISITE_MODULE_INCOMPLETE" : null,
+                            locked ? lockedReason(unmet) : null,
+                            unmet);
+                })
+                .toList();
+    }
+
+    private List<CoursePlayerPrerequisiteDto> unmetPrerequisites(PublishedCurriculum curriculum, UUID moduleId,
+                                                                 String studentId,
+                                                                 Map<UUID, LearnerItemProgress> progressByItemId) {
+        return unmetPrerequisites(
+                curriculum,
+                prerequisiteModuleIds(curriculum).getOrDefault(moduleId, List.of()),
+                studentId,
+                progressByItemId);
+    }
+
+    private List<CoursePlayerPrerequisiteDto> unmetPrerequisites(PublishedCurriculum curriculum,
+                                                                 List<UUID> prerequisiteModuleIds,
+                                                                 String studentId,
+                                                                 Map<UUID, LearnerItemProgress> progressByItemId) {
+        return prerequisiteModuleIds.stream()
+                .filter(requiredModuleId -> !isModuleCompleteByItems(curriculum, requiredModuleId, studentId, progressByItemId))
+                .map(requiredModuleId -> new CoursePlayerPrerequisiteDto(
+                        requiredModuleId.toString(),
+                        curriculum.findModule(requiredModuleId).map(PublishedModule::title).orElse("Module " + requiredModuleId),
+                        false))
+                .toList();
+    }
+
+    private String lockedReason(List<CoursePlayerPrerequisiteDto> unmet) {
+        if (unmet.isEmpty()) {
+            return null;
+        }
+        if (unmet.size() == 1) {
+            return "Hoàn thành " + unmet.getFirst().title() + " trước khi mở chương này.";
+        }
+        return "Hoàn thành " + unmet.size() + " chương điều kiện trước khi mở chương này.";
+    }
+
+    private Map<SourceKey, LearningSourceStatusDto> loadSourceStatuses(UUID courseId, String studentId,
+                                                                       PublishedCurriculum curriculum) {
+        if (sourceStatusClient == null) {
+            return Map.of();
+        }
+        Map<SourceKey, LearningSourceStatusDto> sourceStatuses = sourceStatusClient.loadStatuses(
+                courseId,
+                studentId,
+                sourceRefs(curriculum));
+        return sourceStatuses == null ? Map.of() : sourceStatuses;
+    }
+
+    private List<SourceRef> sourceRefs(PublishedCurriculum curriculum) {
+        return curriculum.items().stream()
+                .map(item -> new SourceRef(normalizeItemType(item), trimToNull(item.refId())))
+                .filter(ref -> ("QUIZ".equals(ref.sourceType()) || "ASSIGNMENT".equals(ref.sourceType()))
+                        && !isBlank(ref.sourceId()))
+                .distinct()
+                .toList();
+    }
+
+    private List<CoursePlayerItemStateDto> itemStates(PublishedCurriculum curriculum,
+                                                      Map<UUID, LearnerItemProgress> progressByItemId,
+                                                      Map<UUID, CoursePlayerModuleStateDto> moduleStateById,
+                                                      Map<SourceKey, LearningSourceStatusDto> sourceStatuses) {
+        return curriculum.items().stream()
+                .map(item -> {
+                    LearnerItemProgress progress = progressByItemId.get(item.id());
+                    CoursePlayerModuleStateDto moduleState = moduleStateById.get(item.moduleId());
+                    boolean locked = moduleState != null && moduleState.locked();
+                    String itemType = normalizeItemType(item);
+                    LearningSourceStatusDto sourceStatus = sourceStatuses.get(new SourceKey(itemType, item.refId()));
+                    return new CoursePlayerItemStateDto(
+                            item.id().toString(),
+                            item.moduleId().toString(),
+                            itemType,
+                            item.required(),
+                            progress == null ? "NOT_STARTED" : progress.getStatus(),
+                            progress == null ? null : progress.getProgressType(),
+                            progress == null ? null : progress.getCompletedAt(),
+                            isLearnerSelfCompletable(item) ? "SELF" : "VERIFIED",
+                            locked,
+                            locked ? moduleState.lockedReasonCode() : null,
+                            locked ? moduleState.lockedReasonText() : null,
+                            locked ? "LOCKED" : itemSourceStatus(sourceStatus),
+                            sourceStatus == null ? null : sourceStatus.dueAt(),
+                            sourceStatus == null ? null : sourceStatus.lockAt());
+                })
+                .toList();
+    }
+
+    private CertificateEligibilityDto certificateEligibility(UUID courseId, String studentId, CurrentUser user,
+                                                            CourseProgressDto progress,
+                                                            List<CoursePlayerItemStateDto> itemStates) {
+        CertificateEligibilityDto remote = certificateEligibilityClient == null
+                ? unavailableCertificateEligibility(courseId, studentId, "Certificate eligibility client is not configured.")
+                : certificateEligibilityClient.loadEligibility(courseId, user);
+        return mergeCertificateEligibility(courseId, studentId, remote, progress, itemStates);
+    }
+
+    private CertificateEligibilityDto mergeCertificateEligibility(UUID courseId, String studentId,
+                                                                  CertificateEligibilityDto remote,
+                                                                  CourseProgressDto progress,
+                                                                  List<CoursePlayerItemStateDto> itemStates) {
+        CertificateEligibilityDto base = remote == null
+                ? unavailableCertificateEligibility(courseId, studentId, "Certificate service returned no eligibility status.")
+                : remote;
+        List<CertificateMissingRequirementDto> requiredItemMissing = missingRequiredItems(progress, itemStates);
+        boolean requiredItemsEligible = requiredItemMissing.isEmpty();
+        boolean issued = base.issued();
+        boolean remoteUnavailable = "ELIGIBILITY_UNAVAILABLE".equalsIgnoreCase(base.status());
+        boolean eligible = issued || (base.eligible() && requiredItemsEligible && !remoteUnavailable);
+        boolean completionEligible = issued || (base.completionEligible() && requiredItemsEligible);
+        List<CertificateMissingRequirementDto> missing = new ArrayList<>();
+        for (CertificateMissingRequirementDto requirement : safeCertificateRequirements(base)) {
+            if ("COURSE_COMPLETION".equalsIgnoreCase(requirement.code())
+                    && (!requiredItemsEligible || "COURSE_NOT_COMPLETED".equalsIgnoreCase(base.status()))) {
+                continue;
+            }
+            missing.add(requirement);
+        }
+        missing.addAll(requiredItemMissing);
+        if (requiredItemsEligible
+                && !issued
+                && "COURSE_NOT_COMPLETED".equalsIgnoreCase(base.status())
+                && missing.stream().noneMatch(requirement -> "COURSE_COMPLETION_SYNC".equalsIgnoreCase(requirement.code()))) {
+            missing.add(new CertificateMissingRequirementDto(
+                    "COURSE_COMPLETION_SYNC",
+                    "Chờ đồng bộ hoàn thành khóa",
+                    "Các mục bắt buộc đã hoàn tất, nhưng trạng thái hoàn thành khóa chưa đồng bộ sang certificate service."));
+        }
+
+        return new CertificateEligibilityDto(
+                base.generatedAt() == null ? Instant.now() : base.generatedAt(),
+                courseId.toString(),
+                studentId,
+                eligible,
+                certificateStatus(base, requiredItemsEligible, remoteUnavailable),
+                completionEligible,
+                issued || base.gradeEligible(),
+                issued || requiredItemsEligible,
+                issued,
+                base.finalGrade(),
+                base.gradeThreshold(),
+                base.finalGradeStatus(),
+                base.certificateId(),
+                base.verificationCode(),
+                base.issuedAt(),
+                missing);
+    }
+
+    private List<CertificateMissingRequirementDto> missingRequiredItems(CourseProgressDto progress,
+                                                                        List<CoursePlayerItemStateDto> itemStates) {
+        if (progress == null || progress.missingRequirements() == null || progress.missingRequirements().isEmpty()) {
+            return List.of();
+        }
+        Map<String, CoursePlayerItemStateDto> stateByItemId = itemStates == null
+                ? Map.of()
+                : itemStates.stream()
+                        .collect(Collectors.toMap(CoursePlayerItemStateDto::itemId, Function.identity(), (a, b) -> a));
+        return progress.missingRequirements().stream()
+                .filter(requirement -> !sourceCompleted(stateByItemId.get(requirement.itemId())))
+                .map(requirement -> new CertificateMissingRequirementDto(
+                        "REQUIRED_ITEM_INCOMPLETE",
+                        requirement.title(),
+                        "Hoàn thành mục bắt buộc trong published course snapshot."))
+                .toList();
+    }
+
+    private String certificateStatus(CertificateEligibilityDto base, boolean requiredItemsEligible,
+                                     boolean remoteUnavailable) {
+        if (base.issued()) {
+            return "ISSUED";
+        }
+        if (remoteUnavailable) {
+            return "ELIGIBILITY_UNAVAILABLE";
+        }
+        if (!requiredItemsEligible) {
+            return "REQUIRED_ITEMS_INCOMPLETE";
+        }
+        if ("COURSE_NOT_COMPLETED".equalsIgnoreCase(base.status())) {
+            return "PROGRESS_SYNC_PENDING";
+        }
+        return isBlank(base.status()) ? "NOT_ELIGIBLE" : base.status();
+    }
+
+    private List<CertificateMissingRequirementDto> safeCertificateRequirements(CertificateEligibilityDto eligibility) {
+        return eligibility == null || eligibility.missingRequirements() == null
+                ? List.of()
+                : eligibility.missingRequirements();
+    }
+
+    private CertificateEligibilityDto unavailableCertificateEligibility(UUID courseId, String studentId, String detail) {
+        return new CertificateEligibilityDto(
+                Instant.now(),
+                courseId.toString(),
+                studentId,
+                false,
+                "ELIGIBILITY_UNAVAILABLE",
+                false,
+                false,
+                false,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(new CertificateMissingRequirementDto(
+                        "CERTIFICATE_ELIGIBILITY_UNAVAILABLE",
+                        "Chưa kiểm tra được điều kiện chứng chỉ",
+                        detail)));
+    }
+
+    private String itemSourceStatus(LearningSourceStatusDto sourceStatus) {
+        if (sourceStatus == null || isBlank(sourceStatus.sourceStatus())) {
+            return "READY";
+        }
+        return sourceStatus.sourceStatus().trim().toUpperCase();
+    }
+
+    private CoursePlayerNextActionDto nextAction(PublishedCurriculum curriculum, CourseProgressDto progress,
+                                                 List<CoursePlayerItemStateDto> itemStates) {
+        Map<String, CoursePlayerItemStateDto> stateByItemId = itemStates.stream()
+                .collect(Collectors.toMap(CoursePlayerItemStateDto::itemId, Function.identity(), (a, b) -> a));
+        if (progress.completed()) {
+            return new CoursePlayerNextActionDto(
+                    "COURSE_COMPLETE",
+                    null,
+                    null,
+                    "COURSE",
+                    "Khóa học đã hoàn tất",
+                    false,
+                    "Ôn lại khóa học",
+                    "Bạn đã hoàn thành các mục bắt buộc của khóa học.");
+        }
+
+        List<PublishedItem> missingItems = progress.missingRequirements().stream()
+                .map(missing -> curriculum.findItem(UUID.fromString(missing.moduleId()), UUID.fromString(missing.itemId())))
+                .flatMap(Optional::stream)
+                .toList();
+        List<PublishedItem> pendingItems = missingItems.stream()
+                .filter(item -> !sourceCompleted(stateByItemId.get(item.id().toString())))
+                .toList();
+        if (!missingItems.isEmpty() && pendingItems.isEmpty()) {
+            return new CoursePlayerNextActionDto(
+                    "SOURCE_SYNC_PENDING",
+                    null,
+                    null,
+                    "COURSE",
+                    "Đang đồng bộ tiến độ",
+                    false,
+                    "Làm mới sau",
+                    "Các hoạt động bắt buộc đã hoàn tất ở hệ thống nguồn; CourseFlow đang chờ đồng bộ tiến độ.");
+        }
+
+        Optional<PublishedItem> next = firstUnlockedWithSourceStatus(
+                        pendingItems,
+                        stateByItemId,
+                        Set.of("OVERDUE"))
+                .or(() -> firstUnlockedWithSourceStatus(
+                        pendingItems,
+                        stateByItemId,
+                        Set.of("IN_PROGRESS")))
+                .or(() -> firstUnlockedWithSourceStatus(
+                        pendingItems,
+                        stateByItemId,
+                        Set.of("READY")))
+                .or(() -> firstUnlockedItem(pendingItems, stateByItemId));
+        boolean onlyLockedItemsRemain = next.isEmpty() && !pendingItems.isEmpty();
+        if (next.isEmpty()) {
+            next = pendingItems.stream().findFirst();
+        }
+        if (next.isEmpty()) {
+            return new CoursePlayerNextActionDto(
+                    "EMPTY",
+                    null,
+                    null,
+                    null,
+                    "Chưa có bài bắt buộc tiếp theo",
+                    false,
+                    "Xem lộ trình",
+                    "Khóa học chưa có mục bắt buộc cần hoàn thành.");
+        }
+
+        PublishedItem item = next.get();
+        CoursePlayerItemStateDto state = stateByItemId.get(item.id().toString());
+        boolean locked = state != null && (state.locked() || sourceBlocksAction(state));
+        return new CoursePlayerNextActionDto(
+                nextActionKind(progress, state, onlyLockedItemsRemain),
+                item.moduleId().toString(),
+                item.id().toString(),
+                normalizeItemType(item),
+                item.title(),
+                locked,
+                ctaForItem(item, state),
+                reasonForItem(state));
+    }
+
+    private Optional<PublishedItem> firstUnlockedWithSourceStatus(List<PublishedItem> items,
+                                                                  Map<String, CoursePlayerItemStateDto> stateByItemId,
+                                                                  Set<String> sourceStatuses) {
+        return items.stream()
+                .filter(item -> {
+                    CoursePlayerItemStateDto state = stateByItemId.get(item.id().toString());
+                    return !isPrerequisiteLocked(state) && sourceStatuses.contains(sourceStatus(state));
+                })
+                .findFirst();
+    }
+
+    private Optional<PublishedItem> firstUnlockedItem(List<PublishedItem> items,
+                                                      Map<String, CoursePlayerItemStateDto> stateByItemId) {
+        return items.stream()
+                .filter(item -> !isPrerequisiteLocked(stateByItemId.get(item.id().toString())))
+                .findFirst();
+    }
+
+    private boolean isPrerequisiteLocked(CoursePlayerItemStateDto state) {
+        return state != null && state.locked();
+    }
+
+    private boolean sourceCompleted(CoursePlayerItemStateDto state) {
+        return sourceStatusIn(state, "COMPLETED", "GRADED");
+    }
+
+    private boolean sourceBlocksAction(CoursePlayerItemStateDto state) {
+        return sourceStatusIn(state, "NOT_AVAILABLE", "LOCKED", "UNAVAILABLE", "SOURCE_STATUS_UNAVAILABLE");
+    }
+
+    private boolean sourceStatusIn(CoursePlayerItemStateDto state, String... statuses) {
+        String sourceStatus = sourceStatus(state);
+        for (String status : statuses) {
+            if (status.equals(sourceStatus)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String sourceStatus(CoursePlayerItemStateDto state) {
+        if (state == null || isBlank(state.sourceStatus())) {
+            return "READY";
+        }
+        return state.sourceStatus().trim().toUpperCase();
+    }
+
+    private String nextActionKind(CourseProgressDto progress, CoursePlayerItemStateDto state,
+                                  boolean onlyLockedItemsRemain) {
+        if (onlyLockedItemsRemain || isPrerequisiteLocked(state)) {
+            return "LOCKED_BY_PREREQUISITE";
+        }
+        return switch (sourceStatus(state)) {
+            case "OVERDUE" -> "OVERDUE_ITEM";
+            case "IN_PROGRESS" -> "CONTINUE_ITEM";
+            case "SUBMITTED", "RESUBMITTED", "PENDING_GRADE", "ATTEMPTS_EXHAUSTED" -> "AWAITING_GRADE";
+            case "NOT_AVAILABLE" -> "NOT_AVAILABLE_YET";
+            case "LOCKED" -> "SOURCE_LOCKED";
+            case "SOURCE_STATUS_UNAVAILABLE" -> "SOURCE_STATUS_UNAVAILABLE";
+            case "UNAVAILABLE" -> "SOURCE_UNAVAILABLE";
+            default -> progress.percentComplete() == 0 && progress.completedItems() == 0
+                    ? "START_COURSE"
+                    : "CONTINUE_ITEM";
+        };
+    }
+
+    private String ctaForItem(PublishedItem item) {
+        return switch (normalizeItemType(item)) {
+            case "QUIZ" -> "Mở quiz";
+            case "ASSIGNMENT" -> "Mở assignment";
+            case "VIDEO" -> "Xem video";
+            default -> "Tiếp tục học";
+        };
+    }
+
+    private String ctaForItem(PublishedItem item, CoursePlayerItemStateDto state) {
+        if (isPrerequisiteLocked(state)) {
+            return "Xem điều kiện";
+        }
+        return switch (sourceStatus(state)) {
+            case "OVERDUE" -> "Xem bài quá hạn";
+            case "IN_PROGRESS" -> "Tiếp tục làm";
+            case "SUBMITTED", "RESUBMITTED", "PENDING_GRADE", "ATTEMPTS_EXHAUSTED" -> "Xem trạng thái";
+            case "NOT_AVAILABLE" -> "Xem lịch mở";
+            case "LOCKED" -> "Xem hạn nộp";
+            case "SOURCE_STATUS_UNAVAILABLE" -> "Thử lại sau";
+            case "UNAVAILABLE" -> "Xem cấu hình";
+            default -> ctaForItem(item);
+        };
+    }
+
+    private String reasonForItem(CoursePlayerItemStateDto state) {
+        if (isPrerequisiteLocked(state)) {
+            return state.lockedReasonText();
+        }
+        return switch (sourceStatus(state)) {
+            case "OVERDUE" -> "Hoạt động này đã quá hạn và vẫn chưa hoàn tất.";
+            case "IN_PROGRESS" -> "Bạn đang làm dở hoạt động này, hãy tiếp tục trước khi chuyển sang việc khác.";
+            case "SUBMITTED", "RESUBMITTED", "PENDING_GRADE" ->
+                    "Bài đã nộp và đang chờ chấm điểm hoặc đồng bộ kết quả.";
+            case "ATTEMPTS_EXHAUSTED" -> "Bạn đã dùng hết lượt làm; hãy chờ điểm hoặc phản hồi từ giảng viên.";
+            case "NOT_AVAILABLE" -> "Hoạt động này chưa đến thời gian mở.";
+            case "LOCKED" -> "Hoạt động này đã khóa sau hạn nộp.";
+            case "SOURCE_STATUS_UNAVAILABLE" ->
+                    "Chưa lấy được trạng thái từ hệ thống nguồn, nên CourseFlow tạm thời không gợi ý hoạt động này.";
+            case "UNAVAILABLE" -> "Hoạt động nguồn chưa sẵn sàng cho learner.";
+            default -> "Bài bắt buộc tiếp theo chưa hoàn thành.";
+        };
+    }
+
     private void outbox(UUID aggregateId, String eventType, String payload) {
         outbox.save(new OutboxEvent(aggregateId, "course", eventType, payload));
     }
 
-    private Optional<PublishedItem> findPublishedItemByVerifiedSource(UUID courseId, String sourceType, String sourceId) {
-        return publishedCurriculum(courseId).items().stream()
+    private Optional<PublishedItem> findPublishedItemByVerifiedSource(PublishedCurriculum curriculum,
+                                                                      String sourceType,
+                                                                      String sourceId) {
+        return curriculum.items().stream()
                 .filter(item -> sourceType.equals(normalizeItemType(item)))
                 .filter(item -> sourceMatches(item, sourceId))
                 .findFirst();
@@ -388,27 +994,53 @@ public class CourseModuleService {
         }
     }
 
-    private void requireModulePrerequisites(UUID courseId, UUID moduleId, String studentId) {
-        List<UUID> unmetPrerequisites = prerequisites.findByModuleId(moduleId).stream()
-                .map(p -> p.getRequiredModuleId())
-                .filter(requiredModuleId -> !isModuleCompleteByItems(courseId, requiredModuleId, studentId))
+    private void requireModulePrerequisites(PublishedCurriculum curriculum, UUID moduleId, String studentId,
+                                            Map<UUID, LearnerItemProgress> progressByItemId) {
+        List<UUID> unmetPrerequisites = prerequisiteModuleIds(curriculum).getOrDefault(moduleId, List.of()).stream()
+                .filter(requiredModuleId -> !isModuleCompleteByItems(curriculum, requiredModuleId, studentId, progressByItemId))
                 .toList();
         if (!unmetPrerequisites.isEmpty()) {
             throw new BadRequestException("Module prerequisites not completed: " + unmetPrerequisites);
         }
     }
 
-    private boolean isModuleCompleteByItems(UUID courseId, UUID moduleId, String studentId) {
-        List<PublishedItem> moduleItems = publishedCurriculum(courseId).findModule(moduleId)
+    private boolean isModuleCompleteByItems(PublishedCurriculum curriculum, UUID moduleId, String studentId,
+                                            Map<UUID, LearnerItemProgress> progressByItemId) {
+        List<PublishedItem> moduleItems = curriculum.findModule(moduleId)
                 .map(PublishedModule::items)
                 .orElseGet(List::of);
         List<PublishedItem> requiredItems = moduleItems.stream().filter(PublishedItem::required).toList();
         if (requiredItems.isEmpty()) {
             return progressRepository.existsByModuleIdAndStudentIdAndStatus(moduleId, studentId, "COMPLETED");
         }
-        Map<UUID, LearnerItemProgress> progressByItemId = itemProgressRepository.findByModuleIdAndStudentId(moduleId, studentId).stream()
-                .collect(Collectors.toMap(LearnerItemProgress::getItemId, Function.identity(), (a, b) -> a));
         return requiredItems.stream().allMatch(item -> isItemCompleted(item.id(), progressByItemId));
+    }
+
+    private Map<UUID, List<UUID>> prerequisiteModuleIds(PublishedCurriculum curriculum) {
+        List<PublishedModule> modulesWithoutSnapshotPrerequisites = curriculum.modules().stream()
+                .filter(module -> module.prerequisites() == null)
+                .toList();
+        Map<UUID, List<UUID>> result = new HashMap<>();
+        curriculum.modules().stream()
+                .filter(module -> module.prerequisites() != null)
+                .forEach(module -> result.put(
+                        module.id(),
+                        module.prerequisites().stream()
+                                .map(PublishedPrerequisite::requiredModuleId)
+                                .toList()));
+        if (modulesWithoutSnapshotPrerequisites.isEmpty()) {
+            return result;
+        }
+        List<UUID> legacyModuleIds = modulesWithoutSnapshotPrerequisites.stream()
+                .map(PublishedModule::id)
+                .toList();
+        prerequisites.findByModuleIdIn(legacyModuleIds).stream()
+                .collect(Collectors.groupingBy(
+                        prerequisite -> prerequisite.getModuleId(),
+                        Collectors.mapping(prerequisite -> prerequisite.getRequiredModuleId(), Collectors.toList())))
+                .forEach(result::put);
+        modulesWithoutSnapshotPrerequisites.forEach(module -> result.putIfAbsent(module.id(), List.of()));
+        return result;
     }
 
     private LearnerModuleProgress saveModuleCompletion(UUID courseId, UUID moduleId, String studentId, Instant completedAt) {
@@ -619,14 +1251,14 @@ public class CourseModuleService {
                             .findFirst());
         }
 
-        private boolean containsDocumentMedia(UUID mediaId) {
+        private Optional<PublishedItem> findItemByDocumentMedia(UUID mediaId) {
             if (mediaId == null) {
-                return false;
+                return Optional.empty();
             }
             String target = mediaId.toString();
             return items().stream()
-                    .flatMap(item -> item.documentMediaIds().stream())
-                    .anyMatch(target::equalsIgnoreCase);
+                    .filter(item -> item.documentMediaIds().stream().anyMatch(target::equalsIgnoreCase))
+                    .findFirst();
         }
     }
 
@@ -636,8 +1268,10 @@ public class CourseModuleService {
             String description,
             int position,
             String status,
+            List<PublishedPrerequisite> prerequisites,
             List<PublishedItem> items) {
         private PublishedModule {
+            prerequisites = prerequisites == null ? null : List.copyOf(prerequisites);
             items = items == null ? List.of() : List.copyOf(items);
         }
 
@@ -646,12 +1280,16 @@ public class CourseModuleService {
             List<PublishedItem> publishedItems = module.items() == null ? List.of() : module.items().stream()
                     .map(item -> PublishedItem.fromSnapshot(moduleId, item))
                     .toList();
+            List<PublishedPrerequisite> publishedPrerequisites = module.prerequisites() == null ? null : module.prerequisites().stream()
+                    .map(PublishedPrerequisite::fromSnapshot)
+                    .toList();
             return new PublishedModule(
                     moduleId,
                     module.title(),
                     module.description(),
                     module.position(),
                     module.status(),
+                    publishedPrerequisites,
                     publishedItems);
         }
 
@@ -662,7 +1300,19 @@ public class CourseModuleService {
                     module.getDescription(),
                     module.getPosition(),
                     module.getStatus(),
+                    List.of(),
                     items == null ? List.of() : items.stream().map(PublishedItem::fromLive).toList());
+        }
+    }
+
+    private record PublishedPrerequisite(
+            UUID requiredModuleId,
+            String ruleType) {
+
+        private static PublishedPrerequisite fromSnapshot(ModulePrerequisiteOutlineDto prerequisite) {
+            return new PublishedPrerequisite(
+                    snapshotUuid(prerequisite.requiredModuleId(), "requiredModuleId"),
+                    isBlank(prerequisite.ruleType()) ? "MODULE_COMPLETED" : prerequisite.ruleType());
         }
     }
 

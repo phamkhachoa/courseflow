@@ -32,9 +32,6 @@ management:
     web:
       exposure:
         include: health,info,prometheus
-courseflow:
-  security:
-    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
-  entitlement:
+courseflow:  entitlement:
     course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
     enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clientFetch } from "@/shared/api/client";
-import type { CourseModule, CourseProgress } from "./api";
+import type { CourseModule, CourseProgress, LearnerCoursePlayer } from "./api";
 
 export function useCourseModules(courseId: string, enabled = true) {
   return useQuery({
@@ -20,6 +20,14 @@ export function useCourseProgress(courseId: string, enabled = true) {
   });
 }
 
+export function useCoursePlayer(courseId: string, enabled = true) {
+  return useQuery({
+    queryKey: ["course-player", courseId],
+    queryFn: () => clientFetch<LearnerCoursePlayer>(`/v1/courses/${courseId}/modules/player`),
+    enabled: Boolean(courseId && enabled)
+  });
+}
+
 export function useMarkProgress(courseId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -31,6 +39,7 @@ export function useMarkProgress(courseId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["course-modules", courseId] });
       qc.invalidateQueries({ queryKey: ["course-progress", courseId] });
+      qc.invalidateQueries({ queryKey: ["course-player", courseId] });
     }
   });
 }
@@ -54,6 +63,7 @@ export function useMarkItemProgress(courseId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["course-modules", courseId] });
       qc.invalidateQueries({ queryKey: ["course-progress", courseId] });
+      qc.invalidateQueries({ queryKey: ["course-player", courseId] });
     }
   });
 }

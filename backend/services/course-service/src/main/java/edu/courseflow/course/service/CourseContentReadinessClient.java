@@ -1,6 +1,6 @@
 package edu.courseflow.course.service;
 
-import edu.courseflow.commonlibrary.security.CourseAccessClient;
+import edu.courseflow.commonlibrary.security.InternalJwtService;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,17 +13,17 @@ public class CourseContentReadinessClient {
     private final RestClient mediaClient;
     private final RestClient quizClient;
     private final RestClient assignmentClient;
-    private final String serviceToken;
+    private final InternalJwtService internalJwt;
 
     public CourseContentReadinessClient(RestClient.Builder restClientBuilder,
             @Value("${courseflow.content.media-service-url:http://localhost:8091}") String mediaServiceUrl,
             @Value("${courseflow.content.quiz-service-url:http://localhost:8095}") String quizServiceUrl,
             @Value("${courseflow.content.assignment-service-url:http://localhost:8085}") String assignmentServiceUrl,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+            InternalJwtService internalJwt) {
         this.mediaClient = restClientBuilder.baseUrl(mediaServiceUrl).build();
         this.quizClient = restClientBuilder.baseUrl(quizServiceUrl).build();
         this.assignmentClient = restClientBuilder.baseUrl(assignmentServiceUrl).build();
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
+        this.internalJwt = internalJwt;
     }
 
     public Optional<String> videoIssue(UUID videoId, UUID courseId) {
@@ -33,7 +33,7 @@ public class CourseContentReadinessClient {
         VideoReadinessResponse response = fetchReadiness(
                 () -> mediaClient.get()
                         .uri("/internal/media/videos/{videoId}/readiness", videoId)
-                        .header(CourseAccessClient.SERVICE_TOKEN_HEADER, serviceToken)
+                        .headers(internalJwt::applyServiceToken)
                         .retrieve()
                         .body(VideoReadinessResponse.class),
                 "video asset",
@@ -48,7 +48,7 @@ public class CourseContentReadinessClient {
         QuizReadinessResponse response = fetchReadiness(
                 () -> quizClient.get()
                         .uri("/internal/quizzes/{quizId}/readiness", quizId)
-                        .header(CourseAccessClient.SERVICE_TOKEN_HEADER, serviceToken)
+                        .headers(internalJwt::applyServiceToken)
                         .retrieve()
                         .body(QuizReadinessResponse.class),
                 "quiz",
@@ -63,7 +63,7 @@ public class CourseContentReadinessClient {
         AssignmentReadinessResponse response = fetchReadiness(
                 () -> assignmentClient.get()
                         .uri("/internal/assignments/{assignmentId}/readiness", assignmentId)
-                        .header(CourseAccessClient.SERVICE_TOKEN_HEADER, serviceToken)
+                        .headers(internalJwt::applyServiceToken)
                         .retrieve()
                         .body(AssignmentReadinessResponse.class),
                 "assignment",
@@ -78,9 +78,6 @@ public class CourseContentReadinessClient {
             ReadinessRequest<T> request,
             String label,
             UUID courseId) {
-        if (serviceToken.isBlank()) {
-            throw new ContentReadinessException(label + " readiness service token is not configured");
-        }
         T response;
         try {
             response = request.fetch();

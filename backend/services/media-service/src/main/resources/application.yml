@@ -21,10 +21,7 @@ spring:
     multipart:
       max-file-size: ${MEDIA_MAX_FILE_SIZE:512MB}
       max-request-size: ${MEDIA_MAX_REQUEST_SIZE:512MB}
-courseflow:
-  security:
-    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
-  entitlement:
+courseflow:  entitlement:
     enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
     course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
   storage:

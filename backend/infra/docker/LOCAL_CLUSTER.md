@@ -33,6 +33,10 @@ API_GATEWAY_PORT=8080 docker compose \
 
 Each service is also exposed on its configured local port for debugging.
 
+For production-shaped Compose validation, use `docker-compose.prod.yml` as an override instead of
+changing these local files. The prod profile removes direct host ports for internal services and
+requires non-default secrets before Compose will render.
+
 ## Web UIs
 
 The Compose cluster starts backend services only. Run the web apps from the repo root in separate
@@ -85,6 +89,42 @@ SPRING_LIQUIBASE_CONTEXTS=prod,demo docker compose \
   -f infra/docker/docker-compose.services.yml \
   up --build
 ```
+
+## Production Profile Dry Run
+
+The prod profile is a security-oriented Compose render for shared environments. It keeps only the API
+gateway published by default and blocks blank/default external JWT, internal JWT, certificate-signing
+and DB password values. It also switches Liquibase to `prod` unless overridden.
+
+From `backend/`, validate without booting the cluster:
+
+```bash
+COURSEFLOW_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
+COURSEFLOW_INTERNAL_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
+CERTIFICATE_SIGNING_SECRET="replace-with-generated-32-byte-minimum-secret" \
+COURSEFLOW_DB_PASSWORD="replace-with-generated-db-password" \
+COURSEFLOW_STORAGE_ACCESS_KEY="replace-with-object-storage-access-key" \
+COURSEFLOW_STORAGE_SECRET_KEY="replace-with-object-storage-secret-key" \
+COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.com \
+KEYCLOAK_ADMIN_PASSWORD="replace-with-generated-keycloak-admin-password" \
+  scripts/validate-prod-profile.sh --compose
+```
+
+Render the prod config:
+
+The Compose command assumes the same prod variables are exported in the shell or injected by
+CI/secret management.
+
+```bash
+docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.services.yml \
+  -f infra/docker/docker-compose.prod.yml \
+  config
+```
+
+If Prometheus/Grafana should be exposed too, include the observability files and set
+`GRAFANA_ADMIN_PASSWORD`; otherwise leave them out.
 
 ## Debezium Search Sync
 
@@ -154,11 +194,13 @@ scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_i
 ## Trust Boundary
 
 - Browser/client traffic goes through `api-gateway`.
-- The gateway strips `X-User-*` and `X-Service-Token` headers from inbound requests.
-- After validating JWTs, the gateway re-adds `X-User-*` plus `X-Service-Token`; downstream
-  services reject identity headers without that matching token.
-- Internal entitlement checks also use `COURSEFLOW_SERVICE_TOKEN` directly between services.
-- Default local token is only for this Compose cluster; override it for any shared environment.
+- The gateway strips client-supplied identity/internal headers from inbound requests.
+- After validating user JWTs, the gateway exchanges them for a short-lived internal JWT and forwards
+  `X-User-*` plus `X-Internal-Authorization`.
+- Downstream services reject `/internal/**` calls and propagated identity headers unless that
+  internal JWT validates with `COURSEFLOW_INTERNAL_JWT_SECRET`.
+- Direct service clients use `InternalJwtService` from `common-library` to mint service/user
+  internal JWTs for service-to-service calls.
 
 ## Course Chat
 

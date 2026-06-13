@@ -14,7 +14,7 @@ area; it is to prove that the core LMS workflow can be operated, audited and rec
 - Notification baseline: every notification has durable inbox state plus delivery status
   (`PENDING`, `DELIVERED`, `FAILED`) so operators can distinguish stored rows from delivery failures.
 - Trust boundary baseline: downstream services only accept propagated `X-User-*` identity headers
-  when the gateway also presents the shared `X-Service-Token` attestation header.
+  when the request also presents a valid short-lived internal JWT.
 - Migration safety: fresh local databases must apply Liquibase changelogs without duplicate-column
   failures.
 
@@ -128,7 +128,7 @@ docker compose \
 Then check:
 
 - `GET http://localhost:28080/api/v1/courses` returns only published courses.
-- Direct service calls that forge `X-User-*` without `X-Service-Token` return `401`.
+- Direct service calls that forge `X-User-*` without a valid internal JWT return `401`.
 - Admin course publish emits lifecycle events and enrollment capacity is created.
 - Disposable authoring courses can move from draft to approved and published.
 - Course review/publish/archive rejects staff outside the course department scope.
@@ -156,7 +156,7 @@ Do not call a build production-ready if any item below is true:
 - Grade changes lack override reason/audit.
 - Notification send creates an inbox row with no delivery status.
 - Identity privacy export/deactivation lacks audit or token revocation.
-- Downstream services trust `X-User-*` headers without a gateway service-token attestation.
+- Downstream services trust `X-User-*` headers without internal JWT attestation.
 - Staff roles can read org dashboards or student analytics without matching org/course scope.
 - Fresh Liquibase migration fails from an empty database.
 - No metrics endpoint exists for backend services.

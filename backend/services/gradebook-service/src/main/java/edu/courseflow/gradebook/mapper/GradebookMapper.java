@@ -35,6 +35,7 @@ public interface GradebookMapper {
 
     GradeCategoryDto toDto(GradeCategory category);
 
+    @Mapping(target = "passThreshold", ignore = true)
     FinalGradeDto toDto(FinalGrade grade);
 
     GradingSchemeEntryDto toDto(GradingSchemeEntry entry);

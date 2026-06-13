@@ -81,4 +81,22 @@ public class CourseModule {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public void restoreDraft(String title, String description, int position) {
+        this.title = title;
+        this.description = description;
+        this.position = position;
+        this.status = "DRAFT";
+    }
+
+    public void updateDraft(String title, String description) {
+        this.title = title;
+        this.description = description;
+        this.status = "DRAFT";
+    }
+
+    public void archive(int position) {
+        this.position = position;
+        this.status = "ARCHIVED";
+    }
 }

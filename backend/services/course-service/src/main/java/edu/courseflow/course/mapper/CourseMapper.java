@@ -37,6 +37,7 @@ public interface CourseMapper {
 
     @Mapping(target = "moduleId", source = "module.id")
     @Mapping(target = "items", source = "items")
+    @Mapping(target = "prerequisites", ignore = true)
     ModuleOutlineDto toOutlineDto(CourseModule module, List<ItemOutlineDto> items);
 
     @Mapping(target = "itemId", source = "id")

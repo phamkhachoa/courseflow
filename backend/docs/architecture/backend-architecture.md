@@ -109,7 +109,17 @@ Current route convention follows audience first, version second:
 Service controllers may still use `/public/**`, `/internal/**`, or `/backoffice/**` internally.
 Those prefixes are implementation details behind the gateway and should not appear in client code.
 True service-to-service APIs stay off the public gateway and are protected by network policy or a
-service token.
+short-lived internal JWT.
+
+`identity-token-converter-service` is the internal OAuth2 token-exchange bridge. In converter mode,
+the gateway validates the external identity token, calls `/oauth/token`, and forwards a short-lived
+internal JWT in `X-Internal-Authorization`. `X-User-*` headers remain as a compatibility payload for
+`CurrentUser`, but downstream services only trust them when `TrustedGatewayHeaderFilter` verifies
+the internal JWT. Direct service clients mint service/user internal JWTs through
+`common-library`'s `InternalJwtService`.
+
+For the enterprise Keycloak target architecture and migration plan, see
+[`keycloak-enterprise-adoption.md`](./keycloak-enterprise-adoption.md).
 
 ## Data Access Convention
 

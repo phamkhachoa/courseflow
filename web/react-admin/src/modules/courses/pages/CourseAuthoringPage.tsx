@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
   BookOpenCheck,
   CheckCircle2,
+  ClipboardCheck,
   FilePenLine,
   Layers3,
   Plus,
@@ -30,7 +31,7 @@ import {
   Th
 } from "@/shared/ui";
 import { cn } from "@/shared/ui/cn";
-import { listCourses } from "../api";
+import { listCourseReviewQueue, listCourses } from "../api";
 import type { Course } from "../types";
 
 const statusFilters = [
@@ -77,6 +78,14 @@ function statusLabel(status?: string) {
 function compactId(value?: string) {
   if (!value) return "—";
   return value.length > 12 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(value));
 }
 
 function courseMatches(course: Course, keyword: string, status: string) {
@@ -134,8 +143,15 @@ export function CourseAuthoringPage() {
     retry: 1,
     staleTime: 60_000
   });
+  const reviewQueue = useQuery({
+    queryKey: queryKeys.authoring.reviewQueue,
+    queryFn: listCourseReviewQueue,
+    retry: 1,
+    staleTime: 60_000
+  });
 
   const rows = courses.data ?? [];
+  const queueRows = reviewQueue.data ?? [];
   const filteredRows = useMemo(
     () => rows.filter((course) => courseMatches(course, search, statusFilter)),
     [rows, search, statusFilter]
@@ -159,7 +175,7 @@ export function CourseAuthoringPage() {
         }
       />
 
-      <div className="mb-4 grid gap-3 md:grid-cols-4">
+      <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <Metric
           label="Tổng khóa"
           value={String(rows.length)}
@@ -172,6 +188,13 @@ export function CourseAuthoringPage() {
           detail="Cần thêm chương, bài học hoặc gửi duyệt."
           icon={FilePenLine}
           tone="amber"
+        />
+        <Metric
+          label="Chờ duyệt"
+          value={String(queueRows.length)}
+          detail="Course IN_REVIEW cần reviewer xử lý."
+          icon={ClipboardCheck}
+          tone="sky"
         />
         <Metric
           label="Đã công khai"
@@ -188,6 +211,71 @@ export function CourseAuthoringPage() {
           tone="sky"
         />
       </div>
+
+      <Card className="mb-4">
+        <CardHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              <ClipboardCheck size={18} className="text-brand-700" />
+              Review queue
+            </span>
+          }
+          subtitle="Course đang IN_REVIEW, kèm owner, version và dung lượng nội dung để reviewer mở đúng việc."
+          actions={<Badge value="IN_REVIEW" label={`${queueRows.length} chờ duyệt`} />}
+        />
+        {reviewQueue.isLoading && <Spinner />}
+        {reviewQueue.isError && <ErrorState error={reviewQueue.error} />}
+        {!reviewQueue.isLoading && !reviewQueue.isError && queueRows.length === 0 && (
+          <EmptyState message="Không có course nào đang chờ duyệt." />
+        )}
+        {!reviewQueue.isLoading && !reviewQueue.isError && queueRows.length > 0 && (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Course</Th>
+                <Th>Owner</Th>
+                <Th>Nội dung</Th>
+                <Th>Gửi duyệt</Th>
+                <Th>Action</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {queueRows.map((course) => (
+                <tr key={course.courseId} className="hover:bg-slate-50">
+                  <Td>
+                    <Link className="font-semibold text-brand-600 hover:underline" to={`${course.courseId}/draft`}>
+                      {course.title}
+                    </Link>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {[course.slug, `v${course.currentVersionNo}`, `ID ${compactId(course.courseId)}`].join(" · ")}
+                    </p>
+                  </Td>
+                  <Td>
+                    <span className="font-medium text-slate-700">{course.ownerId}</span>
+                    <p className="mt-1 text-xs text-slate-500">Dept {compactId(course.departmentId)}</p>
+                  </Td>
+                  <Td>
+                    <span className="font-medium text-slate-700">{course.moduleCount} chương</span>
+                    <p className="mt-1 text-xs text-slate-500">{course.itemCount} item</p>
+                  </Td>
+                  <Td>
+                    <span className="font-medium text-slate-700">{formatDateTime(course.submittedAt)}</span>
+                    <p className="mt-1 text-xs text-slate-500">By {course.submittedBy ?? course.lastAuthoredBy ?? "—"}</p>
+                  </Td>
+                  <Td>
+                    <Link to={`${course.courseId}/draft`}>
+                      <Button size="sm" variant="secondary">
+                        <ClipboardCheck size={15} />
+                        Review
+                      </Button>
+                    </Link>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </Card>
 
       <div className="mb-4 grid gap-4 xl:grid-cols-[1fr_380px]">
         <Card>

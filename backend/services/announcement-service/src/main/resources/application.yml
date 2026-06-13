@@ -23,10 +23,7 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
-courseflow:
-  security:
-    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
-  entitlement:
+courseflow:  entitlement:
     enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
     course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
   outbox:

@@ -50,6 +50,9 @@ public class ModuleItem {
     @Column(nullable = false)
     private boolean required = true;
 
+    @Column(nullable = false, length = 40)
+    private String status = "ACTIVE";
+
     protected ModuleItem() {
     }
 
@@ -68,6 +71,7 @@ public class ModuleItem {
         this.estimatedMinutes = estimatedMinutes;
         this.position = position;
         this.required = required;
+        this.status = "ACTIVE";
     }
 
     public UUID getId() {
@@ -120,5 +124,48 @@ public class ModuleItem {
 
     public boolean isRequired() {
         return required;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void restoreDraft(UUID moduleId, String itemType, String itemId, String title, String description,
+            UUID videoMediaId, List<String> documentMediaIds, String contentUrl,
+            Integer estimatedMinutes, int position, boolean required) {
+        this.moduleId = moduleId;
+        this.itemType = itemType;
+        this.itemId = itemId;
+        this.title = title;
+        this.description = description;
+        this.videoMediaId = videoMediaId;
+        this.documentMediaIds = documentMediaIds == null ? List.of() : List.copyOf(documentMediaIds);
+        this.contentUrl = contentUrl;
+        this.estimatedMinutes = estimatedMinutes;
+        this.position = position;
+        this.required = required;
+        this.status = "ACTIVE";
+    }
+
+    public void updateDraft(String itemType, String itemId, String title, String description,
+            UUID videoMediaId, List<String> documentMediaIds, String contentUrl,
+            Integer estimatedMinutes, boolean required) {
+        restoreDraft(
+                this.moduleId,
+                itemType,
+                itemId,
+                title,
+                description,
+                videoMediaId,
+                documentMediaIds,
+                contentUrl,
+                estimatedMinutes,
+                this.position,
+                required);
+    }
+
+    public void archive(int position) {
+        this.position = position;
+        this.status = "ARCHIVED";
     }
 }

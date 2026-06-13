@@ -2,6 +2,7 @@ package edu.courseflow.certificate.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.courseflow.certificate.dto.CertificateEligibilityDto;
 import edu.courseflow.certificate.dto.CertificateVerificationDto;
 import edu.courseflow.certificate.dto.IssueCertificateRequestDto;
 import edu.courseflow.certificate.dto.PublicCertificateVerificationDto;
@@ -102,6 +103,35 @@ public class CertificateService {
                     return mapper.toDto(certificate, verification);
                 })
                 .toList();
+    }
+
+    public CertificateEligibilityDto eligibility(String studentId, UUID courseId) {
+        CertificateEligibilityDto base = eligibilityClient.evaluate(studentId, courseId);
+        Optional<Certificate> issued = certificates.findByStudentIdAndCourseIdAndStatus(studentId, courseId, "ISSUED");
+        if (issued.isEmpty()) {
+            return base;
+        }
+        Certificate certificate = issued.get();
+        CertificateVerification verification = verifications.findByCertificateId(certificate.getId())
+                .orElseThrow(() -> new NotFoundException(
+                        "Certificate verification not found: " + certificate.getId()));
+        return new CertificateEligibilityDto(
+                base.generatedAt(),
+                courseId.toString(),
+                studentId,
+                true,
+                "ISSUED",
+                true,
+                true,
+                true,
+                true,
+                certificate.getFinalGrade(),
+                base.gradeThreshold(),
+                base.finalGradeStatus(),
+                certificate.getId().toString(),
+                verification.getVerificationCode(),
+                certificate.getIssuedAt(),
+                List.of());
     }
 
     private boolean isPubliclyValid(CertificateVerificationDto dto) {

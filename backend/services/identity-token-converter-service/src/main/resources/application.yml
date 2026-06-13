@@ -1,0 +1,22 @@
+server:
+  port: 8105
+spring:
+  application:
+    name: identity-token-converter-service
+courseflow:
+  security:
+    external-jwt:
+      secret: ${COURSEFLOW_JWT_SECRET:}
+      issuer: ${JWT_ISSUER:courseflow-identity}
+    internal-jwt:
+      secret: ${COURSEFLOW_INTERNAL_JWT_SECRET:}
+      issuer: ${COURSEFLOW_INTERNAL_JWT_ISSUER:courseflow-token-converter}
+      audience: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:courseflow-services}
+      allowed-audiences: ${COURSEFLOW_INTERNAL_JWT_ALLOWED_AUDIENCES:courseflow-services}
+      ttl-seconds: ${COURSEFLOW_INTERNAL_JWT_TTL_SECONDS:180}
+      clock-skew-seconds: ${COURSEFLOW_INTERNAL_JWT_CLOCK_SKEW_SECONDS:30}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

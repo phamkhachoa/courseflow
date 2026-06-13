@@ -3,7 +3,6 @@ package edu.courseflow.commonlibrary.security;
 import edu.courseflow.commonlibrary.exception.ForbiddenException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.exception.UnauthorizedException;
-import edu.courseflow.commonlibrary.constants.GatewayHeaders;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -15,28 +14,26 @@ import org.springframework.web.client.RestClient;
  * Shared course-entitlement guard backed by enrollment-service.
  *
  * <p>Staff roles are allowed locally. Student access is checked through a service-to-service endpoint
- * using {@code X-Service-Token}; the gateway strips that header from public traffic, so clients cannot
- * spoof this trust path.
+ * using the shared internal JWT helper, so service clients use the same downstream trust contract.
  */
 @Component
 @ConditionalOnClass(RestClient.class)
 public class CourseAccessClient {
 
-    public static final String SERVICE_TOKEN_HEADER = GatewayHeaders.SERVICE_TOKEN;
     private static final String STATUS_PUBLISHED = "PUBLISHED";
     private static final String STATUS_ARCHIVED = "ARCHIVED";
 
     private final RestClient enrollmentClient;
     private final RestClient courseClient;
-    private final String serviceToken;
+    private final InternalJwtService internalJwt;
 
     public CourseAccessClient(RestClient.Builder restClientBuilder,
             @Value("${courseflow.entitlement.enrollment-service-url:http://localhost:8084}") String enrollmentServiceUrl,
             @Value("${courseflow.entitlement.course-service-url:http://localhost:8083}") String courseServiceUrl,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+            InternalJwtService internalJwt) {
         this.enrollmentClient = restClientBuilder.baseUrl(enrollmentServiceUrl).build();
         this.courseClient = restClientBuilder.baseUrl(courseServiceUrl).build();
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
+        this.internalJwt = internalJwt;
     }
 
     /**
@@ -80,10 +77,9 @@ public class CourseAccessClient {
         if (courseId == null) {
             throw new NotFoundException("Course not found");
         }
-        requireServiceTokenConfigured();
         CourseMetadataResponse response = courseClient.get()
                 .uri("/internal/courses/{courseId}/metadata", courseId)
-                .header(SERVICE_TOKEN_HEADER, serviceToken)
+                .headers(internalJwt::applyServiceToken)
                 .retrieve()
                 .body(CourseMetadataResponse.class);
         if (response == null || response.id() == null) {
@@ -102,13 +98,12 @@ public class CourseAccessClient {
         if (studentId == null || studentId.isBlank() || courseId == null) {
             return false;
         }
-        requireServiceTokenConfigured();
         CourseAccessResponse response = enrollmentClient.get()
                 .uri(uri -> uri.path("/internal/enrollments/access")
                         .queryParam("courseId", courseId)
                         .queryParam("studentId", studentId)
                         .build())
-                .header(SERVICE_TOKEN_HEADER, serviceToken)
+                .headers(internalJwt::applyServiceToken)
                 .retrieve()
                 .body(CourseAccessResponse.class);
         return response != null && response.enrolled();
@@ -143,12 +138,6 @@ public class CourseAccessClient {
 
     private boolean isStaff(CurrentUser user) {
         return user.hasAnyRole("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA");
-    }
-
-    private void requireServiceTokenConfigured() {
-        if (serviceToken.isBlank()) {
-            throw new ForbiddenException("Course entitlement service token is not configured");
-        }
     }
 
     public record CourseAccessResponse(

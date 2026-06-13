@@ -128,6 +128,7 @@ public final class GradebookDtos {
             BigDecimal finalScore,
             String letter,
             boolean passed,
+            BigDecimal passThreshold,
             String status,
             String finalizedBy,
             Instant finalizedAt) {

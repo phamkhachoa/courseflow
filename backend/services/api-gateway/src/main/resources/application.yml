@@ -194,6 +194,12 @@ spring:
             - Path=/api/v1/courses/*/media/assets/*/download-url
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
+        - id: learning-next-action-user
+          uri: ${COURSE_SERVICE_URI:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/learning/next-action
+          filters:
+            - SetPath=/internal/learning/next-action
         - id: analytics-user-related-courses
           uri: ${ANALYTICS_SERVICE_URI:http://localhost:8093}
           predicates:
@@ -326,6 +332,12 @@ courseflow:
       # No default: the gateway fails fast at startup (see JwtSecretProperties) if COURSEFLOW_JWT_SECRET
       # is unset, blank, the old dev placeholder, or shorter than 32 bytes. Must match identity-service.
       secret: ${COURSEFLOW_JWT_SECRET:}
+    token-converter:
+      # Gateway must fail closed when the converter cannot mint an internal token.
+      mode: ${TOKEN_CONVERTER_MODE:required}
+      uri: ${TOKEN_CONVERTER_URI:http://localhost:8105}
+      audience: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:courseflow-services}
+      timeout-ms: ${TOKEN_CONVERTER_TIMEOUT_MS:800}
   cors:
     # Comma-separated allowlist. Defaults cover common local-dev front-end ports.
     # Never use "*" together with allowCredentials.

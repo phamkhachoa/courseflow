@@ -12,20 +12,17 @@ import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentStatsDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.SetCapacityRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistEntryDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistRequestDto;
-import edu.courseflow.enrollment.exception.ForbiddenException;
 import edu.courseflow.enrollment.service.EnrollmentService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,12 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class EnrollmentController {
 
     private final EnrollmentService enrollments;
-    private final String serviceToken;
 
-    public EnrollmentController(EnrollmentService enrollments,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+    public EnrollmentController(EnrollmentService enrollments) {
         this.enrollments = enrollments;
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
     }
 
     @GetMapping("/internal/enrollments")
@@ -55,10 +49,19 @@ public class EnrollmentController {
 
     @GetMapping("/internal/enrollments/access")
     public CourseAccessDto access(@RequestParam UUID courseId,
-                                  @RequestParam String studentId,
-                                  @RequestHeader(value = "X-Service-Token", required = false) String token) {
-        requireServiceToken(token);
+                                  @RequestParam String studentId) {
         return enrollments.courseAccess(courseId, studentId);
+    }
+
+    @GetMapping("/internal/enrollments/roster")
+    public List<EnrollmentDto> activeRoster(@RequestParam UUID courseId,
+                                            @RequestParam Optional<UUID> cohortId) {
+        return enrollments.activeRoster(courseId, cohortId);
+    }
+
+    @GetMapping("/internal/learner-memberships")
+    public List<EnrollmentDto> learnerMemberships(@RequestParam String studentId) {
+        return enrollments.learnerMemberships(studentId);
     }
 
     @GetMapping("/internal/waitlist")
@@ -105,9 +108,4 @@ public class EnrollmentController {
         return enrollments.auditLog(id, user);
     }
 
-    private void requireServiceToken(String token) {
-        if (serviceToken.isBlank() || token == null || !serviceToken.equals(token.trim())) {
-            throw new ForbiddenException("Service token required");
-        }
-    }
 }

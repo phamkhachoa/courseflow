@@ -17,14 +17,12 @@ import edu.courseflow.media.service.VideoService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -34,14 +32,11 @@ public class VideoController {
 
     private final VideoService videos;
     private final CourseAccessClient courseAccess;
-    private final String serviceToken;
 
     public VideoController(VideoService videos,
-            CourseAccessClient courseAccess,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+            CourseAccessClient courseAccess) {
         this.videos = videos;
         this.courseAccess = courseAccess;
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
     }
 
     @PostMapping("/internal/media/videos")
@@ -80,9 +75,7 @@ public class VideoController {
     }
 
     @GetMapping("/internal/media/videos/{videoId}/readiness")
-    public VideoReadinessDto readiness(@PathVariable UUID videoId,
-            @RequestHeader(value = CourseAccessClient.SERVICE_TOKEN_HEADER, required = false) String token) {
-        requireServiceToken(token);
+    public VideoReadinessDto readiness(@PathVariable UUID videoId) {
         return videos.readiness(videoId);
     }
 
@@ -174,9 +167,4 @@ public class VideoController {
         }
     }
 
-    private void requireServiceToken(String token) {
-        if (serviceToken.isBlank() || token == null || !serviceToken.equals(token.trim())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Service token required");
-        }
-    }
 }

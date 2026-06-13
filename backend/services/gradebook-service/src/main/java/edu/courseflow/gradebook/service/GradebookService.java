@@ -573,7 +573,17 @@ public class GradebookService {
     }
 
     private FinalGradeDto toFinalGradeDto(FinalGrade grade) {
-        return mapper.toDto(grade);
+        return new FinalGradeDto(
+                grade.getId().toString(),
+                grade.getCourseId().toString(),
+                grade.getStudentId(),
+                grade.getFinalScore(),
+                grade.getLetter(),
+                grade.isPassed(),
+                passingThreshold(grade.getCourseId()),
+                grade.getStatus(),
+                grade.getFinalizedBy(),
+                grade.getFinalizedAt());
     }
 
     private GradeOverrideDto toOverrideDto(GradeOverride override) {

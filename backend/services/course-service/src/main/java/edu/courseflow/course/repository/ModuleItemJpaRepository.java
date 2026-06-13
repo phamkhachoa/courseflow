@@ -24,6 +24,11 @@ public interface ModuleItemJpaRepository extends JpaRepository<ModuleItem, UUID>
             """)
     List<ModuleItem> findPublishedCourseItems(@Param("courseId") UUID courseId);
 
-    @Query("select coalesce(max(i.position), -1) + 1 from ModuleItem i where i.moduleId = :moduleId")
+    @Query("""
+            select coalesce(max(i.position), -1) + 1
+            from ModuleItem i
+            where i.moduleId = :moduleId
+              and i.status <> 'ARCHIVED'
+            """)
     int nextPosition(@Param("moduleId") UUID moduleId);
 }

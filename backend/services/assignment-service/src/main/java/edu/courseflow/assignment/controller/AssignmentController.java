@@ -5,6 +5,7 @@ import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentReadinessDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.AttachmentRef;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.LearnerSourceStatusDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedDownloadDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedUploadDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RequestUploadUrlDto;
@@ -19,14 +20,12 @@ import edu.courseflow.commonlibrary.web.CurrentUser;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,14 +36,11 @@ public class AssignmentController {
 
     private final AssignmentService assignments;
     private final CourseAccessClient courseAccess;
-    private final String serviceToken;
 
     public AssignmentController(AssignmentService assignments,
-            CourseAccessClient courseAccess,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+            CourseAccessClient courseAccess) {
         this.assignments = assignments;
         this.courseAccess = courseAccess;
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
     }
 
     @GetMapping("/internal/assignments")
@@ -73,10 +69,15 @@ public class AssignmentController {
     }
 
     @GetMapping("/internal/assignments/{assignmentId}/readiness")
-    public AssignmentReadinessDto readiness(@PathVariable UUID assignmentId,
-            @RequestHeader(value = CourseAccessClient.SERVICE_TOKEN_HEADER, required = false) String token) {
-        requireServiceToken(token);
+    public AssignmentReadinessDto readiness(@PathVariable UUID assignmentId) {
         return assignments.readiness(assignmentId);
+    }
+
+    @GetMapping("/internal/assignments/status")
+    public List<LearnerSourceStatusDto> learnerStatuses(@RequestParam UUID courseId,
+            @RequestParam String studentId,
+            @RequestParam(required = false) List<UUID> sourceIds) {
+        return assignments.learnerStatuses(courseId, studentId, sourceIds);
     }
 
     @PostMapping("/internal/assignments/{assignmentId}/publish")
@@ -109,6 +110,8 @@ public class AssignmentController {
     public SubmissionDto submit(@PathVariable UUID assignmentId,
             @Valid @RequestBody SubmitAssignmentRequestDto request, CurrentUser user) {
         // studentId is the authenticated caller, never trusted from the body.
+        AssignmentDto assignment = assignments.get(assignmentId);
+        courseAccess.requireCourseAccess(user, UUID.fromString(assignment.courseId()));
         return assignments.submit(assignmentId, Authz.callerId(user), request);
     }
 
@@ -189,12 +192,6 @@ public class AssignmentController {
             courseAccess.requireCourseAccess(user, courseId);
         }
         return assignments.presignDownloadAttachment(submissionId, storageKey);
-    }
-
-    private void requireServiceToken(String token) {
-        if (serviceToken.isBlank() || token == null || !serviceToken.equals(token.trim())) {
-            throw new edu.courseflow.assignment.web.ForbiddenException("Service token required");
-        }
     }
 
     private void requireReadableAssignment(CurrentUser user, AssignmentDto assignment) {

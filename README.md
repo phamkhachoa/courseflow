@@ -281,7 +281,7 @@ The architecture is designed for production hardening, but local Compose is not 
 Before a public/paid launch, CourseFlow needs:
 
 - Managed PostgreSQL/Kafka/Elasticsearch/Object Storage or hardened equivalents.
-- TLS, WAF/rate limiting, service network policy, gateway service-token attestation, secret
+- TLS, WAF/rate limiting, service network policy, internal JWT attestation, secret
   management and rotation.
 - Centralized logs, metrics, distributed tracing, SLOs, alerting and runbooks.
 - CI/CD with unit, integration, contract, e2e, load and security tests.

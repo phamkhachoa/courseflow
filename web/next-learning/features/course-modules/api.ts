@@ -40,6 +40,84 @@ export type CourseProgress = {
   missingRequirements?: MissingRequirement[];
 };
 
+export type CoursePlayerNextAction = {
+  kind: string;
+  moduleId?: string | null;
+  itemId?: string | null;
+  itemType?: string | null;
+  title: string;
+  locked: boolean;
+  ctaLabel: string;
+  reason: string;
+};
+
+export type CoursePlayerPrerequisite = {
+  moduleId: string;
+  title: string;
+  completed: boolean;
+};
+
+export type CoursePlayerModuleState = {
+  moduleId: string;
+  locked: boolean;
+  lockedReasonCode?: string | null;
+  lockedReasonText?: string | null;
+  unmetPrerequisites?: CoursePlayerPrerequisite[];
+};
+
+export type CoursePlayerItemState = {
+  itemId: string;
+  moduleId: string;
+  itemType: string;
+  required: boolean;
+  progressStatus: string;
+  progressType?: string | null;
+  completedAt?: string | null;
+  completionMode: "SELF" | "VERIFIED" | string;
+  locked: boolean;
+  lockedReasonCode?: string | null;
+  lockedReasonText?: string | null;
+  sourceStatus?: string | null;
+  sourceDueAt?: string | null;
+  sourceLockAt?: string | null;
+};
+
+export type CertificateMissingRequirement = {
+  code: string;
+  label: string;
+  detail?: string | null;
+};
+
+export type CertificateEligibility = {
+  generatedAt?: string | null;
+  courseId: string;
+  studentId: string;
+  eligible: boolean;
+  status: string;
+  completionEligible: boolean;
+  gradeEligible: boolean;
+  requiredItemsEligible: boolean;
+  issued: boolean;
+  finalGrade?: number | string | null;
+  gradeThreshold?: number | string | null;
+  finalGradeStatus?: string | null;
+  certificateId?: string | null;
+  verificationCode?: string | null;
+  issuedAt?: string | null;
+  missingRequirements?: CertificateMissingRequirement[];
+};
+
+export type LearnerCoursePlayer = {
+  generatedAt: string;
+  courseId: string;
+  modules: CourseModule[];
+  progress: CourseProgress;
+  certificateEligibility?: CertificateEligibility | null;
+  nextAction?: CoursePlayerNextAction | null;
+  moduleStates?: CoursePlayerModuleState[];
+  itemStates?: CoursePlayerItemState[];
+};
+
 export type ProgressBreakdown = {
   itemType: string;
   total: number;

@@ -67,6 +67,13 @@ public class EnrollmentRepository {
         return rows.stream().map(this::toEnrollmentDto).toList();
     }
 
+    public List<EnrollmentDto> listActiveRoster(UUID courseId, UUID cohortId) {
+        List<Enrollment> rows = cohortId == null
+                ? enrollments.findByCourseIdAndStatusOrderByEnrolledAtDesc(courseId, "ACTIVE")
+                : enrollments.findByCourseIdAndSectionIdAndStatusOrderByEnrolledAtDesc(courseId, cohortId, "ACTIVE");
+        return rows.stream().map(this::toEnrollmentDto).toList();
+    }
+
     public Optional<EnrollmentDto> find(String studentId, UUID courseId) {
         return enrollments.findByStudentIdAndCourseId(studentId, courseId).map(this::toEnrollmentDto);
     }

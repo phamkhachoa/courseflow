@@ -6,6 +6,13 @@ on:
     branches:
       - main
       - develop
+  workflow_dispatch:
+    inputs:
+      run_local_cluster_smoke:
+        description: "Boot the full local backend cluster and run the gateway Product Hardening smoke"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   backend:
@@ -120,6 +127,9 @@ jobs:
       - name: Validate backup drill script syntax
         run: bash -n backend/scripts/postgres-backup-drill.sh
 
+      - name: Validate production profile guard syntax
+        run: bash -n backend/scripts/validate-prod-profile.sh
+
       - name: Validate Docker Compose topology
         run: >
           docker compose
@@ -127,3 +137,124 @@ jobs:
           -f backend/infra/docker/docker-compose.services.yml
           -f backend/infra/docker/docker-compose.observability.yml
           config --quiet
+
+      - name: Validate production profile rejects defaults
+        run: |
+          set +e
+          COURSEFLOW_JWT_SECRET=courseflow-local-cluster-jwt-secret-change-me-32 \
+          COURSEFLOW_INTERNAL_JWT_SECRET=courseflow-local-internal-jwt-secret-change-me-32 \
+          CERTIFICATE_SIGNING_SECRET=courseflow-local-certificate-signing-secret-change-me-32 \
+          COURSEFLOW_DB_PASSWORD=courseflow \
+          COURSEFLOW_STORAGE_ACCESS_KEY=courseflow \
+          COURSEFLOW_STORAGE_SECRET_KEY=courseflow \
+          COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.invalid \
+          KEYCLOAK_ADMIN_PASSWORD=admin \
+            backend/scripts/validate-prod-profile.sh
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Production profile guard accepted default secrets"
+            exit 1
+          fi
+
+      - name: Validate production Docker Compose profile
+        env:
+          COURSEFLOW_JWT_SECRET: prod-ci-jwt-secret-32-byte-minimum-value-001
+          COURSEFLOW_INTERNAL_JWT_SECRET: prod-ci-internal-jwt-secret-32-byte-value-001
+          CERTIFICATE_SIGNING_SECRET: prod-ci-cert-signing-secret-32-byte-minimum-value-001
+          COURSEFLOW_DB_PASSWORD: prod-ci-db-password-strong-value-001
+          COURSEFLOW_STORAGE_ACCESS_KEY: prod-ci-storage-access-key
+          COURSEFLOW_STORAGE_SECRET_KEY: prod-ci-storage-secret-strong-value-001
+          COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT: https://storage.example.invalid
+          KEYCLOAK_ADMIN_PASSWORD: prod-ci-keycloak-password-strong-value-001
+          GRAFANA_ADMIN_PASSWORD: prod-ci-grafana-password-strong-value-001
+        run: backend/scripts/validate-prod-profile.sh --compose --include-observability
+
+  local-cluster-smoke:
+    name: Local cluster gateway smoke
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_local_cluster_smoke
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      COURSEFLOW_API_URL: http://localhost:28080/api
+      COURSEFLOW_DIRECT_SERVICE_URL: http://localhost:8083
+      SPRING_LIQUIBASE_CONTEXTS: prod,demo
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate gateway smoke script syntax
+        run: node --check scripts/product-hardening-smoke.mjs
+
+      - name: Boot local backend cluster
+        run: |
+          set -euo pipefail
+          docker compose \
+            -f infra/docker/docker-compose.yml \
+            -f infra/docker/docker-compose.services.yml \
+            up --build -d
+
+      - name: Wait for gateway readiness
+        run: |
+          set -euo pipefail
+
+          wait_for_url() {
+            name="$1"
+            url="$2"
+            deadline=$((SECONDS + 600))
+            until curl -fsS "$url" >/dev/null; do
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::Timed out waiting for ${name} at ${url}"
+                docker compose \
+                  -f infra/docker/docker-compose.yml \
+                  -f infra/docker/docker-compose.services.yml \
+                  ps
+                exit 1
+              fi
+              sleep 10
+            done
+          }
+
+          wait_for_url "gateway actuator health" "http://localhost:28080/actuator/health"
+          wait_for_url "gateway public catalog" "http://localhost:28080/api/v1/courses"
+
+      - name: Run Product Hardening gateway smoke
+        run: node scripts/product-hardening-smoke.mjs
+
+      - name: Collect local cluster logs
+        if: failure()
+        run: |
+          set -euo pipefail
+          mkdir -p product-hardening-smoke-logs
+          docker compose \
+            -f infra/docker/docker-compose.yml \
+            -f infra/docker/docker-compose.services.yml \
+            ps > product-hardening-smoke-logs/compose-ps.txt || true
+          docker compose \
+            -f infra/docker/docker-compose.yml \
+            -f infra/docker/docker-compose.services.yml \
+            logs --no-color > product-hardening-smoke-logs/compose.log || true
+
+      - name: Upload local cluster logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-hardening-local-cluster-logs
+          path: backend/product-hardening-smoke-logs
+          if-no-files-found: ignore
+
+      - name: Stop local backend cluster
+        if: always()
+        run: |
+          docker compose \
+            -f infra/docker/docker-compose.yml \
+            -f infra/docker/docker-compose.services.yml \
+            down -v --remove-orphans

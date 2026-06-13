@@ -2,17 +2,30 @@ import { FormEvent, type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   BookOpen,
   CheckCircle2,
+  ClipboardCheck,
   Clock3,
+  Copy,
+  ExternalLink,
+  Eye,
   FileUp,
   FileText,
+  History,
   Layers3,
   Link2,
+  ListChecks,
+  PackageCheck,
   Plus,
+  Pencil,
+  RotateCcw,
   Rocket,
   Send,
+  ShieldCheck,
+  Trash2,
   UploadCloud,
   Video,
   XCircle
@@ -47,16 +60,42 @@ import { listAssignments } from "@/modules/assignments/api";
 import { listCourseQuizzes } from "@/modules/quizzes/api";
 import {
   approveCourseReview,
+  archiveModule,
+  archiveModuleItem,
   createModule,
   createModuleItem,
+  duplicateModule,
+  duplicateModuleItem,
+  getCourseVersionDiff,
   getCourseDraft,
+  listCourseReviewHistory,
   listCourseVersions,
   publishCourse,
   rejectCourseReview,
+  rollbackCourseVersion,
   submitCourseForReview,
+  updateCurriculum,
+  updateModule,
+  updateModuleItem,
+  type CourseVersion,
+  type CourseVersionDiff,
+  type CourseReviewAudit,
   type CourseModule,
   type CourseModuleItem
 } from "../api";
+import {
+  buildContentIssues,
+  moveItemOrder,
+  moveModuleOrder,
+  orderedCourseModules,
+  orderedModuleItems,
+  buildWorkspaceSummary,
+  type CurriculumOrder,
+  type ContentIssue,
+  type DependencyStatus,
+  type WorkspaceDependency,
+  type CourseWorkspaceSummary
+} from "../workspace";
 
 type ItemForm = {
   title: string;
@@ -75,15 +114,13 @@ type UploadFiles = {
   documentFiles: File[];
 };
 
-type ContentIssue = {
-  id: string;
-  severity: "blocker" | "warning";
-  itemType: string;
-  title: string;
-  detail: string;
-  moduleTitle?: string;
-  itemTitle?: string;
-};
+const LEARNER_WEB_URL = (import.meta.env.VITE_LEARNER_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
+const REVIEW_CHECKLIST = [
+  { id: "content-ready", label: "Nội dung không còn blocker" },
+  { id: "dependency-ready", label: "Media, quiz và assignment đã sẵn sàng" },
+  { id: "learner-preview-checked", label: "Learner preview đã được kiểm tra" },
+  { id: "publish-risk-reviewed", label: "Rủi ro publish đã được rà soát" }
+];
 
 const createEmptyItem = (): ItemForm => ({
   title: "",
@@ -100,6 +137,36 @@ const createEmptyItem = (): ItemForm => ({
 const createEmptyFiles = (): UploadFiles => ({
   documentFiles: []
 });
+
+function formFromItem(item: CourseModuleItem): ItemForm {
+  return {
+    title: item.title,
+    itemType: item.itemType,
+    refId: item.refId ?? "",
+    description: item.description ?? "",
+    videoMediaId: item.videoMediaId ?? "",
+    documentMediaIds: item.documentMediaIds ?? [],
+    contentUrl: item.contentUrl ?? "",
+    estimatedMinutes: item.estimatedMinutes == null ? "" : String(item.estimatedMinutes),
+    required: item.required
+  };
+}
+
+function itemTypeResetPatch(itemType: string): Partial<ItemForm> {
+  if (itemType === "VIDEO") {
+    return { itemType, refId: "", documentMediaIds: [], contentUrl: "" };
+  }
+  if (itemType === "DOCUMENT") {
+    return { itemType, refId: "", videoMediaId: "" };
+  }
+  if (itemType === "LINK") {
+    return { itemType, refId: "", videoMediaId: "", documentMediaIds: [] };
+  }
+  if (itemType === "QUIZ" || itemType === "ASSIGNMENT") {
+    return { itemType, refId: "", videoMediaId: "", documentMediaIds: [], contentUrl: "" };
+  }
+  return { itemType, refId: "", videoMediaId: "" };
+}
 
 function itemIcon(itemType: string) {
   if (itemType === "VIDEO" || itemType === "LESSON") return <Video size={16} />;
@@ -137,200 +204,62 @@ function reviewStateLabel(value?: string) {
   return labels[value ?? ""] ?? value ?? "Đang biên soạn";
 }
 
+function reviewActionLabel(value: string) {
+  const labels: Record<string, string> = {
+    CREATE_DRAFT: "Tạo draft",
+    SUBMIT_REVIEW: "Gửi duyệt",
+    APPROVE: "Duyệt",
+    REJECT: "Từ chối",
+    PUBLISH: "Publish",
+    ROLLBACK_TO_DRAFT: "Rollback draft"
+  };
+  return labels[value] ?? value;
+}
+
+function reviewChecklistLabel(id: string) {
+  return REVIEW_CHECKLIST.find((item) => item.id === id)?.label ?? id;
+}
+
+function diffChangeLabel(value: string) {
+  const labels: Record<string, string> = {
+    ADDED: "Thêm",
+    REMOVED: "Xóa",
+    CHANGED: "Sửa",
+    MOVED: "Di chuyển"
+  };
+  return labels[value] ?? value;
+}
+
+function diffScopeLabel(value: string) {
+  return value === "MODULE" ? "Chương" : value === "ITEM" ? "Bài" : value;
+}
+
+function diffFieldLabel(value?: string) {
+  const labels: Record<string, string> = {
+    title: "Tên",
+    description: "Mô tả",
+    position: "Vị trí",
+    itemType: "Loại",
+    refId: "Nguồn",
+    videoMediaId: "Video",
+    documentMediaIds: "Tài liệu",
+    contentUrl: "URL",
+    estimatedMinutes: "Thời lượng",
+    required: "Bắt buộc"
+  };
+  return value ? labels[value] ?? value : "Nội dung";
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 function itemTypeLabel(itemType: string) {
   return contentTypeLabel(itemType === "MATERIAL" ? "DOCUMENT" : itemType);
-}
-
-function assignmentStatusLabel(status?: string) {
-  const labels: Record<string, string> = {
-    DRAFT: "Nháp - chưa hiển thị",
-    PUBLISHED: "Đã công khai",
-    ARCHIVED: "Đã lưu trữ"
-  };
-  return labels[status ?? ""] ?? status ?? "Nháp - chưa hiển thị";
-}
-
-function referencedStatusLabel(status?: string) {
-  if (!status) return "không rõ trạng thái";
-  return assignmentStatusLabel(status);
-}
-
-function contentIssue(
-  item: CourseModuleItem,
-  module: CourseModule,
-  severity: ContentIssue["severity"],
-  title: string,
-  detail: string
-): ContentIssue {
-  return {
-    id: `${module.moduleId}:${item.itemId}:${title}`,
-    severity,
-    itemType: item.itemType,
-    title,
-    detail,
-    moduleTitle: module.title,
-    itemTitle: item.title
-  };
-}
-
-function buildContentIssues({
-  modules,
-  quizzes,
-  assignments,
-  canValidateQuizzes,
-  canValidateAssignments,
-  quizCheckFailed,
-  assignmentCheckFailed
-}: {
-  modules: CourseModule[];
-  quizzes: Array<{ id: string; title: string; status?: string }>;
-  assignments: Array<{ id: string; title: string; status?: string }>;
-  canValidateQuizzes: boolean;
-  canValidateAssignments: boolean;
-  quizCheckFailed: boolean;
-  assignmentCheckFailed: boolean;
-}): ContentIssue[] {
-  const issues: ContentIssue[] = [];
-  const quizById = new Map(quizzes.map((quiz) => [quiz.id, quiz]));
-  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
-  const hasQuizItem = modules.some((module) => module.items?.some((item) => item.itemType === "QUIZ"));
-  const hasAssignmentItem = modules.some((module) => module.items?.some((item) => item.itemType === "ASSIGNMENT"));
-
-  if (modules.length === 0) {
-    issues.push({
-      id: "course:no-modules",
-      severity: "blocker",
-      itemType: "MODULE",
-      title: "Course chưa có chương",
-      detail: "Tạo ít nhất một chương và thêm nội dung học trước khi gửi duyệt."
-    });
-  }
-
-  if (hasQuizItem && quizCheckFailed) {
-    issues.push({
-      id: "quiz-catalog-check",
-      severity: "blocker",
-      itemType: "QUIZ",
-      title: "Không kiểm tra được bài thi",
-      detail: "Cần tải được danh sách quiz để xác nhận learner có thể mở bài thi trước khi gửi duyệt hoặc publish."
-    });
-  }
-
-  if (hasAssignmentItem && assignmentCheckFailed) {
-    issues.push({
-      id: "assignment-catalog-check",
-      severity: "blocker",
-      itemType: "ASSIGNMENT",
-      title: "Không kiểm tra được bài tập",
-      detail: "Cần tải được danh sách assignment để tránh publish course trỏ tới assignment nháp."
-    });
-  }
-
-  for (const module of modules) {
-    const items = module.items ?? [];
-    if (items.length === 0) {
-      issues.push({
-        id: `${module.moduleId}:empty`,
-        severity: "blocker",
-        itemType: "MODULE",
-        title: "Chương chưa có bài học",
-        detail: "Mỗi chương cần ít nhất một item sẵn sàng trước khi gửi duyệt.",
-        moduleTitle: module.title
-      });
-    }
-
-    for (const item of items) {
-      const type = item.itemType;
-      const docs = item.documentMediaIds ?? [];
-      const hasAnyPayload = Boolean(
-        item.description?.trim() ||
-          item.videoMediaId ||
-          docs.length > 0 ||
-          item.contentUrl ||
-          item.refId
-      );
-
-      if ((type === "LESSON" || !type) && !hasAnyPayload) {
-        issues.push(contentIssue(
-          item,
-          module,
-          "blocker",
-          "Bài học chưa có nội dung",
-          "Thêm mô tả, video, tài liệu hoặc link để learner không mở vào trang rỗng."
-        ));
-      }
-
-      if (type === "VIDEO" && !item.videoMediaId) {
-        issues.push(contentIssue(
-          item,
-          module,
-          "blocker",
-          "Video chưa gắn file phát",
-          "Upload hoặc chọn video media trước khi gửi duyệt."
-        ));
-      }
-
-      if ((type === "DOCUMENT" || type === "PDF" || type === "MATERIAL") && docs.length === 0 && !item.contentUrl) {
-        issues.push(contentIssue(
-          item,
-          module,
-          "blocker",
-          "Tài liệu chưa có file hoặc link",
-          "Gắn ít nhất một media asset hoặc link tài liệu."
-        ));
-      }
-
-      if (type === "LINK" && !item.contentUrl) {
-        issues.push(contentIssue(
-          item,
-          module,
-          "blocker",
-          "Liên kết đang trống",
-          "Thêm URL trước khi learner nhìn thấy bài này."
-        ));
-      }
-
-      if (type === "QUIZ") {
-        if (!item.refId) {
-          issues.push(contentIssue(item, module, "blocker", "Bài thi chưa được chọn", "Chọn quiz đã thuộc khóa học này."));
-        } else if (canValidateQuizzes) {
-          const quiz = quizById.get(item.refId);
-          if (!quiz) {
-            issues.push(contentIssue(item, module, "blocker", "Quiz reference không tìm thấy", `Không tìm thấy quiz ${shortId(item.refId)} trong khóa học.`));
-          } else if (quiz.status !== "PUBLISHED") {
-            issues.push(contentIssue(
-              item,
-              module,
-              "blocker",
-              "Quiz chưa công khai",
-              `${quiz.title} đang ở trạng thái ${referencedStatusLabel(quiz.status)}; learner sẽ không mở được quiz này.`
-            ));
-          }
-        }
-      }
-
-      if (type === "ASSIGNMENT") {
-        if (!item.refId) {
-          issues.push(contentIssue(item, module, "blocker", "Bài tập chưa được chọn", "Chọn assignment đã thuộc khóa học này."));
-        } else if (canValidateAssignments) {
-          const assignment = assignmentById.get(item.refId);
-          if (!assignment) {
-            issues.push(contentIssue(item, module, "blocker", "Assignment reference không tìm thấy", `Không tìm thấy assignment ${shortId(item.refId)} trong khóa học.`));
-          } else if (assignment.status !== "PUBLISHED") {
-            issues.push(contentIssue(
-              item,
-              module,
-              "blocker",
-              "Assignment chưa learner-visible",
-              `${assignment.title} đang ở trạng thái ${referencedStatusLabel(assignment.status)}; assignment nháp không hiển thị cho learner.`
-            ));
-          }
-        }
-      }
-    }
-  }
-
-  return issues;
 }
 
 async function putToUploadUrl(uploadUrl: string, file: File) {
@@ -367,19 +296,95 @@ async function uploadDocumentFile(file: File): Promise<string> {
   return asset.id;
 }
 
-function LessonCard({ item, displayIndex }: { item: CourseModuleItem; displayIndex: number }) {
+function formatMinutes(minutes: number) {
+  if (!minutes) return "Chưa ước lượng";
+  if (minutes < 60) return `${minutes} phút`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}p` : `${hours}h`;
+}
+
+function learnerPreviewUrl(slug: string) {
+  return `${LEARNER_WEB_URL}/courses/${slug}/modules`;
+}
+
+function issueTone(issues: ContentIssue[]) {
+  if (issues.some((issue) => issue.severity === "blocker")) return "danger";
+  if (issues.length > 0) return "warning";
+  return "success";
+}
+
+function issueLabel(issues: ContentIssue[]) {
+  const blockers = issues.filter((issue) => issue.severity === "blocker").length;
+  const warnings = issues.filter((issue) => issue.severity === "warning").length;
+  if (blockers > 0) return `${blockers} blocker`;
+  if (warnings > 0) return `${warnings} cảnh báo`;
+  return "Ready";
+}
+
+function issuesForModule(issues: ContentIssue[], moduleId: string) {
+  return issues.filter((issue) => issue.moduleId === moduleId);
+}
+
+function issuesForItem(issues: ContentIssue[], itemId: string) {
+  return issues.filter((issue) => issue.itemId === itemId);
+}
+
+function dependencyTone(status: DependencyStatus) {
+  if (status === "ready") return "success";
+  if (status === "loading" || status === "warning") return "warning";
+  if (status === "error" || status === "blocked") return "danger";
+  return "neutral";
+}
+
+function dependencyLabel(status: DependencyStatus) {
+  const labels: Record<DependencyStatus, string> = {
+    ready: "Ready",
+    loading: "Đang tải",
+    error: "Lỗi tải",
+    empty: "Không dùng",
+    blocked: "Blocker",
+    warning: "Cảnh báo"
+  };
+  return labels[status];
+}
+
+function dependencyIcon(key: WorkspaceDependency["key"]) {
+  if (key === "media") return <PackageCheck size={18} />;
+  if (key === "quiz") return <ListChecks size={18} />;
+  return <FileText size={18} />;
+}
+
+function dependencyLink(key: WorkspaceDependency["key"], courseId: string) {
+  if (key === "media") return `/media?courseId=${courseId}`;
+  if (key === "quiz") return `/quizzes?courseId=${courseId}`;
+  return `/assignments?courseId=${courseId}`;
+}
+
+function LessonCard({
+  item,
+  displayIndex,
+  issues,
+  actions
+}: {
+  item: CourseModuleItem;
+  displayIndex: number;
+  issues: ContentIssue[];
+  actions?: ReactNode;
+}) {
   const docs = item.documentMediaIds ?? [];
   return (
-    <div className="rounded-lg border border-black/10 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+    <div id={`item-${item.itemId}`} className="scroll-mt-6 rounded-lg border border-black/10 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="grid size-8 place-items-center rounded-md bg-brand-50 text-brand-700">
               {itemIcon(item.itemType)}
             </span>
-            <h3 className="font-bold text-slate-950">{item.title}</h3>
+            <h3 className="min-w-0 break-words font-bold text-slate-950">{item.title}</h3>
             <Badge value={item.itemType === "MATERIAL" ? "DOCUMENT" : item.itemType} label={contentTypeLabel(item.itemType)} />
             {item.required && <Badge value="REQUIRED" />}
+            <Badge tone={issueTone(issues)} label={issueLabel(issues)} />
           </div>
           {item.description && (
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">{item.description}</p>
@@ -405,9 +410,34 @@ function LessonCard({ item, displayIndex }: { item: CourseModuleItem; displayInd
                 <Link2 size={14} /> External link
               </span>
             )}
+            {item.refId && (
+              <span className="inline-flex items-center gap-1">
+                <ListChecks size={14} /> Ref {shortId(item.refId)}
+              </span>
+            )}
           </div>
+          {issues.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {issues.map((issue) => (
+                <div
+                  key={issue.id}
+                  className={
+                    issue.severity === "blocker"
+                      ? "rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900"
+                      : "rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                  }
+                >
+                  <span className="font-semibold">{issue.title}</span>
+                  <span className="ml-1 opacity-85">{issue.detail}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        <span className="text-xs font-bold text-slate-400">#{displayIndex}</span>
+        <div className="flex shrink-0 items-center gap-2">
+          {actions}
+          <span className="text-xs font-bold text-slate-400">#{displayIndex}</span>
+        </div>
       </div>
     </div>
   );
@@ -557,7 +587,7 @@ function ReadinessGate({
             <p className="font-bold text-slate-950">{label}</p>
             <Badge
               tone={tone}
-              label={ready ? "Sẵn sàng" : pending ? "Đang kiểm tra" : `${blockers.length} blocker`}
+              label={ready ? "Sẵn sàng" : pending ? "Đang kiểm tra" : blockers.length > 0 ? `${blockers.length} blocker` : "Chờ review"}
             />
           </div>
           <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -569,24 +599,556 @@ function ReadinessGate({
   );
 }
 
-function CourseMap({ modules }: { modules: CourseModule[] }) {
+function PublishConfidencePanel({
+  summary,
+  previewUrl
+}: {
+  summary: CourseWorkspaceSummary;
+  previewUrl: string;
+}) {
   return (
-    <Card className="sticky top-6">
-      <CardHeader title="Course map" subtitle="Chương và số bài học" />
-      <div className="space-y-2 p-4">
-        {modules.length === 0 && <EmptyState message="Chưa có chương" />}
-        {modules.map((module) => (
+    <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+            <ShieldCheck size={18} className="text-brand-700" />
+            Publish confidence
+          </div>
+          <p className="mt-1 text-sm leading-6 text-slate-500">{summary.publishConfidence.detail}</p>
+        </div>
+        <Badge tone={summary.publishConfidence.tone} label={summary.publishConfidence.label} />
+      </div>
+      <div className="mt-4">
+        <div className="flex items-end justify-between gap-3">
+          <span className="text-3xl font-bold text-slate-950">{summary.publishConfidence.score}%</span>
           <a
-            key={module.moduleId}
-            href={`#module-${module.moduleId}`}
-            className="flex items-center justify-between rounded-md border border-black/10 px-3 py-2 text-sm transition hover:bg-brand-50"
+            href={previewUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
+            title="Mở learner preview"
           >
-            <span className="line-clamp-1 font-semibold text-slate-800">{module.title}</span>
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">
-              {module.items?.length ?? 0}
-            </span>
+            <Eye size={16} />
+            Preview
+            <ExternalLink size={14} />
           </a>
-        ))}
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+          <div
+            className={
+              summary.publishConfidence.tone === "success"
+                ? "h-full rounded-full bg-emerald-500"
+                : summary.publishConfidence.tone === "warning"
+                  ? "h-full rounded-full bg-amber-500"
+                  : "h-full rounded-full bg-red-500"
+            }
+            style={{ width: `${summary.publishConfidence.score}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DependencySummaryPanel({
+  dependencies,
+  courseId
+}: {
+  dependencies: WorkspaceDependency[];
+  courseId: string;
+}) {
+  return (
+    <div className="grid gap-3 lg:grid-cols-3">
+      {dependencies.map((dependency) => (
+        <div key={dependency.key} className="rounded-md border border-slate-200 bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="grid size-9 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-700">
+                {dependencyIcon(dependency.key)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-950">{dependency.label}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {dependency.ready}/{dependency.total} ready
+                </p>
+              </div>
+            </div>
+            <Badge tone={dependencyTone(dependency.status)} label={dependencyLabel(dependency.status)} />
+          </div>
+          <p className="mt-3 min-h-10 text-sm leading-5 text-slate-600">{dependency.detail}</p>
+          <Link
+            to={dependencyLink(dependency.key, courseId)}
+            className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-brand-700 hover:underline"
+          >
+            Mở console
+            <ExternalLink size={12} />
+          </Link>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReviewOperationsPanel({
+  reviewState,
+  reviewNote,
+  reviewChecklist,
+  history,
+  historyLoading,
+  historyError,
+  historyErrorValue,
+  canApprove,
+  canApproveDecision,
+  canRejectDecision,
+  approvePending,
+  rejectPending,
+  approveTitle,
+  rejectTitle,
+  onReviewNoteChange,
+  onChecklistChange,
+  onApprove,
+  onReject
+}: {
+  reviewState: string;
+  reviewNote: string;
+  reviewChecklist: Record<string, boolean>;
+  history?: CourseReviewAudit[];
+  historyLoading: boolean;
+  historyError: boolean;
+  historyErrorValue: unknown;
+  canApprove: boolean;
+  canApproveDecision: boolean;
+  canRejectDecision: boolean;
+  approvePending: boolean;
+  rejectPending: boolean;
+  approveTitle: string;
+  rejectTitle: string;
+  onReviewNoteChange: (value: string) => void;
+  onChecklistChange: (id: string, checked: boolean) => void;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const entries = history ?? [];
+  const lifecycleTone = reviewState === "IN_REVIEW" ? "warning" : reviewState === "APPROVED" || reviewState === "PUBLISHED" ? "success" : "neutral";
+
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <ClipboardCheck size={18} className="text-brand-700" />
+            Review operations
+          </span>
+        }
+        subtitle="Checklist, note và lịch sử quyết định nội dung."
+        actions={<Badge value={reviewState} label={reviewStateLabel(reviewState)} />}
+      />
+      <div className="grid gap-5 p-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <Notice
+            tone={lifecycleTone}
+            title={reviewState === "IN_REVIEW" ? "Đang chờ reviewer quyết định" : reviewStateLabel(reviewState)}
+          >
+            {reviewState === "IN_REVIEW"
+              ? "Reviewer cần hoàn tất checklist trước khi duyệt và phải ghi rõ lý do nếu từ chối."
+              : "Course chưa ở trạng thái cần reviewer quyết định."}
+          </Notice>
+
+          <div className="space-y-2">
+            {REVIEW_CHECKLIST.map((item) => (
+              <label
+                key={item.id}
+                className={
+                  canApprove
+                    ? "flex items-start gap-3 rounded-md border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700"
+                    : "flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-400"
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(reviewChecklist[item.id])}
+                  disabled={!canApprove}
+                  onChange={(event) => onChecklistChange(item.id, event.target.checked)}
+                  className="mt-1"
+                />
+                <span>{item.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <FormField
+            label="Reviewer note"
+            htmlFor="review-note"
+            hint={canApprove ? "Bắt buộc khi từ chối, tùy chọn khi duyệt." : undefined}
+          >
+            <Textarea
+              id="review-note"
+              value={reviewNote}
+              onChange={(event) => onReviewNoteChange(event.target.value)}
+              rows={4}
+              disabled={!canApprove}
+              placeholder="Ghi chú review, blocker còn lại hoặc xác nhận publish readiness..."
+            />
+          </FormField>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              disabled={!canApproveDecision || approvePending}
+              title={approveTitle}
+              onClick={onApprove}
+            >
+              <CheckCircle2 size={16} />
+              {approvePending ? "Đang duyệt..." : "Duyệt"}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={!canRejectDecision || rejectPending}
+              title={rejectTitle}
+              onClick={onReject}
+            >
+              <XCircle size={16} />
+              {rejectPending ? "Đang trả..." : "Từ chối"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <div className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-950">
+            <History size={18} className="text-brand-700" />
+            Review history
+          </div>
+          {historyLoading && <Spinner label="Đang tải lịch sử review" />}
+          {historyError && <ErrorState error={historyErrorValue} />}
+          {!historyLoading && !historyError && entries.length === 0 && (
+            <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
+              Chưa có lịch sử review cho course này.
+            </div>
+          )}
+          {!historyLoading && !historyError && entries.length > 0 && (
+            <div className="space-y-3">
+              {entries.map((entry) => (
+                <div key={entry.id} className="rounded-md border border-slate-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge value={entry.action} label={reviewActionLabel(entry.action)} />
+                        <span className="text-xs font-semibold text-slate-500">v{entry.versionNo}</span>
+                        {entry.fromState && entry.toState && (
+                          <span className="text-xs font-semibold text-slate-500">
+                            {reviewStateLabel(entry.fromState)}{" -> "}{reviewStateLabel(entry.toState)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">
+                        Actor {entry.actorId}{entry.actorRole ? ` · ${entry.actorRole}` : ""}
+                      </p>
+                      {entry.note && <p className="mt-1 text-sm leading-6 text-slate-600">{entry.note}</p>}
+                      {(entry.checklist?.length ?? 0) > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {entry.checklist?.map((item) => (
+                            <Badge key={item} value="READY" label={reviewChecklistLabel(item)} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-xs font-semibold text-slate-400">{formatDateTime(entry.createdAt)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function VersionControlPanel({
+  versions,
+  selectedPublished,
+  diff,
+  diffLoading,
+  diffError,
+  diffErrorValue,
+  rollbackNote,
+  rollbackPending,
+  rollbackError,
+  rollbackErrorValue,
+  currentVersionNo,
+  onSelectedVersionChange,
+  onRollbackNoteChange,
+  onRollback
+}: {
+  versions?: CourseVersion[];
+  selectedPublished?: CourseVersion;
+  diff?: CourseVersionDiff;
+  diffLoading: boolean;
+  diffError: boolean;
+  diffErrorValue: unknown;
+  rollbackNote: string;
+  rollbackPending: boolean;
+  rollbackError: boolean;
+  rollbackErrorValue: unknown;
+  currentVersionNo: number;
+  onSelectedVersionChange: (value: number | undefined) => void;
+  onRollbackNoteChange: (value: string) => void;
+  onRollback: () => void;
+}) {
+  const publishedVersions = versions?.filter((version) => version.state === "PUBLISHED") ?? [];
+  const totalChanges = diff
+    ? diff.addedModules + diff.removedModules + diff.changedModules + diff.movedModules
+      + diff.addedItems + diff.removedItems + diff.changedItems + diff.movedItems
+    : 0;
+  const rollbackReady = Boolean(selectedPublished) && rollbackNote.trim().length > 0;
+
+  return (
+    <Card className="mb-4">
+      <CardHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <History size={18} className="text-brand-700" />
+            Version diff & rollback
+          </span>
+        }
+        subtitle="So sánh draft hiện tại với snapshot đã publish và tạo draft rollback có audit."
+        actions={
+          selectedPublished
+            ? <Badge value="PUBLISHED" label={`Rollback target v${selectedPublished.versionNo}`} />
+            : <Badge value="DRAFT" label="Chưa có live snapshot" />
+        }
+      />
+      <div className="grid gap-5 p-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <Notice tone={selectedPublished ? "info" : "warning"} title={selectedPublished ? "Published snapshot được khóa" : "Chưa thể diff"}>
+            {selectedPublished
+              ? `Rollback sẽ lấy published snapshot v${selectedPublished.versionNo} để tạo draft mới v${currentVersionNo + 1}; learner vẫn học từ bản live hiện tại cho tới lần publish tiếp theo.`
+              : "Course cần ít nhất một phiên bản PUBLISHED trước khi có thể so sánh hoặc rollback."}
+          </Notice>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Published</p>
+              <p className="mt-1 text-2xl font-bold text-slate-950">{publishedVersions.length}</p>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Changes</p>
+              <p className="mt-1 text-2xl font-bold text-slate-950">{diff ? totalChanges : "-"}</p>
+            </div>
+          </div>
+
+          <FormField label="Published snapshot" htmlFor="rollback-version">
+            <Select
+              id="rollback-version"
+              value={selectedPublished?.versionNo ?? ""}
+              disabled={publishedVersions.length === 0 || rollbackPending}
+              onChange={(event) => onSelectedVersionChange(event.target.value ? Number(event.target.value) : undefined)}
+            >
+              {publishedVersions.length === 0 && <option value="">Chưa có published version</option>}
+              {publishedVersions.map((version) => (
+                <option key={version.id} value={version.versionNo}>
+                  v{version.versionNo}{version.publishedAt ? ` - ${formatDateTime(version.publishedAt)}` : ""}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField
+            label="Rollback note"
+            htmlFor="rollback-note"
+            hint={selectedPublished ? "Bắt buộc để tạo audit trail." : undefined}
+          >
+            <Textarea
+              id="rollback-note"
+              value={rollbackNote}
+              onChange={(event) => onRollbackNoteChange(event.target.value)}
+              rows={4}
+              disabled={!selectedPublished || rollbackPending}
+              placeholder="Lý do rollback snapshot này thành draft mới..."
+            />
+          </FormField>
+
+          {rollbackError && <ErrorState error={rollbackErrorValue} />}
+          <Button
+            variant="danger"
+            disabled={!rollbackReady || rollbackPending}
+            title={rollbackReady ? "Tạo draft rollback từ live snapshot" : "Chọn snapshot và nhập rollback note"}
+            onClick={onRollback}
+          >
+            <RotateCcw size={16} />
+            {rollbackPending ? "Đang rollback..." : "Rollback thành draft"}
+          </Button>
+        </div>
+
+        <div className="min-w-0">
+          {diffLoading && <Spinner label="Đang tải version diff" />}
+          {diffError && <ErrorState error={diffErrorValue} />}
+          {!diffLoading && !diffError && !diff && (
+            <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">
+              Chưa có diff để hiển thị.
+            </div>
+          )}
+          {diff && (
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-md border border-slate-200 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Module</p>
+                  <p className="mt-1 text-sm font-bold text-slate-950">
+                    +{diff.addedModules} / -{diff.removedModules} / {diff.changedModules} sửa / {diff.movedModules} chuyển
+                  </p>
+                </div>
+                <div className="rounded-md border border-slate-200 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Item</p>
+                  <p className="mt-1 text-sm font-bold text-slate-950">
+                    +{diff.addedItems} / -{diff.removedItems} / {diff.changedItems} sửa / {diff.movedItems} chuyển
+                  </p>
+                </div>
+                <div className="rounded-md border border-slate-200 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Required +</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-700">{diff.requiredItemsAdded}</p>
+                </div>
+                <div className="rounded-md border border-slate-200 p-3">
+                  <p className="text-xs font-semibold uppercase text-slate-500">Required -</p>
+                  <p className="mt-1 text-sm font-bold text-red-700">{diff.requiredItemsRemoved}</p>
+                </div>
+              </div>
+
+              {diff.warnings.length > 0 && (
+                <div className="space-y-2">
+                  {diff.warnings.map((warning) => (
+                    <Notice key={warning} tone="warning" title="Publish risk">
+                      {warning}
+                    </Notice>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {diff.changes.slice(0, 10).map((change, index) => (
+                  <div key={`${change.scope}-${change.itemId ?? change.moduleId}-${change.field}-${index}`} className="rounded-md border border-slate-200 bg-white p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge value={change.changeType} label={diffChangeLabel(change.changeType)} />
+                      <span className="text-xs font-semibold text-slate-500">{diffScopeLabel(change.scope)}</span>
+                      <span className="min-w-0 truncate text-sm font-bold text-slate-950">{change.title ?? change.itemId ?? change.moduleId}</span>
+                    </div>
+                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                      {diffFieldLabel(change.field)}: {change.fromValue ?? "-"}{" -> "}{change.toValue ?? "-"}
+                    </p>
+                  </div>
+                ))}
+                {diff.changes.length > 10 && (
+                  <p className="text-xs font-semibold text-slate-500">
+                    Còn {diff.changes.length - 10} thay đổi khác trong snapshot diff.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function WorkspaceStats({
+  summary,
+  moduleCount,
+  versionNo
+}: {
+  summary: CourseWorkspaceSummary;
+  moduleCount: number;
+  versionNo: number;
+}) {
+  return (
+    <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="rounded-lg border border-black/10 bg-white p-4">
+        <p className="text-sm text-slate-500">Chương</p>
+        <p className="mt-1 text-3xl font-bold text-slate-950">{moduleCount}</p>
+        <p className="mt-2 text-xs text-slate-500">Module trong outline</p>
+      </div>
+      <div className="rounded-lg border border-black/10 bg-white p-4">
+        <p className="text-sm text-slate-500">Items</p>
+        <p className="mt-1 text-3xl font-bold text-slate-950">{summary.totalItems}</p>
+        <p className="mt-2 text-xs text-slate-500">{summary.requiredItems} bắt buộc · {summary.optionalItems} tùy chọn</p>
+      </div>
+      <div className="rounded-lg border border-black/10 bg-white p-4">
+        <p className="text-sm text-slate-500">Thời lượng</p>
+        <p className="mt-1 break-words text-2xl font-bold text-slate-950">{formatMinutes(summary.totalMinutes)}</p>
+        <p className="mt-2 text-xs text-slate-500">Tổng estimated minutes</p>
+      </div>
+      <div className="rounded-lg border border-black/10 bg-white p-4">
+        <p className="text-sm text-slate-500">Dependencies</p>
+        <p className="mt-1 text-3xl font-bold text-slate-950">{summary.mediaCount}</p>
+        <p className="mt-2 text-xs text-slate-500">{summary.videoCount} video · {summary.documentCount} tài liệu · {summary.linkCount} link</p>
+      </div>
+      <div className="rounded-lg border border-black/10 bg-white p-4">
+        <p className="text-sm text-slate-500">Phiên bản</p>
+        <p className="mt-1 text-3xl font-bold text-slate-950">v{versionNo}</p>
+        <p className="mt-2 text-xs text-slate-500">{summary.blockers} blocker · {summary.warnings} cảnh báo</p>
+      </div>
+    </div>
+  );
+}
+
+function CourseOutline({ modules, issues }: { modules: CourseModule[]; issues: ContentIssue[] }) {
+  return (
+    <Card className="sticky top-6 max-h-[calc(100vh-7rem)] overflow-y-auto">
+      <CardHeader
+        title={
+          <span className="inline-flex items-center gap-2">
+            <ListChecks size={18} className="text-brand-700" />
+            Outline
+          </span>
+        }
+        subtitle="Module, item và trạng thái readiness"
+      />
+      <div className="space-y-3 p-4">
+        {modules.length === 0 && <EmptyState message="Chưa có chương" />}
+        {modules.map((module) => {
+          const moduleIssues = issuesForModule(issues, module.moduleId);
+          const items = orderedModuleItems(module);
+
+          return (
+            <div key={module.moduleId} className="rounded-md border border-black/10 bg-white">
+              <a
+                href={`#module-${module.moduleId}`}
+                className="flex items-start justify-between gap-3 px-3 py-3 text-sm transition hover:bg-brand-50"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-bold text-slate-900">{module.title}</span>
+                  <span className="mt-1 block text-xs text-slate-500">{items.length} item</span>
+                </span>
+                <Badge tone={issueTone(moduleIssues)} label={issueLabel(moduleIssues)} />
+              </a>
+              <div className="border-t border-black/10 px-2 py-2">
+                {items.length === 0 ? (
+                  <p className="px-2 py-2 text-xs text-slate-500">Chưa có item trong module này.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {items.map((item) => {
+                      const itemIssues = issuesForItem(issues, item.itemId);
+                      return (
+                        <a
+                          key={item.itemId}
+                          href={`#item-${item.itemId}`}
+                          className="flex items-center justify-between gap-2 rounded-md px-2 py-2 text-xs transition hover:bg-slate-50"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="grid size-6 shrink-0 place-items-center rounded bg-slate-100 text-slate-600">
+                              {itemIcon(item.itemType)}
+                            </span>
+                            <span className="truncate font-semibold text-slate-700">{item.title}</span>
+                          </span>
+                          <Badge tone={issueTone(itemIssues)} label={issueLabel(itemIssues)} className="shrink-0" />
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Card>
   );
@@ -607,6 +1169,20 @@ export function CourseDraftPage() {
     queryFn: () => listCourseVersions(courseId),
     enabled: Boolean(courseId)
   });
+  const [selectedRollbackVersionNo, setSelectedRollbackVersionNo] = useState<number | undefined>();
+  const publishedVersions = versions.data?.filter((version) => version.state === "PUBLISHED") ?? [];
+  const selectedPublishedVersion = publishedVersions.find((version) => version.versionNo === selectedRollbackVersionNo)
+    ?? publishedVersions[0];
+  const versionDiff = useQuery({
+    queryKey: queryKeys.authoring.versionDiff(courseId, selectedPublishedVersion?.versionNo),
+    queryFn: () => getCourseVersionDiff(courseId, selectedPublishedVersion?.versionNo),
+    enabled: Boolean(courseId && selectedPublishedVersion)
+  });
+  const reviewHistory = useQuery({
+    queryKey: queryKeys.authoring.reviewHistory(courseId),
+    queryFn: () => listCourseReviewHistory(courseId),
+    enabled: Boolean(courseId)
+  });
   const quizzes = useQuery({
     queryKey: queryKeys.quizzes.list(courseId),
     queryFn: () => listCourseQuizzes(courseId),
@@ -625,9 +1201,23 @@ export function CourseDraftPage() {
   const [moduleForm, setModuleForm] = useState({ title: "", description: "" });
   const [itemForms, setItemForms] = useState<Record<string, ItemForm>>({});
   const [uploadFiles, setUploadFiles] = useState<Record<string, UploadFiles>>({});
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewChecklist, setReviewChecklist] = useState<Record<string, boolean>>({});
+  const [rollbackNote, setRollbackNote] = useState("");
+  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
+  const [moduleEdits, setModuleEdits] = useState<Record<string, { title: string; description: string }>>({});
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [itemEdits, setItemEdits] = useState<Record<string, ItemForm>>({});
 
   function invalidateDraft() {
     qc.invalidateQueries({ queryKey: queryKeys.authoring.draft(courseId) });
+  }
+
+  function invalidateLifecycle() {
+    invalidateDraft();
+    qc.invalidateQueries({ queryKey: queryKeys.authoring.versions(courseId) });
+    qc.invalidateQueries({ queryKey: ["authoring", "version-diff", courseId] });
+    qc.invalidateQueries({ queryKey: queryKeys.authoring.reviewHistory(courseId) });
   }
 
   const addModule = useMutation({
@@ -638,7 +1228,7 @@ export function CourseDraftPage() {
     }),
     onSuccess: () => {
       setModuleForm({ title: "", description: "" });
-      invalidateDraft();
+      invalidateLifecycle();
     }
   });
 
@@ -666,31 +1256,116 @@ export function CourseDraftPage() {
     onSuccess: (_data, variables) => {
       setItemForms((prev) => ({ ...prev, [variables.moduleId]: createEmptyItem() }));
       setUploadFiles((prev) => ({ ...prev, [variables.moduleId]: createEmptyFiles() }));
-      invalidateDraft();
+      invalidateLifecycle();
     }
+  });
+
+  const updateModuleMutation = useMutation({
+    mutationFn: ({ moduleId, form }: { moduleId: string; form: { title: string; description: string } }) =>
+      updateModule(courseId, moduleId, {
+        title: form.title,
+        description: form.description || undefined
+      }),
+    onSuccess: () => {
+      setEditingModuleId(null);
+      invalidateLifecycle();
+    }
+  });
+
+  const duplicateModuleMutation = useMutation({
+    mutationFn: (moduleId: string) => duplicateModule(courseId, moduleId),
+    onSuccess: invalidateLifecycle
+  });
+
+  const archiveModuleMutation = useMutation({
+    mutationFn: (moduleId: string) => archiveModule(courseId, moduleId),
+    onSuccess: invalidateLifecycle
+  });
+
+  const updateItemMutation = useMutation({
+    mutationFn: ({ moduleId, itemId, form }: { moduleId: string; itemId: string; form: ItemForm }) =>
+      updateModuleItem(courseId, moduleId, itemId, {
+        title: form.title,
+        itemType: form.itemType,
+        refId: form.refId || undefined,
+        description: form.description || undefined,
+        videoMediaId: form.videoMediaId || undefined,
+        documentMediaIds: form.documentMediaIds,
+        contentUrl: form.contentUrl || undefined,
+        estimatedMinutes: form.estimatedMinutes ? Number(form.estimatedMinutes) : undefined,
+        required: form.required
+      }),
+    onSuccess: () => {
+      setEditingItemId(null);
+      invalidateLifecycle();
+    }
+  });
+
+  const duplicateItemMutation = useMutation({
+    mutationFn: ({ moduleId, itemId }: { moduleId: string; itemId: string }) => duplicateModuleItem(courseId, moduleId, itemId),
+    onSuccess: invalidateLifecycle
+  });
+
+  const archiveItemMutation = useMutation({
+    mutationFn: ({ moduleId, itemId }: { moduleId: string; itemId: string }) => archiveModuleItem(courseId, moduleId, itemId),
+    onSuccess: invalidateLifecycle
+  });
+
+  const reorderCurriculumMutation = useMutation({
+    mutationFn: (modules: CurriculumOrder[]) => updateCurriculum(courseId, modules),
+    onSuccess: invalidateLifecycle
   });
 
   const submitReview = useMutation({
     mutationFn: () => submitCourseForReview(courseId),
-    onSuccess: invalidateDraft
+    onSuccess: invalidateLifecycle
   });
 
   const approveReview = useMutation({
-    mutationFn: () => approveCourseReview(courseId),
-    onSuccess: invalidateDraft
+    mutationFn: () => approveCourseReview(courseId, {
+      note: reviewNote.trim() || undefined,
+      checklist: REVIEW_CHECKLIST.filter((item) => reviewChecklist[item.id]).map((item) => item.id)
+    }),
+    onSuccess: () => {
+      setReviewNote("");
+      setReviewChecklist({});
+      invalidateLifecycle();
+    }
   });
 
   const rejectReview = useMutation({
-    mutationFn: () => rejectCourseReview(courseId),
-    onSuccess: invalidateDraft
+    mutationFn: () => rejectCourseReview(courseId, {
+      note: reviewNote.trim(),
+      checklist: REVIEW_CHECKLIST.filter((item) => reviewChecklist[item.id]).map((item) => item.id)
+    }),
+    onSuccess: () => {
+      setReviewNote("");
+      setReviewChecklist({});
+      invalidateLifecycle();
+    }
   });
 
   const publish = useMutation({
     mutationFn: () => publishCourse(courseId),
     onSuccess: () => {
-      invalidateDraft();
+      invalidateLifecycle();
       qc.invalidateQueries({ queryKey: queryKeys.courses.list() });
-      qc.invalidateQueries({ queryKey: queryKeys.authoring.versions(courseId) });
+    }
+  });
+
+  const rollbackVersion = useMutation({
+    mutationFn: () => {
+      if (!selectedPublishedVersion) {
+        throw new Error("No published version available for rollback");
+      }
+      return rollbackCourseVersion(courseId, selectedPublishedVersion.versionNo, {
+        note: rollbackNote.trim(),
+        expectedCurrentVersionNo: draft.data?.currentVersionNo
+      });
+    },
+    onSuccess: () => {
+      setRollbackNote("");
+      invalidateLifecycle();
     }
   });
 
@@ -710,6 +1385,32 @@ export function CourseDraftPage() {
     setUploadFiles((prev) => ({ ...prev, [moduleId]: { ...filesFor(moduleId), ...patch } }));
   }
 
+  function startEditModule(module: CourseModule) {
+    setEditingModuleId(module.moduleId);
+    setModuleEdits((prev) => ({
+      ...prev,
+      [module.moduleId]: {
+        title: module.title,
+        description: module.description ?? ""
+      }
+    }));
+  }
+
+  function updateModuleEdit(moduleId: string, patch: Partial<{ title: string; description: string }>) {
+    const current = moduleEdits[moduleId] ?? { title: "", description: "" };
+    setModuleEdits((prev) => ({ ...prev, [moduleId]: { ...current, ...patch } }));
+  }
+
+  function startEditItem(item: CourseModuleItem) {
+    setEditingItemId(item.itemId);
+    setItemEdits((prev) => ({ ...prev, [item.itemId]: formFromItem(item) }));
+  }
+
+  function updateItemEdit(itemId: string, patch: Partial<ItemForm>) {
+    const current = itemEdits[itemId] ?? createEmptyItem();
+    setItemEdits((prev) => ({ ...prev, [itemId]: { ...current, ...patch } }));
+  }
+
   function submitModule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     addModule.mutate();
@@ -720,12 +1421,30 @@ export function CourseDraftPage() {
     addItem.mutate({ moduleId, form: formFor(moduleId), files: filesFor(moduleId) });
   }
 
-  if (draft.isLoading) return <Spinner />;
+  function submitModuleEdit(event: FormEvent<HTMLFormElement>, moduleId: string) {
+    event.preventDefault();
+    const form = moduleEdits[moduleId];
+    if (form) updateModuleMutation.mutate({ moduleId, form });
+  }
+
+  function submitItemEdit(event: FormEvent<HTMLFormElement>, moduleId: string, itemId: string) {
+    event.preventDefault();
+    const form = itemEdits[itemId];
+    if (form) updateItemMutation.mutate({ moduleId, itemId, form });
+  }
+
+  function reorderCurriculum(order: CurriculumOrder[] | null) {
+    if (order && !reorderCurriculumMutation.isPending) {
+      reorderCurriculumMutation.mutate(order);
+    }
+  }
+
+  if (draft.isLoading) return <Spinner label="Đang tải course builder workspace" />;
   if (draft.isError) return <ErrorState error={draft.error} />;
-  if (!draft.data) return null;
+  if (!draft.data) return <EmptyState message="Không tìm thấy draft course để biên soạn." />;
 
   const d = draft.data;
-  const modules = [...(d.modules ?? [])].sort((a, b) => a.position - b.position);
+  const modules = orderedCourseModules(d.modules ?? []);
   const quizRows = quizzes.data ?? [];
   const assignmentRows = assignments.data ?? [];
   const lessonCount = modules.reduce((sum, module) => sum + (module.items?.length ?? 0), 0);
@@ -744,14 +1463,43 @@ export function CourseDraftPage() {
   });
   const contentBlockers = contentIssues.filter((issue) => issue.severity === "blocker");
   const contentReady = !readinessChecksPending && modules.length > 0 && lessonCount > 0 && contentBlockers.length === 0;
-  const canSubmitReview = d.status === "DRAFT" && reviewState === "DRAFT" && contentReady;
+  const courseCanAuthor = d.status !== "ARCHIVED";
+  const reorderDisabled = !courseCanAuthor || reorderCurriculumMutation.isPending;
+  const canSubmitReview = courseCanAuthor && reviewState === "DRAFT" && contentReady;
   const canApprove = reviewState === "IN_REVIEW";
-  const canPublish = d.status === "DRAFT" && reviewState === "APPROVED" && contentReady;
+  const reviewChecklistComplete = REVIEW_CHECKLIST.every((item) => reviewChecklist[item.id]);
+  const reviewNoteReady = reviewNote.trim().length > 0;
+  const canApproveDecision = canApprove && reviewChecklistComplete;
+  const canRejectDecision = canApprove && reviewNoteReady;
+  const canPublish = courseCanAuthor && reviewState === "APPROVED" && contentReady;
   const submitReviewTitle = canSubmitReview
     ? "Sẵn sàng gửi duyệt"
-    : "Cần course draft, review DRAFT và không còn blocker nội dung";
-  const approveTitle = canApprove ? "Sẵn sàng duyệt" : "Chỉ duyệt khi course đang IN_REVIEW";
-  const publishTitle = canPublish ? "Sẵn sàng publish" : "Cần review APPROVED và không còn blocker nội dung";
+    : "Cần course chưa archived, review DRAFT và không còn blocker nội dung";
+  const approveTitle = !canApprove
+    ? "Chỉ duyệt khi course đang IN_REVIEW"
+    : reviewChecklistComplete
+      ? "Sẵn sàng duyệt"
+      : "Hoàn tất reviewer checklist trước khi duyệt";
+  const rejectTitle = !canApprove
+    ? "Chỉ từ chối khi course đang IN_REVIEW"
+    : reviewNoteReady
+      ? "Trả course về trạng thái cần sửa"
+      : "Nhập reviewer note trước khi từ chối";
+  const publishTitle = canPublish ? "Sẵn sàng publish" : "Cần course chưa archived, review APPROVED và không còn blocker nội dung";
+  const workspaceSummary = buildWorkspaceSummary({
+    modules,
+    quizzes: quizRows,
+    assignments: assignmentRows,
+    contentIssues,
+    reviewState,
+    courseStatus: d.status,
+    readinessChecksPending,
+    quizLoading: quizzes.isLoading,
+    quizError: quizzes.isError,
+    assignmentLoading: assignments.isLoading,
+    assignmentError: assignments.isError
+  });
+  const previewUrl = learnerPreviewUrl(d.slug);
 
   return (
     <div>
@@ -775,24 +1523,6 @@ export function CourseDraftPage() {
               {submitReview.isPending ? "Đang gửi..." : "Gửi duyệt"}
             </Button>
             <Button
-              variant="secondary"
-              disabled={!canApprove || approveReview.isPending}
-              title={approveTitle}
-              onClick={() => approveReview.mutate()}
-            >
-              <CheckCircle2 size={16} />
-              {approveReview.isPending ? "Đang duyệt..." : "Duyệt"}
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={!canApprove || rejectReview.isPending}
-              title={approveTitle}
-              onClick={() => rejectReview.mutate()}
-            >
-              <XCircle size={16} />
-              {rejectReview.isPending ? "Đang trả..." : "Từ chối"}
-            </Button>
-            <Button
               disabled={!canPublish || publish.isPending}
               title={publishTitle}
               onClick={() => publish.mutate()}
@@ -804,14 +1534,89 @@ export function CourseDraftPage() {
         }
       />
 
-      {(submitReview.isError || approveReview.isError || rejectReview.isError || publish.isError) && (
+      {(submitReview.isError || approveReview.isError || rejectReview.isError || publish.isError
+        || updateModuleMutation.isError || duplicateModuleMutation.isError || archiveModuleMutation.isError
+        || updateItemMutation.isError || duplicateItemMutation.isError || archiveItemMutation.isError
+        || reorderCurriculumMutation.isError) && (
         <div className="mb-4">
           {submitReview.isError && <ErrorState error={submitReview.error} />}
           {approveReview.isError && <ErrorState error={approveReview.error} />}
           {rejectReview.isError && <ErrorState error={rejectReview.error} />}
           {publish.isError && <ErrorState error={publish.error} />}
+          {updateModuleMutation.isError && <ErrorState error={updateModuleMutation.error} />}
+          {duplicateModuleMutation.isError && <ErrorState error={duplicateModuleMutation.error} />}
+          {archiveModuleMutation.isError && <ErrorState error={archiveModuleMutation.error} />}
+          {updateItemMutation.isError && <ErrorState error={updateItemMutation.error} />}
+          {duplicateItemMutation.isError && <ErrorState error={duplicateItemMutation.error} />}
+          {archiveItemMutation.isError && <ErrorState error={archiveItemMutation.error} />}
+          {reorderCurriculumMutation.isError && <ErrorState error={reorderCurriculumMutation.error} />}
         </div>
       )}
+
+      <Card className="mb-4">
+        <CardHeader
+          title="Course builder workspace"
+          subtitle="Tổng hợp readiness, dependency và preview learner từ draft hiện tại."
+          actions={<Badge value={d.status} label={d.status} />}
+        />
+        <div className="grid gap-4 p-5 xl:grid-cols-[320px_minmax(0,1fr)]">
+          <PublishConfidencePanel summary={workspaceSummary} previewUrl={previewUrl} />
+          <div className="min-w-0">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+                <PackageCheck size={18} className="text-brand-700" />
+                Dependency summary
+              </div>
+              <span className="text-xs font-semibold text-slate-500">
+                {workspaceSummary.blockers} blocker · {workspaceSummary.warnings} cảnh báo
+              </span>
+            </div>
+            <DependencySummaryPanel dependencies={workspaceSummary.dependencies} courseId={courseId} />
+          </div>
+        </div>
+      </Card>
+
+      <ReviewOperationsPanel
+        reviewState={reviewState}
+        reviewNote={reviewNote}
+        reviewChecklist={reviewChecklist}
+        history={reviewHistory.data}
+        historyLoading={reviewHistory.isLoading}
+        historyError={reviewHistory.isError}
+        historyErrorValue={reviewHistory.error}
+        canApprove={canApprove}
+        canApproveDecision={canApproveDecision}
+        canRejectDecision={canRejectDecision}
+        approvePending={approveReview.isPending}
+        rejectPending={rejectReview.isPending}
+        approveTitle={approveTitle}
+        rejectTitle={rejectTitle}
+        onReviewNoteChange={setReviewNote}
+        onChecklistChange={(id, checked) => setReviewChecklist((current) => ({ ...current, [id]: checked }))}
+        onApprove={() => approveReview.mutate()}
+        onReject={() => rejectReview.mutate()}
+      />
+
+      <VersionControlPanel
+        versions={versions.data}
+        selectedPublished={selectedPublishedVersion}
+        diff={versionDiff.data}
+        diffLoading={versionDiff.isLoading}
+        diffError={versionDiff.isError}
+        diffErrorValue={versionDiff.error}
+        rollbackNote={rollbackNote}
+        rollbackPending={rollbackVersion.isPending}
+        rollbackError={rollbackVersion.isError}
+        rollbackErrorValue={rollbackVersion.error}
+        currentVersionNo={d.currentVersionNo}
+        onSelectedVersionChange={setSelectedRollbackVersionNo}
+        onRollbackNoteChange={setRollbackNote}
+        onRollback={() => {
+          if (selectedPublishedVersion && window.confirm(`Rollback published v${selectedPublishedVersion.versionNo} thành draft mới?`)) {
+            rollbackVersion.mutate();
+          }
+        }}
+      />
 
       <Card className="mb-4">
         <CardHeader
@@ -832,8 +1637,8 @@ export function CourseDraftPage() {
               pending={readinessChecksPending}
               readyText="Course có thể được đưa vào hàng chờ review."
               blockedText={
-                d.status !== "DRAFT"
-                  ? "Course phải ở trạng thái draft để gửi duyệt."
+                d.status === "ARCHIVED"
+                  ? "Course đã archive nên không thể gửi duyệt."
                   : reviewState !== "DRAFT"
                     ? `Review hiện tại: ${reviewStateLabel(reviewState)}.`
                     : "Sửa các blocker nội dung trước khi gửi duyệt."
@@ -846,7 +1651,9 @@ export function CourseDraftPage() {
               pending={readinessChecksPending}
               readyText="Snapshot đã duyệt có thể publish cho learner."
               blockedText={
-                reviewState !== "APPROVED"
+                d.status === "ARCHIVED"
+                  ? "Course đã archive nên không thể publish."
+                  : reviewState !== "APPROVED"
                   ? "Reviewer cần duyệt course trước khi publish."
                   : "Sửa các blocker nội dung trước khi publish."
               }
@@ -857,27 +1664,15 @@ export function CourseDraftPage() {
         </div>
       </Card>
 
-      <div className="mb-6 grid gap-3 md:grid-cols-4">
-        <div className="rounded-lg border border-black/10 bg-white p-4">
-          <p className="text-sm text-slate-500">Chương</p>
-          <p className="mt-1 text-3xl font-bold text-slate-950">{modules.length}</p>
-        </div>
-        <div className="rounded-lg border border-black/10 bg-white p-4">
-          <p className="text-sm text-slate-500">Bài học</p>
-          <p className="mt-1 text-3xl font-bold text-slate-950">{lessonCount}</p>
-        </div>
-        <div className="rounded-lg border border-black/10 bg-white p-4">
-          <p className="text-sm text-slate-500">Phiên bản</p>
-          <p className="mt-1 text-3xl font-bold text-slate-950">v{d.currentVersionNo}</p>
-        </div>
-        <div className="rounded-lg border border-black/10 bg-white p-4">
-          <p className="text-sm text-slate-500">Review</p>
-          <p className="mt-2"><Badge value={d.reviewState ?? "DRAFT"} /></p>
-        </div>
-      </div>
+      <WorkspaceStats summary={workspaceSummary} moduleCount={modules.length} versionNo={d.currentVersionNo} />
+      {reorderCurriculumMutation.isPending && (
+        <Notice className="mb-4" title="Đang lưu thứ tự curriculum">
+          Module và bài học sẽ cập nhật sau khi server xác nhận.
+        </Notice>
+      )}
 
-      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
-        <CourseMap modules={modules} />
+      <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+        <CourseOutline modules={modules} issues={contentIssues} />
 
         <div className="space-y-5">
           {modules.length === 0 && (
@@ -886,10 +1681,17 @@ export function CourseDraftPage() {
             </Card>
           )}
 
-          {modules.map((module) => {
+          {modules.map((module, moduleIndex) => {
             const itemForm = formFor(module.moduleId);
             const files = filesFor(module.moduleId);
-            const items = [...(module.items ?? [])].sort((a, b) => a.position - b.position);
+            const moduleEdit = moduleEdits[module.moduleId] ?? {
+              title: module.title,
+              description: module.description ?? ""
+            };
+            const items = orderedModuleItems(module);
+            const canAttachVideo = itemForm.itemType === "LESSON" || itemForm.itemType === "VIDEO";
+            const canAttachDocuments = itemForm.itemType === "LESSON" || itemForm.itemType === "DOCUMENT";
+            const canAttachUrl = ["LESSON", "DOCUMENT", "LINK"].includes(itemForm.itemType);
 
             return (
               <Card key={module.moduleId} id={`module-${module.moduleId}`}>
@@ -901,8 +1703,94 @@ export function CourseDraftPage() {
                     </span>
                   }
                   subtitle={module.description}
-                  actions={<Badge value={module.status} />}
+                  actions={
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Badge value={module.status} />
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        className="w-8 px-0"
+                        type="button"
+                        title="Đưa chương lên"
+                        aria-label="Đưa chương lên"
+                        disabled={moduleIndex === 0 || reorderDisabled}
+                        onClick={() => reorderCurriculum(moveModuleOrder(modules, module.moduleId, "up"))}
+                      >
+                        <ArrowUp size={15} />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        className="w-8 px-0"
+                        type="button"
+                        title="Đưa chương xuống"
+                        aria-label="Đưa chương xuống"
+                        disabled={moduleIndex === modules.length - 1 || reorderDisabled}
+                        onClick={() => reorderCurriculum(moveModuleOrder(modules, module.moduleId, "down"))}
+                      >
+                        <ArrowDown size={15} />
+                      </Button>
+                      <Button variant="secondary" type="button" title="Sửa chương" onClick={() => startEditModule(module)}>
+                        <Pencil size={16} />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        title="Nhân bản chương"
+                        disabled={duplicateModuleMutation.isPending}
+                        onClick={() => duplicateModuleMutation.mutate(module.moduleId)}
+                      >
+                        <Copy size={16} />
+                      </Button>
+                      <Button
+                        variant="danger"
+                        type="button"
+                        title="Archive chương"
+                        disabled={archiveModuleMutation.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Archive chương "${module.title}" và toàn bộ bài học bên trong?`)) {
+                            archiveModuleMutation.mutate(module.moduleId);
+                          }
+                        }}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  }
                 />
+
+                {editingModuleId === module.moduleId && (
+                  <form className="border-t border-black/10 bg-brand-50/40 p-5" onSubmit={(event) => submitModuleEdit(event, module.moduleId)}>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField label="Tên chương" htmlFor={`module-edit-title-${module.moduleId}`}>
+                        <Input
+                          id={`module-edit-title-${module.moduleId}`}
+                          value={moduleEdit.title}
+                          onChange={(event) => updateModuleEdit(module.moduleId, { title: event.target.value })}
+                          required
+                        />
+                      </FormField>
+                      <FormField label="Mô tả chương" htmlFor={`module-edit-description-${module.moduleId}`}>
+                        <Textarea
+                          id={`module-edit-description-${module.moduleId}`}
+                          value={moduleEdit.description}
+                          onChange={(event) => updateModuleEdit(module.moduleId, { description: event.target.value })}
+                          rows={3}
+                        />
+                      </FormField>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button type="submit" disabled={updateModuleMutation.isPending}>
+                        <CheckCircle2 size={16} />
+                        {updateModuleMutation.isPending ? "Đang lưu..." : "Lưu chương"}
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={() => setEditingModuleId(null)}>
+                        <XCircle size={16} />
+                        Hủy
+                      </Button>
+                    </div>
+                  </form>
+                )}
 
                 <div className="space-y-3 p-5">
                   {items.length === 0 ? (
@@ -910,9 +1798,188 @@ export function CourseDraftPage() {
                       Chương này chưa có bài học.
                     </div>
                   ) : (
-                    items.map((item, itemIndex) => (
-                      <LessonCard key={item.itemId} item={item} displayIndex={itemIndex + 1} />
-                    ))
+                    items.map((item, itemIndex) => {
+                      const editForm = itemEdits[item.itemId] ?? formFromItem(item);
+                      const editCanAttachUrl = ["LESSON", "DOCUMENT", "LINK"].includes(editForm.itemType);
+                      return (
+                        <div key={item.itemId} className="space-y-3">
+                          <LessonCard
+                            item={item}
+                            displayIndex={itemIndex + 1}
+                            issues={issuesForItem(contentIssues, item.itemId)}
+                            actions={
+                              <>
+                                <Button
+                                  variant="secondary"
+                                  size="xs"
+                                  className="w-8 px-0"
+                                  type="button"
+                                  title="Đưa bài học lên"
+                                  aria-label="Đưa bài học lên"
+                                  disabled={itemIndex === 0 || reorderDisabled}
+                                  onClick={() => reorderCurriculum(moveItemOrder(modules, module.moduleId, item.itemId, "up"))}
+                                >
+                                  <ArrowUp size={15} />
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="xs"
+                                  className="w-8 px-0"
+                                  type="button"
+                                  title="Đưa bài học xuống"
+                                  aria-label="Đưa bài học xuống"
+                                  disabled={itemIndex === items.length - 1 || reorderDisabled}
+                                  onClick={() => reorderCurriculum(moveItemOrder(modules, module.moduleId, item.itemId, "down"))}
+                                >
+                                  <ArrowDown size={15} />
+                                </Button>
+                                <Button variant="secondary" type="button" title="Sửa bài học" onClick={() => startEditItem(item)}>
+                                  <Pencil size={16} />
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  type="button"
+                                  title="Nhân bản bài học"
+                                  disabled={duplicateItemMutation.isPending}
+                                  onClick={() => duplicateItemMutation.mutate({ moduleId: module.moduleId, itemId: item.itemId })}
+                                >
+                                  <Copy size={16} />
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  type="button"
+                                  title="Archive bài học"
+                                  disabled={archiveItemMutation.isPending}
+                                  onClick={() => {
+                                    if (window.confirm(`Archive bài học "${item.title}"?`)) {
+                                      archiveItemMutation.mutate({ moduleId: module.moduleId, itemId: item.itemId });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
+                              </>
+                            }
+                          />
+                          {editingItemId === item.itemId && (
+                            <form className="rounded-lg border border-brand-200 bg-brand-50/40 p-4" onSubmit={(event) => submitItemEdit(event, module.moduleId, item.itemId)}>
+                              <div className="grid gap-4 xl:grid-cols-2">
+                                <FormField label="Tên bài học" htmlFor={`item-edit-title-${item.itemId}`}>
+                                  <Input
+                                    id={`item-edit-title-${item.itemId}`}
+                                    value={editForm.title}
+                                    onChange={(event) => updateItemEdit(item.itemId, { title: event.target.value })}
+                                    required
+                                  />
+                                </FormField>
+                                <FormField label="Loại nội dung" htmlFor={`item-edit-type-${item.itemId}`}>
+                                  <Select
+                                    id={`item-edit-type-${item.itemId}`}
+                                    value={editForm.itemType}
+                                    onChange={(event) => updateItemEdit(item.itemId, itemTypeResetPatch(event.target.value))}
+                                  >
+                                    <option value="LESSON">Bài học</option>
+                                    <option value="VIDEO">Video</option>
+                                    <option value="DOCUMENT">Tài liệu</option>
+                                    <option value="LINK">Liên kết</option>
+                                    <option value="QUIZ">Bài thi</option>
+                                    <option value="ASSIGNMENT">Bài tập</option>
+                                  </Select>
+                                </FormField>
+                                <FormField label="Mô tả bài học" htmlFor={`item-edit-description-${item.itemId}`}>
+                                  <Textarea
+                                    id={`item-edit-description-${item.itemId}`}
+                                    value={editForm.description}
+                                    onChange={(event) => updateItemEdit(item.itemId, { description: event.target.value })}
+                                    rows={4}
+                                  />
+                                </FormField>
+                                <div className="grid gap-4">
+                                  <FormField label="Thời lượng ước tính" htmlFor={`item-edit-minutes-${item.itemId}`}>
+                                    <Input
+                                      id={`item-edit-minutes-${item.itemId}`}
+                                      type="number"
+                                      min={0}
+                                      value={editForm.estimatedMinutes}
+                                      onChange={(event) => updateItemEdit(item.itemId, { estimatedMinutes: event.target.value })}
+                                    />
+                                  </FormField>
+                                  {editCanAttachUrl && (
+                                    <FormField label="Liên kết nội dung" htmlFor={`item-edit-url-${item.itemId}`}>
+                                      <Input
+                                        id={`item-edit-url-${item.itemId}`}
+                                        value={editForm.contentUrl}
+                                        onChange={(event) => updateItemEdit(item.itemId, { contentUrl: event.target.value })}
+                                        placeholder="https://..."
+                                      />
+                                    </FormField>
+                                  )}
+                                  {editForm.itemType === "QUIZ" && (
+                                    <FormField label="Bài thi" htmlFor={`item-edit-ref-${item.itemId}`}>
+                                      <Select
+                                        id={`item-edit-ref-${item.itemId}`}
+                                        value={editForm.refId}
+                                        onChange={(event) => updateItemEdit(item.itemId, { refId: event.target.value })}
+                                        required
+                                      >
+                                        <option value="">Chọn bài thi</option>
+                                        {quizRows.map((quiz) => (
+                                          <option key={quiz.id} value={quiz.id}>{quiz.title} · {quiz.status ?? "DRAFT"}</option>
+                                        ))}
+                                        {editForm.refId && !quizRows.some((quiz) => quiz.id === editForm.refId) && (
+                                          <option value={editForm.refId}>Bài thi {shortId(editForm.refId)}</option>
+                                        )}
+                                      </Select>
+                                    </FormField>
+                                  )}
+                                  {editForm.itemType === "ASSIGNMENT" && (
+                                    <FormField label="Bài tập" htmlFor={`item-edit-ref-${item.itemId}`}>
+                                      <Select
+                                        id={`item-edit-ref-${item.itemId}`}
+                                        value={editForm.refId}
+                                        onChange={(event) => updateItemEdit(item.itemId, { refId: event.target.value })}
+                                        required
+                                      >
+                                        <option value="">Chọn bài tập</option>
+                                        {assignmentRows.map((assignment) => (
+                                          <option key={assignment.id} value={assignment.id}>{assignment.title} · {assignment.status ?? "DRAFT"}</option>
+                                        ))}
+                                        {editForm.refId && !assignmentRows.some((assignment) => assignment.id === editForm.refId) && (
+                                          <option value={editForm.refId}>Bài tập {shortId(editForm.refId)}</option>
+                                        )}
+                                      </Select>
+                                    </FormField>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                                  <input
+                                    type="checkbox"
+                                    checked={editForm.required}
+                                    onChange={(event) => updateItemEdit(item.itemId, { required: event.target.checked })}
+                                  />
+                                  Bắt buộc hoàn thành
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    type="submit"
+                                    disabled={updateItemMutation.isPending || ((editForm.itemType === "QUIZ" || editForm.itemType === "ASSIGNMENT") && !editForm.refId)}
+                                  >
+                                    <CheckCircle2 size={16} />
+                                    {updateItemMutation.isPending ? "Đang lưu..." : "Lưu bài học"}
+                                  </Button>
+                                  <Button type="button" variant="secondary" onClick={() => setEditingItemId(null)}>
+                                    <XCircle size={16} />
+                                    Hủy
+                                  </Button>
+                                </div>
+                              </div>
+                            </form>
+                          )}
+                        </div>
+                      );
+                    })
                   )}
                 </div>
 
@@ -922,7 +1989,7 @@ export function CourseDraftPage() {
                     <h3 className="font-bold text-slate-950">Thêm bài học</h3>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-4 xl:grid-cols-2">
                     <FormField label="Tên bài học" htmlFor={`item-title-${module.moduleId}`}>
                       <Input
                         id={`item-title-${module.moduleId}`}
@@ -937,7 +2004,7 @@ export function CourseDraftPage() {
                       <Select
                         id={`item-type-${module.moduleId}`}
                         value={itemForm.itemType}
-                        onChange={(e) => updateItemForm(module.moduleId, { itemType: e.target.value, refId: "" })}
+                        onChange={(e) => updateItemForm(module.moduleId, itemTypeResetPatch(e.target.value))}
                       >
                         <option value="LESSON">Bài học</option>
                         <option value="VIDEO">Video</option>
@@ -969,14 +2036,16 @@ export function CourseDraftPage() {
                         />
                       </FormField>
 
-                      <FormField label="Liên kết nội dung" htmlFor={`item-url-${module.moduleId}`} hint="Dùng cho bài dạng link hoặc tài nguyên bên ngoài.">
-                        <Input
-                          id={`item-url-${module.moduleId}`}
-                          value={itemForm.contentUrl}
-                          onChange={(e) => updateItemForm(module.moduleId, { contentUrl: e.target.value })}
-                          placeholder="https://..."
-                        />
-                      </FormField>
+                      {canAttachUrl && (
+                        <FormField label="Liên kết nội dung" htmlFor={`item-url-${module.moduleId}`} hint="Dùng cho bài dạng link hoặc tài nguyên bên ngoài.">
+                          <Input
+                            id={`item-url-${module.moduleId}`}
+                            value={itemForm.contentUrl}
+                            onChange={(e) => updateItemForm(module.moduleId, { contentUrl: e.target.value })}
+                            placeholder="https://..."
+                          />
+                        </FormField>
+                      )}
 
                       {itemForm.itemType === "QUIZ" && (
                         <FormField label="Bài thi" htmlFor={`item-ref-${module.moduleId}`} hint="Chọn quiz đã thuộc khóa học này.">
@@ -1025,26 +2094,30 @@ export function CourseDraftPage() {
                       )}
                     </div>
 
-                    <UploadTile
-                      id={`item-video-${module.moduleId}`}
-                      title="Upload video"
-                      description="Tải video bài học lên media-service, sau đó lưu video ID vào lesson."
-                      icon={<UploadCloud size={20} />}
-                      accept="video/*"
-                      selectedText={files.videoFile?.name}
-                      onChange={(selected) => updateFiles(module.moduleId, { videoFile: selected?.[0] })}
-                    />
+                    {canAttachVideo && (
+                      <UploadTile
+                        id={`item-video-${module.moduleId}`}
+                        title="Tải video"
+                        description="Tải video bài học lên kho media, sau đó gắn video vào lesson."
+                        icon={<UploadCloud size={20} />}
+                        accept="video/*"
+                        selectedText={files.videoFile?.name}
+                        onChange={(selected) => updateFiles(module.moduleId, { videoFile: selected?.[0] })}
+                      />
+                    )}
 
-                    <UploadTile
-                      id={`item-docs-${module.moduleId}`}
-                      title="Upload tài liệu"
-                      description="PDF, slide, workbook hoặc tài liệu bổ trợ cho bài học."
-                      icon={<FileText size={20} />}
-                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,text/*,application/pdf"
-                      multiple
-                      selectedText={files.documentFiles.length > 0 ? `${files.documentFiles.length} file đã chọn` : undefined}
-                      onChange={(selected) => updateFiles(module.moduleId, { documentFiles: Array.from(selected ?? []) })}
-                    />
+                    {canAttachDocuments && (
+                      <UploadTile
+                        id={`item-docs-${module.moduleId}`}
+                        title="Tải tài liệu"
+                        description="PDF, slide, workbook hoặc tài liệu bổ trợ cho bài học."
+                        icon={<FileText size={20} />}
+                        accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,text/*,application/pdf"
+                        multiple
+                        selectedText={files.documentFiles.length > 0 ? `${files.documentFiles.length} file đã chọn` : undefined}
+                        onChange={(selected) => updateFiles(module.moduleId, { documentFiles: Array.from(selected ?? []) })}
+                      />
+                    )}
                   </div>
 
                   <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

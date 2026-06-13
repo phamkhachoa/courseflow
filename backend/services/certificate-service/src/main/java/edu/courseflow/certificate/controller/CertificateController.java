@@ -1,6 +1,7 @@
 package edu.courseflow.certificate.controller;
 
 import edu.courseflow.certificate.service.CertificateService;
+import edu.courseflow.certificate.dto.CertificateEligibilityDto;
 import edu.courseflow.certificate.dto.CertificateVerificationDto;
 import edu.courseflow.certificate.dto.IssueCertificateRequestDto;
 import edu.courseflow.certificate.dto.RevokeCertificateRequestDto;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -52,6 +54,18 @@ public class CertificateController {
     @GetMapping("/mine")
     public List<CertificateVerificationDto> mine(CurrentUser user) {
         return certificates.listMine(authenticatedActorId(user));
+    }
+
+    @GetMapping("/eligibility")
+    public CertificateEligibilityDto eligibility(@RequestParam UUID courseId,
+                                                 @RequestParam String studentId,
+                                                 CurrentUser user) {
+        boolean owner = user != null && user.id() != null && String.valueOf(user.id()).equals(studentId);
+        if (!owner) {
+            requirePrivileged(user);
+            courseAccess.requireCourseStaffAccess(user, courseId);
+        }
+        return certificates.eligibility(studentId, courseId);
     }
 
     /**

@@ -74,6 +74,11 @@ export type QuizAttemptDetail = {
   answers: QuizAttemptAnswer[];
 };
 
+export type StartAttemptResponse = {
+  attempt: QuizAttempt;
+  questions: StudentQuizQuestion[];
+};
+
 // Answers map question id -> answer JSON. For choice questions the backend
 // grades by option label (A/B/C), so the value is label or label[].
 export type QuizAnswers = Record<string, unknown>;
@@ -98,7 +103,7 @@ export function useStartAttempt(quizId: string) {
   return useMutation({
     // studentId is taken from the gateway identity, never sent in the body.
     mutationFn: () =>
-      clientFetch<QuizAttempt>(`/v1/quizzes/${quizId}/attempts`, {
+      clientFetch<StartAttemptResponse>(`/v1/quizzes/${quizId}/attempts`, {
         method: "POST"
       })
   });

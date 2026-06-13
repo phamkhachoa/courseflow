@@ -19,10 +19,7 @@ spring:
     contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-courseflow:
-  security:
-    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
-  entitlement:
+courseflow:  entitlement:
     enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
     course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
 management:

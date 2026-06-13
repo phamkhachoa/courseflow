@@ -34,7 +34,7 @@ class VideoControllerAuthzTest {
 
     @BeforeEach
     void setUp() {
-        controller = new VideoController(videos, courseAccess, "service-token");
+        controller = new VideoController(videos, courseAccess);
     }
 
     @Test

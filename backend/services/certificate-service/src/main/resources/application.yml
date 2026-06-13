@@ -30,11 +30,12 @@ spring:
 courseflow:
   certificate:
     public-base-url: ${CERTIFICATE_PUBLIC_BASE_URL:http://localhost:3000/certificates/verify}
+    course-service-url: ${CERTIFICATE_COURSE_SERVICE_URL:${COURSE_SERVICE_URL:http://localhost:8083}}
     enrollment-service-url: ${CERTIFICATE_ENROLLMENT_SERVICE_URL:${ENROLLMENT_SERVICE_URL:http://localhost:8084}}
+    eligibility-timeout-ms: ${CERTIFICATE_ELIGIBILITY_TIMEOUT_MS:1500}
     gradebook-service-url: ${CERTIFICATE_GRADEBOOK_SERVICE_URL:${GRADEBOOK_SERVICE_URL:http://localhost:8094}}
     signing-secret: ${CERTIFICATE_SIGNING_SECRET:${COURSEFLOW_CERTIFICATE_SIGNING_SECRET:}}
   security:
-    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
 management:
   endpoints:
     web:

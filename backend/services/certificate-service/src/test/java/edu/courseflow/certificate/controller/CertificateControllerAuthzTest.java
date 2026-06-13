@@ -1,8 +1,10 @@
 package edu.courseflow.certificate.controller;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import edu.courseflow.certificate.dto.CertificateEligibilityDto;
 import edu.courseflow.certificate.dto.CertificateVerificationDto;
 import edu.courseflow.certificate.dto.IssueCertificateRequestDto;
 import edu.courseflow.certificate.dto.RevokeCertificateRequestDto;
@@ -11,6 +13,7 @@ import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,6 +72,32 @@ class CertificateControllerAuthzTest {
         controller.verify("CF-VERIFY", instructor);
 
         verify(courseAccess).requireCourseStaffAccess(instructor, COURSE_ID);
+    }
+
+    @Test
+    void ownerCanReadEligibilityWithoutStaffAccess() {
+        CurrentUser learner = new CurrentUser(4L, "learner@courseflow.local", "STUDENT", Set.of("STUDENT"));
+        when(certificates.eligibility("4", COURSE_ID)).thenReturn(new CertificateEligibilityDto(
+                Instant.parse("2026-06-13T00:00:00Z"),
+                COURSE_ID.toString(),
+                "4",
+                false,
+                "FINAL_GRADE_NOT_FINALIZED",
+                true,
+                false,
+                true,
+                false,
+                null,
+                new BigDecimal("60.00"),
+                null,
+                null,
+                null,
+                null,
+                List.of()));
+
+        controller.eligibility(COURSE_ID, "4", learner);
+
+        verifyNoInteractions(courseAccess);
     }
 
     private static CurrentUser instructor() {

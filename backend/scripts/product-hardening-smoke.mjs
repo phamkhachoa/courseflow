@@ -9,7 +9,10 @@
  *   - auth through /api/v1/auth/login
  *   - public catalog read
  *   - protected module content access
- *   - admin authoring review + publish workflow
+ *   - admin authoring readiness review + publish workflow
+ *   - media document/video readiness through MinIO-backed upload URLs
+ *   - quiz and assignment references frozen into the published curriculum snapshot
+ *   - negative readiness and entitlement checks around draft refs and media downloads
  *   - enrollment creation and learner module/progress access
  *   - quiz attempt snapshot, auto-grading and gradebook ingestion
  *   - final grade publication and automatic certificate issuance
@@ -70,6 +73,7 @@ async function main() {
   });
   record("admin create disposable user", Boolean(user.id), `userId=${user.id}`);
 
+  await assertUnreadyReferencesBlocked();
   await runGoldenLearningFlow(user);
 
   const notification = await postAdmin("/admin/v1/notifications", {
@@ -130,20 +134,79 @@ async function runGoldenLearningFlow(user) {
   const draftModuleId = draftModule?.moduleId;
   record("authoring create module", Boolean(draftModuleId), `moduleId=${draftModuleId ?? "missing"}`);
 
+  const refs = await createReadyLearningRefs(courseId);
+
   draft = await postAdmin(
     `/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(draftModuleId)}/items`,
     {
-      itemType: "LESSON",
-      refId: `smoke-lesson-${RUN_ID}`,
-      title: "Smoke lesson",
-      description: "Disposable lesson for learner progress verification.",
-      contentUrl: "https://example.com/courseflow-smoke",
-      estimatedMinutes: 5,
+      itemType: "DOCUMENT",
+      title: "Smoke document",
+      description: "Disposable required document for learner progress verification.",
+      documentMediaIds: [refs.document.id],
+      estimatedMinutes: 2,
       required: true
     }
   );
-  const draftItem = last(draft.modules?.find((module) => module.moduleId === draftModuleId)?.items);
-  record("authoring create required item", Boolean(draftItem?.itemId), `itemId=${draftItem?.itemId ?? "missing"}`);
+  const draftDocumentItem = last(draft.modules?.find((module) => module.moduleId === draftModuleId)?.items);
+  record(
+    "authoring create required document item",
+    Boolean(draftDocumentItem?.itemId && draftDocumentItem?.documentMediaIds?.includes(refs.document.id)),
+    `itemId=${draftDocumentItem?.itemId ?? "missing"} mediaId=${refs.document.id}`
+  );
+
+  draft = await postAdmin(
+    `/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(draftModuleId)}/items`,
+    {
+      itemType: "VIDEO",
+      title: "Smoke video",
+      description: "Disposable ready video for publish readiness verification.",
+      videoMediaId: refs.video.id,
+      estimatedMinutes: 1,
+      required: false
+    }
+  );
+  const draftVideoItem = last(draft.modules?.find((module) => module.moduleId === draftModuleId)?.items);
+  record(
+    "authoring create ready video item",
+    draftVideoItem?.videoMediaId === refs.video.id,
+    `itemId=${draftVideoItem?.itemId ?? "missing"} videoId=${refs.video.id}`
+  );
+
+  draft = await postAdmin(
+    `/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(draftModuleId)}/items`,
+    {
+      itemType: "QUIZ",
+      refId: refs.quiz.id,
+      title: "Smoke quiz",
+      description: "Disposable published quiz linked before course publish.",
+      estimatedMinutes: 3,
+      required: false
+    }
+  );
+  const draftQuizItem = last(draft.modules?.find((module) => module.moduleId === draftModuleId)?.items);
+  record(
+    "authoring create published quiz item",
+    draftQuizItem?.refId === refs.quiz.id,
+    `itemId=${draftQuizItem?.itemId ?? "missing"} refId=${draftQuizItem?.refId ?? "missing"} quizId=${refs.quiz.id}`
+  );
+
+  draft = await postAdmin(
+    `/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(draftModuleId)}/items`,
+    {
+      itemType: "ASSIGNMENT",
+      refId: refs.assignment.id,
+      title: "Smoke assignment",
+      description: "Disposable published assignment linked before course publish.",
+      estimatedMinutes: 4,
+      required: false
+    }
+  );
+  const draftAssignmentItem = last(draft.modules?.find((module) => module.moduleId === draftModuleId)?.items);
+  record(
+    "authoring create published assignment item",
+    draftAssignmentItem?.refId === refs.assignment.id,
+    `itemId=${draftAssignmentItem?.itemId ?? "missing"} refId=${draftAssignmentItem?.refId ?? "missing"} assignmentId=${refs.assignment.id}`
+  );
 
   draft = await postAdmin(`/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/submit-review`);
   record("authoring submit review", draft.reviewState === "IN_REVIEW", `reviewState=${draft.reviewState}`);
@@ -156,7 +219,21 @@ async function runGoldenLearningFlow(user) {
   const published = await postAdmin(`/admin/v1/courses/${encodeURIComponent(courseId)}/publish`, {});
   record("publish disposable course", published.status === "PUBLISHED", `status=${published.status}`);
 
-  const quiz = await createSmokeQuiz(courseId);
+  const learnerSession = await post("/v1/auth/login", {
+    email: DISPOSABLE_EMAIL,
+    password: DISPOSABLE_PASSWORD
+  });
+  const learnerToken = learnerSession.accessToken;
+  record("learner login", Boolean(learnerToken), "Access token issued");
+
+  await expectStatus(
+    "learner cannot download snapshot document before enrollment",
+    "GET",
+    `/v1/courses/${encodeURIComponent(courseId)}/media/assets/${encodeURIComponent(refs.document.id)}/download-url`,
+    undefined,
+    learnerToken,
+    [403]
+  );
 
   const enrollment = await postAdmin("/admin/v1/enrollments", {
     courseId,
@@ -164,12 +241,14 @@ async function runGoldenLearningFlow(user) {
   });
   record("admin enroll disposable learner", enrollment.status === "ACTIVE", `enrollmentId=${enrollment.id}`);
 
-  const learnerSession = await post("/v1/auth/login", {
-    email: DISPOSABLE_EMAIL,
-    password: DISPOSABLE_PASSWORD
-  });
-  const learnerToken = learnerSession.accessToken;
-  record("learner login", Boolean(learnerToken), "Access token issued");
+  const nextAction = await getBearer("/v1/learning/next-action", learnerToken);
+  record(
+    "learner next action bff",
+    ["START_COURSE", "CONTINUE_ITEM"].includes(nextAction.kind)
+      && nextAction.course?.id === courseId
+      && Boolean(nextAction.href),
+    `kind=${nextAction.kind ?? "missing"} href=${nextAction.href ?? "missing"}`
+  );
 
   const learnerModules = await getBearer(`/v1/courses/${encodeURIComponent(courseId)}/modules`, learnerToken);
   const learnerModule = learnerModules.find((module) => module.id === draftModuleId) ?? learnerModules[0];
@@ -179,6 +258,30 @@ async function runGoldenLearningFlow(user) {
     "learner reads published modules",
     Boolean(learnerModule?.id && learnerItemId),
     `${learnerModules.length} module(s) returned`
+  );
+  record(
+    "published snapshot contains ready refs",
+    moduleContainsRefs(learnerModule, refs),
+    `${learnerModule?.items?.length ?? 0} item(s) in learner snapshot`
+  );
+
+  const documentDownload = await getBearer(
+    `/v1/courses/${encodeURIComponent(courseId)}/media/assets/${encodeURIComponent(refs.document.id)}/download-url`,
+    learnerToken
+  );
+  record(
+    "learner downloads snapshot document",
+    Boolean(documentDownload.downloadUrl && documentDownload.storageKey),
+    `storageKey=${documentDownload.storageKey ?? "missing"}`
+  );
+
+  await expectStatus(
+    "learner cannot download document outside snapshot",
+    "GET",
+    `/v1/courses/${encodeURIComponent(courseId)}/media/assets/${encodeURIComponent(refs.unreferencedDocument.id)}/download-url`,
+    undefined,
+    learnerToken,
+    [403]
   );
 
   const itemProgress = await postBearer(
@@ -206,16 +309,151 @@ async function runGoldenLearningFlow(user) {
     `status=${completedEnrollment.status}`
   );
 
-  await runAssessmentCredentialFlow(courseId, quiz, user, learnerToken);
+  await runAssessmentCredentialFlow(courseId, refs.quiz, user, learnerToken);
 
   const archived = await postAdmin(`/admin/v1/courses/${encodeURIComponent(courseId)}/archive`, {});
   record("archive disposable course", archived.status === "ARCHIVED", `status=${archived.status}`);
 }
 
-async function createSmokeQuiz(courseId) {
-  let quiz = await postAdmin("/admin/v1/quizzes", {
+async function assertUnreadyReferencesBlocked() {
+  const code = `SMKN${RUN_ID.slice(-8)}`;
+  const slug = `smoke-negative-${RUN_ID.toLowerCase()}`;
+  let draft = await postAdmin("/admin/v1/authoring/courses", {
+    code,
+    title: `Smoke Negative Refs ${RUN_ID}`,
+    slug,
+    summary: "Disposable negative-readiness course created by the Product Hardening smoke test.",
+    departmentId: DEPARTMENT_ID,
+    level: "BEGINNER"
+  });
+  const courseId = draft.courseId;
+  record("negative authoring create disposable course", Boolean(courseId), `courseId=${courseId}`);
+
+  draft = await postAdmin(`/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/modules`, {
+    title: "Smoke unready references",
+    description: "Disposable module for readiness gate verification.",
+    status: "DRAFT"
+  });
+  const moduleId = last(draft.modules)?.moduleId;
+  record("negative authoring create module", Boolean(moduleId), `moduleId=${moduleId ?? "missing"}`);
+
+  const draftQuiz = await createDraftSmokeQuiz(courseId, "Negative draft quiz");
+  const draftAssignment = await createSmokeAssignment(courseId, { title: "Negative draft assignment", publish: false });
+
+  draft = await postAdmin(
+    `/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/items`,
+    {
+      itemType: "QUIZ",
+      refId: draftQuiz.id,
+      title: "Draft quiz should block readiness",
+      description: "This item intentionally points at a draft quiz.",
+      required: true
+    }
+  );
+  const draftQuizItem = last(draft.modules?.find((module) => module.moduleId === moduleId)?.items);
+  record(
+    "negative authoring link draft quiz",
+    draftQuizItem?.refId === draftQuiz.id,
+    `itemId=${draftQuizItem?.itemId ?? "missing"} refId=${draftQuizItem?.refId ?? "missing"} quizId=${draftQuiz.id}`
+  );
+
+  draft = await postAdmin(
+    `/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/modules/${encodeURIComponent(moduleId)}/items`,
+    {
+      itemType: "ASSIGNMENT",
+      refId: draftAssignment.id,
+      title: "Draft assignment should block readiness",
+      description: "This item intentionally points at a draft assignment.",
+      required: false
+    }
+  );
+  record(
+    "negative authoring link draft assignment",
+    last(draft.modules?.find((module) => module.moduleId === moduleId)?.items)?.refId === draftAssignment.id,
+    `assignmentId=${draftAssignment.id}`
+  );
+
+  await expectStatus(
+    "review blocks draft refs",
+    "POST",
+    `/admin/v1/authoring/courses/${encodeURIComponent(courseId)}/submit-review`,
+    undefined,
+    adminToken,
+    [400]
+  );
+
+  await expectStatus(
+    "publish blocks unapproved draft",
+    "POST",
+    `/admin/v1/courses/${encodeURIComponent(courseId)}/publish`,
+    {},
+    adminToken,
+    [400]
+  );
+
+  const archived = await postAdmin(`/admin/v1/courses/${encodeURIComponent(courseId)}/archive`, {});
+  record("archive negative course", archived.status === "ARCHIVED", `status=${archived.status}`);
+}
+
+async function createReadyLearningRefs(courseId) {
+  const document = await createSmokeDocument("smoke-document.pdf", "Snapshot document");
+  const unreferencedDocument = await createSmokeDocument("smoke-outside-snapshot.pdf", "Outside snapshot document");
+  const video = await createSmokeVideo(courseId);
+  const quiz = await createSmokeQuiz(courseId);
+  const assignment = await createSmokeAssignment(courseId);
+  return { document, unreferencedDocument, video, quiz, assignment };
+}
+
+async function createSmokeDocument(fileName, label) {
+  const contentType = "application/pdf";
+  const bytes = textBytes(`%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n% ${label} ${RUN_ID}\n%%EOF\n`);
+  const upload = await postAdmin("/admin/v1/media/assets/upload-url", {
+    fileName,
+    contentType
+  });
+  record(`media presign ${label}`, Boolean(upload.storageKey && upload.uploadUrl), `storageKey=${upload.storageKey ?? "missing"}`);
+
+  await putPresignedObject(`media upload ${label}`, upload.uploadUrl, bytes, contentType);
+
+  const asset = await postAdmin("/admin/v1/media/assets", {
+    fileName,
+    contentType,
+    storageKey: upload.storageKey,
+    sizeBytes: bytes.byteLength
+  });
+  record(`media register ${label}`, Boolean(asset.id), `mediaId=${asset.id ?? "missing"}`);
+  return asset;
+}
+
+async function createSmokeVideo(courseId) {
+  const contentType = "video/mp4";
+  const bytes = textBytes(`courseflow smoke mp4 placeholder ${RUN_ID}\n`);
+  const upload = await postAdmin("/admin/v1/media/videos/upload-url", {
+    fileName: "smoke-video.mp4",
+    contentType
+  });
+  record("video presign source upload", Boolean(upload.storageKey && upload.uploadUrl), `storageKey=${upload.storageKey ?? "missing"}`);
+
+  await putPresignedObject("video upload source object", upload.uploadUrl, bytes, contentType);
+
+  const video = await postAdmin("/admin/v1/media/videos", {
     courseId,
-    title: `Smoke checkpoint ${RUN_ID}`,
+    title: `Smoke Video ${RUN_ID}`,
+    sourceStorageKey: upload.storageKey,
+    durationSeconds: 1
+  });
+  record(
+    "video register ready asset",
+    Boolean(video.id) && video.status === "READY",
+    `videoId=${video.id ?? "missing"} status=${video.status ?? "missing"}`
+  );
+  return video;
+}
+
+async function createDraftSmokeQuiz(courseId, titlePrefix = "Smoke checkpoint") {
+  const quiz = await postAdmin("/admin/v1/quizzes", {
+    courseId,
+    title: `${titlePrefix} ${RUN_ID}`,
     durationMinutes: 5,
     attemptsAllowed: 1,
     randomizeQuestions: false,
@@ -227,6 +465,11 @@ async function createSmokeQuiz(courseId) {
     status: "DRAFT"
   });
   record("quiz create draft", Boolean(quiz.id), `quizId=${quiz.id ?? "missing"}`);
+  return quiz;
+}
+
+async function createSmokeQuiz(courseId) {
+  let quiz = await createDraftSmokeQuiz(courseId);
 
   quiz = await postAdmin(`/admin/v1/quizzes/${encodeURIComponent(quiz.id)}/questions`, {
     type: "MULTIPLE_CHOICE",
@@ -259,6 +502,32 @@ async function createSmokeQuiz(courseId) {
   });
   record("quiz publish", quiz.status === "PUBLISHED", `status=${quiz.status}`);
   return quiz;
+}
+
+async function createSmokeAssignment(courseId, options = {}) {
+  let assignment = await postAdmin("/admin/v1/assignments", {
+    courseId,
+    title: `${options.title ?? "Smoke assignment"} ${RUN_ID}`,
+    assignmentType: "TEXT",
+    instructions: "Disposable assignment for Product Hardening smoke readiness.",
+    dueAt: "2099-01-01T00:00:00Z",
+    maxScore: 10,
+    submissionTypes: "TEXT",
+    maxAttempts: 1,
+    allowResubmission: false,
+    latePenaltyPercent: 0,
+    latePenaltyInterval: "NONE",
+    latePenaltyMaxPercent: 0
+  });
+  record("assignment create draft", Boolean(assignment.id), `assignmentId=${assignment.id ?? "missing"}`);
+
+  if (options.publish === false) {
+    return assignment;
+  }
+
+  assignment = await postAdmin(`/admin/v1/assignments/${encodeURIComponent(assignment.id)}/publish`, {});
+  record("assignment publish", assignment.status === "PUBLISHED", `status=${assignment.status}`);
+  return assignment;
 }
 
 async function runAssessmentCredentialFlow(courseId, quiz, user, learnerToken) {
@@ -428,6 +697,25 @@ async function postBearer(path, body, bearerToken) {
 }
 
 async function request(method, path, body, bearerToken) {
+  const result = await requestStatus(method, path, body, bearerToken);
+  if (!result.ok) {
+    throw new Error(`${method} ${path} failed: HTTP ${result.status} ${result.detail ?? ""}`.trim());
+  }
+  return unwrap(result.payload);
+}
+
+async function expectStatus(name, method, path, body, bearerToken, expectedStatuses) {
+  const result = await requestStatus(method, path, body, bearerToken);
+  const statuses = Array.isArray(expectedStatuses) ? expectedStatuses : [expectedStatuses];
+  record(
+    name,
+    statuses.includes(result.status),
+    `HTTP ${result.status}${result.detail ? ` ${truncate(result.detail, 140)}` : ""}`
+  );
+  return result;
+}
+
+async function requestStatus(method, path, body, bearerToken) {
   const headers = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (bearerToken) headers.Authorization = `Bearer ${bearerToken}`;
@@ -439,11 +727,12 @@ async function request(method, path, body, bearerToken) {
   });
   const text = await response.text();
   const payload = text ? parseJson(text, path) : null;
-  if (!response.ok) {
-    const detail = payload?.detail ?? payload?.message ?? text;
-    throw new Error(`${method} ${path} failed: HTTP ${response.status} ${detail ?? ""}`.trim());
-  }
-  return unwrap(payload);
+  return {
+    ok: response.ok,
+    status: response.status,
+    payload,
+    detail: responseDetail(payload, text)
+  };
 }
 
 async function assertDirectIdentitySpoofRejected() {
@@ -484,8 +773,15 @@ function parseJson(text, path) {
   try {
     return JSON.parse(text);
   } catch (error) {
-    throw new Error(`Response from ${path} is not JSON: ${text.slice(0, 160)}`);
+    return { message: `Response from ${path} is not JSON: ${text.slice(0, 160)}` };
   }
+}
+
+function responseDetail(payload, text) {
+  if (payload && typeof payload === "object") {
+    return payload.detail ?? payload.message ?? payload.error ?? "";
+  }
+  return text ?? "";
 }
 
 function unwrap(payload) {
@@ -551,6 +847,34 @@ function hasAnyKey(value, keys) {
     return false;
   }
   return Object.entries(value).some(([key, child]) => keys.has(key) || hasAnyKey(child, keys));
+}
+
+async function putPresignedObject(name, uploadUrl, bytes, contentType) {
+  const response = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: bytes
+  });
+  const detail = response.ok ? "" : await response.text();
+  record(name, response.ok, `HTTP ${response.status}${detail ? ` ${truncate(detail, 140)}` : ""}`);
+}
+
+function moduleContainsRefs(module, refs) {
+  const items = Array.isArray(module?.items) ? module.items : [];
+  const documentFound = items.some((item) => item.documentMediaIds?.includes(refs.document.id));
+  const videoFound = items.some((item) => item.videoMediaId === refs.video.id);
+  const quizFound = items.some((item) => item.itemId === refs.quiz.id || item.refId === refs.quiz.id);
+  const assignmentFound = items.some((item) => item.itemId === refs.assignment.id || item.refId === refs.assignment.id);
+  return documentFound && videoFound && quizFound && assignmentFound;
+}
+
+function textBytes(value) {
+  return new TextEncoder().encode(value);
+}
+
+function truncate(value, maxLength) {
+  const text = String(value);
+  return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
 }
 
 function record(name, passed, detail) {

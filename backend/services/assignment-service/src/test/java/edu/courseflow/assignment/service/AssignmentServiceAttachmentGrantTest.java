@@ -50,13 +50,15 @@ class AssignmentServiceAttachmentGrantTest {
     @Mock
     private CourseAccessClient courseAccess;
     @Mock
+    private LearningAccessClient learningAccess;
+    @Mock
     private AttachmentUploadGrantJpaRepository uploadGrants;
 
     private AssignmentService service;
 
     @BeforeEach
     void setUp() {
-        service = new AssignmentService(assignments, storage, new ObjectMapper(), courseAccess, uploadGrants);
+        service = new AssignmentService(assignments, storage, new ObjectMapper(), courseAccess, learningAccess, uploadGrants);
     }
 
     @Test
@@ -71,6 +73,7 @@ class AssignmentServiceAttachmentGrantTest {
                 new edu.courseflow.assignment.dto.AssignmentDtos.RequestUploadUrlDto("answer.pdf", "application/pdf"));
 
         ArgumentCaptor<AttachmentUploadGrant> captor = ArgumentCaptor.forClass(AttachmentUploadGrant.class);
+        verify(learningAccess).requireSourceAccess(COURSE_ID, STUDENT_ID, "ASSIGNMENT", ASSIGNMENT_ID);
         verify(uploadGrants).save(captor.capture());
         assertThat(captor.getValue().getAssignmentId()).isEqualTo(ASSIGNMENT_ID);
         assertThat(captor.getValue().getStudentId()).isEqualTo(STUDENT_ID);
@@ -111,6 +114,7 @@ class AssignmentServiceAttachmentGrantTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AttachmentRef>> attachmentsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(learningAccess).requireSourceAccess(COURSE_ID, STUDENT_ID, "ASSIGNMENT", ASSIGNMENT_ID);
         verify(assignments).insertSubmission(
                 any(),
                 any(),

@@ -6,6 +6,7 @@ import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.ForbiddenException;
 import edu.courseflow.commonlibrary.security.CourseAccessClient;
+import edu.courseflow.commonlibrary.security.InternalJwtService;
 import edu.courseflow.commonlibrary.storage.ObjectStorageClient;
 import edu.courseflow.commonlibrary.storage.ObjectStorageClient.PresignedUrl;
 import edu.courseflow.media.dto.MediaDtos.PresignedUploadDto;
@@ -61,7 +62,7 @@ public class VideoService {
     private final ObjectStorageClient storage;
     private final CourseAccessClient courseAccess;
     private final RestClient courseClient;
-    private final String serviceToken;
+    private final InternalJwtService internalJwt;
     private final String storageProvider;
     private final String cdnBaseUrl;
     private final long signedUrlTtlSeconds;
@@ -75,7 +76,7 @@ public class VideoService {
                         CourseAccessClient courseAccess,
                         RestClient.Builder restClientBuilder,
                         @Value("${courseflow.entitlement.course-service-url:http://localhost:8083}") String courseServiceUrl,
-                        @Value("${courseflow.security.service-token:}") String serviceToken,
+                        InternalJwtService internalJwt,
                         @Value("${courseflow.storage.provider:minio}") String storageProvider,
                         @Value("${courseflow.media.cdn-base-url:https://cdn.local/media}") String cdnBaseUrl,
                         @Value("${courseflow.media.signed-url-ttl-seconds:3600}") long signedUrlTtlSeconds,
@@ -87,7 +88,7 @@ public class VideoService {
         this.storage = storage;
         this.courseAccess = courseAccess;
         this.courseClient = restClientBuilder.baseUrl(courseServiceUrl).build();
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
+        this.internalJwt = internalJwt;
         this.storageProvider = storageProvider;
         this.cdnBaseUrl = cdnBaseUrl;
         this.signedUrlTtlSeconds = signedUrlTtlSeconds;
@@ -237,14 +238,10 @@ public class VideoService {
         if (video.courseId() == null || video.courseId().isBlank()) {
             return;
         }
-        if (serviceToken.isBlank()) {
-            log.warn("Skipping course progress update for video {} because service token is not configured", video.id());
-            return;
-        }
         try {
             courseClient.post()
                     .uri("/internal/courses/{courseId}/modules/items/progress/verified", video.courseId())
-                    .header(CourseAccessClient.SERVICE_TOKEN_HEADER, serviceToken)
+                    .headers(internalJwt::applyServiceToken)
                     .body(Map.of(
                             "studentId", userId,
                             "sourceType", "VIDEO",

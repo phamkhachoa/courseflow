@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.SubmitAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmissionDto;
 import edu.courseflow.assignment.service.AssignmentService;
 import edu.courseflow.commonlibrary.security.CourseAccessClient;
@@ -38,7 +39,7 @@ class AssignmentControllerAuthzTest {
 
     @BeforeEach
     void setUp() {
-        controller = new AssignmentController(assignments, courseAccess, "service-token");
+        controller = new AssignmentController(assignments, courseAccess);
     }
 
     @Test
@@ -91,6 +92,19 @@ class AssignmentControllerAuthzTest {
 
         verify(courseAccess).requireCourseStaffAccess(instructor, COURSE_ID);
         verify(assignments).listSubmissions(ASSIGNMENT_ID, "4");
+    }
+
+    @Test
+    void learnerSubmitRequiresCourseAccessBeforeServiceSubmit() {
+        CurrentUser student = student();
+        SubmitAssignmentRequestDto request = new SubmitAssignmentRequestDto("Done", null, List.of());
+        when(assignments.get(ASSIGNMENT_ID)).thenReturn(assignment());
+        when(assignments.submit(ASSIGNMENT_ID, "4", request)).thenReturn(submission("4"));
+
+        controller.submit(ASSIGNMENT_ID, request, student);
+
+        verify(courseAccess).requireCourseAccess(student, COURSE_ID);
+        verify(assignments).submit(ASSIGNMENT_ID, "4", request);
     }
 
     @Test

@@ -25,7 +25,15 @@ public class ModulePrerequisite {
     protected ModulePrerequisite() {
     }
 
+    public UUID getModuleId() {
+        return moduleId;
+    }
+
     public UUID getRequiredModuleId() {
         return requiredModuleId;
+    }
+
+    public String getRuleType() {
+        return ruleType;
     }
 }

@@ -6,7 +6,8 @@ x-build-common: &build-common
 
 x-service-env: &service-env
   COURSEFLOW_JWT_SECRET: ${COURSEFLOW_JWT_SECRET:-courseflow-local-cluster-jwt-secret-change-me-32}
-  COURSEFLOW_SECURITY_SERVICE_TOKEN: ${COURSEFLOW_SERVICE_TOKEN:-courseflow-local-service-token-change-me}
+  COURSEFLOW_INTERNAL_JWT_SECRET: ${COURSEFLOW_INTERNAL_JWT_SECRET:-courseflow-local-internal-jwt-secret-change-me-32}
+  COURSEFLOW_INTERNAL_JWT_AUDIENCE: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:-courseflow-services}
   EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-http://localhost:3000/verify-email}
   COURSEFLOW_ENTITLEMENT_ENROLLMENT_SERVICE_URL: http://enrollment-service:8084
   COURSEFLOW_ENTITLEMENT_COURSE_SERVICE_URL: http://course-service:8083
@@ -136,6 +137,8 @@ services:
       PEER_REVIEW_SERVICE_URI: http://peer-review-service:8097
       LIVE_SESSION_SERVICE_URI: http://live-session-service:8101
       REVIEW_SERVICE_URI: http://review-service:8102
+      TOKEN_CONVERTER_URI: http://identity-token-converter-service:8105
+      TOKEN_CONVERTER_MODE: ${TOKEN_CONVERTER_MODE:-required}
     ports:
       - "${API_GATEWAY_PORT:-28080}:8080"
 
@@ -147,6 +150,15 @@ services:
         MODULE: services/identity-service
     ports:
       - "8081:8081"
+
+  identity-token-converter-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/identity-token-converter-service
+    ports:
+      - "8105:8105"
 
   organization-service:
     <<: *service-common

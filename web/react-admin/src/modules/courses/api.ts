@@ -90,6 +90,96 @@ export type CourseVersion = {
   publishedAt?: string;
 };
 
+export type CourseReviewAudit = {
+  id: string;
+  courseId: string;
+  versionNo: number;
+  actorId: string;
+  actorRole?: string;
+  action: string;
+  fromState?: string;
+  toState?: string;
+  note?: string;
+  checklist?: string[];
+  createdAt?: string;
+};
+
+export type CourseReviewQueueItem = {
+  courseId: string;
+  title: string;
+  slug: string;
+  summary?: string;
+  status: string;
+  reviewState: string;
+  currentVersionNo: number;
+  ownerId: string;
+  departmentId: string;
+  lastAuthoredBy?: string;
+  moduleCount: number;
+  itemCount: number;
+  submittedBy?: string;
+  submittedAt?: string;
+};
+
+export type CourseVersionDiffChange = {
+  scope: string;
+  changeType: string;
+  moduleId?: string;
+  itemId?: string;
+  title?: string;
+  field?: string;
+  fromValue?: string;
+  toValue?: string;
+};
+
+export type CourseVersionDiff = {
+  courseId: string;
+  draftVersionNo: number;
+  publishedVersionNo?: number;
+  baseLabel: string;
+  targetLabel: string;
+  addedModules: number;
+  removedModules: number;
+  changedModules: number;
+  movedModules: number;
+  addedItems: number;
+  removedItems: number;
+  changedItems: number;
+  movedItems: number;
+  requiredItemsAdded: number;
+  requiredItemsRemoved: number;
+  changes: CourseVersionDiffChange[];
+  warnings: string[];
+};
+
+export type ReviewDecisionInput = {
+  note?: string;
+  checklist?: string[];
+};
+
+export type RollbackVersionInput = {
+  note?: string;
+  expectedCurrentVersionNo?: number;
+};
+
+export type ModuleInput = {
+  title: string;
+  description?: string;
+  status?: string;
+};
+
+export type ModuleItemInput = {
+  itemType: string;
+  refId?: string;
+  title: string;
+  description?: string;
+  videoMediaId?: string;
+  documentMediaIds?: string[];
+  contentUrl?: string;
+  estimatedMinutes?: number;
+  required?: boolean;
+};
+
 export async function createCourseDraft(input: {
   code: string;
   title: string;
@@ -117,28 +207,71 @@ export async function updateCurriculum(
 
 export async function createModule(
   courseId: string,
-  input: { title: string; description?: string; status?: string }
+  input: ModuleInput
 ): Promise<CourseDraft> {
   const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/modules`, input);
+  return unwrap<CourseDraft>(data);
+}
+
+export async function updateModule(
+  courseId: string,
+  moduleId: string,
+  input: ModuleInput
+): Promise<CourseDraft> {
+  const { data } = await apiClient.patch(`/admin/v1/authoring/courses/${courseId}/modules/${moduleId}`, input);
+  return unwrap<CourseDraft>(data);
+}
+
+export async function duplicateModule(courseId: string, moduleId: string): Promise<CourseDraft> {
+  const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/modules/${moduleId}/duplicate`, {});
+  return unwrap<CourseDraft>(data);
+}
+
+export async function archiveModule(courseId: string, moduleId: string): Promise<CourseDraft> {
+  const { data } = await apiClient.delete(`/admin/v1/authoring/courses/${courseId}/modules/${moduleId}`);
   return unwrap<CourseDraft>(data);
 }
 
 export async function createModuleItem(
   courseId: string,
   moduleId: string,
-  input: {
-    itemType: string;
-    refId?: string;
-    title: string;
-    description?: string;
-    videoMediaId?: string;
-    documentMediaIds?: string[];
-    contentUrl?: string;
-    estimatedMinutes?: number;
-    required?: boolean;
-  }
+  input: ModuleItemInput
 ): Promise<CourseDraft> {
   const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/modules/${moduleId}/items`, input);
+  return unwrap<CourseDraft>(data);
+}
+
+export async function updateModuleItem(
+  courseId: string,
+  moduleId: string,
+  itemId: string,
+  input: ModuleItemInput
+): Promise<CourseDraft> {
+  const { data } = await apiClient.patch(
+    `/admin/v1/authoring/courses/${courseId}/modules/${moduleId}/items/${itemId}`,
+    input
+  );
+  return unwrap<CourseDraft>(data);
+}
+
+export async function duplicateModuleItem(
+  courseId: string,
+  moduleId: string,
+  itemId: string
+): Promise<CourseDraft> {
+  const { data } = await apiClient.post(
+    `/admin/v1/authoring/courses/${courseId}/modules/${moduleId}/items/${itemId}/duplicate`,
+    {}
+  );
+  return unwrap<CourseDraft>(data);
+}
+
+export async function archiveModuleItem(
+  courseId: string,
+  moduleId: string,
+  itemId: string
+): Promise<CourseDraft> {
+  const { data } = await apiClient.delete(`/admin/v1/authoring/courses/${courseId}/modules/${moduleId}/items/${itemId}`);
   return unwrap<CourseDraft>(data);
 }
 
@@ -147,18 +280,50 @@ export async function listCourseVersions(courseId: string): Promise<CourseVersio
   return unwrap<CourseVersion[]>(data);
 }
 
+export async function getCourseVersionDiff(
+  courseId: string,
+  publishedVersionNo?: number
+): Promise<CourseVersionDiff> {
+  const { data } = await apiClient.get(`/admin/v1/authoring/courses/${courseId}/versions/diff`, {
+    params: publishedVersionNo ? { publishedVersionNo } : undefined
+  });
+  return unwrap<CourseVersionDiff>(data);
+}
+
+export async function rollbackCourseVersion(
+  courseId: string,
+  versionNo: number,
+  input: RollbackVersionInput
+): Promise<CourseDraft> {
+  const { data } = await apiClient.post(
+    `/admin/v1/authoring/courses/${courseId}/versions/${versionNo}/rollback-to-draft`,
+    input
+  );
+  return unwrap<CourseDraft>(data);
+}
+
+export async function listCourseReviewHistory(courseId: string): Promise<CourseReviewAudit[]> {
+  const { data } = await apiClient.get(`/admin/v1/authoring/courses/${courseId}/review-history`);
+  return unwrap<CourseReviewAudit[]>(data);
+}
+
+export async function listCourseReviewQueue(): Promise<CourseReviewQueueItem[]> {
+  const { data } = await apiClient.get("/admin/v1/authoring/courses/review-queue");
+  return unwrap<CourseReviewQueueItem[]>(data);
+}
+
 export async function submitCourseForReview(courseId: string): Promise<CourseDraft> {
   const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/submit-review`);
   return unwrap<CourseDraft>(data);
 }
 
-export async function approveCourseReview(courseId: string, note?: string): Promise<CourseDraft> {
-  const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/approve`, note ? { note } : {});
+export async function approveCourseReview(courseId: string, input: ReviewDecisionInput = {}): Promise<CourseDraft> {
+  const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/approve`, input);
   return unwrap<CourseDraft>(data);
 }
 
-export async function rejectCourseReview(courseId: string, note?: string): Promise<CourseDraft> {
-  const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/reject`, note ? { note } : {});
+export async function rejectCourseReview(courseId: string, input: ReviewDecisionInput = {}): Promise<CourseDraft> {
+  const { data } = await apiClient.post(`/admin/v1/authoring/courses/${courseId}/reject`, input);
   return unwrap<CourseDraft>(data);
 }
 

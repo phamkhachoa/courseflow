@@ -36,7 +36,8 @@ public class GradebookController {
     private final GradebookService gradebook;
     private final CourseAccessClient courseAccess;
 
-    public GradebookController(GradebookService gradebook, CourseAccessClient courseAccess) {
+    public GradebookController(GradebookService gradebook,
+                               CourseAccessClient courseAccess) {
         this.gradebook = gradebook;
         this.courseAccess = courseAccess;
     }
@@ -142,6 +143,12 @@ public class GradebookController {
         return gradebook.getFinalGrade(courseId, studentId);
     }
 
+    @GetMapping("/courses/{courseId}/students/{studentId}/final-grade/internal")
+    public FinalGradeDto internalFinalGrade(@PathVariable UUID courseId,
+                                            @PathVariable String studentId) {
+        return gradebook.getFinalGrade(courseId, studentId);
+    }
+
     // ---- CSV export ----
 
     @GetMapping(value = "/courses/{courseId}/export.csv", produces = "text/csv")
@@ -164,4 +171,5 @@ public class GradebookController {
         Authz.requireSelfOrStaff(user, ownerStudentId);
         courseAccess.requireCourseAccess(user, courseId);
     }
+
 }

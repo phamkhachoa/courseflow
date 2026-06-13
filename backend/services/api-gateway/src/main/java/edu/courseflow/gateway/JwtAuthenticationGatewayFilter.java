@@ -14,7 +14,6 @@ import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,8 +28,9 @@ import reactor.core.publisher.Mono;
  * <ol>
  *   <li>strips any client-supplied {@code X-User-*} headers so identity cannot be spoofed;</li>
  *   <li>validates the Bearer JWT (HS256, shared secret with identity-service);</li>
- *   <li>forwards a verified identity to downstream services via {@code X-User-*} headers and an
- *       internal {@code X-Service-Token} attestation header.</li>
+ *   <li>exchanges the external JWT for a short-lived internal JWT;</li>
+ *   <li>forwards a verified identity to downstream services via legacy {@code X-User-*} headers,
+ *       plus {@code X-Internal-Authorization}.</li>
  * </ol>
  * Downstream services are only reachable through the gateway (network isolation) and may read
  * these headers as trusted, e.g. via {@code CurrentUserArgumentResolver} in common-library.
@@ -54,17 +54,17 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             List.of("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA", "STUDENT");
 
     private final SecretKey secretKey;
-    private final String serviceToken;
+    private final InternalTokenConverterClient tokenConverter;
 
     @Autowired
     public JwtAuthenticationGatewayFilter(JwtSecretProperties jwtSecretProperties,
-            @Value("${courseflow.security.service-token:}") String serviceToken) {
+            InternalTokenConverterClient tokenConverter) {
         this.secretKey = jwtSecretProperties.secretKey();
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
+        this.tokenConverter = tokenConverter == null ? InternalTokenConverterClient.disabled() : tokenConverter;
     }
 
     JwtAuthenticationGatewayFilter(JwtSecretProperties jwtSecretProperties) {
-        this(jwtSecretProperties, "");
+        this(jwtSecretProperties, InternalTokenConverterClient.disabled());
     }
 
     @Override
@@ -79,7 +79,7 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             headers.remove(GatewayHeaders.USER_ROLES);
             headers.remove(GatewayHeaders.USER_ROLE_SCOPES);
             headers.remove(GatewayHeaders.USER_EMAIL);
-            headers.remove(GatewayHeaders.SERVICE_TOKEN);
+            headers.remove(GatewayHeaders.INTERNAL_AUTHORIZATION);
         });
 
         if (isPublic(path, request.getMethod().name())) {
@@ -92,10 +92,11 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
         }
 
         try {
+            String externalToken = authHeader.substring(7);
             Claims claims = Jwts.parser()
                     .verifyWith(secretKey)
                     .build()
-                    .parseSignedClaims(authHeader.substring(7))
+                    .parseSignedClaims(externalToken)
                     .getPayload();
 
             String userId = requireClaim(claims, "uid");
@@ -123,14 +124,32 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
                     .header(GatewayHeaders.USER_ROLES, String.join(",", roleCodes))
                     .header(GatewayHeaders.USER_ROLE_SCOPES, encodeRoleScopes(roleClaims))
                     .header(GatewayHeaders.USER_EMAIL, email);
-            if (!serviceToken.isBlank()) {
-                builder.header(GatewayHeaders.SERVICE_TOKEN, serviceToken);
-            }
 
-            return chain.filter(exchange.mutate().request(builder.build()).build());
+            return forwardWithInternalToken(exchange, chain, builder, externalToken);
         } catch (JwtException | IllegalArgumentException ex) {
             return unauthorized(exchange, "Invalid or expired token");
         }
+    }
+
+    private Mono<Void> forwardWithInternalToken(ServerWebExchange exchange, GatewayFilterChain chain,
+                                                ServerHttpRequest.Builder builder, String externalToken) {
+        if (!tokenConverter.enabled()) {
+            return error(exchange, HttpStatus.BAD_GATEWAY, "Bad Gateway", "Internal token converter is disabled");
+        }
+        Mono<Void> conversionFailure =
+                error(exchange, HttpStatus.BAD_GATEWAY, "Bad Gateway", "Internal token conversion failed");
+
+        return tokenConverter.exchange(externalToken)
+                .flatMap(internalToken -> {
+                    ServerHttpRequest converted = builder.headers(headers -> {
+                        String bearer = "Bearer " + internalToken;
+                        headers.set("Authorization", bearer);
+                        headers.set(GatewayHeaders.INTERNAL_AUTHORIZATION, bearer);
+                    }).build();
+                    return chain.filter(exchange.mutate().request(converted).build());
+                })
+                .switchIfEmpty(conversionFailure)
+                .onErrorResume(ex -> conversionFailure);
     }
 
     private boolean isPublic(String path, String method) {

@@ -18,6 +18,11 @@ public interface CourseModuleJpaRepository extends JpaRepository<CourseModule, U
 
     int countByCourseIdAndStatus(UUID courseId, String status);
 
-    @Query("select coalesce(max(m.position), -1) + 1 from CourseModule m where m.courseId = :courseId")
+    @Query("""
+            select coalesce(max(m.position), -1) + 1
+            from CourseModule m
+            where m.courseId = :courseId
+              and m.status <> 'ARCHIVED'
+            """)
     int nextPosition(@Param("courseId") UUID courseId);
 }

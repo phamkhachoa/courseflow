@@ -12,6 +12,8 @@ public interface CourseJpaRepository extends JpaRepository<Course, UUID> {
 
     List<Course> findByStatusOrderByCreatedAtDescTitleAsc(String status);
 
+    List<Course> findByReviewStateOrderByUpdatedAtDescTitleAsc(String reviewState);
+
     List<Course> findByOwnerIdOrderByCreatedAtDescTitleAsc(String ownerId);
 
     List<Course> findByOwnerIdAndStatusOrderByCreatedAtDescTitleAsc(String ownerId, String status);

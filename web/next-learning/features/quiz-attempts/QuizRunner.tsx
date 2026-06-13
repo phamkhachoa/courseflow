@@ -258,6 +258,7 @@ export function QuizRunner({ quizId }: { quizId: string }) {
   const submitAttempt = submit.mutate;
 
   const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [attemptQuestions, setAttemptQuestions] = useState<StudentQuizQuestion[] | null>(null);
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [remaining, setRemaining] = useState<number | null>(null);
   const [autoSubmitted, setAutoSubmitted] = useState(false);
@@ -335,7 +336,7 @@ export function QuizRunner({ quizId }: { quizId: string }) {
     localStorage.removeItem(`courseflow.quiz.flags.${attemptId}`);
   }, [attemptId, submit.isSuccess]);
 
-  const questions = useMemo(() => quiz?.questions ?? [], [quiz]);
+  const questions = useMemo(() => attemptQuestions ?? quiz?.questions ?? [], [attemptQuestions, quiz]);
   const totalPoints = useMemo(
     () => questions.reduce((sum, question) => sum + Number(question.points ?? 0), 0),
     [questions]
@@ -405,19 +406,13 @@ export function QuizRunner({ quizId }: { quizId: string }) {
 
   function beginAttempt() {
     if (!session?.user?.id) return;
-    if (inProgressAttempt) {
-      setAttemptId(inProgressAttempt.id);
-      setHydratedAttemptId(null);
-      setRemaining(secondsUntil(inProgressAttempt.deadlineAt) ?? (quiz?.durationMinutes ?? 10) * 60);
-      setAutoSubmitted(false);
-      return;
-    }
     start.mutate(undefined, {
-      onSuccess: (attempt) => {
+      onSuccess: (response) => {
         setAnswers({});
-        setAttemptId(attempt.id);
+        setAttemptQuestions(response.questions ?? []);
+        setAttemptId(response.attempt.id);
         setHydratedAttemptId(null);
-        setRemaining(secondsUntil(attempt.deadlineAt) ?? (quiz?.durationMinutes ?? 10) * 60);
+        setRemaining(secondsUntil(response.attempt.deadlineAt) ?? (quiz?.durationMinutes ?? 10) * 60);
         setAutoSubmitted(false);
         void attempts.refetch();
       }

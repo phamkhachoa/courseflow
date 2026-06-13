@@ -70,6 +70,13 @@ public class EnrollmentService {
         return enrollments.list(courseId.orElse(null), caller);
     }
 
+    public List<EnrollmentDto> learnerMemberships(String studentId) {
+        if (studentId == null || studentId.isBlank()) {
+            throw new BadRequestException("studentId is required");
+        }
+        return enrollments.list(null, studentId.trim());
+    }
+
     /**
      * Enroll a student. A STUDENT caller always enrolls themselves; the studentId in the body is
      * ignored. Only INSTRUCTOR/ADMIN may enroll someone else. Capacity is enforced inside the
@@ -124,6 +131,10 @@ public class EnrollmentService {
                 studentId,
                 found.isPresent(),
                 found.map(EnrollmentDto::status).orElse(null));
+    }
+
+    public List<EnrollmentDto> activeRoster(UUID courseId, Optional<UUID> cohortId) {
+        return enrollments.listActiveRoster(courseId, cohortId.orElse(null));
     }
 
     /**

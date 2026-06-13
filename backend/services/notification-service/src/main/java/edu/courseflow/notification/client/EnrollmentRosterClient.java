@@ -1,5 +1,6 @@
 package edu.courseflow.notification.client;
 
+import edu.courseflow.commonlibrary.security.InternalJwtService;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -15,10 +16,13 @@ import org.springframework.web.client.RestClient;
 public class EnrollmentRosterClient {
 
     private final RestClient restClient;
+    private final InternalJwtService internalJwt;
 
     public EnrollmentRosterClient(RestClient.Builder builder,
-                                  @Value("${courseflow.enrollment.base-url:http://localhost:8084}") String baseUrl) {
+                                  @Value("${courseflow.enrollment.base-url:http://localhost:8084}") String baseUrl,
+                                  InternalJwtService internalJwt) {
         this.restClient = builder.baseUrl(baseUrl).build();
+        this.internalJwt = internalJwt;
     }
 
     /** Minimal projection of an enrollment row; only the fields the fan-out needs. */
@@ -33,9 +37,10 @@ public class EnrollmentRosterClient {
      */
     public List<String> activeStudentIds(String courseId) {
         List<EnrollmentView> rows = restClient.get()
-                .uri(uriBuilder -> uriBuilder.path("/internal/enrollments")
+                .uri(uriBuilder -> uriBuilder.path("/internal/enrollments/roster")
                         .queryParam("courseId", courseId)
                         .build())
+                .headers(internalJwt::applyServiceToken)
                 .retrieve()
                 .body(new org.springframework.core.ParameterizedTypeReference<List<EnrollmentView>>() {});
         if (rows == null) {
@@ -47,4 +52,5 @@ public class EnrollmentRosterClient {
                 .distinct()
                 .toList();
     }
+
 }

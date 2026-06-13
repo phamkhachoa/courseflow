@@ -1,6 +1,5 @@
 package edu.courseflow.media.controller;
 
-import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.media.dto.MediaDtos.MediaAssetDto;
 import edu.courseflow.media.dto.MediaDtos.PresignedDownloadDto;
@@ -12,14 +11,12 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,12 +30,9 @@ public class MediaController {
     private static final String ROLE_INSTRUCTOR = "INSTRUCTOR";
 
     private final MediaService media;
-    private final String serviceToken;
 
-    public MediaController(MediaService media,
-                           @Value("${courseflow.security.service-token:}") String serviceToken) {
+    public MediaController(MediaService media) {
         this.media = media;
-        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
     }
 
     @GetMapping("/internal/media/assets")
@@ -100,9 +94,7 @@ public class MediaController {
     }
 
     @GetMapping("/internal/media/assets/{mediaId}/download-url/trusted")
-    public PresignedDownloadDto trustedDownloadUrl(@PathVariable UUID mediaId,
-            @RequestHeader(value = CourseAccessClient.SERVICE_TOKEN_HEADER, required = false) String token) {
-        requireServiceToken(token);
+    public PresignedDownloadDto trustedDownloadUrl(@PathVariable UUID mediaId) {
         return media.downloadUrl(mediaId, null, true);
     }
 
@@ -113,9 +105,4 @@ public class MediaController {
         return String.valueOf(user.id());
     }
 
-    private void requireServiceToken(String token) {
-        if (serviceToken.isBlank() || token == null || !serviceToken.equals(token.trim())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Service token required");
-        }
-    }
 }

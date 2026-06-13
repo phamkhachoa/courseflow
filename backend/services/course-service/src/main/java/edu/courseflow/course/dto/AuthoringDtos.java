@@ -30,7 +30,24 @@ public final class AuthoringDtos {
             String description,
             int position,
             String status,
-            List<ItemOutlineDto> items
+            List<ItemOutlineDto> items,
+            List<ModulePrerequisiteOutlineDto> prerequisites
+    ) {
+        public ModuleOutlineDto(
+                String moduleId,
+                String title,
+                String description,
+                int position,
+                String status,
+                List<ItemOutlineDto> items
+        ) {
+            this(moduleId, title, description, position, status, items, List.of());
+        }
+    }
+
+    public record ModulePrerequisiteOutlineDto(
+            String requiredModuleId,
+            String ruleType
     ) {
     }
 
@@ -58,6 +75,72 @@ public final class AuthoringDtos {
             String note,
             Instant createdAt,
             Instant publishedAt
+    ) {
+    }
+
+    public record CourseReviewAuditDto(
+            String id,
+            String courseId,
+            int versionNo,
+            String actorId,
+            String actorRole,
+            String action,
+            String fromState,
+            String toState,
+            String note,
+            List<String> checklist,
+            Instant createdAt
+    ) {
+    }
+
+    public record CourseReviewQueueItemDto(
+            String courseId,
+            String title,
+            String slug,
+            String summary,
+            String status,
+            String reviewState,
+            int currentVersionNo,
+            String ownerId,
+            String departmentId,
+            String lastAuthoredBy,
+            int moduleCount,
+            int itemCount,
+            String submittedBy,
+            Instant submittedAt
+    ) {
+    }
+
+    public record CourseVersionDiffDto(
+            String courseId,
+            int draftVersionNo,
+            Integer publishedVersionNo,
+            String baseLabel,
+            String targetLabel,
+            int addedModules,
+            int removedModules,
+            int changedModules,
+            int movedModules,
+            int addedItems,
+            int removedItems,
+            int changedItems,
+            int movedItems,
+            int requiredItemsAdded,
+            int requiredItemsRemoved,
+            List<CourseVersionDiffChangeDto> changes,
+            List<String> warnings
+    ) {
+    }
+
+    public record CourseVersionDiffChangeDto(
+            String scope,
+            String changeType,
+            String moduleId,
+            String itemId,
+            String title,
+            String field,
+            String fromValue,
+            String toValue
     ) {
     }
 
@@ -96,9 +179,16 @@ public final class AuthoringDtos {
     public record SubmitReviewRequestDto() {
     }
 
-    /** Reviewer decision payload for approve/reject; the note is optional reviewer feedback. */
+    /** Reviewer decision payload for approve/reject; reject requires a note. */
     public record ReviewDecisionRequestDto(
-            String note
+            String note,
+            List<String> checklist
+    ) {
+    }
+
+    public record RollbackVersionRequestDto(
+            String note,
+            Integer expectedCurrentVersionNo
     ) {
     }
 
@@ -110,8 +200,27 @@ public final class AuthoringDtos {
     ) {
     }
 
+    public record UpdateModuleRequestDto(
+            @NotBlank String title,
+            String description
+    ) {
+    }
+
     /** Create a new item inside a module. Position is assigned by the server. */
     public record CreateModuleItemRequestDto(
+            @NotBlank String itemType,
+            String refId,
+            @NotBlank String title,
+            String description,
+            UUID videoMediaId,
+            List<String> documentMediaIds,
+            String contentUrl,
+            Integer estimatedMinutes,
+            Boolean required
+    ) {
+    }
+
+    public record UpdateModuleItemRequestDto(
             @NotBlank String itemType,
             String refId,
             @NotBlank String title,

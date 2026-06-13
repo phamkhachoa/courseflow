@@ -154,6 +154,23 @@ public final class QuizDtos {
             String status) {
     }
 
+    public record LearnerSourceStatusDto(
+            String sourceType,
+            String sourceId,
+            String courseId,
+            String title,
+            String sourceStatus,
+            Instant availableAt,
+            Instant dueAt,
+            Instant lockAt,
+            String latestProgressStatus,
+            String latestProgressId,
+            int attemptsUsed,
+            Integer attemptsAllowed,
+            boolean completed,
+            boolean overdue) {
+    }
+
     // studentId is taken from the authenticated caller, never from the body.
     public record StartAttemptRequestDto() {
     }

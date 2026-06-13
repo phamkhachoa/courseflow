@@ -17,8 +17,10 @@ import edu.courseflow.course.model.CourseVersion;
 import edu.courseflow.course.model.ModuleItem;
 import edu.courseflow.course.repository.CourseJpaRepository;
 import edu.courseflow.course.repository.CourseModuleJpaRepository;
+import edu.courseflow.course.repository.CourseReviewAuditLogJpaRepository;
 import edu.courseflow.course.repository.CourseVersionJpaRepository;
 import edu.courseflow.course.repository.ModuleItemJpaRepository;
+import edu.courseflow.course.repository.ModulePrerequisiteJpaRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -48,7 +50,11 @@ class CourseAuthoringServiceReviewabilityTest {
     @Mock
     private ModuleItemJpaRepository items;
     @Mock
+    private ModulePrerequisiteJpaRepository prerequisites;
+    @Mock
     private CourseVersionJpaRepository versions;
+    @Mock
+    private CourseReviewAuditLogJpaRepository reviewAuditLogs;
     @Mock
     private CourseMapper mapper;
     @Mock
@@ -58,7 +64,7 @@ class CourseAuthoringServiceReviewabilityTest {
 
     @BeforeEach
     void setUp() {
-        service = new CourseAuthoringService(courses, modules, items, versions, new ObjectMapper(), mapper,
+        service = new CourseAuthoringService(courses, modules, items, prerequisites, versions, reviewAuditLogs, new ObjectMapper(), mapper,
                 readinessClient);
     }
 

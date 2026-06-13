@@ -89,7 +89,10 @@ export const queryKeys = {
   },
   authoring: {
     draft: (courseId: string) => ["authoring", "draft", courseId] as const,
-    versions: (courseId: string) => ["authoring", "versions", courseId] as const
+    versions: (courseId: string) => ["authoring", "versions", courseId] as const,
+    versionDiff: (courseId: string, versionNo?: number) => ["authoring", "version-diff", courseId, versionNo ?? "latest"] as const,
+    reviewHistory: (courseId: string) => ["authoring", "review-history", courseId] as const,
+    reviewQueue: ["authoring", "review-queue"] as const
   },
   liveSessions: {
     list: (courseId: string) => ["live-sessions", courseId] as const,

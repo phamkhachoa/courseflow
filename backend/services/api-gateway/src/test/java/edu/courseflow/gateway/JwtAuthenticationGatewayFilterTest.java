@@ -26,14 +26,32 @@ import reactor.core.publisher.Mono;
 class JwtAuthenticationGatewayFilterTest {
 
     private static final String SECRET = "test-secret-key-that-is-comfortably-over-32-bytes-long";
-    private static final String SERVICE_TOKEN = "trusted-gateway-to-service-token";
 
     private static JwtAuthenticationGatewayFilter newFilter() {
-        return new JwtAuthenticationGatewayFilter(new JwtSecretProperties(SECRET));
+        return newFilter(converter("converted-internal-token"));
     }
 
-    private static JwtAuthenticationGatewayFilter newFilter(String serviceToken) {
-        return new JwtAuthenticationGatewayFilter(new JwtSecretProperties(SECRET), serviceToken);
+    private static JwtAuthenticationGatewayFilter newFilter(InternalTokenConverterClient converter) {
+        return new JwtAuthenticationGatewayFilter(new JwtSecretProperties(SECRET), converter);
+    }
+
+    private static InternalTokenConverterClient converter(String token) {
+        return new InternalTokenConverterClient() {
+            @Override
+            public boolean enabled() {
+                return true;
+            }
+
+            @Override
+            public boolean required() {
+                return true;
+            }
+
+            @Override
+            public Mono<String> exchange(String subjectToken) {
+                return Mono.just(token);
+            }
+        };
     }
 
     @Test
@@ -51,7 +69,7 @@ class JwtAuthenticationGatewayFilterTest {
                 .header(GatewayHeaders.USER_ROLE, "ADMIN")
                 .header(GatewayHeaders.USER_ROLE_SCOPES, "spoofed.scope.header")
                 .header(GatewayHeaders.USER_EMAIL, "spoofed@example.com")
-                .header(GatewayHeaders.SERVICE_TOKEN, "spoofed-service-token")
+                .header(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer spoofed-internal-token")
                 .build();
 
         filter.filter(MockServerWebExchange.from(request), chain).block();
@@ -64,12 +82,29 @@ class JwtAuthenticationGatewayFilterTest {
                 .doesNotContain("spoofed");
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.USER_EMAIL))
                 .isEqualTo("student@courseflow.local");
-        assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.SERVICE_TOKEN)).isNull();
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.INTERNAL_AUTHORIZATION))
+                .isEqualTo("Bearer converted-internal-token");
     }
 
     @Test
-    void stripsClientServiceTokenAndInjectsConfiguredAttestation() {
-        JwtAuthenticationGatewayFilter filter = newFilter(SERVICE_TOKEN);
+    void injectsInternalTokenWhenConverterIsEnabled() {
+        InternalTokenConverterClient converter = new InternalTokenConverterClient() {
+            @Override
+            public boolean enabled() {
+                return true;
+            }
+
+            @Override
+            public boolean required() {
+                return false;
+            }
+
+            @Override
+            public Mono<String> exchange(String subjectToken) {
+                return Mono.just("converted-internal-token");
+            }
+        };
+        JwtAuthenticationGatewayFilter filter = newFilter(converter);
         AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
             forwarded.set(exchange);
@@ -78,14 +113,44 @@ class JwtAuthenticationGatewayFilterTest {
 
         MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/assignments")
                 .header("Authorization", "Bearer " + accessToken("student@courseflow.local", "4", "STUDENT"))
-                .header(GatewayHeaders.SERVICE_TOKEN, "client-supplied-token")
+                .header(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer forged")
                 .build();
 
         filter.filter(MockServerWebExchange.from(request), chain).block();
 
         assertThat(forwarded.get()).isNotNull();
-        assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.SERVICE_TOKEN))
-                .isEqualTo(SERVICE_TOKEN);
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst("Authorization"))
+                .isEqualTo("Bearer converted-internal-token");
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.INTERNAL_AUTHORIZATION))
+                .isEqualTo("Bearer converted-internal-token");
+    }
+
+    @Test
+    void failsClosedWhenRequiredConverterCannotIssueToken() {
+        InternalTokenConverterClient converter = new InternalTokenConverterClient() {
+            @Override
+            public boolean enabled() {
+                return true;
+            }
+
+            @Override
+            public boolean required() {
+                return true;
+            }
+
+            @Override
+            public Mono<String> exchange(String subjectToken) {
+                return Mono.error(new IllegalStateException("converter down"));
+            }
+        };
+        JwtAuthenticationGatewayFilter filter = newFilter(converter);
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/assignments")
+                .header("Authorization", "Bearer " + accessToken("student@courseflow.local", "4", "STUDENT"))
+                .build());
+
+        filter.filter(exchange, ignored -> Mono.empty()).block();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
     }
 
     @Test
