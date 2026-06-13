@@ -4,7 +4,6 @@ import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
 
 /**
  * Holds and validates the shared JWT signing secret for the gateway (the edge token authority).
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Component;
  * well-known local-development placeholder. This keeps a misconfigured build from verifying tokens
  * with a guessable key. The same secret is shared with identity-service (HS256).
  */
-@Component
 public class JwtSecretProperties {
 
     /** HS256 needs a key of at least 256 bits; reject anything weaker. */

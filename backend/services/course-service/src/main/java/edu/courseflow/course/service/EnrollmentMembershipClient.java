@@ -25,7 +25,7 @@ public class EnrollmentMembershipClient {
     private final InternalJwtService internalJwt;
 
     public EnrollmentMembershipClient(RestClient.Builder restClientBuilder,
-            @Value("${courseflow.entitlement.enrollment-service-url:http://localhost:8084}") String enrollmentServiceUrl,
+            @Value("${courseflow.entitlement.enrollment-service-url:http://enrollment-service:8080}") String enrollmentServiceUrl,
             @Value("${courseflow.entitlement.membership-timeout-ms:1500}") long membershipTimeoutMs,
             InternalJwtService internalJwt) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();

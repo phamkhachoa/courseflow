@@ -1,17 +1,20 @@
 "use client";
 
 import { API_BASE_URL, unwrap } from "./envelope";
+import { keycloakAuthEnabled, refreshKeycloakToken } from "@/features/auth/keycloak-auth";
 
 export type LearnerUser = {
   id: number;
   email: string;
   fullName: string;
+  avatarUrl?: string;
   role?: string;
   status: string;
 };
 export type StoredSession = {
   accessToken: string;
   refreshToken: string;
+  idToken?: string;
   user: LearnerUser;
 };
 
@@ -80,6 +83,38 @@ type ApiErrorPayload = {
   statusCode?: string;
 };
 
+type CurrentUserProfile = {
+  id: string | number;
+  email?: string;
+  fullName?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  role?: string;
+  status?: string;
+};
+
+export async function hydrateLearnerProfile(): Promise<StoredSession | null> {
+  const existing = learnerSession.read();
+  if (!existing?.accessToken) return existing;
+  const profile = await clientFetch<CurrentUserProfile>("/v1/users/me");
+  const latest = learnerSession.read() ?? existing;
+  const numericUserId = Number(profile.id);
+  const next: StoredSession = {
+    ...latest,
+    user: {
+      ...latest.user,
+      id: Number.isFinite(numericUserId) ? numericUserId : latest.user.id,
+      email: profile.email?.trim() || latest.user.email,
+      fullName: profile.fullName?.trim() || profile.displayName?.trim() || latest.user.fullName,
+      avatarUrl: profile.avatarUrl?.trim() || latest.user.avatarUrl,
+      role: profile.role?.trim() || latest.user.role,
+      status: profile.status?.trim() || latest.user.status
+    }
+  };
+  learnerSession.write(next);
+  return next;
+}
+
 /**
  * Browser-side fetch with the learner bearer token attached. On a 401 it tries
  * one refresh, then replays the request once.
@@ -102,18 +137,47 @@ export async function clientFetch<T>(
   let response = await run(session?.accessToken);
 
   if (response.status === 401 && session?.refreshToken) {
-    const refreshed = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken: session.refreshToken })
-    });
-    if (refreshed.ok) {
-      const next = unwrap<StoredSession & { accessToken: string }>(await refreshed.json());
-      learnerSession.write(next);
-      session = next;
-      response = await run(next.accessToken);
+    if (keycloakAuthEnabled) {
+      try {
+        const refreshed = await refreshKeycloakToken(session.refreshToken);
+        const next: StoredSession = {
+          ...refreshed,
+          user: {
+            ...refreshed.user,
+            fullName: refreshed.user.fullName || session.user.fullName,
+            avatarUrl: session.user.avatarUrl ?? refreshed.user.avatarUrl,
+            role: session.user.role || refreshed.user.role,
+            status: session.user.status || refreshed.user.status
+          }
+        };
+        learnerSession.write(next);
+        session = next;
+        response = await run(next.accessToken);
+      } catch {
+        learnerSession.clear();
+      }
     } else {
-      learnerSession.clear();
+      const refreshed = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: session.refreshToken })
+      });
+      if (refreshed.ok) {
+        const refreshedSession = unwrap<StoredSession & { accessToken: string }>(await refreshed.json());
+        const next: StoredSession = {
+          ...refreshedSession,
+          user: {
+            ...refreshedSession.user,
+            fullName: refreshedSession.user.fullName || session.user.fullName,
+            avatarUrl: session.user.avatarUrl ?? refreshedSession.user.avatarUrl
+          }
+        };
+        learnerSession.write(next);
+        session = next;
+        response = await run(next.accessToken);
+      } else {
+        learnerSession.clear();
+      }
     }
   }
 

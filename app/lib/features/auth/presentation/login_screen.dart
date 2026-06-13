@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../application/auth_controller.dart';
+import '../data/auth_config.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -28,7 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!kKeycloakAuthEnabled && !_formKey.currentState!.validate()) return;
     setState(() {
       _submitting = true;
       _error = null;
@@ -50,7 +51,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String _friendly(ApiException e) => switch (e.code) {
         'INVALID_CREDENTIALS' => 'Incorrect email or password.',
-        'NETWORK_UNAVAILABLE' => 'Cannot reach CourseFlow. Check your connection.',
+        'NETWORK_UNAVAILABLE' =>
+          'Cannot reach CourseFlow. Check your connection.',
         _ => e.message,
       };
 
@@ -76,48 +78,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineSmall),
                     const SizedBox(height: 4),
-                    Text('Sign in to continue',
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: theme.colorScheme.outline)),
+                    Text(
+                      kKeycloakAuthEnabled
+                          ? 'Continue with Keycloak SSO'
+                          : 'Sign in to continue',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: theme.colorScheme.outline),
+                    ),
                     const SizedBox(height: 28),
-                    TextFormField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.email],
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.alternate_email),
-                      ),
-                      validator: (v) {
-                        final value = v?.trim() ?? '';
-                        if (value.isEmpty) return 'Email is required';
-                        if (!value.contains('@')) return 'Enter a valid email';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: AppTheme.gap),
-                    TextFormField(
-                      controller: _password,
-                      obscureText: _obscure,
-                      autofillHints: const [AutofillHints.password],
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined),
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
+                    if (!kKeycloakAuthEnabled) ...[
+                      TextFormField(
+                        controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
+                        textInputAction: TextInputAction.next,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.alternate_email),
                         ),
+                        validator: (v) {
+                          final value = v?.trim() ?? '';
+                          if (value.isEmpty) return 'Email is required';
+                          if (!value.contains('@')) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        },
                       ),
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Password is required' : null,
-                    ),
+                      const SizedBox(height: AppTheme.gap),
+                      TextFormField(
+                        controller: _password,
+                        obscureText: _obscure,
+                        autofillHints: const [AutofillHints.password],
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => _submit(),
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined),
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
+                          ),
+                        ),
+                        validator: (v) => (v == null || v.isEmpty)
+                            ? 'Password is required'
+                            : null,
+                      ),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: AppTheme.gap),
                       Text(_error!,
@@ -130,9 +141,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2))
-                          : const Text('Sign in'),
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              kKeycloakAuthEnabled
+                                  ? 'Continue with Keycloak'
+                                  : 'Sign in',
+                            ),
                     ),
                   ],
                 ),

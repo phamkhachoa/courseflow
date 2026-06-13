@@ -28,6 +28,9 @@ public class ScopeMapper {
         if (roles == null) {
             return scopes;
         }
+        if (!roles.isEmpty()) {
+            scopes.add("internal:user");
+        }
         for (String role : roles) {
             switch (normalize(role)) {
                 case "ADMIN" -> scopes.add("*");

@@ -1,5 +1,5 @@
 server:
-  port: 8096
+  port: ${SERVER_PORT:8080}
 spring:
   application:
     name: certificate-service
@@ -30,10 +30,10 @@ spring:
 courseflow:
   certificate:
     public-base-url: ${CERTIFICATE_PUBLIC_BASE_URL:http://localhost:3000/certificates/verify}
-    course-service-url: ${CERTIFICATE_COURSE_SERVICE_URL:${COURSE_SERVICE_URL:http://localhost:8083}}
-    enrollment-service-url: ${CERTIFICATE_ENROLLMENT_SERVICE_URL:${ENROLLMENT_SERVICE_URL:http://localhost:8084}}
+    course-service-url: ${CERTIFICATE_COURSE_SERVICE_URL:${COURSE_SERVICE_URL:http://course-service:8080}}
+    enrollment-service-url: ${CERTIFICATE_ENROLLMENT_SERVICE_URL:${ENROLLMENT_SERVICE_URL:http://enrollment-service:8080}}
     eligibility-timeout-ms: ${CERTIFICATE_ELIGIBILITY_TIMEOUT_MS:1500}
-    gradebook-service-url: ${CERTIFICATE_GRADEBOOK_SERVICE_URL:${GRADEBOOK_SERVICE_URL:http://localhost:8094}}
+    gradebook-service-url: ${CERTIFICATE_GRADEBOOK_SERVICE_URL:${GRADEBOOK_SERVICE_URL:http://gradebook-service:8080}}
     signing-secret: ${CERTIFICATE_SIGNING_SECRET:${COURSEFLOW_CERTIFICATE_SIGNING_SECRET:}}
   security:
 management:
@@ -41,3 +41,15 @@ management:
     web:
       exposure:
         include: health,info,prometheus
+
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

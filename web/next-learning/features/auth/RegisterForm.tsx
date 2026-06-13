@@ -7,6 +7,7 @@ import { CheckCircle2, LogIn, MailCheck, RefreshCw, UserPlus } from "lucide-reac
 import { learnerSession } from "@/shared/api/client";
 import { Button, Card, TextInput } from "@/shared/ui";
 import { registerLearner, resendEmailVerification } from "./auth-api";
+import { keycloakAuthEnabled } from "./keycloak-auth";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -81,6 +82,30 @@ export function RegisterForm() {
     expiryDate && !Number.isNaN(expiryDate.getTime())
       ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(expiryDate)
       : null;
+
+  if (keycloakAuthEnabled) {
+    return (
+      <Card className="mx-auto w-full max-w-md" padding="lg">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-ink-900">Tài khoản Keycloak SSO</h1>
+            <p className="mt-2 text-sm leading-6 text-ink-500">
+              Tài khoản học viên được cấp qua Keycloak SSO hoặc quy trình mời của tổ chức.
+            </p>
+          </div>
+          <span className="grid size-11 shrink-0 place-items-center rounded-md bg-brand-50 text-brand-700">
+            <UserPlus className="size-5" />
+          </span>
+        </div>
+        <Button asChild className="mt-6 w-full">
+          <Link href={loginHref}>
+            <LogIn className="size-4" />
+            Đến trang đăng nhập
+          </Link>
+        </Button>
+      </Card>
+    );
+  }
 
   if (registeredEmail) {
     return (

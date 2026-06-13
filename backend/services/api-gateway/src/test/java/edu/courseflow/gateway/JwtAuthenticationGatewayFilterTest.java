@@ -3,6 +3,8 @@ package edu.courseflow.gateway;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import edu.courseflow.commonlibrary.constants.GatewayHeaders;
+import edu.courseflow.commonlibrary.security.InternalJwtProperties;
+import edu.courseflow.commonlibrary.security.InternalJwtService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -26,13 +28,51 @@ import reactor.core.publisher.Mono;
 class JwtAuthenticationGatewayFilterTest {
 
     private static final String SECRET = "test-secret-key-that-is-comfortably-over-32-bytes-long";
+    private static final String INTERNAL_SECRET = "internal-test-secret-that-is-comfortably-over-32-bytes";
 
     private static JwtAuthenticationGatewayFilter newFilter() {
-        return newFilter(converter("converted-internal-token"));
+        return newFilter(converter(internalToken("4", "student@courseflow.local", "STUDENT")));
     }
 
     private static JwtAuthenticationGatewayFilter newFilter(InternalTokenConverterClient converter) {
-        return new JwtAuthenticationGatewayFilter(new JwtSecretProperties(SECRET), converter);
+        ExternalTokenProperties properties = legacyProperties();
+        return new JwtAuthenticationGatewayFilter(legacyVerifier(properties), properties, converter, internalJwt(), true);
+    }
+
+    private static JwtAuthenticationGatewayFilter newOidcModeFilter() {
+        ExternalTokenProperties properties = new ExternalTokenProperties(
+                "oidc",
+                "",
+                "",
+                "http://localhost:18080/realms/courseflow",
+                "http://localhost:18080/realms/courseflow/protocol/openid-connect/certs",
+                "courseflow-api");
+        return new JwtAuthenticationGatewayFilter(token -> Mono.empty(), properties, converter(internalToken(
+                "4", "student@courseflow.local", "STUDENT")), internalJwt(), true);
+    }
+
+    private static ExternalTokenProperties legacyProperties() {
+        return new ExternalTokenProperties(
+                "legacy",
+                SECRET,
+                "",
+                "",
+                "",
+                "courseflow-api");
+    }
+
+    private static GatewayExternalTokenVerifier legacyVerifier(ExternalTokenProperties properties) {
+        return new ConfiguredGatewayExternalTokenVerifier(properties);
+    }
+
+    private static InternalJwtService internalJwt() {
+        return new InternalJwtService(new InternalJwtProperties(
+                INTERNAL_SECRET,
+                "courseflow-token-converter",
+                "courseflow-services",
+                180,
+                30,
+                "api-gateway"));
     }
 
     private static InternalTokenConverterClient converter(String token) {
@@ -83,11 +123,12 @@ class JwtAuthenticationGatewayFilterTest {
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.USER_EMAIL))
                 .isEqualTo("student@courseflow.local");
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.INTERNAL_AUTHORIZATION))
-                .isEqualTo("Bearer converted-internal-token");
+                .startsWith("Bearer ");
     }
 
     @Test
     void injectsInternalTokenWhenConverterIsEnabled() {
+        String internalToken = internalToken("4", "student@courseflow.local", "STUDENT");
         InternalTokenConverterClient converter = new InternalTokenConverterClient() {
             @Override
             public boolean enabled() {
@@ -101,7 +142,7 @@ class JwtAuthenticationGatewayFilterTest {
 
             @Override
             public Mono<String> exchange(String subjectToken) {
-                return Mono.just("converted-internal-token");
+                return Mono.just(internalToken);
             }
         };
         JwtAuthenticationGatewayFilter filter = newFilter(converter);
@@ -120,9 +161,9 @@ class JwtAuthenticationGatewayFilterTest {
 
         assertThat(forwarded.get()).isNotNull();
         assertThat(forwarded.get().getRequest().getHeaders().getFirst("Authorization"))
-                .isEqualTo("Bearer converted-internal-token");
+                .isEqualTo("Bearer " + internalToken);
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.INTERNAL_AUTHORIZATION))
-                .isEqualTo("Bearer converted-internal-token");
+                .isEqualTo("Bearer " + internalToken);
     }
 
     @Test
@@ -155,7 +196,8 @@ class JwtAuthenticationGatewayFilterTest {
 
     @Test
     void forwardsAllRoleCodesAndPicksHighestRankedPrimary() {
-        JwtAuthenticationGatewayFilter filter = newFilter();
+        JwtAuthenticationGatewayFilter filter = newFilter(converter(internalToken(
+                "7", "ta@courseflow.local", "STUDENT", "TA")));
         AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
             forwarded.set(exchange);
@@ -177,7 +219,8 @@ class JwtAuthenticationGatewayFilterTest {
 
     @Test
     void rejectsProtectedRequestWithoutBearerToken() {
-        JwtAuthenticationGatewayFilter filter = newFilter();
+        JwtAuthenticationGatewayFilter filter = newFilter(converter(internalToken(
+                "7", "ta@courseflow.local", "STUDENT", "TA")));
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/v1/assignments").build());
 
@@ -202,6 +245,32 @@ class JwtAuthenticationGatewayFilterTest {
     }
 
     @Test
+    void allowsPublicProfileReadWithoutBearerToken() {
+        JwtAuthenticationGatewayFilter filter = newFilter();
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            forwarded.set(exchange);
+            return Mono.empty();
+        };
+
+        filter.filter(MockServerWebExchange.from(MockServerHttpRequest.get("/api/v1/profiles/42").build()), chain)
+                .block();
+
+        assertThat(forwarded.get()).isNotNull();
+    }
+
+    @Test
+    void keepsProfileSummaryBatchProtected() {
+        JwtAuthenticationGatewayFilter filter = newFilter();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/profiles/summary:batch").build());
+
+        filter.filter(exchange, ignored -> Mono.empty()).block();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void allowsPublicRegistrationWithoutBearerToken() {
         JwtAuthenticationGatewayFilter filter = newFilter();
         AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
@@ -214,6 +283,44 @@ class JwtAuthenticationGatewayFilterTest {
                 .block();
 
         assertThat(forwarded.get()).isNotNull();
+    }
+
+    @Test
+    void blocksLegacyAuthEndpointsWhenExternalTokenModeIsOidc() {
+        JwtAuthenticationGatewayFilter filter = newOidcModeFilter();
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            forwarded.set(exchange);
+            return Mono.empty();
+        };
+
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/auth/login").build());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.GONE);
+        assertThat(forwarded.get()).isNull();
+    }
+
+    @Test
+    void blocksAllLegacyAuthSubpathsWhenExternalTokenModeIsOidc() {
+        JwtAuthenticationGatewayFilter filter = newOidcModeFilter();
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            forwarded.set(exchange);
+            return Mono.empty();
+        };
+
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/v1/auth/logout")
+                        .header("Authorization", "Bearer " + accessToken("admin@courseflow.local", "1", "ADMIN"))
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.GONE);
+        assertThat(forwarded.get()).isNull();
     }
 
     @Test
@@ -277,7 +384,8 @@ class JwtAuthenticationGatewayFilterTest {
 
     @Test
     void allowsOperatorWithMultipleRolesIntoUserManagement() {
-        JwtAuthenticationGatewayFilter filter = newFilter();
+        JwtAuthenticationGatewayFilter filter = newFilter(converter(internalToken(
+                "7", "ta@courseflow.local", "STUDENT", "TA")));
         AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
         GatewayFilterChain chain = exchange -> {
             forwarded.set(exchange);
@@ -319,6 +427,35 @@ class JwtAuthenticationGatewayFilterTest {
                 .claim("roles", roles)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(3600)))
+                .signWith(key)
+                .compact();
+    }
+
+    private static String internalToken(String userId, String email, String... roleCodes) {
+        Instant now = Instant.now();
+        SecretKey key = Keys.hmacShaKeyFor(INTERNAL_SECRET.getBytes(StandardCharsets.UTF_8));
+        List<Map<String, Object>> roleAssignments = Arrays.stream(roleCodes)
+                .map(code -> {
+                    Map<String, Object> claim = new HashMap<>();
+                    claim.put("code", code);
+                    claim.put("scopeType", "PLATFORM");
+                    claim.put("scopeId", null);
+                    return claim;
+                })
+                .collect(Collectors.toList());
+        return Jwts.builder()
+                .issuer("courseflow-token-converter")
+                .subject(userId)
+                .claim("aud", List.of("courseflow-services"))
+                .claim("token_use", "internal")
+                .claim("actor_type", "user")
+                .claim("uid", userId)
+                .claim("email", email)
+                .claim("roles", Arrays.asList(roleCodes))
+                .claim("role_assignments", roleAssignments)
+                .issuedAt(Date.from(now))
+                .notBefore(Date.from(now.minusSeconds(1)))
+                .expiration(Date.from(now.plusSeconds(180)))
                 .signWith(key)
                 .compact();
     }

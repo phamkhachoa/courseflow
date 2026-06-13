@@ -7,6 +7,7 @@ import { Bell, Compass, LogIn, LogOut, Search, UserPlus } from "lucide-react";
 import { API_BASE_URL } from "@/shared/api/envelope";
 import { learnerSession, type StoredSession } from "@/shared/api/client";
 import { Badge, Button, cn } from "@/shared/ui";
+import { keycloakAuthEnabled, redirectToKeycloakLogout } from "./keycloak-auth";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
@@ -87,6 +88,11 @@ export function LearnerHeader() {
     const current = learnerSession.read();
     setLoggingOut(true);
     try {
+      if (keycloakAuthEnabled) {
+        learnerSession.clear();
+        redirectToKeycloakLogout(current);
+        return;
+      }
       if (current?.accessToken) {
         await fetch(`${API_BASE_URL}/v1/auth/logout`, {
           method: "POST",
@@ -131,9 +137,18 @@ export function LearnerHeader() {
               />
             ) : session ? (
               <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-ink-700 shadow-sm">
-                <span className="grid size-8 place-items-center rounded-lg bg-ink-900 text-xs font-bold text-white">
-                  {initials(session.user.fullName, session.user.email)}
-                </span>
+                {session.user.avatarUrl ? (
+                  <img
+                    src={session.user.avatarUrl}
+                    alt=""
+                    className="size-8 rounded-lg object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="grid size-8 place-items-center rounded-lg bg-ink-900 text-xs font-bold text-white">
+                    {initials(session.user.fullName, session.user.email)}
+                  </span>
+                )}
                 <div className="hidden max-w-[180px] sm:block">
                   <p className="truncate text-sm font-semibold text-ink-900">
                     {session.user.fullName || session.user.email}
@@ -168,12 +183,21 @@ export function LearnerHeader() {
                   </Link>
                 </Button>
                 <Button asChild size="sm">
-                  <Link href={`/register?next=${encodeURIComponent(nextHref)}`}>
-                    <span className="inline-flex items-center gap-2">
-                      <UserPlus className="size-4" />
-                      <span>Đăng ký</span>
-                    </span>
-                  </Link>
+                  {keycloakAuthEnabled ? (
+                    <Link href={`/login?next=${encodeURIComponent(nextHref)}`}>
+                      <span className="inline-flex items-center gap-2">
+                        <LogIn className="size-4" />
+                        <span>IAM</span>
+                      </span>
+                    </Link>
+                  ) : (
+                    <Link href={`/register?next=${encodeURIComponent(nextHref)}`}>
+                      <span className="inline-flex items-center gap-2">
+                        <UserPlus className="size-4" />
+                        <span>Đăng ký</span>
+                      </span>
+                    </Link>
+                  )}
                 </Button>
               </>
             )}

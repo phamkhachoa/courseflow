@@ -13,6 +13,11 @@ on:
         required: false
         type: boolean
         default: false
+      run_keycloak_security_smoke:
+        description: "Run the Keycloak/OIDC security smoke against a reachable staging cluster"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   backend:
@@ -124,6 +129,15 @@ jobs:
       - name: Validate gateway smoke script syntax
         run: node --check backend/scripts/product-hardening-smoke.mjs
 
+      - name: Validate Keycloak security smoke script syntax
+        run: node --check backend/scripts/keycloak-security-smoke.mjs
+
+      - name: Validate Keycloak realm validator syntax
+        run: node --check backend/scripts/validate-keycloak-realm.mjs
+
+      - name: Validate production Keycloak realm template
+        run: node backend/scripts/validate-keycloak-realm.mjs backend/infra/docker/keycloak/courseflow-realm.prod-template.json --prod-template
+
       - name: Validate backup drill script syntax
         run: bash -n backend/scripts/postgres-backup-drill.sh
 
@@ -158,17 +172,52 @@ jobs:
           fi
 
       - name: Validate production Docker Compose profile
-        env:
-          COURSEFLOW_JWT_SECRET: prod-ci-jwt-secret-32-byte-minimum-value-001
-          COURSEFLOW_INTERNAL_JWT_SECRET: prod-ci-internal-jwt-secret-32-byte-value-001
-          CERTIFICATE_SIGNING_SECRET: prod-ci-cert-signing-secret-32-byte-minimum-value-001
-          COURSEFLOW_DB_PASSWORD: prod-ci-db-password-strong-value-001
-          COURSEFLOW_STORAGE_ACCESS_KEY: prod-ci-storage-access-key
-          COURSEFLOW_STORAGE_SECRET_KEY: prod-ci-storage-secret-strong-value-001
-          COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT: https://storage.example.invalid
-          KEYCLOAK_ADMIN_PASSWORD: prod-ci-keycloak-password-strong-value-001
-          GRAFANA_ADMIN_PASSWORD: prod-ci-grafana-password-strong-value-001
-        run: backend/scripts/validate-prod-profile.sh --compose --include-observability
+        run: |
+          set -euo pipefail
+          tmpdir="$(mktemp -d)"
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$tmpdir/internal.key" >/dev/null 2>&1
+          openssl rsa -pubout -in "$tmpdir/internal.key" -out "$tmpdir/internal.pub" >/dev/null 2>&1
+
+          sts_clients=(
+            api-gateway access-control-service user-management-service organization-service
+            course-service enrollment-service assignment-service deadline-service
+            announcement-service portfolio-service discussion-service notification-service
+            chat-service media-service search-service analytics-service gradebook-service
+            quiz-service certificate-service peer-review-service live-session-service
+            review-service outbox-relay
+          )
+          for client in "${sts_clients[@]}"; do
+            env_name="COURSEFLOW_STS_$(printf '%s' "$client" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_SECRET"
+            export "$env_name=prod-ci-sts-${client}-secret-32-byte-minimum-value-001"
+          done
+
+          export COURSEFLOW_JWT_SECRET=prod-ci-jwt-secret-32-byte-minimum-value-001
+          export COURSEFLOW_INTERNAL_JWT_ALGORITHM=RS256
+          export COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY="$(cat "$tmpdir/internal.key")"
+          export COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY="$(cat "$tmpdir/internal.pub")"
+          export COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE=jwks
+          export COURSEFLOW_INTERNAL_JWT_JWKS_URI=http://identity-token-converter-service:8105/oauth/jwks
+          export COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE=sts
+          export CERTIFICATE_SIGNING_SECRET=prod-ci-cert-signing-secret-32-byte-minimum-value-001
+          export COURSEFLOW_DB_PASSWORD=prod-ci-db-password-strong-value-001
+          export COURSEFLOW_STORAGE_ACCESS_KEY=prod-ci-storage-access-key
+          export COURSEFLOW_STORAGE_SECRET_KEY=prod-ci-storage-secret-strong-value-001
+          export COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.invalid
+          export EXTERNAL_TOKEN_MODE=oidc
+          export KEYCLOAK_ADMIN_PASSWORD=prod-ci-keycloak-password-strong-value-001
+          export KEYCLOAK_PUBLIC_BASE_URL=https://auth.example.invalid
+          export KEYCLOAK_BASE_URL=https://auth.example.invalid
+          export KEYCLOAK_REALM=courseflow
+          export KEYCLOAK_ADMIN_CLIENT_ID=keycloak-user-lifecycle
+          export KEYCLOAK_ADMIN_CLIENT_SECRET=prod-ci-keycloak-admin-client-secret-strong-value-001
+          export KEYCLOAK_SETUP_EMAIL_CLIENT_ID=courseflow-admin-web
+          export KEYCLOAK_SETUP_EMAIL_REDIRECT_URI=https://admin.example.invalid/login/callback
+          export KEYCLOAK_ISSUER_URI=https://auth.example.invalid/realms/courseflow
+          export KEYCLOAK_JWK_SET_URI=https://auth.example.invalid/realms/courseflow/protocol/openid-connect/certs
+          export KEYCLOAK_AUDIENCE=courseflow-api
+          export GRAFANA_ADMIN_PASSWORD=prod-ci-grafana-password-strong-value-001
+
+          backend/scripts/validate-prod-profile.sh --compose --include-observability
 
   local-cluster-smoke:
     name: Local cluster gateway smoke
@@ -193,6 +242,9 @@ jobs:
 
       - name: Validate gateway smoke script syntax
         run: node --check scripts/product-hardening-smoke.mjs
+
+      - name: Validate Keycloak security smoke script syntax
+        run: node --check scripts/keycloak-security-smoke.mjs
 
       - name: Boot local backend cluster
         run: |
@@ -258,3 +310,89 @@ jobs:
             -f infra/docker/docker-compose.yml \
             -f infra/docker/docker-compose.services.yml \
             down -v --remove-orphans
+
+  keycloak-security-smoke:
+    name: Keycloak/OIDC security smoke
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_keycloak_security_smoke
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      COURSEFLOW_API_URL: ${{ vars.COURSEFLOW_SECURITY_SMOKE_API_URL }}
+      COURSEFLOW_TOKEN_CONVERTER_URL: ${{ vars.COURSEFLOW_SECURITY_SMOKE_TOKEN_CONVERTER_URL }}
+      COURSEFLOW_DIRECT_SERVICE_URL: ${{ vars.COURSEFLOW_SECURITY_SMOKE_DIRECT_SERVICE_URL }}
+      COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN: ${{ secrets.COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN }}
+      COURSEFLOW_SECURITY_SMOKE_ALLOW_PASSWORD_GRANT: ${{ vars.COURSEFLOW_SECURITY_SMOKE_ALLOW_PASSWORD_GRANT }}
+      COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_ID: ${{ vars.COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_ID }}
+      COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET: ${{ secrets.COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET }}
+      COURSEFLOW_STS_API_GATEWAY_SECRET: ${{ secrets.COURSEFLOW_STS_API_GATEWAY_SECRET }}
+      COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_ID: ${{ vars.COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_ID }}
+      COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_SECRET: ${{ secrets.COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_SECRET }}
+      COURSEFLOW_STS_COURSE_SERVICE_SECRET: ${{ secrets.COURSEFLOW_STS_COURSE_SERVICE_SECRET }}
+      KEYCLOAK_TOKEN_URL: ${{ vars.KEYCLOAK_TOKEN_URL }}
+      KEYCLOAK_CLIENT_ID: ${{ vars.KEYCLOAK_CLIENT_ID }}
+      KEYCLOAK_USERNAME: ${{ secrets.KEYCLOAK_USERNAME }}
+      KEYCLOAK_PASSWORD: ${{ secrets.KEYCLOAK_PASSWORD }}
+      KEYCLOAK_CLIENT_SECRET: ${{ secrets.KEYCLOAK_CLIENT_SECRET }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validate Keycloak security smoke script syntax
+        run: node --check scripts/keycloak-security-smoke.mjs
+
+      - name: Validate staging smoke configuration
+        run: |
+          set -euo pipefail
+
+          require_value() {
+            name="$1"
+            value="${!name:-}"
+            if [ -z "${value//[[:space:]]/}" ]; then
+              echo "::error::${name} must be configured for run_keycloak_security_smoke"
+              exit 1
+            fi
+          }
+
+          is_blank() {
+            name="$1"
+            value="${!name:-}"
+            [ -z "${value//[[:space:]]/}" ]
+          }
+
+          require_value COURSEFLOW_API_URL
+          require_value COURSEFLOW_TOKEN_CONVERTER_URL
+          require_value COURSEFLOW_DIRECT_SERVICE_URL
+
+          if is_blank COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN; then
+            if [ "${COURSEFLOW_SECURITY_SMOKE_ALLOW_PASSWORD_GRANT:-false}" != "true" ]; then
+              echo "::error::Set COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN or explicitly enable password grant for a non-production smoke realm"
+              exit 1
+            fi
+            require_value KEYCLOAK_TOKEN_URL
+            require_value KEYCLOAK_CLIENT_ID
+            require_value KEYCLOAK_USERNAME
+            require_value KEYCLOAK_PASSWORD
+          fi
+
+          if is_blank COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET &&
+            is_blank COURSEFLOW_STS_API_GATEWAY_SECRET; then
+            echo "::error::Set COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET or COURSEFLOW_STS_API_GATEWAY_SECRET"
+            exit 1
+          fi
+
+          if is_blank COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_SECRET &&
+            is_blank COURSEFLOW_STS_COURSE_SERVICE_SECRET; then
+            echo "::error::Set COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_SECRET or COURSEFLOW_STS_COURSE_SERVICE_SECRET"
+            exit 1
+          fi
+
+      - name: Run Keycloak/OIDC security smoke
+        run: node scripts/keycloak-security-smoke.mjs

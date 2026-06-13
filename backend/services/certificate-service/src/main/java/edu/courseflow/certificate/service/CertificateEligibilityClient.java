@@ -25,9 +25,9 @@ public class CertificateEligibilityClient {
     private final InternalJwtService internalJwt;
 
     public CertificateEligibilityClient(RestClient.Builder restClientBuilder,
-            @Value("${courseflow.certificate.enrollment-service-url:http://localhost:8084}") String enrollmentServiceUrl,
-            @Value("${courseflow.certificate.gradebook-service-url:http://localhost:8094}") String gradebookServiceUrl,
-            @Value("${courseflow.certificate.course-service-url:http://localhost:8083}") String courseServiceUrl,
+            @Value("${courseflow.certificate.enrollment-service-url:http://enrollment-service:8080}") String enrollmentServiceUrl,
+            @Value("${courseflow.certificate.gradebook-service-url:http://gradebook-service:8080}") String gradebookServiceUrl,
+            @Value("${courseflow.certificate.course-service-url:http://course-service:8080}") String courseServiceUrl,
             @Value("${courseflow.certificate.eligibility-timeout-ms:1500}") long eligibilityTimeoutMs,
             InternalJwtService internalJwt) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();

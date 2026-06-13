@@ -28,8 +28,8 @@ public class CourseAccessClient {
     private final InternalJwtService internalJwt;
 
     public CourseAccessClient(RestClient.Builder restClientBuilder,
-            @Value("${courseflow.entitlement.enrollment-service-url:http://localhost:8084}") String enrollmentServiceUrl,
-            @Value("${courseflow.entitlement.course-service-url:http://localhost:8083}") String courseServiceUrl,
+            @Value("${courseflow.entitlement.enrollment-service-url:http://enrollment-service:8080}") String enrollmentServiceUrl,
+            @Value("${courseflow.entitlement.course-service-url:http://course-service:8080}") String courseServiceUrl,
             InternalJwtService internalJwt) {
         this.enrollmentClient = restClientBuilder.baseUrl(enrollmentServiceUrl).build();
         this.courseClient = restClientBuilder.baseUrl(courseServiceUrl).build();

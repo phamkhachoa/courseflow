@@ -1,5 +1,5 @@
 server:
-  port: 8086
+  port: ${SERVER_PORT:8080}
 spring:
   application:
     name: deadline-service
@@ -24,10 +24,22 @@ courseflow:  deadline:
       auto-dispatch-enabled: ${DEADLINE_REMINDER_AUTO_DISPATCH_ENABLED:true}
       dispatch-interval-ms: ${DEADLINE_REMINDER_DISPATCH_INTERVAL_MS:60000}
   entitlement:
-    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
-    course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
+    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://enrollment-service:8080}
+    course-service-url: ${COURSE_SERVICE_URL:http://course-service:8080}
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
+
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

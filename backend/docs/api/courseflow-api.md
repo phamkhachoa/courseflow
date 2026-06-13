@@ -5,8 +5,9 @@ Public traffic goes through `api-gateway`.
 ## API Entrypoints
 
 | Gateway path | Audience | Downstream mapping |
-|---|---|
-| `/api/v1/auth/**` | user/admin login and token lifecycle | identity-service `/auth/**` |
+|---|---|---|
+| Keycloak OIDC endpoints | user/admin login and token lifecycle | external IAM/IdP; clients receive OAuth2/OIDC tokens |
+| `/api/v1/auth/**` | legacy local compatibility only | blocked by the gateway in Keycloak/OIDC mode |
 | `/api/v1/**` | learner/public API | service `/public/**` for whitelisted reads, otherwise service `/internal/**` |
 | `/api/admin/v1/**` | admin/backoffice API | service `/internal/**` or identity `/backoffice/**` |
 | `/ws/**` | WebSocket/STOMP | notification-service `/ws/**` |
@@ -20,8 +21,9 @@ Clients (Next.js, React admin, Flutter) call the gateway directly. Next.js serve
 
 | Domain | Example APIs |
 |---|---|
-| Identity | `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `GET /api/v1/users/me` |
-| Admin Identity/RBAC | `GET /api/admin/v1/users`, `GET /api/admin/v1/roles`, `GET /api/admin/v1/permissions`, `POST /api/admin/v1/users/{id}/assignments` |
+| Identity/Profile | Keycloak OIDC login/logout/token endpoints, `GET /api/v1/users/me`, `GET/PUT /api/v1/users/me/profile`, `GET /api/v1/profiles/{id}`, `POST /api/v1/profiles/summary:batch` |
+| Admin Identity | `GET/POST /api/admin/v1/users`, `GET /api/admin/v1/users/{id}`, `GET /api/admin/v1/users/{id}/privacy-export`, `POST /api/admin/v1/users/{id}/deactivate` through user-management lifecycle facade + Keycloak Admin REST |
+| Admin Access Control/RBAC | `GET /api/admin/v1/roles`, `GET /api/admin/v1/permissions`, `POST /api/admin/v1/users/{id}/assignments` |
 | Organization | `GET /api/admin/v1/organizations/departments`, `GET /api/admin/v1/terms`, `POST /api/admin/v1/sections` |
 | Course | `GET /api/v1/courses`, `GET /api/v1/courses/{slug}`, `GET /api/admin/v1/courses`, `POST /api/admin/v1/courses/{id}/publish` |
 | Course Authoring | `POST /api/admin/v1/authoring/courses`, `GET /api/admin/v1/authoring/courses/{id}/draft`, `PUT /api/admin/v1/authoring/courses/{id}/curriculum` |
@@ -42,6 +44,28 @@ Clients (Next.js, React admin, Flutter) call the gateway directly. Next.js serve
 | Peer Review | `GET /api/v1/peer-reviews/settings/{assignmentId}`, `POST /api/admin/v1/peer-reviews/assignments`, `POST /api/v1/peer-reviews/review-assignments/{id}/submit` |
 | Live Session | `GET /api/v1/live-sessions?courseId=`, `POST /api/admin/v1/live-sessions`, `POST /api/v1/live-sessions/{id}/register` |
 | Review | `GET /api/v1/reviews/courses/{courseId}`, `GET /api/v1/reviews/courses/{courseId}/summary`, `POST /api/v1/reviews`, `POST /api/admin/v1/reviews/{id}/moderate` |
+
+`GET /api/v1/users/me`, profile update, public profiles and profile summary batch are served by
+`user-management-service`. In Keycloak mode, `/api/v1/auth/**` is legacy-only and blocked by the
+gateway so login/session/password policy stay in Keycloak. Profile summary batch responses preserve
+the requested user id order and omit missing profiles.
+`POST /api/admin/v1/users` creates the Keycloak account and user profile only; it does not grant a
+CourseFlow product role. Operators assign product roles separately through
+`POST /api/admin/v1/users/{id}/assignments` with explicit `roleId`, `scopeType` and `scopeId`.
+Public profile reads only return profiles marked `PUBLIC`; `PRIVATE` and `ORG` profiles are not
+exposed through the public profile endpoint. Authenticated/internal surfaces that need avatar/name
+for enrolled users should use the profile summary batch endpoint instead.
+
+`POST /internal/authz/check` accepts `scopeType` values `PLATFORM`, `ORG`, `DEPARTMENT`, `COURSE`
+and `SECTION`. `PLATFORM` must be sent without `scopeId`; every other scope requires a non-empty
+`scopeId`. The requested scope must be compatible with the permission definition scope maintained by
+`access-control-service`; mismatches are rejected before an allow/deny decision is returned.
+When checking a child resource, only the domain service that owns the resource topology should pass
+server-derived `ancestorScopes`, for example `{scopeType:"COURSE", scopeId:"course-1",
+ancestorScopes:[{scopeType:"DEPARTMENT", scopeId:"dept-1"}]}`. Access-control then evaluates role
+assignments granted at platform, requested scope and supplied ancestor scopes without learning
+course/organization topology itself. `ancestorScopes` are accepted only from service internal JWTs
+with `internal:authz:assert-topology`; never forward client-supplied ancestor paths directly.
 
 ## Response Rules
 

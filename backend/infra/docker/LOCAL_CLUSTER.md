@@ -99,14 +99,44 @@ and DB password values. It also switches Liquibase to `prod` unless overridden.
 From `backend/`, validate without booting the cluster:
 
 ```bash
-COURSEFLOW_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
-COURSEFLOW_INTERNAL_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/courseflow-internal-jwt.key
+openssl rsa -pubout -in /tmp/courseflow-internal-jwt.key -out /tmp/courseflow-internal-jwt.pub
+
+export COURSEFLOW_INTERNAL_JWT_ALGORITHM="RS256"
+export COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY="$(cat /tmp/courseflow-internal-jwt.key)"
+export COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY="$(cat /tmp/courseflow-internal-jwt.pub)"
+export COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE="jwks"
+export COURSEFLOW_INTERNAL_JWT_JWKS_URI="http://identity-token-converter-service:8105/oauth/jwks"
+export COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE="sts"
+
+sts_clients=(
+  api-gateway access-control-service user-management-service organization-service
+  course-service enrollment-service assignment-service deadline-service announcement-service
+  portfolio-service discussion-service notification-service chat-service media-service
+  search-service analytics-service gradebook-service quiz-service certificate-service
+  peer-review-service live-session-service review-service outbox-relay
+)
+for client in "${sts_clients[@]}"; do
+  env_name="COURSEFLOW_STS_$(printf '%s' "$client" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_SECRET"
+  export "$env_name=$(openssl rand -base64 48)"
+done
+
 CERTIFICATE_SIGNING_SECRET="replace-with-generated-32-byte-minimum-secret" \
 COURSEFLOW_DB_PASSWORD="replace-with-generated-db-password" \
 COURSEFLOW_STORAGE_ACCESS_KEY="replace-with-object-storage-access-key" \
 COURSEFLOW_STORAGE_SECRET_KEY="replace-with-object-storage-secret-key" \
 COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.com \
 KEYCLOAK_ADMIN_PASSWORD="replace-with-generated-keycloak-admin-password" \
+KEYCLOAK_PUBLIC_BASE_URL="https://auth.example.com" \
+KEYCLOAK_BASE_URL="https://auth.example.com" \
+KEYCLOAK_REALM="courseflow" \
+KEYCLOAK_ADMIN_CLIENT_ID="keycloak-user-lifecycle" \
+KEYCLOAK_ADMIN_CLIENT_SECRET="replace-with-generated-lifecycle-client-secret" \
+KEYCLOAK_SETUP_EMAIL_CLIENT_ID="courseflow-admin-web" \
+KEYCLOAK_SETUP_EMAIL_REDIRECT_URI="https://admin.example.com/login/callback" \
+KEYCLOAK_ISSUER_URI="https://auth.example.com/realms/courseflow" \
+KEYCLOAK_JWK_SET_URI="https://auth.example.com/realms/courseflow/protocol/openid-connect/certs" \
+KEYCLOAK_AUDIENCE="courseflow-api" \
   scripts/validate-prod-profile.sh --compose
 ```
 
@@ -198,9 +228,20 @@ scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_i
 - After validating user JWTs, the gateway exchanges them for a short-lived internal JWT and forwards
   `X-User-*` plus `X-Internal-Authorization`.
 - Downstream services reject `/internal/**` calls and propagated identity headers unless that
-  internal JWT validates with `COURSEFLOW_INTERNAL_JWT_SECRET`.
-- Direct service clients use `InternalJwtService` from `common-library` to mint service/user
-  internal JWTs for service-to-service calls.
+  internal JWT validates with the configured verifier. Local/dev defaults use HS256 with
+  `COURSEFLOW_INTERNAL_JWT_SECRET`; the prod profile requires RS256, keeps
+  `COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY` only on `identity-token-converter-service`, and has domain
+  services verify with `COURSEFLOW_INTERNAL_JWT_JWKS_URI`.
+- Direct service clients use `InternalJwtService` from `common-library` to attach service/user
+  internal JWTs. In the prod profile they request those tokens from `identity-token-converter-service`
+  with their own per-client `COURSEFLOW_STS_*_SECRET`; the converter keeps the central
+  `COURSEFLOW_STS_CLIENT_SECRETS` and `COURSEFLOW_STS_CLIENT_SCOPES` policy maps. Only the gateway
+  and chat websocket adapter receive `internal:token-exchange` by default. Only topology-owning
+  services such as organization-service and course-service receive `internal:authz:assert-topology`,
+  and role/permission policy reads require `internal:role-management:read` rather than generic `internal:service`. The
+  next hardening step is operational key rotation and e2e verification against the running cluster.
+- For a running OIDC cluster, run `node scripts/keycloak-security-smoke.mjs` from a context that can
+  reach the gateway, token converter and one direct domain service.
 
 ## Course Chat
 

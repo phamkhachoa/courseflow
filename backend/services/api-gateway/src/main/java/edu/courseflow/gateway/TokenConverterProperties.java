@@ -14,16 +14,24 @@ class TokenConverterProperties {
     private final Mode mode;
     private final String audience;
     private final long timeoutMs;
+    private final String clientId;
+    private final String clientSecret;
 
     TokenConverterProperties(
-            @Value("${courseflow.security.token-converter.uri:http://localhost:8105}") String uri,
+            @Value("${courseflow.security.token-converter.uri:http://identity-token-converter-service:8080}") String uri,
             @Value("${courseflow.security.token-converter.mode:required}") String mode,
             @Value("${courseflow.security.token-converter.audience:courseflow-services}") String audience,
-            @Value("${courseflow.security.token-converter.timeout-ms:800}") long timeoutMs) {
-        this.uri = trimToDefault(uri, "http://localhost:8105");
+            @Value("${courseflow.security.token-converter.timeout-ms:800}") long timeoutMs,
+            @Value("${courseflow.security.token-converter.client-id:${spring.application.name:api-gateway}}")
+            String clientId,
+            @Value("${courseflow.security.token-converter.client-secret:${COURSEFLOW_STS_CLIENT_SECRET:}}")
+            String clientSecret) {
+        this.uri = trimToDefault(uri, "http://identity-token-converter-service:8080");
         this.mode = parseMode(mode);
         this.audience = trimToDefault(audience, "courseflow-services");
         this.timeoutMs = Math.max(100, Math.min(timeoutMs, 5000));
+        this.clientId = trimToDefault(clientId, "api-gateway");
+        this.clientSecret = clientSecret == null ? "" : clientSecret.trim();
     }
 
     String uri() {
@@ -40,6 +48,14 @@ class TokenConverterProperties {
 
     long timeoutMs() {
         return timeoutMs;
+    }
+
+    String clientId() {
+        return clientId;
+    }
+
+    String clientSecret() {
+        return clientSecret;
     }
 
     private Mode parseMode(String raw) {

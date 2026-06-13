@@ -1,5 +1,5 @@
 server:
-  port: 8084
+  port: ${SERVER_PORT:8080}
 spring:
   application:
     name: enrollment-service
@@ -33,7 +33,19 @@ management:
       exposure:
         include: health,info,prometheus
 courseflow:  entitlement:
-    course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
-    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
+    course-service-url: ${COURSE_SERVICE_URL:http://course-service:8080}
+    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://enrollment-service:8080}
   enrollment:
     default-capacity: ${ENROLLMENT_DEFAULT_CAPACITY:100}
+
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

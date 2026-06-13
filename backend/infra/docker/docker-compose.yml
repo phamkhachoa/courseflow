@@ -120,12 +120,21 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:25.0
     container_name: courseflow-keycloak
-    command: ["start-dev"]
+    command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_BASE_URL:-http://localhost:18080}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
     ports:
       - "18080:8080"
+    volumes:
+      - ./keycloak/courseflow-realm.json:/opt/keycloak/data/import/courseflow-realm.json:ro
 
   minio:
     image: minio/minio:RELEASE.2024-10-13T13-34-11Z

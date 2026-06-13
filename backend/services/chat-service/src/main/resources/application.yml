@@ -1,5 +1,5 @@
 server:
-  port: 8104
+  port: ${SERVER_PORT:8080}
 spring:
   application:
     name: chat-service
@@ -8,11 +8,11 @@ spring:
       uri: ${CHAT_MONGO_URI:mongodb://localhost:27017/cf_chat}
       auto-index-creation: true
 courseflow:
-  security:
-    jwt:
-      secret: ${COURSEFLOW_JWT_SECRET:}
-      issuer: ${COURSEFLOW_JWT_ISSUER:courseflow-identity}
   chat:
+    token-converter-uri: ${TOKEN_CONVERTER_URI:http://identity-token-converter-service:8080}
+    token-converter-client-id: ${COURSEFLOW_STS_CLIENT_ID:${spring.application.name:chat-service}}
+    token-converter-client-secret: ${COURSEFLOW_STS_CLIENT_SECRET:}
+    internal-jwt-audience: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:courseflow-services}
     websocket:
       allowed-origins: ${CHAT_WS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:28080,http://localhost:8080}
 management:
@@ -20,3 +20,15 @@ management:
     web:
       exposure:
         include: health,info,prometheus
+
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

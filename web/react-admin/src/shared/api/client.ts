@@ -5,7 +5,8 @@ import axios, {
   type InternalAxiosRequestConfig
 } from "axios";
 import { unwrap } from "@/shared/api/envelope";
-import { sessionStore, type TokenResponse } from "@/shared/auth/session-store";
+import { keycloakAuthEnabled, refreshKeycloakToken } from "@/shared/auth/keycloak-auth";
+import { sessionStore, type StoredSession, type TokenResponse } from "@/shared/auth/session-store";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_GATEWAY_URL ?? "http://localhost:8080/api";
@@ -14,6 +15,39 @@ export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" }
 });
+
+type CurrentUserProfile = {
+  id: string | number;
+  email?: string;
+  fullName?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  role?: string;
+  status?: string;
+};
+
+export async function hydrateSessionProfile(): Promise<StoredSession | null> {
+  const existing = sessionStore.read();
+  if (!existing?.accessToken) return existing;
+  const { data: payload } = await apiClient.get<unknown>("/v1/users/me");
+  const profile = unwrap<CurrentUserProfile>(payload);
+  const latest = sessionStore.read() ?? existing;
+  const numericUserId = Number(profile.id);
+  const next = {
+    ...latest,
+    user: {
+      ...latest.user,
+      id: Number.isFinite(numericUserId) ? numericUserId : latest.user.id,
+      email: profile.email?.trim() || latest.user.email,
+      fullName: profile.fullName?.trim() || profile.displayName?.trim() || latest.user.fullName,
+      avatarUrl: profile.avatarUrl?.trim() || latest.user.avatarUrl,
+      role: profile.role?.trim() || latest.user.role,
+      status: profile.status?.trim() || latest.user.status
+    }
+  };
+  sessionStore.write(next);
+  return next;
+}
 
 /** Attach the bearer token to every outgoing request. */
 apiClient.interceptors.request.use((config) => {
@@ -42,6 +76,21 @@ async function refreshAccessToken(): Promise<string> {
   if (!session?.refreshToken) {
     throw new Error("No refresh token available");
   }
+  if (keycloakAuthEnabled) {
+    const refreshed = await refreshKeycloakToken(session.refreshToken);
+    const next = {
+      ...refreshed,
+      user: {
+      ...refreshed.user,
+      fullName: refreshed.user.fullName || session.user.fullName,
+      avatarUrl: session.user.avatarUrl ?? refreshed.user.avatarUrl,
+      role: session.user.role || refreshed.user.role,
+      status: session.user.status || refreshed.user.status
+    }
+  };
+    sessionStore.write(next);
+    return next.accessToken;
+  }
   // Bare axios call so we don't recurse through the interceptors below.
   const { data: payload } = await axios.post<unknown>(
     `${API_BASE_URL}/v1/auth/refresh`,
@@ -52,7 +101,11 @@ async function refreshAccessToken(): Promise<string> {
   sessionStore.write({
     accessToken: data.accessToken,
     refreshToken: data.refreshToken,
-    user: data.user
+    user: {
+      ...data.user,
+      fullName: data.user.fullName || session.user.fullName,
+      avatarUrl: session.user.avatarUrl ?? data.user.avatarUrl
+    }
   });
   return data.accessToken;
 }

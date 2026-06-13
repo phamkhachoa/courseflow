@@ -23,20 +23,29 @@ the product decides what the caller can do inside product-specific resources.
 
 ## Current State
 
-The repository already contains a Keycloak container in local Docker, but Keycloak is not yet the
-runtime authorization server for CourseFlow APIs.
+The repository now supports two external-token modes during migration:
 
-Current runtime behavior:
+- `legacy`: `identity-service` signs CourseFlow HS256 user tokens. This remains for local/demo
+  compatibility and should not be used for the production target.
+- `oidc`: Keycloak issues external OAuth2/OIDC access tokens, `api-gateway` validates issuer, JWKS
+  and audience, then `identity-token-converter-service` validates the token again, resolves the
+  CourseFlow user through `access-control-service`, and issues a short-lived internal JWT.
 
-- `identity-service` signs user access tokens with an HS256 shared secret.
-- `api-gateway` validates those custom access tokens directly with `COURSEFLOW_JWT_SECRET`.
-- `identity-token-converter-service` validates the same custom token and issues an internal JWT.
-- `common-library` validates internal JWTs and protects propagated `X-User-*` headers.
-- Keycloak is present as infrastructure, but it is not part of the login/token validation path.
+`common-library` validates internal JWTs and protects propagated `X-User-*` headers. In OIDC mode,
+legacy auth endpoints are blocked at the gateway so Keycloak is the only supported edge login
+authority. Admin user lifecycle now goes through `user-management-service`, which provisions and
+deactivates Keycloak users through the Keycloak Admin API, mirrors CourseFlow authorization data in
+`access-control-service`, and keeps profile data in `user-management-service`.
 
-That design is a good migration step away from raw service tokens, but it is not yet enterprise
-identity architecture. The remaining gap is external OAuth2/OIDC integration and hardening of
-internal token issuance.
+Internal JWT signing now supports `HS256` for local/demo compatibility and `RS256` for the production
+profile. The token converter also exposes an internal JWKS endpoint and supports internal
+`client_credentials` / trusted-user token issuance, so domain services can request service-to-service
+tokens from the converter instead of holding signing keys. Domain services can verify internal JWTs
+through the converter JWKS endpoint with cache and `kid` refresh. Trusted-user issuance requires the
+caller to pass the verified inbound internal user JWT as `actor_token`; the converter rejects
+self-asserted `user_id`, `roles` and `role_assignments` in this grant. The remaining gaps are mobile
+native callback/e2e verification, full Keycloak end-to-end verification in Docker, key rotation
+drills and auth metrics.
 
 ## Target Flow
 
@@ -46,7 +55,7 @@ sequenceDiagram
     participant KC as "Keycloak"
     participant GW as "api-gateway"
     participant STS as "identity-token-converter-service"
-    participant ID as "identity-service"
+    participant ACL as "access-control-service"
     participant SVC as "Domain Service"
 
     User->>KC: Authorization Code + PKCE login
@@ -55,8 +64,8 @@ sequenceDiagram
     GW->>GW: Validate iss/aud/exp/nbf/signature via JWKS
     GW->>STS: Token exchange with external access_token
     STS->>STS: Validate Keycloak token again
-    STS->>ID: Resolve external subject to CourseFlow user and roles
-    ID-->>STS: user id, status, role assignments, permissions snapshot
+    STS->>ACL: Resolve external subject to CourseFlow user and roles
+    ACL-->>STS: user id, status, role assignments, permissions snapshot
     STS-->>GW: short-lived CourseFlow internal JWT
     GW->>SVC: Forward internal JWT and verified identity headers
     SVC->>SVC: Verify internal JWT and enforce domain authorization
@@ -103,20 +112,21 @@ audit, product transactions and product-specific invariants.
 
 ## CourseFlow Responsibility
 
-`identity-service` should evolve from custom password/JWT issuer into an IAM facade plus domain
-authorization service:
+CourseFlow splits product identity data across two services and deliberately does not build another
+IAM service beside Keycloak:
 
-- Maintain `users` as CourseFlow users with status, display name, preferences and audit state.
-- Maintain a mapping table from external identities to CourseFlow users.
-- Own role assignments, permissions and scoped memberships used by LMS workflows.
-- Provide internal authorization checks such as `course:publish`, `gradebook:override`,
-  `review:approve`, and scoped course/organization checks.
-- Consume Keycloak/admin events or provisioning callbacks to sync user lifecycle when needed.
-- Use Keycloak Admin API only from this facade, never directly from random domain services.
-
-If profile complexity grows, split profile data into a dedicated user-management/profile service.
-That service owns avatar, bio, locale, notification preferences and learner profile data. It should
-not own password, sessions or access-token signing.
+- `access-control-service` owns CourseFlow authorization: immutable Keycloak `issuer + subject`
+  links, CourseFlow user id resolution, role assignments, scoped permissions, authorization checks
+  and audit history. It is a product authorization service, not an IAM.
+- `user-management-service` owns profile and directory data: display name, avatar, bio, locale,
+  timezone, public profile, learner/instructor profile views and batch profile summaries. Public
+  profile reads only expose profiles marked `PUBLIC`; summary batch lookup is the preferred
+  authenticated/internal way to hydrate avatar/name in UI lists.
+- `identity-service` remains only as a temporary legacy auth/account compatibility service while
+  custom password/JWT auth is being phased out. It should not own long-term password/session policy,
+  LMS authorization or profile directory data.
+- Keycloak/admin events or provisioning callbacks may feed CourseFlow user lifecycle, but random
+  domain services must not call Keycloak Admin API directly.
 
 ## Client Model
 
@@ -146,6 +156,10 @@ External Keycloak access token should carry only stable IAM facts:
 - coarse roles or groups when useful
 - `email` and `email_verified` as profile hints, not primary identity keys
 
+External tokens must not emit CourseFlow product identifiers such as `uid` or `courseflow_user_id`.
+CourseFlow user id is resolved from `iss + sub` by `access-control-service` and appears only in the
+internal JWT or user-management responses.
+
 CourseFlow internal JWT should carry product facts with a very short TTL:
 
 - `iss`: CourseFlow internal STS
@@ -158,9 +172,25 @@ CourseFlow internal JWT should carry product facts with a very short TTL:
 - `scope` or `scp` for internal service permissions
 - `jti`, `iat`, `nbf`, `exp`
 
-Enterprise hardening target: internal tokens should be asymmetrically signed by the converter/STS
-and verified through an internal JWKS endpoint. Sharing one HMAC signing secret across all services
-is acceptable only as a transition because any compromised service that can sign tokens can
+Current implementation supports two internal signing modes:
+
+- `HS256`: local/demo migration mode using `COURSEFLOW_INTERNAL_JWT_SECRET`.
+- `RS256`: production profile mode using `COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY` for signing and
+  `COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY` for verification.
+
+Service-to-service issuance supports two modes:
+
+- `local`: the compatibility mode where `InternalJwtService` signs directly.
+- `sts`: production mode where `InternalJwtService` calls `identity-token-converter-service`
+  with `client_credentials` or trusted-user delegation and receives a short-lived internal JWT.
+  Each production service authenticates with its own STS client secret, and the converter grants
+  only the scopes configured for that client.
+  Trusted-user delegation forwards the already-verified inbound internal JWT as `actor_token`; it
+  does not let a service submit arbitrary user ids or roles.
+
+Enterprise hardening target after this step: exercise key rotation and observability around STS/JWKS
+in a running cluster. Sharing an HMAC secret, or distributing an RSA private key outside the
+converter/STS, is acceptable only as a transition because any compromised signing service can
 impersonate other actors.
 
 ## Realm and Tenant Strategy
@@ -191,6 +221,9 @@ Production requirements:
 - Disable Direct Access Grants unless there is an explicit machine-approved exception.
 - Enable health, metrics, audit/admin events and log shipping.
 - Configure SMTP for required actions and account recovery if email workflows are enabled.
+- Validate the production realm template with `scripts/validate-keycloak-realm.mjs` so PKCE clients,
+  API audience mapping, password/session/OTP policy, no-demo-users and no-localhost redirects remain
+  enforced in source control.
 - Export realm configuration as code for repeatable environments.
 - Separate local/dev realm config from production realm config.
 
@@ -204,6 +237,20 @@ Production requirements:
 - Add the same verifier capability to `identity-token-converter-service`.
 - Add tests for issuer mismatch, audience mismatch, expired token, key rotation and missing subject.
 
+Implementation note: gateway and converter now expose `EXTERNAL_TOKEN_MODE=legacy|oidc` plus
+`KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWK_SET_URI` and `KEYCLOAK_AUDIENCE`. In `legacy` mode they keep
+accepting CourseFlow HS256 tokens. In `oidc` mode they validate external access tokens with issuer,
+JWKS and audience before the converter resolves CourseFlow roles from `access-control-service`.
+Local Docker now imports `backend/infra/docker/keycloak/courseflow-realm.json`, which defines the
+CourseFlow realm, learner/admin public PKCE clients and the `courseflow-api` audience mapper. The
+React admin can use Authorization Code + PKCE with `VITE_AUTH_MODE=keycloak`; the learner web can use
+the same flow with `NEXT_PUBLIC_AUTH_MODE=keycloak`. The Flutter app has a Keycloak/AppAuth mode via
+`COURSEFLOW_AUTH_MODE=keycloak` and the `courseflow-mobile` public PKCE client. The local realm
+includes demo users only for developer testing. Production uses
+`backend/infra/docker/keycloak/courseflow-realm.prod-template.json` as a no-demo-users starting point
+and does not import the local realm. Full Keycloak e2e tests and mobile platform callback
+configuration remain follow-up work.
+
 ### Phase 2: Identity mapping and converter enrichment
 
 - Add `user_external_identities` with `provider`, `issuer`, `subject`, `user_id`, `linked_at`,
@@ -211,13 +258,43 @@ Production requirements:
 - Token converter maps Keycloak `iss + sub` to CourseFlow `user_id`.
 - First-time provisioning is explicit: invite, registration approval, SCIM, admin import or trusted
   JIT provisioning. Do not silently create privileged users from arbitrary email domains.
+- The provisioning worker/importer calls `access-control-service`
+  `POST /internal/identities/provision` to create the authorization link and role hints, then calls
+  `user-management-service` `POST /internal/users/provision-profile` to create display name/avatar
+  directory data. Profile summary batch responses preserve the requested user id order and omit
+  missing profiles.
 - Token converter enriches internal JWT from CourseFlow roles and scoped assignments.
+- `access-control-service` enforces the supported assignment scopes (`PLATFORM`, `ORG`,
+  `DEPARTMENT`, `COURSE`, `SECTION`), requires non-platform `scopeId` values, and validates each
+  authorization check against the permission definition scope (`ANY`, `PLATFORM`, `ORG`,
+  `DEPARTMENT`, `COURSE`, `SECTION`). This keeps Keycloak coarse and CourseFlow precise.
+- Authorization checks may include `ancestorScopes` supplied by the domain service that owns the
+  resource topology, so department/org assignments can apply to course/section checks without
+  turning access-control into a topology aggregator. Access-control accepts those ancestors only
+  from service internal JWTs with `internal:authz:assert-topology`.
+- Admin user list/detail/create/deactivate/privacy-export are migrated to a lifecycle facade in
+  `user-management-service`: profile/display fields come from user-management, email/status/primary
+  role and role-grant exports come from `access-control-service`, and account enablement/session
+  revocation/setup email are delegated to Keycloak Admin REST through the dedicated
+  `keycloak-user-lifecycle` service account. The facade asks `access-control-service` for
+  `platform:admin` before serving backoffice reads or lifecycle mutations. Creating a user does not
+  grant product roles inline; role assignment is a separate access-control operation with explicit
+  `roleId`, `scopeType` and `scopeId`.
+- `GET /api/v1/users/me` is also routed to `user-management-service` as a compatibility facade. It
+  no longer reads from `identity-service`; access-control remains the canonical source for
+  CourseFlow user id/email/status/primary role, and user-management owns display name/avatar.
+- Web and mobile clients must not treat Keycloak `realm_access.roles` as CourseFlow product roles.
+  After Keycloak login they hydrate `/api/v1/users/me`; `user-management-service` returns profile
+  fields plus the role/status resolved from `access-control-service`.
 
 ### Phase 3: Client login migration
 
 - Move learner web, admin web and mobile login to Authorization Code + PKCE.
 - Remove password handling from frontend clients.
-- Keep custom `/auth/login` only as a temporary legacy path with a deprecation flag.
+- Keep custom `/auth/login` only behind an explicit local legacy compatibility profile.
+- The default gateway route table no longer exposes `/api/v1/auth/**`. In `EXTERNAL_TOKEN_MODE=oidc`,
+  the global gateway filter also returns `410 Gone` for every `/api/v1/auth/**` path so clients use
+  Keycloak as the edge login authority even if a legacy route is mounted for local testing.
 - Move MFA and password reset flows to Keycloak required actions.
 - Update logout to use OIDC logout and revoke/clear refresh tokens.
 
@@ -225,16 +302,57 @@ Production requirements:
 
 - Stop issuing CourseFlow HS256 user access tokens from `identity-service`.
 - Remove `COURSEFLOW_JWT_SECRET` from external user auth paths.
-- Keep `identity-service` for user lifecycle, profile, role assignment, authz checks and audit.
+- Keep CourseFlow user authorization in `access-control-service` and profile/directory data in
+  `user-management-service`; `identity-service` must not be an STS client and should be retired once
+  the temporary legacy password endpoints are removed. In the production compose overlay,
+  `identity-service` is placed behind the `legacy-identity` profile so it is not part of the default
+  Keycloak deployment.
 - Keep downstream services unchanged where possible because they already consume internal JWT.
 
 ### Phase 5: Harden internal service authentication
 
-- Replace shared-secret internal JWT signing with STS-issued asymmetric tokens.
-- Services verify internal JWT using STS JWKS.
+- Current implementation: add RS256 internal JWT mode and require it in the prod validation profile.
+- Current implementation: add STS `client_credentials` / trusted-user grants and internal JWKS.
+- Current implementation: trusted-user grants require a signed internal user `actor_token` and reject
+  self-asserted user/role form fields.
+- Current implementation: production Compose defaults domain services to STS-issued service tokens
+  while keeping the converter in local signing mode to avoid token-issuance loops.
+- Current implementation: production validation requires token converter identity resolution through
+  `access-control-service` and rejects wildcard STS client allowlists.
+- Current implementation: production validation requires per-client STS secrets and scope maps, and
+  rejects secret reuse across STS clients.
+- Current implementation: domain services verify internal JWT using STS JWKS instead of static
+  public-key env values.
 - Service-to-service machine calls use client credentials, mTLS, or STS-issued service tokens with
   per-service audiences and scopes.
-- Add token issuance metrics, failed conversion metrics, invalid internal JWT metrics and audit logs.
+- Current implementation: `TrustedGatewayHeaderFilter` enforces endpoint-level service scopes for
+  internal machine tokens. Examples include `internal:identity:resolve`,
+  `internal:identity:provision`, `internal:authz:check`, `internal:authz:assert-topology`,
+  `internal:user-directory:*`, `internal:role-assignment:*`, `internal:role-management:*`, `internal:profile:*`,
+  `internal:token-exchange` and `internal:backoffice`.
+- Current implementation: external-token exchange requires STS client authentication plus
+  `internal:token-exchange`; by default only `api-gateway` and `chat-service` receive that scope.
+- Current implementation: user internal JWTs cannot call `/internal/**` directly unless
+  gateway/service-propagated identity headers are present and match the token claims.
+- Current implementation: token converter exports token exchange success/failure/duration metrics
+  and JWKS request metrics.
+- Current implementation: token converter emits structured audit logs for token-exchange,
+  client-credentials and trusted-user grant success/failure without logging bearer tokens or client
+  secrets.
+- Current implementation: downstream services export internal JWT rejection metrics when
+  `/internal/**`, `/backoffice/**` or gateway identity headers are denied.
+- Current implementation: access-control-service audits denied authorization decisions and exports
+  authorization decision counters. Allowed decision audit is optional via
+  `ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED=true`.
+- Current implementation: access-control-service validates scoped authorization requests before
+  making a decision, rejecting unknown scope types, missing non-platform scope ids and permission
+  scope mismatches.
+- Current implementation: access-control-service supports service-supplied scope ancestry for child
+  resource checks only when the caller has `internal:authz:assert-topology`, while preserving
+  exact-scope behavior for callers that do not send ancestors.
+- Current implementation: chat WebSocket STOMP `CONNECT` exchanges the presented Keycloak/legacy
+  external bearer token through `identity-token-converter-service`, verifies the returned internal
+  JWT locally, and uses its scoped role assignments for course access checks.
 
 ## Anti-Patterns to Avoid
 
@@ -247,6 +365,13 @@ Production requirements:
 - Do not expose Keycloak admin console publicly.
 - Do not let internal services rely on `X-User-*` without internal token verification.
 - Do not keep shared HMAC token signing as the final enterprise design.
+- Do not treat distributed RSA private keys as the final enterprise design; move signing into STS/JWKS.
+- Do not let WebSocket/STOMP services verify legacy CourseFlow JWTs directly in Keycloak mode.
+- Do not let the token converter fall back to external token role claims in production.
+- Do not use wildcard STS client allowlists in production.
+- Do not reuse one STS client secret across all internal services in production.
+- Do not grant `internal:token-exchange` broadly; it belongs only to gateway-like edge adapters that
+  must convert already-present external user tokens.
 
 ## Production Readiness Gates
 
@@ -255,33 +380,51 @@ CourseFlow should not be called enterprise-ready for Keycloak until all gates pa
 - Gateway accepts a Keycloak RS256/ES256 access token and rejects wrong issuer, audience, expiry and
   unsigned/invalid signatures.
 - Converter validates the same Keycloak token independently and issues a short-lived internal JWT.
+- Production profile uses RS256 for CourseFlow internal JWTs.
 - Domain services reject forged `X-User-*` headers without valid internal JWT.
 - Frontend login uses Authorization Code + PKCE.
 - Custom password grant/login is disabled or explicitly marked legacy.
 - Identity mapping uses immutable Keycloak subject plus issuer.
 - Admin/operator roles are coarse in Keycloak and fine-grained LMS permissions remain in CourseFlow.
+- Access-control rejects invalid scope types, missing non-platform `scopeId` values and permission
+  scope mismatches before returning authorization decisions.
 - Realm config is repeatable from source-controlled configuration.
 - Keycloak production deployment does not use `start-dev`.
+- Production Compose does not import the local demo realm or demo users.
 - Keycloak database backup/restore and key rotation drills are documented.
 - Auth failure, token conversion failure and authorization denial metrics exist.
+- Token converter Prometheus metrics include `courseflow.token_converter.requests`,
+  `courseflow.token_converter.success`, `courseflow.token_converter.failure`,
+  `courseflow.token_converter.duration` and `courseflow.token_converter.jwks.requests`.
+- Token converter structured audit logs are emitted on logger
+  `courseflow.security.token_converter.audit` for success and failure outcomes, and must not contain
+  raw bearer tokens or client secrets.
+- Downstream internal JWT rejection metrics include `courseflow.internal_jwt.rejections` tagged by
+  low-cardinality `reason` and `request_type`, including internal, backoffice and identity-header
+  request surfaces.
+- Access-control Prometheus metrics include `courseflow.access_control.authz.checks` tagged by
+  low-cardinality `result`, `reason` and `scope_type`; denied checks are also written to the
+  access-control audit log.
+- `scripts/keycloak-security-smoke.mjs` passes against a running OIDC cluster with a real Keycloak
+  access token and a per-client STS secret.
 
 ## Recommended Backlog
 
 P0:
 
-- Add Keycloak OIDC/JWKS verifier in gateway and converter.
-- Add `user_external_identities` mapping and resolver API in `identity-service`.
-- Add realm/client bootstrap config for local dev.
-- Switch web learner/admin login to Authorization Code + PKCE.
-- Add negative security tests for invalid issuer/audience/signature and forged identity headers.
+- Run `scripts/keycloak-security-smoke.mjs` in CI/staging after the OIDC cluster starts.
+- Run full Keycloak lifecycle e2e for admin create/deactivate/privacy-export against a real realm
+  with SMTP configured.
+- Add operational key rotation runbooks and tests for Keycloak JWKS and internal STS JWKS rollover.
 
 P1:
 
-- Convert custom auth endpoints into IAM facade endpoints.
+- Register mobile redirect schemes in generated Android/iOS platform projects, run mobile Keycloak
+  e2e, and disable the legacy password mode for production mobile builds.
 - Move MFA/password reset to Keycloak.
 - Add Keycloak event sync for user lifecycle and audit.
-- Add converter audit log and metrics.
-- Add internal STS JWKS and asymmetric internal tokens.
+- Add operator dashboards for token exchange failures, JWKS refresh failures and denied
+  access-control checks.
 
 P2:
 

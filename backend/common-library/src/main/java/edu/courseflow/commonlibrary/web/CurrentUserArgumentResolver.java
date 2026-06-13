@@ -32,9 +32,10 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         String role = webRequest.getHeader(GatewayHeaders.USER_ROLE);
         String rolesHeader = webRequest.getHeader(GatewayHeaders.USER_ROLES);
         String roleScopesHeader = webRequest.getHeader(GatewayHeaders.USER_ROLE_SCOPES);
+        String internalToken = webRequest.getHeader(GatewayHeaders.INTERNAL_AUTHORIZATION);
         Long userId = parseUserId(id);
         Set<String> roles = parseRoles(rolesHeader, role);
-        return new CurrentUser(userId, email, role, roles, parseRoleScopes(roleScopesHeader));
+        return new CurrentUser(userId, email, role, roles, parseRoleScopes(roleScopesHeader), internalToken);
     }
 
     private Long parseUserId(String id) {

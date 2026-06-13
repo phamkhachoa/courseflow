@@ -95,7 +95,7 @@ public class CourseModuleService {
             CertificateEligibilityClient certificateEligibilityClient,
             LearningSourceStatusClient sourceStatusClient,
             RestClient.Builder restClientBuilder,
-            @Value("${courseflow.content.media-service-url:http://localhost:8091}") String mediaServiceUrl,
+            @Value("${courseflow.content.media-service-url:http://media-service:8080}") String mediaServiceUrl,
             InternalJwtService internalJwt) {
         this.modules = modules;
         this.items = items;

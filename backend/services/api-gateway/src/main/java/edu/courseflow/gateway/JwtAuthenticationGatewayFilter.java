@@ -1,16 +1,15 @@
 package edu.courseflow.gateway;
 
 import edu.courseflow.commonlibrary.constants.GatewayHeaders;
+import edu.courseflow.commonlibrary.security.InternalJwtService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -27,10 +26,10 @@ import reactor.core.publisher.Mono;
  * The gateway is the single trust boundary. For every inbound request it:
  * <ol>
  *   <li>strips any client-supplied {@code X-User-*} headers so identity cannot be spoofed;</li>
- *   <li>validates the Bearer JWT (HS256, shared secret with identity-service);</li>
+ *   <li>validates the external Bearer JWT (legacy HS256 or OAuth2/OIDC JWKS);</li>
  *   <li>exchanges the external JWT for a short-lived internal JWT;</li>
- *   <li>forwards a verified identity to downstream services via legacy {@code X-User-*} headers,
- *       plus {@code X-Internal-Authorization}.</li>
+ *   <li>forwards identity derived from the verified internal JWT via legacy {@code X-User-*}
+ *       headers, plus {@code X-Internal-Authorization}.</li>
  * </ol>
  * Downstream services are only reachable through the gateway (network isolation) and may read
  * these headers as trusted, e.g. via {@code CurrentUserArgumentResolver} in common-library.
@@ -53,18 +52,28 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
     private static final List<String> ROLE_RANK =
             List.of("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA", "STUDENT");
 
-    private final SecretKey secretKey;
+    private final GatewayExternalTokenVerifier externalTokenVerifier;
+    private final ExternalTokenProperties externalTokenProperties;
     private final InternalTokenConverterClient tokenConverter;
+    private final InternalJwtService internalJwtService;
 
     @Autowired
-    public JwtAuthenticationGatewayFilter(JwtSecretProperties jwtSecretProperties,
-            InternalTokenConverterClient tokenConverter) {
-        this.secretKey = jwtSecretProperties.secretKey();
+    public JwtAuthenticationGatewayFilter(GatewayExternalTokenVerifier externalTokenVerifier,
+            ExternalTokenProperties externalTokenProperties,
+            InternalTokenConverterClient tokenConverter,
+            InternalJwtService internalJwtService) {
+        this.externalTokenVerifier = externalTokenVerifier;
+        this.externalTokenProperties = externalTokenProperties;
         this.tokenConverter = tokenConverter == null ? InternalTokenConverterClient.disabled() : tokenConverter;
+        this.internalJwtService = internalJwtService;
     }
 
-    JwtAuthenticationGatewayFilter(JwtSecretProperties jwtSecretProperties) {
-        this(jwtSecretProperties, InternalTokenConverterClient.disabled());
+    JwtAuthenticationGatewayFilter(GatewayExternalTokenVerifier externalTokenVerifier,
+            ExternalTokenProperties externalTokenProperties,
+            InternalTokenConverterClient tokenConverter,
+            InternalJwtService internalJwtService,
+            boolean testConstructor) {
+        this(externalTokenVerifier, externalTokenProperties, tokenConverter, internalJwtService);
     }
 
     @Override
@@ -82,6 +91,10 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             headers.remove(GatewayHeaders.INTERNAL_AUTHORIZATION);
         });
 
+        if (isLegacyAuthPath(path) && !externalTokenProperties.legacyMode()) {
+            return error(exchange, HttpStatus.GONE, "Gone", "Legacy auth endpoints are disabled in OIDC mode");
+        }
+
         if (isPublic(path, request.getMethod().name())) {
             return chain.filter(exchange.mutate().request(builder.build()).build());
         }
@@ -91,44 +104,10 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             return unauthorized(exchange, "Missing bearer token");
         }
 
-        try {
-            String externalToken = authHeader.substring(7);
-            Claims claims = Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(externalToken)
-                    .getPayload();
-
-            String userId = requireClaim(claims, "uid");
-            String email = claims.getSubject();
-            if (email == null || email.isBlank()) {
-                return unauthorized(exchange, "Token subject is missing");
-            }
-
-            // identity-service issues a `roles` claim: an array of {code, scopeType, scopeId}.
-            List<RoleClaim> roleClaims = extractRoleClaims(claims);
-            Set<String> roleCodes = roleClaims.stream()
-                    .map(RoleClaim::code)
-                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-            if (roleCodes.isEmpty()) {
-                return unauthorized(exchange, "Token carries no roles");
-            }
-            String primaryRole = primaryRole(roleCodes);
-
-            if (isOperatorPath(path) && roleCodes.stream().noneMatch(OPERATOR_ROLES::contains)) {
-                return forbidden(exchange, "Admin API requires an operator role");
-            }
-
-            builder.header(GatewayHeaders.USER_ID, userId)
-                    .header(GatewayHeaders.USER_ROLE, primaryRole)
-                    .header(GatewayHeaders.USER_ROLES, String.join(",", roleCodes))
-                    .header(GatewayHeaders.USER_ROLE_SCOPES, encodeRoleScopes(roleClaims))
-                    .header(GatewayHeaders.USER_EMAIL, email);
-
-            return forwardWithInternalToken(exchange, chain, builder, externalToken);
-        } catch (JwtException | IllegalArgumentException ex) {
-            return unauthorized(exchange, "Invalid or expired token");
-        }
+        String externalToken = authHeader.substring(7);
+        return externalTokenVerifier.verify(externalToken)
+                .then(forwardWithInternalToken(exchange, chain, builder, externalToken))
+                .onErrorResume(ex -> unauthorized(exchange, "Invalid or expired token"));
     }
 
     private Mono<Void> forwardWithInternalToken(ServerWebExchange exchange, GatewayFilterChain chain,
@@ -141,11 +120,17 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
 
         return tokenConverter.exchange(externalToken)
                 .flatMap(internalToken -> {
-                    ServerHttpRequest converted = builder.headers(headers -> {
-                        String bearer = "Bearer " + internalToken;
-                        headers.set("Authorization", bearer);
-                        headers.set(GatewayHeaders.INTERNAL_AUTHORIZATION, bearer);
-                    }).build();
+                    IdentityHeaders identity;
+                    try {
+                        Claims internalClaims = internalJwtService.verify(internalToken);
+                        identity = identityHeaders(internalClaims, exchange.getRequest().getURI().getPath());
+                    } catch (OperatorForbiddenException ex) {
+                        return forbidden(exchange, "Admin API requires an operator role");
+                    } catch (JwtException | IllegalArgumentException | IllegalStateException ex) {
+                        return conversionFailure;
+                    }
+                    ServerHttpRequest converted = builder.headers(headers ->
+                            writeInternalIdentityHeaders(headers, internalToken, identity)).build();
                     return chain.filter(exchange.mutate().request(converted).build());
                 })
                 .switchIfEmpty(conversionFailure)
@@ -163,12 +148,17 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
         return "GET".equalsIgnoreCase(method) && isPublicReadPath(path);
     }
 
+    private boolean isLegacyAuthPath(String path) {
+        return path.startsWith("/api/v1/auth/");
+    }
+
     private boolean isPublicReadPath(String path) {
         if (path.equals("/api/v1/courses") || path.matches("/api/v1/courses/[^/]+")
                 || path.matches("/api/v1/courses/[^/]+/related")) {
             return true;
         }
         return path.startsWith("/api/v1/search")
+                || path.matches("/api/v1/profiles/[^/]+")
                 || path.startsWith("/api/v1/certificates/verify")
                 || path.startsWith("/api/v1/reviews/courses");
     }
@@ -186,17 +176,25 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
     }
 
     /**
-     * Pull the distinct role codes out of the {@code roles} claim. The claim is an array of
-     * {@code {code, scopeType, scopeId}} maps; we only need the codes at the edge — scope-aware
-     * decisions are delegated to identity-service's {@code /internal/authz/check}. Order is
-     * preserved so {@link #primaryRole} can pick deterministically.
+     * Pull role assignment tuples out of the verified internal JWT. The converter writes
+     * `role_assignments` as an array of `{code, scopeType, scopeId}` maps; older/legacy internal
+     * tokens may only have `roles`, so we tolerate both shapes.
      */
     @SuppressWarnings("unchecked")
     private List<RoleClaim> extractRoleClaims(Claims claims) {
-        Object raw = claims.get("roles");
-        if (!(raw instanceof List<?> list)) {
-            return List.of();
+        Object rawAssignments = claims.get("role_assignments");
+        if (rawAssignments instanceof List<?> assignments && !assignments.isEmpty()) {
+            return roleClaims(assignments);
         }
+        Object rawRoles = claims.get("roles");
+        if (rawRoles instanceof List<?> roles) {
+            return roleClaims(roles);
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<RoleClaim> roleClaims(List<?> list) {
         List<RoleClaim> roles = new java.util.ArrayList<>();
         for (Object element : list) {
             if (element instanceof Map<?, ?> map) {
@@ -215,6 +213,37 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             }
         }
         return roles;
+    }
+
+    private IdentityHeaders identityHeaders(Claims claims, String path) {
+        String userId = requireClaim(claims, "uid");
+        String email = claims.get("email", String.class);
+        List<RoleClaim> roleClaims = extractRoleClaims(claims);
+        Set<String> roleCodes = roleClaims.stream()
+                .map(RoleClaim::code)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (roleCodes.isEmpty()) {
+            throw new IllegalArgumentException("Internal token carries no roles");
+        }
+        if (isOperatorPath(path) && roleCodes.stream().noneMatch(OPERATOR_ROLES::contains)) {
+            throw new OperatorForbiddenException();
+        }
+        return new IdentityHeaders(userId, email, primaryRole(roleCodes), roleCodes, roleClaims);
+    }
+
+    private void writeInternalIdentityHeaders(org.springframework.http.HttpHeaders headers,
+                                              String internalToken,
+                                              IdentityHeaders identity) {
+        String bearer = "Bearer " + internalToken;
+        headers.set("Authorization", bearer);
+        headers.set(GatewayHeaders.INTERNAL_AUTHORIZATION, bearer);
+        headers.set(GatewayHeaders.USER_ID, identity.userId());
+        headers.set(GatewayHeaders.USER_ROLE, identity.primaryRole());
+        headers.set(GatewayHeaders.USER_ROLES, String.join(",", identity.roleCodes()));
+        headers.set(GatewayHeaders.USER_ROLE_SCOPES, encodeRoleScopes(identity.roleClaims()));
+        if (identity.email() != null && !identity.email().isBlank()) {
+            headers.set(GatewayHeaders.USER_EMAIL, identity.email());
+        }
     }
 
     private String encodeRoleScopes(List<RoleClaim> roleClaims) {
@@ -266,5 +295,12 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
     }
 
     private record RoleClaim(String code, String scopeType, String scopeId) {
+    }
+
+    private record IdentityHeaders(String userId, String email, String primaryRole, Set<String> roleCodes,
+                                   List<RoleClaim> roleClaims) {
+    }
+
+    private static final class OperatorForbiddenException extends RuntimeException {
     }
 }

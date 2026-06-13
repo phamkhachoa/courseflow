@@ -30,8 +30,8 @@ public class LearningSourceStatusClient {
     private final InternalJwtService internalJwt;
 
     public LearningSourceStatusClient(RestClient.Builder restClientBuilder,
-            @Value("${courseflow.content.quiz-service-url:http://localhost:8095}") String quizServiceUrl,
-            @Value("${courseflow.content.assignment-service-url:http://localhost:8085}") String assignmentServiceUrl,
+            @Value("${courseflow.content.quiz-service-url:http://quiz-service:8080}") String quizServiceUrl,
+            @Value("${courseflow.content.assignment-service-url:http://assignment-service:8080}") String assignmentServiceUrl,
             @Value("${courseflow.content.source-status-timeout-ms:1500}") long sourceStatusTimeoutMs,
             InternalJwtService internalJwt) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();

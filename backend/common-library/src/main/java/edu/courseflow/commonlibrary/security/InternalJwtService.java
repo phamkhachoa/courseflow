@@ -4,6 +4,7 @@ import edu.courseflow.commonlibrary.constants.GatewayHeaders;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -16,8 +17,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 @Component
 public class InternalJwtService {
@@ -26,9 +34,24 @@ public class InternalJwtService {
             List.of("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA", "STUDENT");
 
     private final InternalJwtProperties properties;
+    private final RestClient tokenConverterClient;
+    private final InternalJwksKeyLocator jwksKeyLocator;
 
     public InternalJwtService(InternalJwtProperties properties) {
+        this(properties, null);
+    }
+
+    @Autowired
+    public InternalJwtService(InternalJwtProperties properties,
+                              ObjectProvider<RestClient.Builder> restClientBuilderProvider) {
         this.properties = properties;
+        RestClient.Builder builder = restClientBuilderProvider == null
+                ? RestClient.builder()
+                : restClientBuilderProvider.getIfAvailable(RestClient::builder);
+        this.tokenConverterClient = properties.tokenConverterUri().isBlank()
+                ? builder.clone().build()
+                : builder.clone().baseUrl(properties.tokenConverterUri()).build();
+        this.jwksKeyLocator = new InternalJwksKeyLocator(properties, builder.clone().build());
     }
 
     public boolean configured() {
@@ -36,10 +59,14 @@ public class InternalJwtService {
     }
 
     public void applyServiceToken(HttpHeaders headers) {
-        applyServiceToken(headers, Set.of("internal:service"));
+        applyServiceToken(headers, Set.of(InternalScopes.SERVICE));
     }
 
     public void applyServiceToken(HttpHeaders headers, Collection<String> scopes) {
+        if (properties.stsServiceTokenMode()) {
+            applyBearer(headers, requestStsServiceToken(scopes == null ? Set.of() : scopes));
+            return;
+        }
         String token = issueServiceToken(scopes == null ? Set.of() : scopes);
         applyBearer(headers, token);
     }
@@ -49,6 +76,10 @@ public class InternalJwtService {
             throw new IllegalArgumentException("Current user is required for internal user JWT");
         }
         writeIdentityHeaders(headers, user);
+        if (properties.stsServiceTokenMode()) {
+            applyBearer(headers, requestStsUserToken(user));
+            return;
+        }
         applyBearer(headers, issueUserToken(user));
     }
 
@@ -60,12 +91,7 @@ public class InternalJwtService {
         if (token.isBlank()) {
             throw new JwtException("Internal JWT is missing");
         }
-        Claims claims = Jwts.parser()
-                .verifyWith(properties.signingKey())
-                .clockSkewSeconds(properties.clockSkewSeconds())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+        Claims claims = parse(token);
         validateIssuer(claims);
         validateAudience(claims);
         return claims;
@@ -79,7 +105,7 @@ public class InternalJwtService {
         if (primaryRole != null && !primaryRole.isBlank()) {
             roles.add(primaryRole);
         }
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .issuer(properties.issuer())
                 .subject(user.id().toString())
@@ -91,19 +117,18 @@ public class InternalJwtService {
                 .claim("email", user.email())
                 .claim("roles", List.copyOf(roles))
                 .claim("role_assignments", roleAssignments)
-                .claim("scope", "internal:user")
-                .claim("scp", List.of("internal:user"))
+                .claim("scope", InternalScopes.USER)
+                .claim("scp", List.of(InternalScopes.USER))
                 .issuedAt(Date.from(now))
                 .notBefore(Date.from(now.minusSeconds(1)))
-                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())))
-                .signWith(properties.signingKey())
-                .compact();
+                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())));
+        return sign(builder);
     }
 
     private String issueServiceToken(Collection<String> scopes) {
         Instant now = Instant.now();
         Set<String> normalizedScopes = normalizeScopes(scopes);
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .issuer(properties.issuer())
                 .subject("service:" + properties.serviceName())
@@ -115,9 +140,86 @@ public class InternalJwtService {
                 .claim("scp", List.copyOf(normalizedScopes))
                 .issuedAt(Date.from(now))
                 .notBefore(Date.from(now.minusSeconds(1)))
-                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())))
-                .signWith(properties.signingKey())
-                .compact();
+                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())));
+        return sign(builder);
+    }
+
+    private Claims parse(String token) {
+        if (properties.rs256()) {
+            if (properties.jwksVerificationMode()) {
+                return Jwts.parser()
+                        .keyLocator(jwksKeyLocator)
+                        .clockSkewSeconds(properties.clockSkewSeconds())
+                        .build()
+                        .parseSignedClaims(token)
+                        .getPayload();
+            }
+            return Jwts.parser()
+                    .verifyWith(properties.publicKey())
+                    .clockSkewSeconds(properties.clockSkewSeconds())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        }
+        return Jwts.parser()
+                .verifyWith(properties.signingKey())
+                .clockSkewSeconds(properties.clockSkewSeconds())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    private String sign(JwtBuilder builder) {
+        if (properties.rs256()) {
+            return builder.signWith(properties.privateKey()).compact();
+        }
+        return builder.signWith(properties.signingKey()).compact();
+    }
+
+    private String requestStsServiceToken(Collection<String> scopes) {
+        MultiValueMap<String, String> form = baseStsForm("client_credentials");
+        form.add("scope", String.join(" ", normalizeScopes(scopes)));
+        return requestStsToken(form);
+    }
+
+    private String requestStsUserToken(CurrentUser user) {
+        MultiValueMap<String, String> form = baseStsForm("urn:courseflow:params:oauth:grant-type:trusted-user");
+        if (user.internalToken() == null || user.internalToken().isBlank()) {
+            throw new IllegalStateException("Trusted-user STS delegation requires the verified inbound internal JWT");
+        }
+        form.add("actor_token", user.internalToken());
+        form.add("scope", InternalScopes.USER);
+        return requestStsToken(form);
+    }
+
+    private MultiValueMap<String, String> baseStsForm(String grantType) {
+        if (properties.tokenConverterUri().isBlank() || properties.stsClientSecret().isBlank()) {
+            throw new IllegalStateException("TOKEN_CONVERTER_URI and COURSEFLOW_STS_CLIENT_SECRET are required"
+                    + " when COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE=sts");
+        }
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", grantType);
+        form.add("client_id", properties.serviceName());
+        form.add("client_secret", properties.stsClientSecret());
+        form.add("audience", properties.primaryAudience());
+        return form;
+    }
+
+    private String requestStsToken(MultiValueMap<String, String> form) {
+        try {
+            TokenExchangeResponse response = tokenConverterClient.post()
+                    .uri("/oauth/token")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(form)
+                    .retrieve()
+                    .body(TokenExchangeResponse.class);
+            if (response == null || response.access_token() == null || response.access_token().isBlank()) {
+                throw new IllegalStateException("Token converter returned an empty internal token");
+            }
+            return response.access_token();
+        } catch (RestClientException ex) {
+            throw new IllegalStateException("Could not obtain internal token from identity-token-converter-service", ex);
+        }
     }
 
     private void applyBearer(HttpHeaders headers, String token) {
@@ -197,7 +299,7 @@ public class InternalJwtService {
                 .map(String::trim)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         if (normalized.isEmpty()) {
-            normalized.add("internal:service");
+            normalized.add(InternalScopes.SERVICE);
         }
         return normalized;
     }
@@ -218,5 +320,9 @@ public class InternalJwtService {
             return;
         }
         throw new JwtException("Invalid internal JWT audience");
+    }
+
+    private record TokenExchangeResponse(String access_token, String issued_token_type,
+                                         String token_type, long expires_in, String scope) {
     }
 }

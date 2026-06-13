@@ -1,6 +1,7 @@
 package edu.courseflow.tokenconverter.controller;
 
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -18,13 +19,20 @@ class TokenExchangeControllerTest {
     private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new TokenExchangeController(service)).build();
 
     @Test
-    void acceptsTokenExchangeWithoutLegacyServiceToken() throws Exception {
+    void forwardsTokenExchangeClientCredentials() throws Exception {
         when(service.exchange(
                 eq(TokenExchangeService.TOKEN_EXCHANGE_GRANT),
                 eq(TokenExchangeService.ACCESS_TOKEN_TYPE),
                 eq("external"),
                 eq("courseflow-services"),
-                eq("course:read")))
+                eq("course:read"),
+                eq("api-gateway"),
+                eq("secret"),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull()))
                 .thenReturn(new TokenExchangeResponse(
                         "internal",
                         TokenExchangeService.ACCESS_TOKEN_TYPE,
@@ -38,7 +46,9 @@ class TokenExchangeControllerTest {
                         .param("subject_token", "external")
                         .param("subject_token_type", TokenExchangeService.ACCESS_TOKEN_TYPE)
                         .param("audience", "courseflow-services")
-                        .param("scope", "course:read"))
+                        .param("scope", "course:read")
+                        .param("client_id", "api-gateway")
+                        .param("client_secret", "secret"))
                 .andExpect(status().isOk());
 
         verify(service).exchange(
@@ -46,6 +56,13 @@ class TokenExchangeControllerTest {
                 TokenExchangeService.ACCESS_TOKEN_TYPE,
                 "external",
                 "courseflow-services",
-                "course:read");
+                "course:read",
+                "api-gateway",
+                "secret",
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 }

@@ -19,16 +19,24 @@ class TokenStorage {
 
   static const _kAccess = 'cf.accessToken';
   static const _kRefresh = 'cf.refreshToken';
+  static const _kId = 'cf.idToken';
 
   Future<String?> readAccessToken() => _storage.read(key: _kAccess);
   Future<String?> readRefreshToken() => _storage.read(key: _kRefresh);
+  Future<String?> readIdToken() => _storage.read(key: _kId);
 
   Future<void> save({
     required String accessToken,
     required String refreshToken,
+    String? idToken,
   }) async {
     await _storage.write(key: _kAccess, value: accessToken);
     await _storage.write(key: _kRefresh, value: refreshToken);
+    if (idToken == null || idToken.isEmpty) {
+      await _storage.delete(key: _kId);
+    } else {
+      await _storage.write(key: _kId, value: idToken);
+    }
   }
 
   Future<void> updateAccessToken(String accessToken) =>
@@ -37,6 +45,7 @@ class TokenStorage {
   Future<void> clear() async {
     await _storage.delete(key: _kAccess);
     await _storage.delete(key: _kRefresh);
+    await _storage.delete(key: _kId);
   }
 }
 

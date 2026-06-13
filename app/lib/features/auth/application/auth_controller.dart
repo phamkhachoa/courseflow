@@ -56,13 +56,15 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> login({required String email, required String password}) async {
-    final session = await _repo.login(email: email, password: password);
+    final session = _repo.keycloakEnabled
+        ? await _repo.loginWithKeycloak()
+        : await _repo.login(email: email, password: password);
     await _persist(session);
     state = AuthState(status: AuthStatus.authenticated, user: session.user);
   }
 
   Future<void> logout() async {
-    await _repo.logout();
+    await _repo.logout(idToken: await _storage.readIdToken());
     await _storage.clear();
     state = const AuthState.signedOut();
   }
@@ -70,6 +72,7 @@ class AuthController extends Notifier<AuthState> {
   Future<void> _persist(AuthSession session) => _storage.save(
     accessToken: session.accessToken,
     refreshToken: session.refreshToken,
+    idToken: session.idToken,
   );
 
   /// Interceptor hook: refresh the access token using the stored refresh token.

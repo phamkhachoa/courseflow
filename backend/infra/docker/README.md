@@ -44,14 +44,44 @@ secrets.
 Validate the prod profile without starting containers:
 
 ```bash
-COURSEFLOW_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
-COURSEFLOW_INTERNAL_JWT_SECRET="replace-with-generated-32-byte-minimum-secret" \
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/courseflow-internal-jwt.key
+openssl rsa -pubout -in /tmp/courseflow-internal-jwt.key -out /tmp/courseflow-internal-jwt.pub
+
+export COURSEFLOW_INTERNAL_JWT_ALGORITHM="RS256"
+export COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY="$(cat /tmp/courseflow-internal-jwt.key)"
+export COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY="$(cat /tmp/courseflow-internal-jwt.pub)"
+export COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE="jwks"
+export COURSEFLOW_INTERNAL_JWT_JWKS_URI="http://identity-token-converter-service:8105/oauth/jwks"
+export COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE="sts"
+
+sts_clients=(
+  api-gateway access-control-service user-management-service organization-service
+  course-service enrollment-service assignment-service deadline-service announcement-service
+  portfolio-service discussion-service notification-service chat-service media-service
+  search-service analytics-service gradebook-service quiz-service certificate-service
+  peer-review-service live-session-service review-service outbox-relay
+)
+for client in "${sts_clients[@]}"; do
+  env_name="COURSEFLOW_STS_$(printf '%s' "$client" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_SECRET"
+  export "$env_name=$(openssl rand -base64 48)"
+done
+
 CERTIFICATE_SIGNING_SECRET="replace-with-generated-32-byte-minimum-secret" \
 COURSEFLOW_DB_PASSWORD="replace-with-generated-db-password" \
 COURSEFLOW_STORAGE_ACCESS_KEY="replace-with-object-storage-access-key" \
 COURSEFLOW_STORAGE_SECRET_KEY="replace-with-object-storage-secret-key" \
 COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.com \
 KEYCLOAK_ADMIN_PASSWORD="replace-with-generated-keycloak-admin-password" \
+KEYCLOAK_PUBLIC_BASE_URL="https://auth.example.com" \
+KEYCLOAK_BASE_URL="https://auth.example.com" \
+KEYCLOAK_REALM="courseflow" \
+KEYCLOAK_ADMIN_CLIENT_ID="keycloak-user-lifecycle" \
+KEYCLOAK_ADMIN_CLIENT_SECRET="replace-with-generated-lifecycle-client-secret" \
+KEYCLOAK_SETUP_EMAIL_CLIENT_ID="courseflow-admin-web" \
+KEYCLOAK_SETUP_EMAIL_REDIRECT_URI="https://admin.example.com/login/callback" \
+KEYCLOAK_ISSUER_URI="https://auth.example.com/realms/courseflow" \
+KEYCLOAK_JWK_SET_URI="https://auth.example.com/realms/courseflow/protocol/openid-connect/certs" \
+KEYCLOAK_AUDIENCE="courseflow-api" \
   scripts/validate-prod-profile.sh --compose
 ```
 
@@ -74,6 +104,25 @@ API_GATEWAY_PORT=8080 docker compose \
   -f infra/docker/docker-compose.services.yml \
   -f infra/docker/docker-compose.prod.yml \
   up --build
+```
+
+After the cluster is reachable, run the security smoke gate with a real Keycloak access token. The
+prod profile does not publish `identity-token-converter-service` or domain services on the host, so
+run this from a staging runner/container with access to the Compose network, or set the URLs to an
+approved temporary port-forward. The gate checks Keycloak token exchange, internal JWKS
+verification, STS client credentials, public profile visibility at the gateway, protected profile
+summary batch access and direct-service forged-header rejection:
+
+```bash
+COURSEFLOW_API_URL=http://localhost:28080/api \
+COURSEFLOW_TOKEN_CONVERTER_URL=http://identity-token-converter-service:8105 \
+COURSEFLOW_DIRECT_SERVICE_URL=http://course-service:8083 \
+COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN="<keycloak-access-token-from-approved-login>" \
+COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_ID=api-gateway \
+COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET="$COURSEFLOW_STS_API_GATEWAY_SECRET" \
+COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_ID=course-service \
+COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_SECRET="$COURSEFLOW_STS_COURSE_SERVICE_SECRET" \
+node scripts/keycloak-security-smoke.mjs
 ```
 
 Optional observability for the prod profile is explicit. Add the local observability file and the prod
@@ -165,8 +214,48 @@ The gateway strips client-supplied identity/internal headers. After JWT validati
 external user JWT with `identity-token-converter-service`, forwards verified `X-User-*` identity
 headers, and attaches a short-lived internal JWT in `X-Internal-Authorization`. Downstream services
 reject `/internal/**` requests and propagated identity headers unless that internal JWT validates
-with `COURSEFLOW_INTERNAL_JWT_SECRET`. Direct service clients use `InternalJwtService` from
-`common-library` to mint the same internal JWT proof.
+with the configured internal JWT verifier. Local/dev defaults use HS256 with
+`COURSEFLOW_INTERNAL_JWT_SECRET`; the prod profile requires RS256, keeps
+`COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY` only on `identity-token-converter-service`, and has domain
+services verify with `COURSEFLOW_INTERNAL_JWT_JWKS_URI`. In the prod profile, domain service clients
+use `InternalJwtService` from `common-library` to request service/user tokens from
+`identity-token-converter-service` with their own per-client `COURSEFLOW_STS_*_SECRET`; the converter
+keeps the central `COURSEFLOW_STS_CLIENT_SECRETS` and `COURSEFLOW_STS_CLIENT_SCOPES` policy maps and
+remains the signing authority. Keep `COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES` explicit and include the endpoint
+scopes required by the common filter, such as `internal:identity:resolve`,
+`internal:identity:provision`, `internal:authz:check`, `internal:authz:assert-topology`,
+`internal:user-directory:*`, `internal:role-assignment:*`, `internal:role-management:*`, `internal:profile:*`,
+`internal:token-exchange` and `internal:backoffice`. Only the gateway and chat websocket adapter
+should receive `internal:token-exchange` by default; only topology-owning services such as
+organization-service and course-service should receive `internal:authz:assert-topology`. The next enterprise
+hardening step is operational key rotation and e2e verification against the running cluster.
+
+In `EXTERNAL_TOKEN_MODE=oidc`, Keycloak is the only supported edge login authority. The gateway
+blocks legacy `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/refresh`, and email
+verification endpoints so clients cannot accidentally obtain identity-service tokens that are no
+longer trusted by the edge.
+
+Local Docker imports `infra/docker/keycloak/courseflow-realm.json`, which includes demo users for
+developer testing. Production must not mount/import that local realm. Use
+`infra/docker/keycloak/courseflow-realm.prod-template.json` as the reviewed starting point, replace
+the placeholder web domains, rotate the `keycloak-user-lifecycle` client secret, and provision real
+users through the approved IAM/user lifecycle flow. The admin user create/deactivate/privacy-export
+paths call Keycloak Admin REST through that lifecycle client, while CourseFlow profile and
+authorization data remain in `user-management-service` and `access-control-service`. The legacy
+`identity-service` is behind the `legacy-identity` profile in the production overlay and is not part
+of the default Keycloak deployment.
+`scripts/validate-prod-profile.sh` also validates the production realm template for PKCE, API
+audience mapping, password/session/OTP policy, no demo users and no localhost redirects.
+The prod profile also requires `ACCESS_CONTROL_RESOLUTION_MODE=required` and an explicit
+`COURSEFLOW_STS_ALLOWED_CLIENTS` allowlist. Do not use the local/demo wildcard `*` in production,
+and do not include the legacy `identity-service` in the Keycloak production allowlist, because STS
+client credentials must identify the calling service instead of letting one shared secret impersonate
+any service name.
+Services running in STS mode also require `TOKEN_CONVERTER_URI`; chat WebSocket auth uses the same
+converter to exchange STOMP bearer tokens before trusting internal JWT claims.
+`access-control-service` always audits denied authorization checks. Set
+`ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED=true` only when the environment needs full allow/deny decision
+audit, because this can produce high-volume audit rows.
 
 When `SPRING_LIQUIBASE_CONTEXTS=prod,demo` is enabled, demo accounts are seeded in `identity-service` with password `password`:
 

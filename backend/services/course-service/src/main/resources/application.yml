@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: ${SERVER_PORT:8080}
 spring:
   application:
     name: course-service
@@ -24,13 +24,26 @@ management:
     web:
       exposure:
         include: health,info,prometheus
-courseflow:  entitlement:
-    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
-    course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
+courseflow:
+  entitlement:
+    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://enrollment-service:8080}
+    course-service-url: ${COURSE_SERVICE_URL:http://course-service:8080}
   content:
-    assignment-service-url: ${ASSIGNMENT_SERVICE_URL:http://localhost:8085}
-    media-service-url: ${MEDIA_SERVICE_URL:http://localhost:8091}
-    quiz-service-url: ${QUIZ_SERVICE_URL:http://localhost:8095}
+    assignment-service-url: ${ASSIGNMENT_SERVICE_URL:http://assignment-service:8080}
+    media-service-url: ${MEDIA_SERVICE_URL:http://media-service:8080}
+    quiz-service-url: ${QUIZ_SERVICE_URL:http://quiz-service:8080}
   certificate:
-    service-url: ${CERTIFICATE_SERVICE_URL:http://localhost:8096}
+    service-url: ${CERTIFICATE_SERVICE_URL:http://certificate-service:8080}
     eligibility-timeout-ms: ${CERTIFICATE_ELIGIBILITY_TIMEOUT_MS:1500}
+
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

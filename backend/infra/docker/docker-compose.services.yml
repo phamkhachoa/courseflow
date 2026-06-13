@@ -6,11 +6,38 @@ x-build-common: &build-common
 
 x-service-env: &service-env
   COURSEFLOW_JWT_SECRET: ${COURSEFLOW_JWT_SECRET:-courseflow-local-cluster-jwt-secret-change-me-32}
+  COURSEFLOW_INTERNAL_JWT_ALGORITHM: ${COURSEFLOW_INTERNAL_JWT_ALGORITHM:-HS256}
   COURSEFLOW_INTERNAL_JWT_SECRET: ${COURSEFLOW_INTERNAL_JWT_SECRET:-courseflow-local-internal-jwt-secret-change-me-32}
+  COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY: ${COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY:-}
+  COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY: ${COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY:-}
+  COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE: ${COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE:-local}
+  COURSEFLOW_INTERNAL_JWT_JWKS_URI: ${COURSEFLOW_INTERNAL_JWT_JWKS_URI:-}
+  COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS: ${COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS:-300}
   COURSEFLOW_INTERNAL_JWT_AUDIENCE: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:-courseflow-services}
+  COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE: ${COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE:-local}
+  COURSEFLOW_STS_CLIENT_SECRET: ${COURSEFLOW_STS_CLIENT_SECRET:-local-courseflow-sts-client-secret-change-me-32}
+  COURSEFLOW_STS_CLIENT_SECRETS: ${COURSEFLOW_STS_CLIENT_SECRETS:-api-gateway=local-courseflow-sts-client-secret-change-me-32;access-control-service=local-courseflow-sts-client-secret-change-me-32;user-management-service=local-courseflow-sts-client-secret-change-me-32;organization-service=local-courseflow-sts-client-secret-change-me-32;course-service=local-courseflow-sts-client-secret-change-me-32;enrollment-service=local-courseflow-sts-client-secret-change-me-32;assignment-service=local-courseflow-sts-client-secret-change-me-32;deadline-service=local-courseflow-sts-client-secret-change-me-32;announcement-service=local-courseflow-sts-client-secret-change-me-32;portfolio-service=local-courseflow-sts-client-secret-change-me-32;discussion-service=local-courseflow-sts-client-secret-change-me-32;notification-service=local-courseflow-sts-client-secret-change-me-32;chat-service=local-courseflow-sts-client-secret-change-me-32;media-service=local-courseflow-sts-client-secret-change-me-32;search-service=local-courseflow-sts-client-secret-change-me-32;analytics-service=local-courseflow-sts-client-secret-change-me-32;gradebook-service=local-courseflow-sts-client-secret-change-me-32;quiz-service=local-courseflow-sts-client-secret-change-me-32;certificate-service=local-courseflow-sts-client-secret-change-me-32;peer-review-service=local-courseflow-sts-client-secret-change-me-32;live-session-service=local-courseflow-sts-client-secret-change-me-32;review-service=local-courseflow-sts-client-secret-change-me-32;outbox-relay=local-courseflow-sts-client-secret-change-me-32}
+  COURSEFLOW_STS_ALLOWED_CLIENTS: ${COURSEFLOW_STS_ALLOWED_CLIENTS:-api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,outbox-relay}
+  COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES: ${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice}
+  COURSEFLOW_STS_CLIENT_SCOPES: ${COURSEFLOW_STS_CLIENT_SCOPES:-api-gateway=internal:service,internal:token-exchange;access-control-service=internal:service;user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;enrollment-service=internal:service;assignment-service=internal:service;deadline-service=internal:service;announcement-service=internal:service;portfolio-service=internal:service;discussion-service=internal:service;notification-service=internal:service;chat-service=internal:service,internal:token-exchange;media-service=internal:service;search-service=internal:service;analytics-service=internal:service;gradebook-service=internal:service;quiz-service=internal:service;certificate-service=internal:service;peer-review-service=internal:service;live-session-service=internal:service;review-service=internal:service;outbox-relay=internal:service}
+  TOKEN_CONVERTER_URI: ${TOKEN_CONVERTER_URI:-http://identity-token-converter-service:8105}
   EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-http://localhost:3000/verify-email}
   COURSEFLOW_ENTITLEMENT_ENROLLMENT_SERVICE_URL: http://enrollment-service:8084
   COURSEFLOW_ENTITLEMENT_COURSE_SERVICE_URL: http://course-service:8083
+  ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8106
+  USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8107
+  EXTERNAL_TOKEN_MODE: ${EXTERNAL_TOKEN_MODE:-oidc}
+  KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:18080/realms/courseflow}
+  KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-courseflow-api}
+  KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/courseflow/protocol/openid-connect/certs}
+  KEYCLOAK_BASE_URL: ${KEYCLOAK_BASE_URL:-http://keycloak:8080}
+  KEYCLOAK_REALM: ${KEYCLOAK_REALM:-courseflow}
+  KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID:-keycloak-user-lifecycle}
+  KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-local-keycloak-user-lifecycle-secret-change-me}
+  KEYCLOAK_SETUP_EMAIL_CLIENT_ID: ${KEYCLOAK_SETUP_EMAIL_CLIENT_ID:-courseflow-admin-web}
+  ACCESS_CONTROL_RESOLUTION_MODE: ${ACCESS_CONTROL_RESOLUTION_MODE:-required}
+  ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP: ${ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP:-true}
+  ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED: ${ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED:-false}
   CERTIFICATE_ENROLLMENT_SERVICE_URL: http://enrollment-service:8084
   CERTIFICATE_GRADEBOOK_SERVICE_URL: http://gradebook-service:8094
   CERTIFICATE_SIGNING_SECRET: ${CERTIFICATE_SIGNING_SECRET:-courseflow-local-certificate-signing-secret-change-me-32}
@@ -35,6 +62,8 @@ x-service-env: &service-env
   STORAGE_SECRET_KEY: courseflow
   STORAGE_ALLOW_DEMO_CREDENTIALS: "true"
   IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/cf_identity
+  ACCESS_CONTROL_DB_URL: jdbc:postgresql://postgres:5432/cf_access_control
+  USER_MANAGEMENT_DB_URL: jdbc:postgresql://postgres:5432/cf_user_management
   ORGANIZATION_DB_URL: jdbc:postgresql://postgres:5432/cf_organization
   COURSE_DB_URL: jdbc:postgresql://postgres:5432/cf_course
   ENROLLMENT_DB_URL: jdbc:postgresql://postgres:5432/cf_enrollment
@@ -54,6 +83,10 @@ x-service-env: &service-env
   OUTBOX_RELAY_DB_URL: jdbc:postgresql://postgres:5432/cf_outbox
   IDENTITY_DB_USERNAME: courseflow
   IDENTITY_DB_PASSWORD: courseflow
+  ACCESS_CONTROL_DB_USERNAME: courseflow
+  ACCESS_CONTROL_DB_PASSWORD: courseflow
+  USER_MANAGEMENT_DB_USERNAME: courseflow
+  USER_MANAGEMENT_DB_PASSWORD: courseflow
   ORGANIZATION_DB_USERNAME: courseflow
   ORGANIZATION_DB_PASSWORD: courseflow
   COURSE_DB_USERNAME: courseflow
@@ -116,7 +149,8 @@ services:
         MODULE: services/api-gateway
     environment:
       <<: *service-env
-      IDENTITY_SERVICE_URI: http://identity-service:8081
+      ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8106
+      USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8107
       ORGANIZATION_SERVICE_URI: http://organization-service:8082
       COURSE_SERVICE_URI: http://course-service:8083
       ENROLLMENT_SERVICE_URI: http://enrollment-service:8084
@@ -151,12 +185,33 @@ services:
     ports:
       - "8081:8081"
 
+  access-control-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/access-control-service
+    ports:
+      - "8106:8106"
+
+  user-management-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/user-management-service
+    ports:
+      - "8107:8107"
+
   identity-token-converter-service:
     <<: *service-common
     build:
       <<: *build-common
       args:
         MODULE: services/identity-token-converter-service
+    environment:
+      <<: *service-env
+      COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE: local
     ports:
       - "8105:8105"
 

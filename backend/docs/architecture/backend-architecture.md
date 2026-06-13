@@ -10,7 +10,10 @@ This follows the same architectural lesson from YAS: independent business servic
 
 | Service | Owns | Does Not Own |
 |---|---|---|
-| identity-service | users, credentials, roles, permissions, role-permission grants, org-scoped memberships, refresh tokens, auth audit | departments, courses, enrollments |
+| keycloak | external IAM/IdP: login, SSO, MFA, password policy, sessions, OAuth2/OIDC access tokens, federation, JWKS/key rotation | LMS course/section permissions, profile directory |
+| identity-service | retired legacy/local compatibility surfaces only; excluded from the production Keycloak profile unless an operator explicitly enables a legacy profile | long-term password/session ownership, profile directory, LMS authorization |
+| access-control-service | CourseFlow product authorization, Keycloak `issuer + subject` mapping, scoped roles, permissions, role grants, authorization audit | login, password, MFA, SSO sessions, user profile content |
+| user-management-service | display name, avatar, bio, locale/timezone, public profile, profile summaries and user directory | login, password, token issuance, role/permission decisions |
 | organization-service | departments, programs, academic terms, course sections | course content, user credentials |
 | course-service | course catalog, syllabus, outcomes, material metadata, course modules and learning path structure, authoring drafts/versions, publish workflow | enrollment state, submissions |
 | enrollment-service | roster, enrollment status, waitlist, capacity decisions | course content, identity credentials |
@@ -56,8 +59,8 @@ No shared module may contain LMS business rules.
 ## Gateway and Internal APIs
 
 The `api-gateway` is the single client entrypoint and trust boundary. It strips client-supplied
-`X-User-*` headers, verifies the JWT issued by `identity-service`, then injects verified identity
-headers for downstream services.
+`X-User-*` headers, verifies the external OAuth2/OIDC access token, exchanges it for a CourseFlow
+internal JWT, then injects verified identity headers for downstream services.
 
 ```text
 Client -> api-gateway -> internal domain service route
@@ -71,9 +74,11 @@ correlation id and header hardening.
 
 ## RBAC and Authorization Model
 
-Authorization is owned by `identity-service`. The gateway only authenticates (verifies JWT) and
-forwards verified identity headers; it does not make business authorization decisions. Domain services
-enforce permissions using the identity headers and, where needed, an authorization check call.
+External authentication is owned by Keycloak in the enterprise target. CourseFlow product
+authorization is owned by `access-control-service`. The gateway authenticates external tokens and
+forwards only identities that have been converted into short-lived internal JWTs; it does not make
+business authorization decisions. Domain services enforce permissions using the verified internal
+identity and, where needed, an authorization check call.
 
 Three concepts:
 
@@ -81,19 +86,63 @@ Three concepts:
 |---|---|---|
 | Role | Named bundle of permissions | `STUDENT`, `INSTRUCTOR`, `TA`, `ORG_ADMIN`, `ADMIN` |
 | Permission | Fine-grained capability, `resource:action` | `course:publish`, `quiz:grade`, `review:moderate` |
-| Membership | Role granted, optionally scoped to an organization | user X is `INSTRUCTOR` in org `org-42` |
+| Membership | Role granted to a supported LMS scope | user X is `INSTRUCTOR` in course `course-42` |
 
 Roles: `STUDENT` (default learner), `TA` (assists grading/moderation in assigned courses),
 `INSTRUCTOR` (authors and runs own courses), `ORG_ADMIN` (manages users/courses inside one
 organization), `ADMIN` (platform-wide). `PROFESSOR` is kept as an alias of `INSTRUCTOR` for
 backward compatibility with existing data.
 
-The JWT carries `roles` and `orgId`. A service that needs a fine-grained decision calls
-`POST /internal/authz/check` on identity-service with `{userId, permission, orgId?}` and caches the
-result for the request. Coarse role checks (e.g. "is ADMIN") are done locally from JWT claims.
+The internal JWT carries CourseFlow roles and scoped role assignments resolved by
+`access-control-service`. A service that needs a fine-grained decision calls
+`POST /internal/authz/check` on access-control-service with `{userId, permission, scopeType,
+scopeId?}` and caches the result for the request. Coarse role checks (e.g. "is ADMIN") are done
+locally from internal JWT claims. Denied authorization checks are persisted in
+`access_control_audit_logs` and counted through `courseflow.access_control.authz.checks`; allowed
+checks can also be audited by setting `ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED=true`.
+
+Supported role assignment scopes are `PLATFORM`, `ORG`, `DEPARTMENT`, `COURSE` and `SECTION`.
+`PLATFORM` scope must not include a `scopeId`; every other scope must include one. Permission
+definitions declare a `scopeType` of `ANY`, `PLATFORM`, `ORG`, `DEPARTMENT`, `COURSE` or `SECTION`,
+and `access-control-service` rejects authorization checks whose requested scope is wider than the
+permission allows. For example, an `ORG` permission can be checked at org, department, course or
+section scope, but a `PLATFORM` permission can only be checked at platform scope.
+Domain services that own resource topology send server-derived `ancestorScopes` to
+`/internal/authz/check` when evaluating a child resource. For example, course-service can check a
+course-scoped action with the course id plus its department ancestor so a department-level role
+assignment is honored without making access-control call course-service or organization-service.
+Access-control accepts those ancestors only when the caller's service internal JWT has
+`internal:authz:assert-topology`; exact-scope checks still need only `internal:authz:check`. Do not
+forward client-supplied ancestor paths directly.
+
+Enterprise user provisioning is explicit before first login: an invite/import/SCIM worker links the
+Keycloak `issuer + subject` to a CourseFlow user through `POST /internal/identities/provision` on
+`access-control-service`, then creates the directory/profile row through
+`POST /internal/users/provision-profile` on `user-management-service`. The token converter only
+resolves existing links; it does not silently create privileged users from arbitrary external claims.
+Admin role, permission and user-role-assignment routes terminate at `access-control-service`;
+`identity-service` remains only for legacy account/security compatibility during the Keycloak
+migration and is not mounted in the default gateway route table.
+The compatibility `GET /api/v1/users/me` route now terminates at `user-management-service`; it
+combines the CourseFlow user id/email/status/primary role resolved by `access-control-service` with
+display name/avatar stored in the profile repository. This keeps client hydration off the legacy
+identity database while preserving the old response shape during the migration.
+Admin user list/detail reads are composed by `user-management-service` so admin screens keep one
+read endpoint while display profile data stays in user-management and email/status/primary role stay
+in access-control. Backoffice user-management endpoints require a valid internal JWT and ask
+`access-control-service` for `platform:admin` before reading or mutating admin user data. Admin
+create/deactivate/privacy export are also routed through the `user-management-service` lifecycle
+facade: Keycloak owns account enablement, required actions, setup email and session logout;
+access-control owns product status, role-grant revocation and the authorization decision. Admin
+create user does not assign a CourseFlow product role inline; operators grant role + scope through
+the `access-control-service` assignment endpoint after the account/profile exists.
+Profile summary batch lookup preserves request order for UI hydration. Public profile endpoints only
+return profiles whose visibility is `PUBLIC`; private and organization-scoped profile data stay on
+authenticated/internal surfaces.
 
 ```text
-Client -> api-gateway (verify JWT, inject X-User-Id/X-User-Roles/X-Org-Id)
+Client -> Keycloak login -> api-gateway (verify external token)
+       -> identity-token-converter-service -> access-control-service (resolve CourseFlow user/roles)
        -> domain service (local role check, or /internal/authz/check for fine-grained permission)
 ```
 
@@ -113,10 +162,35 @@ short-lived internal JWT.
 
 `identity-token-converter-service` is the internal OAuth2 token-exchange bridge. In converter mode,
 the gateway validates the external identity token, calls `/oauth/token`, and forwards a short-lived
-internal JWT in `X-Internal-Authorization`. `X-User-*` headers remain as a compatibility payload for
-`CurrentUser`, but downstream services only trust them when `TrustedGatewayHeaderFilter` verifies
-the internal JWT. Direct service clients mint service/user internal JWTs through
-`common-library`'s `InternalJwtService`.
+internal JWT in `X-Internal-Authorization`. The converter resolves external identities through
+`access-control-service` before issuing internal claims. `X-User-*` headers remain as a compatibility
+payload for `CurrentUser`, but downstream services only trust them when `TrustedGatewayHeaderFilter`
+verifies the internal JWT. `TrustedGatewayHeaderFilter` also requires an internal JWT on
+`/internal/**` and `/backoffice/**` service surfaces so direct service access cannot bypass the
+gateway/admin gate. Service internal JWTs are additionally checked for endpoint-level scopes:
+generic internal calls need `internal:service`, while identity resolution/provisioning, authz
+checks, topology assertions, user directory, role assignment and profile surfaces require their matching
+`internal:*` service scopes. Gateway and chat websocket token exchange require
+`internal:token-exchange`; role and permission policy reads require `internal:role-management:read`
+instead of generic `internal:service`. User internal JWTs may enter `/internal/**` only when gateway/service
+identity headers are present and match the token claims. Direct service clients use
+`common-library`'s `InternalJwtService` to
+attach internal tokens. Local/demo environments may use HS256 local signing; the production profile
+uses RS256 and defaults service clients to request service/user internal tokens from
+`identity-token-converter-service` via STS-style `client_credentials` or trusted-user delegation.
+Each production service has its own STS client secret, while the converter owns the per-client
+secret and scope policy so one service cannot borrow another service's machine privileges.
+Trusted-user delegation is not a user/role assertion API: the caller must forward the verified
+inbound internal user JWT as `actor_token`, and the converter copies user identity and role
+assignments only from that signed token.
+Token exchange attempts emit structured audit logs through
+`courseflow.security.token_converter.audit`; those logs include outcome, grant type, actor, audience
+and issued scopes, but never bearer tokens or client secrets. The
+production profile verifies internal JWTs through the converter JWKS endpoint so domain services no
+longer rely on static public-key material. Chat WebSocket STOMP `CONNECT` also exchanges its bearer
+token through the converter before trusting internal JWT claims, because the gateway cannot inspect
+STOMP `CONNECT` headers after the HTTP upgrade. The next enterprise hardening step is operational
+key rotation and e2e verification against the running cluster.
 
 For the enterprise Keycloak target architecture and migration plan, see
 [`keycloak-enterprise-adoption.md`](./keycloak-enterprise-adoption.md).
@@ -128,7 +202,7 @@ consistent inside a service and documented in code:
 
 | Adapter | Used For |
 |---|---|
-| JPA | identity-service user/refresh-token aggregate |
+| JPA | identity-service account compatibility, access-control-service authorization aggregate, user-management-service profile aggregate, rich LMS aggregates |
 | JdbcClient | small Postgres domain services and reporting-style reads/writes |
 | MongoRepository | portfolio-service learning evidence documents |
 | ElasticsearchRepository | search-service course/content search documents |
@@ -207,7 +281,8 @@ the `demo` Spring profile.
 ## Development Order
 
 1. Backend skeleton, local infra, common-library, event-contracts.
-2. identity-service with auth/RBAC.
+2. Keycloak realm, `access-control-service`, `user-management-service` and
+   `identity-token-converter-service`.
 3. organization-service and course-service.
 4. enrollment-service with capacity/waitlist.
 5. assignment-service and media-service.

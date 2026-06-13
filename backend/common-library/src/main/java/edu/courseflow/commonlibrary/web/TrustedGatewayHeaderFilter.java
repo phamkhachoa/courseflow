@@ -2,14 +2,25 @@ package edu.courseflow.commonlibrary.web;
 
 import edu.courseflow.commonlibrary.constants.GatewayHeaders;
 import edu.courseflow.commonlibrary.security.InternalJwtService;
+import edu.courseflow.commonlibrary.security.InternalScopes;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
@@ -23,8 +34,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <p>The API gateway is still the primary trust boundary: it strips client-supplied identity headers,
  * verifies JWTs, then injects {@code X-User-*}. This filter closes the direct-service access gap:
- * downstream services only accept propagated identity headers and {@code /internal/**} endpoints
- * when the request carries a valid short-lived internal JWT.
+ * downstream services only accept propagated identity headers, {@code /internal/**} endpoints and
+ * {@code /backoffice/**} endpoints when the request carries a valid short-lived internal JWT.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
@@ -36,11 +47,24 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
             GatewayHeaders.USER_ROLES,
             GatewayHeaders.USER_ROLE_SCOPES,
             GatewayHeaders.USER_EMAIL);
+    private static final String REJECTION_METRIC = "courseflow.internal_jwt.rejections";
 
     private final InternalJwtService internalJwtService;
+    private final MeterRegistry meterRegistry;
 
     public TrustedGatewayHeaderFilter(InternalJwtService internalJwtService) {
+        this(internalJwtService, (MeterRegistry) null);
+    }
+
+    @Autowired
+    public TrustedGatewayHeaderFilter(
+            InternalJwtService internalJwtService, ObjectProvider<MeterRegistry> meterRegistryProvider) {
+        this(internalJwtService, meterRegistryProvider.getIfAvailable());
+    }
+
+    TrustedGatewayHeaderFilter(InternalJwtService internalJwtService, MeterRegistry meterRegistry) {
         this.internalJwtService = internalJwtService;
+        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -51,11 +75,13 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (validInternalJwt(request)) {
+        RejectionReason rejectionReason = internalJwtRejectionReason(request);
+        if (rejectionReason == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        recordRejection(rejectionReason, request);
         deny(response);
     }
 
@@ -64,23 +90,135 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
     }
 
     private boolean requiresInternalJwt(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/internal/") || hasIdentityHeaders(request);
+        String path = request.getRequestURI();
+        return path.startsWith("/internal/") || path.startsWith("/backoffice/") || hasIdentityHeaders(request);
     }
 
-    private boolean validInternalJwt(HttpServletRequest request) {
+    private RejectionReason internalJwtRejectionReason(HttpServletRequest request) {
         String header = firstBearerHeader(request);
         if (header == null) {
-            return false;
+            return RejectionReason.MISSING;
         }
         try {
             Claims claims = internalJwtService.verify(header);
             if (!"internal".equals(claims.get("token_use", String.class))) {
-                return false;
+                return RejectionReason.WRONG_TOKEN_USE;
             }
-            return !hasIdentityHeaders(request) || identityClaimsMatchHeaders(claims, request);
+            if (requiresServiceActor(request) && !"service".equals(claims.get("actor_type", String.class))) {
+                return RejectionReason.WRONG_ACTOR_TYPE;
+            }
+            if (hasIdentityHeaders(request) && !identityClaimsMatchHeaders(claims, request)) {
+                return RejectionReason.IDENTITY_MISMATCH;
+            }
+            if (requiresGatewayIdentityHeaders(claims, request)) {
+                return RejectionReason.MISSING_IDENTITY_HEADERS;
+            }
+            if (serviceScopeMissing(claims, request)) {
+                return RejectionReason.INSUFFICIENT_SCOPE;
+            }
+            return null;
         } catch (JwtException | IllegalArgumentException | IllegalStateException ex) {
+            return RejectionReason.INVALID;
+        }
+    }
+
+    private boolean requiresGatewayIdentityHeaders(Claims claims, HttpServletRequest request) {
+        if (!requiresInternalJwt(request) || "service".equals(claims.get("actor_type", String.class))) {
             return false;
         }
+        return !hasIdentityHeaders(request);
+    }
+
+    private boolean serviceScopeMissing(Claims claims, HttpServletRequest request) {
+        if (!"service".equals(claims.get("actor_type", String.class))) {
+            return false;
+        }
+        Set<String> required = requiredServiceScopes(request);
+        if (required.isEmpty()) {
+            return false;
+        }
+        Set<String> granted = extractScopes(claims);
+        return !granted.contains("*") && required.stream().noneMatch(granted::contains);
+    }
+
+    private boolean requiresServiceActor(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/internal/identities/")
+                || path.startsWith("/internal/authz/check")
+                || path.startsWith("/internal/users/provision-profile");
+    }
+
+    private Set<String> requiredServiceScopes(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+        if (path.startsWith("/backoffice/")) {
+            return Set.of(InternalScopes.BACKOFFICE);
+        }
+        if (path.startsWith("/internal/identities/resolve")) {
+            return Set.of(InternalScopes.IDENTITY_RESOLVE);
+        }
+        if (path.startsWith("/internal/identities/provision")) {
+            return Set.of(InternalScopes.IDENTITY_PROVISION);
+        }
+        if (path.startsWith("/internal/authz/check")) {
+            return Set.of(InternalScopes.AUTHZ_CHECK);
+        }
+        if (path.equals("/internal/permissions") || path.startsWith("/internal/roles")) {
+            return Set.of("GET".equalsIgnoreCase(method)
+                    ? InternalScopes.ROLE_MANAGEMENT_READ
+                    : InternalScopes.ROLE_MANAGEMENT_WRITE);
+        }
+        if (path.startsWith("/internal/users/provision-profile")) {
+            return Set.of(InternalScopes.PROFILE_WRITE);
+        }
+        if (path.startsWith("/internal/profiles/")) {
+            return Set.of("GET".equalsIgnoreCase(method) || path.endsWith(":batch")
+                    ? InternalScopes.PROFILE_READ
+                    : InternalScopes.PROFILE_WRITE);
+        }
+        if (path.equals("/internal/users") || path.startsWith("/internal/users/")) {
+            return userDirectoryScopes(path, method);
+        }
+        if (path.startsWith("/internal/")) {
+            return Set.of(InternalScopes.SERVICE);
+        }
+        return Set.of();
+    }
+
+    private Set<String> userDirectoryScopes(String path, String method) {
+        if (path.contains("/assignments")) {
+            return Set.of("GET".equalsIgnoreCase(method)
+                    ? InternalScopes.ROLE_ASSIGNMENT_READ
+                    : InternalScopes.ROLE_ASSIGNMENT_WRITE);
+        }
+        if (path.endsWith("/deactivate")) {
+            return Set.of(InternalScopes.USER_DIRECTORY_WRITE);
+        }
+        if (path.endsWith(":batch") || "GET".equalsIgnoreCase(method)) {
+            return Set.of(InternalScopes.USER_DIRECTORY_READ);
+        }
+        return Set.of(InternalScopes.USER_DIRECTORY_WRITE);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> extractScopes(Claims claims) {
+        Set<String> scopes = new LinkedHashSet<>();
+        Object rawScope = claims.get("scope");
+        if (rawScope != null) {
+            Arrays.stream(rawScope.toString().split("\\s+"))
+                    .map(String::trim)
+                    .filter(value -> !value.isBlank())
+                    .forEach(scopes::add);
+        }
+        Object rawScp = claims.get("scp");
+        if (rawScp instanceof List<?> list) {
+            for (Object scope : list) {
+                if (scope != null && !scope.toString().isBlank()) {
+                    scopes.add(scope.toString().trim());
+                }
+            }
+        }
+        return scopes;
     }
 
     private String firstBearerHeader(HttpServletRequest request) {
@@ -107,7 +245,118 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
         }
         String emailHeader = request.getHeader(GatewayHeaders.USER_EMAIL);
         String emailClaim = claims.get("email", String.class);
-        return emailHeader == null || emailClaim == null || emailClaim.equals(emailHeader);
+        if (emailHeader != null && (emailClaim == null || !emailClaim.equals(emailHeader))) {
+            return false;
+        }
+
+        Set<String> roles = extractRoleCodes(claims);
+        String primaryRoleHeader = request.getHeader(GatewayHeaders.USER_ROLE);
+        if (primaryRoleHeader != null && !primaryRoleHeader.isBlank()
+                && !roles.contains(primaryRoleHeader.trim())) {
+            return false;
+        }
+
+        String rolesHeader = request.getHeader(GatewayHeaders.USER_ROLES);
+        if (rolesHeader != null && !rolesHeader.isBlank() && !roles.equals(parseCsv(rolesHeader))) {
+            return false;
+        }
+
+        String roleScopesHeader = request.getHeader(GatewayHeaders.USER_ROLE_SCOPES);
+        return roleScopesHeader == null
+                || roleScopesHeader.isBlank()
+                || encodedRoleScopes(claims).equals(parseCsv(roleScopesHeader));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> extractRoleCodes(Claims claims) {
+        Set<String> roles = new LinkedHashSet<>();
+        Object rawRoles = claims.get("roles");
+        if (rawRoles instanceof List<?> list) {
+            addRoleCodes(roles, list);
+        }
+        Object rawAssignments = claims.get("role_assignments");
+        if (rawAssignments instanceof List<?> list) {
+            addRoleCodes(roles, list);
+        }
+        return roles;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void addRoleCodes(Set<String> roles, List<?> list) {
+        for (Object element : list) {
+            if (element instanceof Map<?, ?> map) {
+                Object code = ((Map<String, Object>) map).get("code");
+                if (code != null && !code.toString().isBlank()) {
+                    roles.add(code.toString());
+                }
+            } else if (element != null && !element.toString().isBlank()) {
+                roles.add(element.toString());
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Set<String> encodedRoleScopes(Claims claims) {
+        Object rawAssignments = claims.get("role_assignments");
+        if (!(rawAssignments instanceof List<?> assignments)) {
+            return Set.of();
+        }
+        Set<String> encoded = new LinkedHashSet<>();
+        for (Object element : assignments) {
+            if (!(element instanceof Map<?, ?> raw)) {
+                continue;
+            }
+            Map<String, Object> assignment = (Map<String, Object>) raw;
+            Object code = assignment.get("code");
+            if (code == null || code.toString().isBlank()) {
+                continue;
+            }
+            Object scopeType = assignment.get("scopeType");
+            Object scopeId = assignment.get("scopeId");
+            encoded.add(encode(code.toString()) + "." + encode(scopeType) + "." + encode(scopeId));
+        }
+        return encoded;
+    }
+
+    private Set<String> parseCsv(String raw) {
+        return Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private String encode(Object raw) {
+        if (raw == null || raw.toString().isBlank()) {
+            return "";
+        }
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(raw.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void recordRejection(RejectionReason reason, HttpServletRequest request) {
+        if (meterRegistry == null) {
+            return;
+        }
+        meterRegistry.counter(
+                        REJECTION_METRIC,
+                        "reason",
+                        reason.metricValue,
+                        "request_type",
+                        requestType(request))
+                .increment();
+    }
+
+    private String requestType(HttpServletRequest request) {
+        if (request.getRequestURI().startsWith("/internal/")) {
+            return "internal_endpoint";
+        }
+        if (request.getRequestURI().startsWith("/backoffice/")) {
+            return "backoffice_endpoint";
+        }
+        if (hasIdentityHeaders(request)) {
+            return "identity_headers";
+        }
+        return "unknown";
     }
 
     private void deny(HttpServletResponse response) throws IOException {
@@ -115,5 +364,21 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write("{\"statusCode\":\"401 UNAUTHORIZED\",\"title\":\"Unauthorized\","
                 + "\"detail\":\"Trusted gateway internal token is required\"}");
+    }
+
+    private enum RejectionReason {
+        MISSING("missing"),
+        INVALID("invalid"),
+        WRONG_TOKEN_USE("wrong_token_use"),
+        WRONG_ACTOR_TYPE("wrong_actor_type"),
+        IDENTITY_MISMATCH("identity_mismatch"),
+        MISSING_IDENTITY_HEADERS("missing_identity_headers"),
+        INSUFFICIENT_SCOPE("insufficient_scope");
+
+        private final String metricValue;
+
+        RejectionReason(String metricValue) {
+            this.metricValue = metricValue;
+        }
     }
 }

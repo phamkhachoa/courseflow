@@ -16,9 +16,9 @@ public class CourseContentReadinessClient {
     private final InternalJwtService internalJwt;
 
     public CourseContentReadinessClient(RestClient.Builder restClientBuilder,
-            @Value("${courseflow.content.media-service-url:http://localhost:8091}") String mediaServiceUrl,
-            @Value("${courseflow.content.quiz-service-url:http://localhost:8095}") String quizServiceUrl,
-            @Value("${courseflow.content.assignment-service-url:http://localhost:8085}") String assignmentServiceUrl,
+            @Value("${courseflow.content.media-service-url:http://media-service:8080}") String mediaServiceUrl,
+            @Value("${courseflow.content.quiz-service-url:http://quiz-service:8080}") String quizServiceUrl,
+            @Value("${courseflow.content.assignment-service-url:http://assignment-service:8080}") String assignmentServiceUrl,
             InternalJwtService internalJwt) {
         this.mediaClient = restClientBuilder.baseUrl(mediaServiceUrl).build();
         this.quizClient = restClientBuilder.baseUrl(quizServiceUrl).build();

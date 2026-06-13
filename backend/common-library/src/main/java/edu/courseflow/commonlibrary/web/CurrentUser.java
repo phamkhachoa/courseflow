@@ -12,11 +12,13 @@ import java.util.stream.Collectors;
  * prefer {@link #hasAnyRole(String...)} over {@code role} equality. Scope-aware guards should use
  * {@code roleAssignments}; services still receive legacy role codes for backward compatibility.
  */
-public record CurrentUser(Long id, String email, String role, Set<String> roles, Set<RoleAssignment> roleAssignments) {
+public record CurrentUser(Long id, String email, String role, Set<String> roles,
+                          Set<RoleAssignment> roleAssignments, String internalToken) {
 
     public CurrentUser {
         roles = roles == null ? Set.of() : Set.copyOf(roles);
         roleAssignments = roleAssignments == null ? Set.of() : Set.copyOf(roleAssignments);
+        internalToken = normalizeToken(internalToken);
         if (roleAssignments.isEmpty() && !roles.isEmpty()) {
             roleAssignments = roles.stream()
                     .map(code -> new RoleAssignment(code, "PLATFORM", null))
@@ -24,14 +26,29 @@ public record CurrentUser(Long id, String email, String role, Set<String> roles,
         }
     }
 
+    public CurrentUser(Long id, String email, String role, Set<String> roles, Set<RoleAssignment> roleAssignments) {
+        this(id, email, role, roles, roleAssignments, null);
+    }
+
     /** Backward-compatible constructor for callers that only know a single role. */
     public CurrentUser(Long id, String email, String role) {
-        this(id, email, role, role == null ? Set.of() : Set.of(role), Set.of());
+        this(id, email, role, role == null ? Set.of() : Set.of(role), Set.of(), null);
     }
 
     /** Backward-compatible constructor for callers that know role codes but not scopes. */
     public CurrentUser(Long id, String email, String role, Set<String> roles) {
-        this(id, email, role, roles, Set.of());
+        this(id, email, role, roles, Set.of(), null);
+    }
+
+    private static String normalizeToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        String normalized = token.trim();
+        if (normalized.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            normalized = normalized.substring(7).trim();
+        }
+        return normalized.isBlank() ? null : normalized;
     }
 
     public boolean hasRole(String expected) {

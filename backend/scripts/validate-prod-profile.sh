@@ -85,6 +85,24 @@ check_value() {
   fi
 }
 
+check_pem_value() {
+  local name="$1"
+  local begin_marker="$2"
+  local value="${!name-}"
+  check_value "$name"
+  if [[ "$value" != *"$begin_marker"* ]]; then
+    fail "$name must be a PEM value containing $begin_marker"
+  fi
+
+  local lower_value
+  lower_value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  case "$lower_value" in
+    *change-me*|*changeme*|*placeholder*|*replace-with*)
+      fail "$name still looks like a placeholder"
+      ;;
+  esac
+}
+
 check_not_local_url() {
   local name="$1"
   local value="${!name-}"
@@ -106,16 +124,307 @@ check_liquibase_contexts() {
   esac
 }
 
-check_secret COURSEFLOW_JWT_SECRET 32 \
-  courseflow-local-cluster-jwt-secret-change-me-32 \
-  courseflow \
-  password \
-  admin
-check_secret COURSEFLOW_INTERNAL_JWT_SECRET 32 \
-  courseflow-local-internal-jwt-secret-change-me-32 \
-  courseflow \
-  password \
-  admin
+check_access_control_resolution_mode() {
+  local mode="${ACCESS_CONTROL_RESOLUTION_MODE:-required}"
+  local normalized
+  normalized="$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  if [ "$normalized" != "required" ]; then
+    fail "ACCESS_CONTROL_RESOLUTION_MODE must be required in the prod profile"
+  fi
+}
+
+check_gateway_identity_routes() {
+  local gateway_config="$backend_dir/services/api-gateway/src/main/resources/application.yml"
+  if grep -Eq 'id:[[:space:]]*identity-auth-v1' "$gateway_config"; then
+    fail "/api/v1/auth/** must not route to identity-service in the Keycloak gateway profile"
+  fi
+  if grep -Eq 'id:[[:space:]]*identity-user-me' "$gateway_config"; then
+    fail "/api/v1/users/me must route to user-management-service, not identity-service"
+  fi
+  if grep -Eq 'id:[[:space:]]*identity-admin-users' "$gateway_config"; then
+    fail "/api/admin/v1/users routes must use user-management-service/access-control-service in the Keycloak profile"
+  fi
+}
+
+check_sts_allowed_clients() {
+  local default_clients="api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,outbox-relay"
+  local clients="${COURSEFLOW_STS_ALLOWED_CLIENTS:-$default_clients}"
+  local normalized
+  normalized="$(printf '%s' "$clients" | tr '[:space:]' ',' | tr -s ',')"
+  if trimmed_is_empty "$normalized"; then
+    fail "COURSEFLOW_STS_ALLOWED_CLIENTS must be set and non-blank"
+  fi
+  case ",$normalized," in
+    *,\*,*)
+      fail "COURSEFLOW_STS_ALLOWED_CLIENTS must not use wildcard '*' in the prod profile"
+      ;;
+  esac
+  case ",$normalized," in
+    *,identity-service,*)
+      fail "identity-service must not be an STS client in the Keycloak production profile"
+      ;;
+  esac
+}
+
+check_sts_allowed_service_scopes() {
+  local default_scopes="internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice"
+  local scopes="${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-$default_scopes}"
+  local normalized
+  normalized="$(printf '%s' "$scopes" | tr '[:space:]' ',' | tr -s ',')"
+  if trimmed_is_empty "$normalized"; then
+    fail "COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES must be set and non-blank"
+  fi
+  case ",$normalized," in
+    *,\*,*)
+      fail "COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES must not use wildcard '*' in the prod profile"
+      ;;
+  esac
+  local required
+  for required in internal:service internal:token-exchange internal:user internal:identity:resolve internal:identity:provision \
+    internal:authz:check internal:authz:assert-topology internal:user-directory:read internal:user-directory:write \
+    internal:role-assignment:read internal:role-assignment:write internal:role-management:read \
+    internal:role-management:write internal:profile:read internal:profile:write internal:backoffice; do
+    case ",$normalized," in
+      *,"$required",*)
+        ;;
+      *)
+        fail "COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES must include $required"
+        ;;
+    esac
+  done
+}
+
+check_sts_client_policy() {
+  COURSEFLOW_STS_CLIENT_SECRETS="${COURSEFLOW_STS_CLIENT_SECRETS-}" \
+  COURSEFLOW_STS_CLIENT_SCOPES="${COURSEFLOW_STS_CLIENT_SCOPES-}" \
+    node <<'EOF_NODE' || fail "COURSEFLOW_STS per-client secret/scope policy is not production-safe"
+const requiredClients = [
+  "api-gateway",
+  "access-control-service",
+  "user-management-service",
+  "organization-service",
+  "course-service",
+  "enrollment-service",
+  "assignment-service",
+  "deadline-service",
+  "announcement-service",
+  "portfolio-service",
+  "discussion-service",
+  "notification-service",
+  "chat-service",
+  "media-service",
+  "search-service",
+  "analytics-service",
+  "gradebook-service",
+  "quiz-service",
+  "certificate-service",
+  "peer-review-service",
+  "live-session-service",
+  "review-service",
+  "outbox-relay"
+];
+const requiredUserManagementScopes = [
+  "internal:identity:provision",
+  "internal:authz:check",
+  "internal:user-directory:read",
+  "internal:user-directory:write",
+  "internal:role-assignment:read"
+];
+const topologyAssertionClients = new Set(["organization-service", "course-service"]);
+const topologyAssertionScopes = new Set(["internal:authz:check", "internal:authz:assert-topology"]);
+const defaultClientScopes =
+  "api-gateway=internal:service,internal:token-exchange;"
+  + "access-control-service=internal:service;"
+  + "user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;"
+  + "organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;"
+  + "course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;"
+  + "enrollment-service=internal:service;"
+  + "assignment-service=internal:service;"
+  + "deadline-service=internal:service;"
+  + "announcement-service=internal:service;"
+  + "portfolio-service=internal:service;"
+  + "discussion-service=internal:service;"
+  + "notification-service=internal:service;"
+  + "chat-service=internal:service,internal:token-exchange;"
+  + "media-service=internal:service;"
+  + "search-service=internal:service;"
+  + "analytics-service=internal:service;"
+  + "gradebook-service=internal:service;"
+  + "quiz-service=internal:service;"
+  + "certificate-service=internal:service;"
+  + "peer-review-service=internal:service;"
+  + "live-session-service=internal:service;"
+  + "review-service=internal:service;"
+  + "outbox-relay=internal:service";
+const privilegedScopes = new Set([
+  "internal:identity:resolve",
+  "internal:identity:provision",
+  "internal:authz:check",
+  "internal:authz:assert-topology",
+  "internal:user-directory:read",
+  "internal:user-directory:write",
+  "internal:role-assignment:read",
+  "internal:role-assignment:write",
+  "internal:role-management:read",
+  "internal:role-management:write",
+  "internal:profile:read",
+  "internal:profile:write",
+  "internal:backoffice"
+]);
+const violations = [];
+
+function parseMap(raw, name, valuesAsScopes = false, required = true) {
+  if (!raw || !raw.trim()) {
+    if (required) {
+      violations.push(`${name} must be set and non-blank`);
+    }
+    return new Map();
+  }
+  const map = new Map();
+  for (const entry of raw.split(";").map((value) => value.trim()).filter(Boolean)) {
+    const separator = entry.indexOf("=");
+    if (separator <= 0 || separator === entry.length - 1) {
+      violations.push(`${name} has invalid entry: ${entry}`);
+      continue;
+    }
+    const client = entry.slice(0, separator).trim();
+    const value = entry.slice(separator + 1).trim();
+    if (client === "*" || client === "identity-service") {
+      violations.push(`${name} must not include client ${client}`);
+    }
+    if (map.has(client)) {
+      violations.push(`${name} repeats client ${client}`);
+    }
+    map.set(client, valuesAsScopes ? value.split(/[,\s]+/).map((scope) => scope.trim()).filter(Boolean) : value);
+  }
+  return map;
+}
+
+function clientSecretEnvName(client) {
+  return `COURSEFLOW_STS_${client.toUpperCase().replace(/-/g, "_")}_SECRET`;
+}
+
+function resolveClientSecrets() {
+  const configured = parseMap(process.env.COURSEFLOW_STS_CLIENT_SECRETS, "COURSEFLOW_STS_CLIENT_SECRETS", false, false);
+  if (configured.size > 0) {
+    return configured;
+  }
+  const resolved = new Map();
+  for (const client of requiredClients) {
+    const envName = clientSecretEnvName(client);
+    const value = (process.env[envName] ?? "").trim();
+    if (!value) {
+      violations.push(`${envName} must be set when COURSEFLOW_STS_CLIENT_SECRETS is not provided`);
+      continue;
+    }
+    resolved.set(client, value);
+  }
+  return resolved;
+}
+
+function secretLooksWeak(secret) {
+  const lower = String(secret ?? "").toLowerCase();
+  return lower.length < 32
+    || lower.includes("change-me")
+    || lower.includes("changeme")
+    || lower.includes("default")
+    || lower.includes("placeholder")
+    || lower.includes("replace-with")
+    || ["courseflow", "password", "admin"].includes(lower);
+}
+
+const secrets = resolveClientSecrets();
+const scopes = parseMap(process.env.COURSEFLOW_STS_CLIENT_SCOPES || defaultClientScopes, "COURSEFLOW_STS_CLIENT_SCOPES", true);
+
+for (const client of requiredClients) {
+  if (!secrets.has(client)) {
+    violations.push(`COURSEFLOW_STS_CLIENT_SECRETS missing ${client}`);
+  }
+  if (!scopes.has(client)) {
+    violations.push(`COURSEFLOW_STS_CLIENT_SCOPES missing ${client}`);
+  }
+}
+
+const seenSecrets = new Map();
+for (const [client, secret] of secrets) {
+  if (secretLooksWeak(secret)) {
+    violations.push(`COURSEFLOW_STS_CLIENT_SECRETS[${client}] is weak or placeholder-like`);
+  }
+  if (seenSecrets.has(secret)) {
+    violations.push(`COURSEFLOW_STS_CLIENT_SECRETS reuses the same secret for ${seenSecrets.get(secret)} and ${client}`);
+  }
+  seenSecrets.set(secret, client);
+}
+
+for (const [client, clientScopes] of scopes) {
+  if (clientScopes.length === 0) {
+    violations.push(`COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not be empty`);
+  }
+  if (clientScopes.includes("*")) {
+    violations.push(`COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include wildcard '*'`);
+  }
+  for (const scope of clientScopes) {
+    const allowedTopologyScope = topologyAssertionClients.has(client) && topologyAssertionScopes.has(scope);
+    if (privilegedScopes.has(scope) && client !== "user-management-service" && !allowedTopologyScope) {
+      violations.push(`${client} must not be granted privileged STS scope ${scope}`);
+    }
+    if (scope === "internal:user" && client !== "course-service") {
+      violations.push(`${client} must not be granted trusted-user delegation scope internal:user`);
+    }
+    if (scope === "internal:token-exchange" && !["api-gateway", "chat-service"].includes(client)) {
+      violations.push(`${client} must not be granted token exchange scope internal:token-exchange`);
+    }
+    if (scope.startsWith("internal:role-management:")) {
+      violations.push(`${client} must not be granted role-management machine scope by default`);
+    }
+  }
+}
+
+const userManagementScopes = new Set(scopes.get("user-management-service") ?? []);
+for (const scope of requiredUserManagementScopes) {
+  if (!userManagementScopes.has(scope)) {
+    violations.push(`user-management-service must be granted ${scope}`);
+  }
+}
+const courseScopes = new Set(scopes.get("course-service") ?? []);
+if (!courseScopes.has("internal:service") || !courseScopes.has("internal:user")) {
+  violations.push("course-service must be granted internal:service and internal:user");
+}
+for (const client of topologyAssertionClients) {
+  const clientScopes = new Set(scopes.get(client) ?? []);
+  for (const scope of topologyAssertionScopes) {
+    if (!clientScopes.has(scope)) {
+      violations.push(`${client} must be granted ${scope} to assert server-derived authorization topology`);
+    }
+  }
+}
+for (const client of ["api-gateway", "chat-service"]) {
+  const clientScopeSet = new Set(scopes.get(client) ?? []);
+  if (!clientScopeSet.has("internal:token-exchange")) {
+    violations.push(`${client} must be granted internal:token-exchange`);
+  }
+}
+
+if (violations.length > 0) {
+  for (const violation of violations) {
+    console.error(`  - ${violation}`);
+  }
+  process.exit(1);
+}
+EOF_NODE
+}
+
+script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+backend_dir="$(CDPATH= cd -- "$script_dir/.." && pwd)"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node is required for Keycloak realm validation"
+fi
+
+node "$script_dir/validate-keycloak-realm.mjs" \
+  "$backend_dir/infra/docker/keycloak/courseflow-realm.prod-template.json" \
+  --prod-template >/dev/null
+
 check_secret CERTIFICATE_SIGNING_SECRET 32 \
   courseflow-local-certificate-signing-secret-change-me-32 \
   courseflow \
@@ -140,6 +449,47 @@ check_secret KEYCLOAK_ADMIN_PASSWORD 12 \
   courseflow
 check_value COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT
 check_not_local_url COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT
+check_value EXTERNAL_TOKEN_MODE
+if [ "${EXTERNAL_TOKEN_MODE}" != "oidc" ]; then
+  fail "EXTERNAL_TOKEN_MODE must be oidc in the prod profile"
+fi
+check_value COURSEFLOW_INTERNAL_JWT_ALGORITHM
+if [ "${COURSEFLOW_INTERNAL_JWT_ALGORITHM}" != "RS256" ]; then
+  fail "COURSEFLOW_INTERNAL_JWT_ALGORITHM must be RS256 in the prod profile"
+fi
+check_pem_value COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY "-----BEGIN PRIVATE KEY-----"
+check_value COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE
+if [ "${COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE}" != "jwks" ]; then
+  fail "COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE must be jwks in the prod profile"
+fi
+check_value COURSEFLOW_INTERNAL_JWT_JWKS_URI
+check_sts_allowed_clients
+check_sts_allowed_service_scopes
+check_sts_client_policy
+check_value TOKEN_CONVERTER_URI
+check_access_control_resolution_mode
+check_gateway_identity_routes
+check_value KEYCLOAK_ISSUER_URI
+check_not_local_url KEYCLOAK_ISSUER_URI
+check_value KEYCLOAK_JWK_SET_URI
+check_not_local_url KEYCLOAK_JWK_SET_URI
+check_value KEYCLOAK_AUDIENCE
+check_value KEYCLOAK_PUBLIC_BASE_URL
+check_not_local_url KEYCLOAK_PUBLIC_BASE_URL
+check_value KEYCLOAK_BASE_URL
+check_not_local_url KEYCLOAK_BASE_URL
+check_value KEYCLOAK_REALM
+check_value KEYCLOAK_ADMIN_CLIENT_ID
+check_secret KEYCLOAK_ADMIN_CLIENT_SECRET 24 \
+  admin \
+  password \
+  courseflow \
+  local-courseflow-iam-lifecycle-secret-change-me \
+  local-keycloak-user-lifecycle-secret-change-me \
+  __REPLACE_WITH_GENERATED_LIFECYCLE_CLIENT_SECRET__
+check_value KEYCLOAK_SETUP_EMAIL_CLIENT_ID
+check_value KEYCLOAK_SETUP_EMAIL_REDIRECT_URI
+check_not_local_url KEYCLOAK_SETUP_EMAIL_REDIRECT_URI
 check_liquibase_contexts
 
 if [ "${COURSEFLOW_STORAGE_ALLOW_DEMO_CREDENTIALS:-false}" = "true" ] ||
@@ -162,8 +512,6 @@ if [ "$validate_compose" -eq 1 ]; then
     fail "node is required for --compose port validation"
   fi
 
-  script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-  backend_dir="$(CDPATH= cd -- "$script_dir/.." && pwd)"
   docker_dir="$backend_dir/infra/docker"
   config_json="$(mktemp)"
   trap 'rm -f "$config_json"' EXIT
@@ -211,6 +559,10 @@ const forbiddenValues = new Set([
 
 const publishedPortViolations = [];
 const secretViolations = [];
+const keycloakViolations = [];
+const internalJwtViolations = [];
+const tokenConverterViolations = [];
+const legacyIdentityViolations = [];
 
 function envEntries(environment) {
   if (!environment) return [];
@@ -221,6 +573,18 @@ function envEntries(environment) {
     });
   }
   return Object.entries(environment).map(([key, value]) => [key, value == null ? "" : String(value)]);
+}
+
+function pairMap(raw, valueParser = (value) => value) {
+  const map = new Map();
+  for (const entry of String(raw ?? "").split(";").map((value) => value.trim()).filter(Boolean)) {
+    const separator = entry.indexOf("=");
+    if (separator <= 0 || separator === entry.length - 1) {
+      continue;
+    }
+    map.set(entry.slice(0, separator).trim(), valueParser(entry.slice(separator + 1).trim()));
+  }
+  return map;
 }
 
 for (const [serviceName, service] of Object.entries(services)) {
@@ -234,11 +598,49 @@ for (const [serviceName, service] of Object.entries(services)) {
     }
   }
 
+  const serviceEnv = new Map(envEntries(service.environment));
+  const internalJwtAlgorithm = (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_ALGORITHM") ?? "").trim().toUpperCase();
+  const internalJwtVerificationMode =
+    (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE") ?? "").trim().toLowerCase();
+  const internalJwtJwksUri = (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_JWKS_URI") ?? "").trim();
+  const internalJwtPrivateKey = (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY") ?? "").trim();
+  const serviceTokenMode = (serviceEnv.get("COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE") ?? "").trim().toLowerCase();
+  const tokenConverterUri = (serviceEnv.get("TOKEN_CONVERTER_URI") ?? "").trim();
+  const isTokenConverter = serviceName === "identity-token-converter-service";
+
+  if (internalJwtAlgorithm === "RS256") {
+    if (isTokenConverter) {
+      if (!internalJwtPrivateKey) {
+        internalJwtViolations.push(`${serviceName} must hold COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY for signing`);
+      }
+    } else {
+      if (internalJwtPrivateKey) {
+        internalJwtViolations.push(`${serviceName} must not receive COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY`);
+      }
+      if (internalJwtVerificationMode !== "jwks") {
+        internalJwtViolations.push(`${serviceName} must verify internal JWTs with JWKS`);
+      }
+      if (!internalJwtJwksUri) {
+        internalJwtViolations.push(`${serviceName} must set COURSEFLOW_INTERNAL_JWT_JWKS_URI`);
+      }
+    }
+  }
+
+  if (!isTokenConverter && serviceTokenMode === "sts" && !tokenConverterUri) {
+    internalJwtViolations.push(`${serviceName} must set TOKEN_CONVERTER_URI when COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE=sts`);
+  }
+
   for (const [key, value] of envEntries(service.environment)) {
     const upperKey = key.toUpperCase();
     const lowerValue = value.trim().toLowerCase();
     if (upperKey === "SPRING_LIQUIBASE_CONTEXTS" && lowerValue.split(",").map((part) => part.trim()).includes("demo")) {
       secretViolations.push(`${serviceName}.${key} includes demo`);
+    }
+    if (upperKey === "COURSEFLOW_INTERNAL_JWT_SECRET" && internalJwtAlgorithm === "RS256") {
+      continue;
+    }
+    if (upperKey === "COURSEFLOW_JWT_SECRET") {
+      continue;
     }
     if (/(PASSWORD|SECRET|TOKEN|ACCESS_KEY)$/.test(upperKey)) {
       if (!value.trim()) {
@@ -256,6 +658,138 @@ for (const [serviceName, service] of Object.entries(services)) {
   }
 }
 
+const keycloak = services.keycloak;
+if (!keycloak) {
+  keycloakViolations.push("keycloak service is missing");
+} else {
+  const command = Array.isArray(keycloak.command) ? keycloak.command.join(" ") : String(keycloak.command ?? "");
+  if (/\bstart-dev\b/.test(command)) {
+    keycloakViolations.push("keycloak command uses start-dev");
+  }
+  if (/--import-realm\b/.test(command)) {
+    keycloakViolations.push("keycloak command imports the local realm");
+  }
+  const volumes = Array.isArray(keycloak.volumes) ? keycloak.volumes : [];
+  for (const volume of volumes) {
+    const target = typeof volume === "string" ? volume : String(volume.target ?? "");
+    if (target.includes("/opt/keycloak/data/import")) {
+      keycloakViolations.push("keycloak mounts the local realm import directory");
+    }
+  }
+  const env = new Map(envEntries(keycloak.environment));
+  if ((env.get("KC_DB") ?? "").trim() !== "postgres") {
+    keycloakViolations.push("keycloak must use KC_DB=postgres in the prod profile");
+  }
+}
+
+const tokenConverter = services["identity-token-converter-service"];
+let tokenConverterClientSecrets = new Map();
+if (!tokenConverter) {
+  tokenConverterViolations.push("identity-token-converter-service is missing");
+} else {
+  const env = new Map(envEntries(tokenConverter.environment));
+  const accessControlMode = (env.get("ACCESS_CONTROL_RESOLUTION_MODE") ?? "").trim().toLowerCase();
+  if (accessControlMode !== "required") {
+    tokenConverterViolations.push("identity-token-converter-service must use ACCESS_CONTROL_RESOLUTION_MODE=required");
+  }
+  const allowedClients = (env.get("COURSEFLOW_STS_ALLOWED_CLIENTS") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const allowedServiceScopes = (env.get("COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  tokenConverterClientSecrets = pairMap(env.get("COURSEFLOW_STS_CLIENT_SECRETS") ?? "");
+  const tokenConverterClientScopes = pairMap(
+    env.get("COURSEFLOW_STS_CLIENT_SCOPES") ?? "",
+    (value) => value.split(/[,\s]+/).map((scope) => scope.trim()).filter(Boolean)
+  );
+  const requiredServiceScopes = [
+    "internal:service",
+    "internal:token-exchange",
+    "internal:user",
+    "internal:identity:resolve",
+    "internal:identity:provision",
+    "internal:authz:check",
+    "internal:authz:assert-topology",
+    "internal:user-directory:read",
+    "internal:user-directory:write",
+    "internal:role-assignment:read",
+    "internal:role-assignment:write",
+    "internal:role-management:read",
+    "internal:role-management:write",
+    "internal:profile:read",
+    "internal:profile:write",
+    "internal:backoffice"
+  ];
+  if (allowedClients.length === 0) {
+    tokenConverterViolations.push("identity-token-converter-service must define COURSEFLOW_STS_ALLOWED_CLIENTS");
+  }
+  if (allowedClients.includes("*")) {
+    tokenConverterViolations.push("COURSEFLOW_STS_ALLOWED_CLIENTS must not include wildcard '*'");
+  }
+  if (allowedClients.includes("identity-service")) {
+    tokenConverterViolations.push("identity-service must not be an STS client in the Keycloak production profile");
+  }
+  if (allowedServiceScopes.length === 0) {
+    tokenConverterViolations.push("identity-token-converter-service must define COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES");
+  }
+  if (allowedServiceScopes.includes("*")) {
+    tokenConverterViolations.push("COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES must not include wildcard '*'");
+  }
+  if (tokenConverterClientSecrets.size === 0) {
+    tokenConverterViolations.push("identity-token-converter-service must define COURSEFLOW_STS_CLIENT_SECRETS");
+  }
+  if (tokenConverterClientScopes.size === 0) {
+    tokenConverterViolations.push("identity-token-converter-service must define COURSEFLOW_STS_CLIENT_SCOPES");
+  }
+  for (const scope of requiredServiceScopes) {
+    if (!allowedServiceScopes.includes(scope)) {
+      tokenConverterViolations.push(`COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES must include ${scope}`);
+    }
+  }
+  for (const client of allowedClients) {
+    if (!tokenConverterClientSecrets.has(client)) {
+      tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SECRETS missing ${client}`);
+    }
+    if (!tokenConverterClientScopes.has(client)) {
+      tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SCOPES missing ${client}`);
+    }
+  }
+  for (const [client, scopes] of tokenConverterClientScopes) {
+    if (scopes.includes("*")) {
+      tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include wildcard '*'`);
+    }
+  }
+}
+
+for (const [serviceName, service] of Object.entries(services)) {
+  if (serviceName === "identity-token-converter-service" || serviceName === "identity-service") {
+    continue;
+  }
+  const serviceEnv = new Map(envEntries(service.environment));
+  const serviceTokenMode = (serviceEnv.get("COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE") ?? "").trim().toLowerCase();
+  if (serviceTokenMode !== "sts") {
+    continue;
+  }
+  const expectedSecret = tokenConverterClientSecrets.get(serviceName);
+  const actualSecret = (serviceEnv.get("COURSEFLOW_STS_CLIENT_SECRET") ?? "").trim();
+  if (!actualSecret) {
+    tokenConverterViolations.push(`${serviceName} must receive only its own COURSEFLOW_STS_CLIENT_SECRET`);
+  } else if (expectedSecret && actualSecret !== expectedSecret) {
+    tokenConverterViolations.push(`${serviceName} COURSEFLOW_STS_CLIENT_SECRET does not match converter client secret map`);
+  }
+}
+
+const identityService = services["identity-service"];
+if (identityService) {
+  const profiles = Array.isArray(identityService.profiles) ? identityService.profiles : [];
+  if (!profiles.includes("legacy-identity")) {
+    legacyIdentityViolations.push("identity-service must be behind the legacy-identity profile in prod");
+  }
+}
+
 if (publishedPortViolations.length > 0) {
   console.error("Unexpected prod published ports:");
   for (const violation of publishedPortViolations) {
@@ -270,7 +804,37 @@ if (secretViolations.length > 0) {
   }
 }
 
-if (publishedPortViolations.length > 0 || secretViolations.length > 0) {
+if (keycloakViolations.length > 0) {
+  console.error("Unsafe prod Keycloak configuration:");
+  for (const violation of keycloakViolations) {
+    console.error(`  - ${violation}`);
+  }
+}
+
+if (internalJwtViolations.length > 0) {
+  console.error("Unsafe prod internal JWT configuration:");
+  for (const violation of internalJwtViolations) {
+    console.error(`  - ${violation}`);
+  }
+}
+
+if (tokenConverterViolations.length > 0) {
+  console.error("Unsafe prod token converter configuration:");
+  for (const violation of tokenConverterViolations) {
+    console.error(`  - ${violation}`);
+  }
+}
+
+if (legacyIdentityViolations.length > 0) {
+  console.error("Unsafe prod legacy identity-service configuration:");
+  for (const violation of legacyIdentityViolations) {
+    console.error(`  - ${violation}`);
+  }
+}
+
+if (publishedPortViolations.length > 0 || secretViolations.length > 0 ||
+    keycloakViolations.length > 0 || internalJwtViolations.length > 0 ||
+    tokenConverterViolations.length > 0 || legacyIdentityViolations.length > 0) {
   process.exit(1);
 }
 EOF_NODE

@@ -2,6 +2,9 @@ package edu.courseflow.tokenconverter.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import edu.courseflow.tokenconverter.config.TokenConverterProperties;
 import edu.courseflow.tokenconverter.dto.TokenExchangeResponse;
@@ -9,13 +12,18 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.crypto.SecretKey;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,18 +32,32 @@ class TokenExchangeServiceTest {
 
     private static final String EXTERNAL_SECRET = "external-jwt-secret-that-is-at-least-32-bytes";
     private static final String INTERNAL_SECRET = "internal-jwt-secret-that-is-at-least-32-bytes";
+    private static final String STS_SECRET = "sts-client-secret-that-is-at-least-32-bytes";
+    private static final String USER_MANAGEMENT_STS_SECRET = "user-management-sts-secret-32-byte-value";
+    private static final String API_GATEWAY_CLIENT_ID = "api-gateway";
 
     private final TokenConverterProperties properties = new TokenConverterProperties(
+            "legacy",
             EXTERNAL_SECRET,
             "courseflow-identity",
+            "",
+            "",
+            "courseflow-api",
+            "HS256",
             INTERNAL_SECRET,
+            "",
+            "",
             "courseflow-token-converter",
             "courseflow-services",
             "courseflow-services,course-service",
+            STS_SECRET,
+            API_GATEWAY_CLIENT_ID,
+            "internal:service,internal:token-exchange",
             180,
             30);
     private final TokenExchangeService service = new TokenExchangeService(
             new ExternalTokenVerifier(properties),
+            AccessControlIdentityResolver.legacyClaims(),
             new InternalTokenIssuer(properties, new ScopeMapper()),
             properties);
 
@@ -46,7 +68,13 @@ class TokenExchangeServiceTest {
                 TokenExchangeService.ACCESS_TOKEN_TYPE,
                 externalToken("student@courseflow.local", "4", "STUDENT"),
                 "courseflow-services",
-                "course:read learning:write admin:write");
+                "course:read learning:write admin:write",
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null);
 
         assertThat(response.token_type()).isEqualTo("Bearer");
         assertThat(response.expires_in()).isEqualTo(180);
@@ -70,12 +98,31 @@ class TokenExchangeServiceTest {
     }
 
     @Test
+    void rejectsTokenExchangeWithoutClientCredentials() {
+        assertThatThrownBy(() -> service.exchange(
+                TokenExchangeService.TOKEN_EXCHANGE_GRANT,
+                TokenExchangeService.ACCESS_TOKEN_TYPE,
+                externalToken("student@courseflow.local", "4", "STUDENT"),
+                "courseflow-services",
+                "course:read"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void rejectsAudienceOutsideAllowlist() {
         assertThatThrownBy(() -> service.exchange(
                 TokenExchangeService.TOKEN_EXCHANGE_GRANT,
                 TokenExchangeService.ACCESS_TOKEN_TYPE,
                 externalToken("student@courseflow.local", "4", "STUDENT"),
                 "gradebook-service",
+                null,
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
                 null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
@@ -89,10 +136,433 @@ class TokenExchangeServiceTest {
                 TokenExchangeService.ACCESS_TOKEN_TYPE,
                 externalTokenWithIssuer("courseflow-other-issuer", "student@courseflow.local", "4", "STUDENT"),
                 "courseflow-services",
+                null,
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
                 null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
                 .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void canIssueRs256InternalJwt() throws Exception {
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048);
+        var pair = generator.generateKeyPair();
+        TokenConverterProperties rsProperties = new TokenConverterProperties(
+                "legacy",
+                EXTERNAL_SECRET,
+                "courseflow-identity",
+                "",
+                "",
+                "courseflow-api",
+                "RS256",
+                "",
+                pem("PRIVATE KEY", pair.getPrivate()),
+                "",
+                "courseflow-token-converter",
+                "courseflow-services",
+                "courseflow-services",
+                STS_SECRET,
+                API_GATEWAY_CLIENT_ID,
+                "internal:service,internal:token-exchange",
+                180,
+                30);
+        TokenExchangeService rsService = new TokenExchangeService(
+                new ExternalTokenVerifier(rsProperties),
+                AccessControlIdentityResolver.legacyClaims(),
+                new InternalTokenIssuer(rsProperties, new ScopeMapper()),
+                rsProperties);
+
+        TokenExchangeResponse response = rsService.exchange(
+                TokenExchangeService.TOKEN_EXCHANGE_GRANT,
+                TokenExchangeService.ACCESS_TOKEN_TYPE,
+                externalToken("student@courseflow.local", "4", "STUDENT"),
+                "courseflow-services",
+                null,
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        Claims claims = Jwts.parser()
+                .verifyWith(pair.getPublic())
+                .build()
+                .parseSignedClaims(response.access_token())
+                .getPayload();
+        assertThat(claims.getIssuer()).isEqualTo("courseflow-token-converter");
+        assertThat(claims.getSubject()).isEqualTo("4");
+    }
+
+    @Test
+    void canIssueServiceTokenWithClientCredentials() {
+        TokenConverterProperties stsProperties = stsProperties();
+        TokenExchangeService stsService = service(stsProperties);
+
+        TokenExchangeResponse response = stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:service",
+                "course-service",
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        Claims claims = Jwts.parser()
+                .verifyWith(internalKey())
+                .build()
+                .parseSignedClaims(response.access_token())
+                .getPayload();
+        assertThat(claims.getSubject()).isEqualTo("service:course-service");
+        assertThat(claims.get("actor_type")).isEqualTo("service");
+        assertThat(claims.get("azp")).isEqualTo("course-service");
+        assertThat(claims.get("scope")).isEqualTo("internal:service");
+    }
+
+    @Test
+    void rejectsServiceScopeOutsidePerClientProfile() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:identity:provision",
+                "course-service",
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void acceptsPrivilegedScopeOnlyForMappedClient() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        TokenExchangeResponse response = stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:identity:provision",
+                "user-management-service",
+                USER_MANAGEMENT_STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        Claims claims = Jwts.parser()
+                .verifyWith(internalKey())
+                .build()
+                .parseSignedClaims(response.access_token())
+                .getPayload();
+        assertThat(claims.get("azp")).isEqualTo("user-management-service");
+        assertThat(claims.get("scope")).isEqualTo("internal:identity:provision");
+    }
+
+    @Test
+    void rejectsSecretFromAnotherClient() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:service",
+                "course-service",
+                USER_MANAGEMENT_STS_SECRET,
+                null,
+                null,
+                null,
+                null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void oidcModeRequiresPerClientStsSecretsAndScopes() {
+        assertThatThrownBy(() -> new TokenConverterProperties(
+                "oidc",
+                "",
+                "courseflow-identity",
+                "https://sso.courseflow.example.com/realms/courseflow",
+                "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs",
+                "courseflow-api",
+                "HS256",
+                INTERNAL_SECRET,
+                "",
+                "",
+                "courseflow-token-converter",
+                "courseflow-services",
+                "courseflow-services",
+                STS_SECRET,
+                "api-gateway",
+                "internal:service,internal:token-exchange",
+                180,
+                30))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COURSEFLOW_STS_CLIENT_SECRETS");
+    }
+
+    @Test
+    void oidcModeRejectsPerClientSecretWithoutScopePolicy() {
+        assertThatThrownBy(() -> new TokenConverterProperties(
+                "oidc",
+                "",
+                "courseflow-identity",
+                "https://sso.courseflow.example.com/realms/courseflow",
+                "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs",
+                "courseflow-api",
+                "HS256",
+                INTERNAL_SECRET,
+                "",
+                "",
+                "courseflow-token-converter",
+                "courseflow-services",
+                "courseflow-services",
+                "",
+                "api-gateway=" + STS_SECRET,
+                "api-gateway",
+                "internal:service,internal:token-exchange",
+                "",
+                180,
+                30))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COURSEFLOW_STS_CLIENT_SCOPES");
+    }
+
+    @Test
+    void oidcModeAcceptsPerClientStsPolicy() {
+        TokenConverterProperties oidcProperties = new TokenConverterProperties(
+                "oidc",
+                "",
+                "courseflow-identity",
+                "https://sso.courseflow.example.com/realms/courseflow",
+                "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs",
+                "courseflow-api",
+                "HS256",
+                INTERNAL_SECRET,
+                "",
+                "",
+                "courseflow-token-converter",
+                "courseflow-services",
+                "courseflow-services",
+                "",
+                "api-gateway=" + STS_SECRET,
+                "api-gateway",
+                "internal:service,internal:token-exchange",
+                "api-gateway=internal:service,internal:token-exchange",
+                180,
+                30);
+
+        assertThat(oidcProperties.serviceClientAllowed("api-gateway")).isTrue();
+        assertThat(oidcProperties.serviceScopesForClient("api-gateway", "internal:token-exchange"))
+                .containsExactly("internal:token-exchange");
+    }
+
+    @Test
+    void canIssueTrustedUserTokenWithVerifiedActorToken() {
+        TokenConverterProperties stsProperties = stsProperties();
+        TokenExchangeService stsService = service(stsProperties);
+        String actorToken = internalUserToken("42", "student@courseflow.local", "STUDENT");
+
+        TokenExchangeResponse response = stsService.exchange(
+                TokenExchangeService.TRUSTED_USER_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:user",
+                "course-service",
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null,
+                actorToken);
+
+        Claims claims = Jwts.parser()
+                .verifyWith(internalKey())
+                .build()
+                .parseSignedClaims(response.access_token())
+                .getPayload();
+        assertThat(claims.getSubject()).isEqualTo("42");
+        assertThat(claims.get("actor_type")).isEqualTo("user");
+        assertThat(claims.get("azp")).isEqualTo("course-service");
+        assertThat(claims.get("roles", List.class)).contains("STUDENT");
+        assertThat(claims.get("uid")).isEqualTo("42");
+    }
+
+    @Test
+    void rejectsTrustedUserTokenWithSelfAssertedClaims() {
+        TokenConverterProperties stsProperties = stsProperties();
+        TokenExchangeService stsService = service(stsProperties);
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.TRUSTED_USER_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:user",
+                "course-service",
+                STS_SECRET,
+                "42",
+                "student@courseflow.local",
+                "ADMIN",
+                null,
+                null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void rejectsTrustedUserTokenWithoutActorToken() {
+        TokenConverterProperties stsProperties = stsProperties();
+        TokenExchangeService stsService = service(stsProperties);
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.TRUSTED_USER_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:user",
+                "course-service",
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null,
+                null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void recordsTokenExchangeMetricsForSuccessAndFailure() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        TokenExchangeService metered = service(properties, registry);
+
+        metered.exchange(
+                TokenExchangeService.TOKEN_EXCHANGE_GRANT,
+                TokenExchangeService.ACCESS_TOKEN_TYPE,
+                externalToken("student@courseflow.local", "4", "STUDENT"),
+                "courseflow-services",
+                "course:read",
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        assertThat(registry.find("courseflow.token_converter.requests")
+                .tag("grant_type", "token_exchange")
+                .counter()
+                .count()).isEqualTo(1.0);
+        assertThat(registry.find("courseflow.token_converter.success")
+                .tag("grant_type", "token_exchange")
+                .tag("actor_type", "user")
+                .counter()
+                .count()).isEqualTo(1.0);
+
+        assertThatThrownBy(() -> metered.exchange(
+                TokenExchangeService.TOKEN_EXCHANGE_GRANT,
+                TokenExchangeService.ACCESS_TOKEN_TYPE,
+                externalToken("student@courseflow.local", "4", "STUDENT"),
+                "gradebook-service",
+                null,
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null)).isInstanceOf(ResponseStatusException.class);
+
+        assertThat(registry.find("courseflow.token_converter.failure")
+                .tag("grant_type", "token_exchange")
+                .tag("reason", "audience_is_not_allowed")
+                .tag("status", "400")
+                .counter()
+                .count()).isEqualTo(1.0);
+        assertThat(registry.find("courseflow.token_converter.duration")
+                .tag("grant_type", "token_exchange")
+                .tag("outcome", "success")
+                .timer()
+                .count()).isEqualTo(1);
+        assertThat(registry.find("courseflow.token_converter.duration")
+                .tag("grant_type", "token_exchange")
+                .tag("outcome", "failure")
+                .timer()
+                .count()).isEqualTo(1);
+    }
+
+    @Test
+    void auditsTokenExchangeSuccessAndFailure() {
+        TokenConverterAudit audit = mock(TokenConverterAudit.class);
+        TokenExchangeService audited = service(properties, audit);
+
+        audited.exchange(
+                TokenExchangeService.TOKEN_EXCHANGE_GRANT,
+                TokenExchangeService.ACCESS_TOKEN_TYPE,
+                externalToken("student@courseflow.local", "4", "STUDENT"),
+                "courseflow-services",
+                "course:read",
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        verify(audit).success(argThat(event -> event != null
+                && TokenExchangeService.TOKEN_EXCHANGE_GRANT.equals(event.grantType())
+                && "user".equals(event.actorType())
+                && "4".equals(event.actorId())
+                && "courseflow-services".equals(event.audience())
+                && event.scopes().contains("course:read")
+                && "courseflow-identity".equals(event.externalIssuer())
+                && "student@courseflow.local".equals(event.externalSubject())
+                && "200".equals(event.status())));
+
+        assertThatThrownBy(() -> audited.exchange(
+                TokenExchangeService.TOKEN_EXCHANGE_GRANT,
+                TokenExchangeService.ACCESS_TOKEN_TYPE,
+                externalToken("student@courseflow.local", "4", "STUDENT"),
+                "gradebook-service",
+                null,
+                API_GATEWAY_CLIENT_ID,
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null)).isInstanceOf(ResponseStatusException.class);
+
+        verify(audit).failure(argThat(event -> event != null
+                && TokenExchangeService.TOKEN_EXCHANGE_GRANT.equals(event.grantType())
+                && "external_user".equals(event.actorType())
+                && "gradebook-service".equals(event.audience())
+                && "400".equals(event.status())
+                && "Audience is not allowed".equals(event.reason())
+                && event.scopes().isEmpty()));
     }
 
     private String externalToken(String subject, String userId, String... roleCodes) {
@@ -123,5 +593,115 @@ class TokenExchangeServiceTest {
 
     private SecretKey internalKey() {
         return Keys.hmacShaKeyFor(INTERNAL_SECRET.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String internalUserToken(String userId, String email, String role) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .issuer("courseflow-token-converter")
+                .subject(userId)
+                .claim("aud", List.of("courseflow-services"))
+                .claim("token_use", "internal")
+                .claim("actor_type", "user")
+                .claim("azp", "api-gateway")
+                .claim("uid", userId)
+                .claim("email", email)
+                .claim("roles", List.of(role))
+                .claim("role_assignments", List.of(Map.of(
+                        "code", role,
+                        "scopeType", "COURSE",
+                        "scopeId", "100")))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusSeconds(180)))
+                .signWith(internalKey())
+                .compact();
+    }
+
+    private TokenConverterProperties stsProperties() {
+        return new TokenConverterProperties(
+                "legacy",
+                EXTERNAL_SECRET,
+                "courseflow-identity",
+                "",
+                "",
+                "courseflow-api",
+                "HS256",
+                INTERNAL_SECRET,
+                "",
+                "",
+                "courseflow-token-converter",
+                "courseflow-services",
+                "courseflow-services",
+                STS_SECRET,
+                "course-service",
+                "internal:service,internal:user",
+                180,
+                30);
+    }
+
+    private TokenConverterProperties stsPropertiesWithClientPolicy() {
+        return new TokenConverterProperties(
+                "legacy",
+                EXTERNAL_SECRET,
+                "courseflow-identity",
+                "",
+                "",
+                "courseflow-api",
+                "HS256",
+                INTERNAL_SECRET,
+                "",
+                "",
+                "courseflow-token-converter",
+                "courseflow-services",
+                "courseflow-services",
+                "",
+                "course-service=" + STS_SECRET + ";user-management-service=" + USER_MANAGEMENT_STS_SECRET,
+                "course-service,user-management-service",
+                "internal:service,internal:user,internal:identity:provision,internal:authz:check",
+                "course-service=internal:service,internal:user;"
+                        + "user-management-service=internal:identity:provision,internal:authz:check",
+                180,
+                30);
+    }
+
+    private TokenExchangeService service(TokenConverterProperties customProperties) {
+        return new TokenExchangeService(
+                new ExternalTokenVerifier(customProperties),
+                AccessControlIdentityResolver.legacyClaims(),
+                new InternalTokenIssuer(customProperties, new ScopeMapper()),
+                customProperties);
+    }
+
+    private TokenExchangeService service(TokenConverterProperties customProperties, SimpleMeterRegistry registry) {
+        return new TokenExchangeService(
+                new ExternalTokenVerifier(customProperties),
+                AccessControlIdentityResolver.legacyClaims(),
+                new InternalTokenIssuer(customProperties, new ScopeMapper()),
+                customProperties,
+                new TokenConverterMetrics(registry));
+    }
+
+    private TokenExchangeService service(TokenConverterProperties customProperties, TokenConverterAudit audit) {
+        return new TokenExchangeService(
+                new ExternalTokenVerifier(customProperties),
+                AccessControlIdentityResolver.legacyClaims(),
+                new InternalTokenIssuer(customProperties, new ScopeMapper()),
+                customProperties,
+                TokenConverterMetrics.noop(),
+                audit);
+    }
+
+    private String pem(String label, PrivateKey key) {
+        return pem(label, key.getEncoded());
+    }
+
+    private String pem(String label, PublicKey key) {
+        return pem(label, key.getEncoded());
+    }
+
+    private String pem(String label, byte[] encoded) {
+        return "-----BEGIN " + label + "-----\n"
+                + Base64.getMimeEncoder(64, "\n".getBytes()).encodeToString(encoded)
+                + "\n-----END " + label + "-----";
     }
 }

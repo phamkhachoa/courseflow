@@ -50,9 +50,10 @@ public class ChatStompAuthInterceptor implements ChannelInterceptor {
         if (StompCommand.SUBSCRIBE.equals(command) || StompCommand.SEND.equals(command)) {
             ChatPrincipal principal = principal(accessor);
             UUID courseId = extractCourseId(command, accessor.getDestination());
-            if (courseId != null) {
-                courseAccess.requireCourseAccess(principal.toCurrentUser(), courseId);
+            if (courseId == null) {
+                throw new MessagingException("Unsupported STOMP destination");
             }
+            courseAccess.requireCourseAccess(principal.toCurrentUser(), courseId);
         }
         return message;
     }

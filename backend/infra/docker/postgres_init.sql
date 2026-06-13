@@ -1,4 +1,7 @@
 CREATE DATABASE cf_identity;
+CREATE DATABASE cf_keycloak;
+CREATE DATABASE cf_access_control;
+CREATE DATABASE cf_user_management;
 CREATE DATABASE cf_organization;
 CREATE DATABASE cf_course;
 CREATE DATABASE cf_enrollment;
@@ -18,6 +21,9 @@ CREATE DATABASE cf_review;
 CREATE DATABASE cf_outbox;
 
 ALTER DATABASE cf_identity OWNER TO courseflow;
+ALTER DATABASE cf_keycloak OWNER TO courseflow;
+ALTER DATABASE cf_access_control OWNER TO courseflow;
+ALTER DATABASE cf_user_management OWNER TO courseflow;
 ALTER DATABASE cf_organization OWNER TO courseflow;
 ALTER DATABASE cf_course OWNER TO courseflow;
 ALTER DATABASE cf_enrollment OWNER TO courseflow;

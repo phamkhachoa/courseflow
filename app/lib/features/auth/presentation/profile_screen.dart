@@ -22,12 +22,17 @@ class ProfileScreen extends ConsumerWidget {
           if (user != null) ...[
             CircleAvatar(
               radius: 36,
-              child: Text(
-                user.fullName.isNotEmpty
-                    ? user.fullName[0].toUpperCase()
-                    : '?',
-                style: theme.textTheme.headlineMedium,
-              ),
+              backgroundImage: user.avatarUrl == null || user.avatarUrl!.isEmpty
+                  ? null
+                  : NetworkImage(user.avatarUrl!),
+              child: user.avatarUrl == null || user.avatarUrl!.isEmpty
+                  ? Text(
+                      user.fullName.isNotEmpty
+                          ? user.fullName[0].toUpperCase()
+                          : '?',
+                      style: theme.textTheme.headlineMedium,
+                    )
+                  : null,
             ),
             const SizedBox(height: AppTheme.gap),
             Center(

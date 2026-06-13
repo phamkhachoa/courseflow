@@ -33,6 +33,9 @@
         <module>common-library</module>
         <module>event-contracts</module>
         <module>services/identity-service</module>
+        <module>services/discovery-service</module>
+        <module>services/access-control-service</module>
+        <module>services/user-management-service</module>
         <module>services/identity-token-converter-service</module>
         <module>services/organization-service</module>
         <module>services/course-service</module>

@@ -13,7 +13,6 @@ import {
   FormField,
   Input,
   PageHeader,
-  Select,
   Spinner,
   Table,
   Td,
@@ -216,8 +215,7 @@ export function UserCreatePage() {
   const [form, setForm] = useState<CreateUserInput>({
     email: "",
     fullName: "",
-    role: "STUDENT",
-    password: ""
+    sendSetupEmail: true
   });
 
   function update<K extends keyof CreateUserInput>(k: K, v: CreateUserInput[K]) {
@@ -239,16 +237,21 @@ export function UserCreatePage() {
           <FormField label="Email" htmlFor="email">
             <Input id="email" type="email" value={form.email} onChange={(e) => update("email", e.target.value)} required />
           </FormField>
-          <FormField label="Mật khẩu" htmlFor="password">
-            <Input id="password" type="password" value={form.password} onChange={(e) => update("password", e.target.value)} required />
-          </FormField>
-          <FormField label="Vai trò" htmlFor="role">
-            <Select id="role" value={form.role} onChange={(e) => update("role", e.target.value)}>
-              <option value="STUDENT">STUDENT</option>
-              <option value="INSTRUCTOR">INSTRUCTOR</option>
-              <option value="ADMIN">ADMIN</option>
-            </Select>
-          </FormField>
+          <label className="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              checked={form.sendSetupEmail}
+              onChange={(e) => update("sendSetupEmail", e.target.checked)}
+            />
+            <span>
+              <span className="block font-semibold text-slate-800">Gửi email thiết lập qua Keycloak</span>
+              <span className="text-slate-500">User sẽ tự đặt mật khẩu bằng required action của IAM.</span>
+            </span>
+          </label>
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Vai trò CourseFlow được cấp riêng trong màn Vai trò bằng role + scope cụ thể.
+          </div>
           {create.isError && <ErrorState error={create.error} />}
           <div className="flex gap-2">
             <Button type="submit" disabled={create.isPending}>

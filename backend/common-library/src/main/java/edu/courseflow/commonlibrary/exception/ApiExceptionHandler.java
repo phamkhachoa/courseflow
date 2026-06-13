@@ -5,19 +5,16 @@ import jakarta.validation.ConstraintViolationException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import jakarta.persistence.OptimisticLockException;
 
 /**
  * Single error contract for every service. Imported by each service's component
@@ -52,21 +49,9 @@ public class ApiExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorDto> handleDataIntegrity(DataIntegrityViolationException ex) {
-        log.warn("Data integrity violation", ex);
-        return build(HttpStatus.CONFLICT, "Request conflicts with existing data", null);
-    }
-
     @ExceptionHandler({ DuplicatedException.class, ConflictException.class })
     public ResponseEntity<ErrorDto> handleConflict(RuntimeException ex) {
         return build(HttpStatus.CONFLICT, ex.getMessage(), null);
-    }
-
-    @ExceptionHandler({ ObjectOptimisticLockingFailureException.class, OptimisticLockException.class })
-    public ResponseEntity<ErrorDto> handleOptimisticLock(Exception ex) {
-        log.warn("Optimistic locking conflict", ex);
-        return build(HttpStatus.CONFLICT, "Resource was modified concurrently; retry the request", null);
     }
 
     @ExceptionHandler(ResponseStatusException.class)

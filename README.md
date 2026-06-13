@@ -32,7 +32,7 @@ courseflow/
 | Web admin | React, Vite, TypeScript, TanStack Query, Tailwind CSS, lucide-react |
 | Mobile | Flutter |
 | API and services | Java 21, Spring Boot 3, Spring Cloud Gateway |
-| Identity | JWT, RBAC, service-to-service authorization checks |
+| Identity and authorization | Keycloak OAuth2/OIDC IAM, CourseFlow access-control, internal JWT/JWKS |
 | Data stores | PostgreSQL per service, MongoDB for document/chat style domains, Redis |
 | Search | Elasticsearch, Spring Data Elasticsearch |
 | Event backbone | Kafka, transactional outbox for business events, Debezium CDC for search projections, Kafka Connect |
@@ -55,10 +55,13 @@ flowchart TB
     Mobile["Mobile App\nFlutter"]
   end
 
-  Gateway["API Gateway\nJWT, CORS, Routing, Header Hardening"]
+  Gateway["API Gateway\nOIDC verify, CORS, Routing, Header Hardening"]
 
   subgraph Services["Business Services"]
-    Identity["identity-service\nUsers, roles, permissions"]
+    Keycloak["Keycloak\nIAM/IdP"]
+    TokenConverter["identity-token-converter-service\nKeycloak token -> internal JWT"]
+    AccessControl["access-control-service\nCourseFlow roles, permissions, audit"]
+    UserManagement["user-management-service\nProfiles, avatars, directory"]
     Org["organization-service\nDepartments, terms, sections"]
     Course["course-service\nCatalog, modules, authoring"]
     Enrollment["enrollment-service\nRoster, waitlist, capacity"]
@@ -90,7 +93,11 @@ flowchart TB
   Next --> Gateway
   Admin --> Gateway
   Mobile --> Gateway
-  Gateway --> Identity
+  Gateway --> Keycloak
+  Gateway --> TokenConverter
+  TokenConverter --> AccessControl
+  Gateway --> UserManagement
+  Gateway --> AccessControl
   Gateway --> Org
   Gateway --> Course
   Gateway --> Enrollment
@@ -104,7 +111,10 @@ flowchart TB
   Gateway --> Search
   Gateway --> Analytics
 
-  Identity --> Pg
+  Keycloak --> Pg
+  TokenConverter --> AccessControl
+  AccessControl --> Pg
+  UserManagement --> Pg
   Org --> Pg
   Course --> Pg
   Enrollment --> Pg
@@ -181,7 +191,9 @@ flowchart LR
   classDef assessment fill:#fff7ed,stroke:#ea580c,color:#431407
   classDef engagement fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
 
-  Identity["Identity\nRBAC, auth audit"]:::core
+  Keycloak["Keycloak\nIAM/IdP"]:::core
+  AccessControl["Access Control\nProduct authorization"]:::core
+  UserManagement["User Management\nProfile directory"]:::core
   Organization["Organization\nDepartments, terms"]:::core
   Course["Course\nCatalog, modules, authoring"]:::learning
   Enrollment["Enrollment\nRoster, capacity"]:::learning
@@ -195,7 +207,9 @@ flowchart LR
   Analytics["Analytics\nReports, risk, recommendations"]:::engagement
   Search["Search\nElasticsearch projections"]:::engagement
 
-  Identity --> Organization
+  Keycloak --> AccessControl
+  AccessControl --> UserManagement
+  UserManagement --> Organization
   Organization --> Course
   Course --> Enrollment
   Course --> Media
@@ -216,9 +230,9 @@ flowchart LR
 ```mermaid
 flowchart LR
   Browser["Browser or Mobile"] --> Gateway["api-gateway"]
-  Gateway -->|"Verify JWT\nStrip X-User-* input headers"| Claims["Verified identity headers"]
+  Gateway -->|"Verify Keycloak token\nExchange to internal JWT\nStrip X-User-* input headers"| Claims["Verified identity headers"]
   Claims --> Service["Domain service"]
-  Service -->|"Local role check or\n/internal/authz/check"| Identity["identity-service"]
+  Service -->|"Local role check or\n/internal/authz/check"| AccessControl["access-control-service"]
   Service --> Store["Owned database"]
   Service --> Outbox["outbox_events\nbusiness events"]
   Outbox --> Kafka["Kafka via outbox-relay"]

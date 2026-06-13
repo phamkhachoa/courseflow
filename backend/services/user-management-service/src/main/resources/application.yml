@@ -1,0 +1,36 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: user-management-service
+  datasource:
+    url: ${USER_MANAGEMENT_DB_URL:jdbc:postgresql://localhost:5432/cf_user_management}
+    username: ${USER_MANAGEMENT_DB_USERNAME:courseflow}
+    password: ${USER_MANAGEMENT_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

@@ -56,8 +56,7 @@ export async function getUser(id: string): Promise<AdminUser> {
 export type CreateUserInput = {
   email: string;
   fullName: string;
-  role: string;
-  password: string;
+  sendSetupEmail: boolean;
 };
 
 export async function createUser(input: CreateUserInput): Promise<AdminUser> {

@@ -4,6 +4,16 @@ import { groupedModuleRegistry, moduleGroups, moduleRegistry } from "@/shared/mo
 import { useAuth } from "@/shared/auth/auth-context";
 import { cn } from "@/shared/ui/cn";
 
+function initials(name?: string, email?: string) {
+  const source = (name?.trim() || email?.split("@")[0] || "U").trim();
+  return source
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
 export function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -11,7 +21,7 @@ export function AdminLayout() {
   const activePath = location.pathname.split("/").filter(Boolean)[0] ?? "dashboard";
   const activeModule = moduleRegistry.find((module) => module.path === activePath) ?? moduleRegistry[0];
   const activeGroup = moduleGroups.find((group) => group.id === activeModule.group) ?? moduleGroups[0];
-  const roleLabel = user?.role || "ADMIN";
+  const roleLabel = user?.role || "UNRESOLVED";
   const ActiveIcon = activeModule.icon;
 
   return (
@@ -125,11 +135,25 @@ export function AdminLayout() {
                 ))}
               </select>
               {user && (
-                <div className="hidden text-right sm:block">
-                  <p className="text-sm font-semibold text-slate-800">{user.fullName}</p>
-                  <p className="text-xs text-slate-400">
-                    {roleLabel} · {user.email}
-                  </p>
+                <div className="hidden items-center gap-2 sm:flex">
+                  {user.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt=""
+                      className="size-9 rounded-md object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="grid size-9 place-items-center rounded-md bg-brand-900 text-xs font-bold text-white">
+                      {initials(user.fullName, user.email)}
+                    </span>
+                  )}
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-slate-800">{user.fullName}</p>
+                    <p className="text-xs text-slate-400">
+                      {roleLabel} · {user.email}
+                    </p>
+                  </div>
                 </div>
               )}
               <button

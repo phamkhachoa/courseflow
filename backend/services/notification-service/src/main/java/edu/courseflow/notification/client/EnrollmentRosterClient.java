@@ -19,7 +19,7 @@ public class EnrollmentRosterClient {
     private final InternalJwtService internalJwt;
 
     public EnrollmentRosterClient(RestClient.Builder builder,
-                                  @Value("${courseflow.enrollment.base-url:http://localhost:8084}") String baseUrl,
+                                  @Value("${courseflow.enrollment.base-url:http://enrollment-service:8080}") String baseUrl,
                                   InternalJwtService internalJwt) {
         this.restClient = builder.baseUrl(baseUrl).build();
         this.internalJwt = internalJwt;

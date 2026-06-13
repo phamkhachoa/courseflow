@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AdminLayout } from "@/shared/layout/AdminLayout";
 import { RequireAuth } from "@/shared/auth/RequireAuth";
 import { LoginPage } from "@/modules/auth/LoginPage";
+import { LoginCallbackPage } from "@/modules/auth/LoginCallbackPage";
 import { DashboardPage } from "@/modules/dashboard/DashboardPage";
 
 import { coursesRoutes, authoringRoutes } from "@/modules/courses/routes";
@@ -27,6 +28,7 @@ import { rolesRoutes } from "@/modules/roles/routes";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/login/callback", element: <LoginCallbackPage /> },
   {
     path: "/",
     element: (

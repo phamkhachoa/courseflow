@@ -1,6 +1,6 @@
 package edu.courseflow.identity.config;
 
-import edu.courseflow.commonlibrary.web.WebCommonConfig;
+import edu.courseflow.commonlibrary.web.JpaAuditorConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -13,12 +13,13 @@ import org.springframework.data.domain.AuditorAware;
 @Configuration
 @Import({
         edu.courseflow.commonlibrary.exception.ApiExceptionHandler.class,
+        edu.courseflow.commonlibrary.exception.PersistenceExceptionHandler.class,
         edu.courseflow.commonlibrary.web.WebCommonConfig.class
 })
 public class CommonScanConfig {
 
     @Bean
     public AuditorAware<String> auditorAware() {
-        return WebCommonConfig.gatewayAuditorAware();
+        return JpaAuditorConfig.auditorAware();
     }
 }

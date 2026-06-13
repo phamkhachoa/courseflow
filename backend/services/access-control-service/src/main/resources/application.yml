@@ -1,0 +1,40 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: access-control-service
+  datasource:
+    url: ${ACCESS_CONTROL_DB_URL:jdbc:postgresql://localhost:5432/cf_access_control}
+    username: ${ACCESS_CONTROL_DB_USERNAME:courseflow}
+    password: ${ACCESS_CONTROL_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
+courseflow:
+  access-control:
+    allow-legacy-bootstrap: ${ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP:false}
+    audit-authz-allowed: ${ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED:false}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

@@ -24,7 +24,7 @@ public class CertificateEligibilityClient {
     private final InternalJwtService internalJwt;
 
     public CertificateEligibilityClient(RestClient.Builder restClientBuilder,
-            @Value("${courseflow.certificate.service-url:http://localhost:8096}") String certificateServiceUrl,
+            @Value("${courseflow.certificate.service-url:http://certificate-service:8080}") String certificateServiceUrl,
             @Value("${courseflow.certificate.eligibility-timeout-ms:1500}") long eligibilityTimeoutMs,
             InternalJwtService internalJwt) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();

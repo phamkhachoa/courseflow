@@ -75,7 +75,7 @@ public class VideoService {
                         ObjectStorageClient storage,
                         CourseAccessClient courseAccess,
                         RestClient.Builder restClientBuilder,
-                        @Value("${courseflow.entitlement.course-service-url:http://localhost:8083}") String courseServiceUrl,
+                        @Value("${courseflow.entitlement.course-service-url:http://course-service:8080}") String courseServiceUrl,
                         InternalJwtService internalJwt,
                         @Value("${courseflow.storage.provider:minio}") String storageProvider,
                         @Value("${courseflow.media.cdn-base-url:https://cdn.local/media}") String cdnBaseUrl,

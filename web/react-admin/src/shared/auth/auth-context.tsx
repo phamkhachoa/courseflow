@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { setAuthFailureHandler } from "@/shared/api/client";
+import { hydrateSessionProfile, setAuthFailureHandler } from "@/shared/api/client";
 import { loginRequest, logoutRequest } from "./auth-api";
+import { keycloakAuthEnabled, redirectToKeycloakLogout } from "./keycloak-auth";
 import { sessionStore, type AuthUser, type StoredSession } from "./session-store";
 
 type AuthContextValue = {
@@ -24,9 +25,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(() => sessionStore.read());
 
   const logout = useCallback(() => {
-    void logoutRequest();
+    const current = sessionStore.read();
+    if (!keycloakAuthEnabled) {
+      void logoutRequest();
+    }
     sessionStore.clear();
     setSession(null);
+    if (keycloakAuthEnabled) {
+      redirectToKeycloakLogout(current);
+    }
   }, []);
 
   // When the api client gives up on refreshing, drop the session.
@@ -43,7 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: token.user
     };
     sessionStore.write(next);
-    setSession(next);
+    const hydrated = await hydrateSessionProfile().catch(() => next);
+    setSession(hydrated ?? next);
   }, []);
 
   const value = useMemo<AuthContextValue>(

@@ -80,6 +80,31 @@ COURSEFLOW_SMOKE_ADMIN_PASSWORD=password \
 node scripts/product-hardening-smoke.mjs
 ```
 
+Keycloak security smoke gate against a running OIDC cluster. Run it from a runner/container that can
+reach the internal token converter and at least one direct domain service; in local non-prod Compose,
+the defaults can be host ports, while the prod profile normally uses internal DNS names.
+
+```bash
+cd backend
+COURSEFLOW_API_URL=http://localhost:28080/api \
+COURSEFLOW_TOKEN_CONVERTER_URL=http://identity-token-converter-service:8105 \
+COURSEFLOW_DIRECT_SERVICE_URL=http://course-service:8083 \
+COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN="<keycloak-access-token-from-approved-login>" \
+COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_ID=api-gateway \
+COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET="<api-gateway STS client secret>" \
+COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_ID=course-service \
+COURSEFLOW_SECURITY_SMOKE_STS_CLIENT_SECRET="<course-service STS client secret>" \
+node scripts/keycloak-security-smoke.mjs
+```
+
+This gate proves the security architecture, not the whole LMS workflow: Keycloak access token reaches
+the gateway, the converter exchanges it for a CourseFlow internal JWT, converter JWKS verifies the
+internal signature and `kid`, STS `client_credentials` issues a service token, public profile lookup
+does not require a bearer token, profile summary batch remains protected, and a direct service call
+with forged `X-User-*` headers is rejected. Do not use password grant for production smoke; the
+script only supports it when `COURSEFLOW_SECURITY_SMOKE_ALLOW_PASSWORD_GRANT=true` is explicitly set
+for local/demo realms.
+
 This gate now covers the full disposable learning path through the gateway:
 public catalog, protected module access, authoring draft/module/item creation,
 review approval, publish, enrollment, learner login, learner module read, item
@@ -129,6 +154,7 @@ Then check:
 
 - `GET http://localhost:28080/api/v1/courses` returns only published courses.
 - Direct service calls that forge `X-User-*` without a valid internal JWT return `401`.
+- `node scripts/keycloak-security-smoke.mjs` passes with `Keycloak security smoke passed`.
 - Admin course publish emits lifecycle events and enrollment capacity is created.
 - Disposable authoring courses can move from draft to approved and published.
 - Course review/publish/archive rejects staff outside the course department scope.
@@ -141,6 +167,30 @@ Then check:
 - Admin user detail can download privacy export JSON and deactivate a disposable account.
 - `node scripts/product-hardening-smoke.mjs` passes with `Smoke passed`.
 - Prometheus can scrape service `/actuator/prometheus` targets when the observability compose override is enabled.
+- Token converter metrics show token exchange request/success/failure/duration and JWKS request
+  counters: `courseflow.token_converter.*`.
+- Token converter emits structured security audit logs on
+  `courseflow.security.token_converter.audit` for exchange success/failure without raw bearer tokens
+  or client secrets.
+- Production token converter runs with `ACCESS_CONTROL_RESOLUTION_MODE=required`; it must not fall
+  back to roles embedded in external token claims when `access-control-service` is unavailable.
+- Production STS client credentials use an explicit `COURSEFLOW_STS_ALLOWED_CLIENTS` allowlist; `*`
+  is reserved for local/demo only, and the legacy `identity-service` is rejected in the Keycloak
+  production profile.
+- Production STS service scopes are explicit; wildcard `COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES=*`
+  is rejected, and the list must include the endpoint-level scopes enforced by
+  `TrustedGatewayHeaderFilter`.
+- Downstream services expose internal JWT rejection counters through
+  `courseflow.internal_jwt.rejections` for `/internal/**`, `/backoffice/**` and identity-header
+  requests.
+- Access-control exposes authorization decision counters through
+  `courseflow.access_control.authz.checks` and persists denied decisions in
+  `access_control_audit_logs`.
+- Scoped authorization smoke covers an assignment at an ancestor scope, such as `DEPARTMENT`, being
+  honored for a child `COURSE` check only when the service caller supplies server-derived
+  `ancestorScopes` with `internal:authz:assert-topology`.
+- Chat WebSocket `CONNECT` succeeds with a Keycloak access token only through token converter ->
+  internal JWT verification, and direct legacy HS256 JWT verification is not used in Keycloak mode.
 - Kafka Connect is verified through `GET /connectors/courseflow-course-search-cdc/status`; it is not a Spring actuator target.
 - Grafana starts with the CourseFlow Prometheus datasource provisioned.
 - Prometheus loads `infra/observability/alerts.yml` and evaluates basic service-down alerts.
@@ -156,8 +206,17 @@ Do not call a build production-ready if any item below is true:
 - Grade changes lack override reason/audit.
 - Notification send creates an inbox row with no delivery status.
 - Identity privacy export/deactivation lacks audit or token revocation.
+- Token converter can issue a user internal JWT from external claims without resolving
+  `access-control-service`.
+- STS client credentials allow `COURSEFLOW_STS_ALLOWED_CLIENTS=*` or include `identity-service` in
+  production.
 - Downstream services trust `X-User-*` headers without internal JWT attestation.
+- `/backoffice/**` service endpoints are reachable without a valid internal JWT.
 - Staff roles can read org dashboards or student analytics without matching org/course scope.
+- Department/org-scoped roles false-deny child course/section actions because callers omitted
+  `ancestorScopes`.
+- Chat/WebSocket accepts legacy CourseFlow JWTs directly instead of exchanging the bearer token
+  through `identity-token-converter-service`.
 - Fresh Liquibase migration fails from an empty database.
 - No metrics endpoint exists for backend services.
 - No restore-checked backup artifact exists for Postgres service databases.

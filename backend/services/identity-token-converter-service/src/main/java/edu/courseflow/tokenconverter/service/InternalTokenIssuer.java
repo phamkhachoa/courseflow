@@ -1,10 +1,9 @@
 package edu.courseflow.tokenconverter.service;
 
 import edu.courseflow.tokenconverter.config.TokenConverterProperties;
-import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.Jwts;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -26,72 +25,133 @@ public class InternalTokenIssuer {
         this.scopeMapper = scopeMapper;
     }
 
-    public IssuedInternalToken issue(Claims externalClaims, String audience, String requestedScope) {
+    public IssuedInternalToken issue(ResolvedIdentity identity, String audience, String requestedScope) {
         Instant now = Instant.now();
-        String userId = String.valueOf(externalClaims.get("uid"));
-        String email = externalClaims.getSubject();
-        List<Map<String, Object>> roleAssignments = roleAssignments(externalClaims.get("roles"));
+        List<Map<String, Object>> roleAssignments = roleAssignments(identity);
         List<String> roles = roleAssignments.stream()
                 .map(role -> String.valueOf(role.get("code")))
                 .filter(role -> role != null && !role.isBlank() && !"null".equals(role))
                 .distinct()
                 .toList();
         List<String> scopes = scopeMapper.scopesFor(roles, requestedScope);
-        String token = Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .issuer(properties.internalJwtIssuer())
-                .subject(userId)
+                .subject(identity.userId())
                 .claim("aud", List.of(audience))
                 .claim("token_use", "internal")
+                .claim("actor_type", "user")
                 .claim("azp", "api-gateway")
-                .claim("uid", userId)
-                .claim("email", email)
+                .claim("uid", identity.userId())
+                .claim("email", identity.email())
                 .claim("tenant_id", "default")
                 .claim("roles", roles)
                 .claim("role_assignments", roleAssignments)
                 .claim("scope", String.join(" ", scopes))
                 .claim("scp", scopes)
-                .claim("external_iss", externalClaims.getIssuer())
+                .claim("external_iss", identity.externalIssuer())
+                .claim("external_sub", identity.externalSubject())
                 .issuedAt(Date.from(now))
                 .notBefore(Date.from(now.minusSeconds(1)))
-                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())))
-                .signWith(properties.internalJwtKey())
-                .compact();
+                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())));
+        String token = sign(builder);
         return new IssuedInternalToken(token, scopes, properties.ttlSeconds());
     }
 
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> roleAssignments(Object rawRoles) {
-        if (!(rawRoles instanceof Collection<?> roles)) {
-            return List.of();
-        }
-        List<Map<String, Object>> result = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
-        for (Object raw : roles) {
-            Map<String, Object> role = new LinkedHashMap<>();
-            if (raw instanceof Map<?, ?> map) {
-                Object code = ((Map<String, Object>) map).get("code");
-                if (code == null || code.toString().isBlank()) {
-                    continue;
-                }
-                role.put("code", code.toString());
-                role.put("scopeType", stringValue(((Map<String, Object>) map).get("scopeType"), "PLATFORM"));
-                role.put("scopeId", stringValue(((Map<String, Object>) map).get("scopeId"), null));
-            } else if (raw != null && !raw.toString().isBlank()) {
-                role.put("code", raw.toString());
-                role.put("scopeType", "PLATFORM");
-                role.put("scopeId", null);
-            }
-            String key = role.get("code") + ":" + role.get("scopeType") + ":" + role.get("scopeId");
-            if (seen.add(key)) {
-                result.add(role);
-            }
-        }
-        return result;
+    public IssuedInternalToken issueTrustedUser(ResolvedIdentity identity, String audience, String requestedScope,
+                                                String clientId) {
+        return issueUser(identity, audience, requestedScope, clientId == null || clientId.isBlank()
+                ? "trusted-service"
+                : clientId.trim());
     }
 
-    private String stringValue(Object value, String fallback) {
-        return value == null || value.toString().isBlank() ? fallback : value.toString();
+    public IssuedInternalToken issueService(String clientId, String audience, Collection<String> scopes) {
+        Instant now = Instant.now();
+        List<String> grantedScopes = scopes == null ? List.of() : scopes.stream()
+                .filter(scope -> scope != null && !scope.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        String azp = clientId == null || clientId.isBlank() ? "courseflow-service" : clientId.trim();
+        JwtBuilder builder = Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .issuer(properties.internalJwtIssuer())
+                .subject("service:" + azp)
+                .claim("aud", List.of(audience))
+                .claim("token_use", "internal")
+                .claim("actor_type", "service")
+                .claim("azp", azp)
+                .claim("scope", String.join(" ", grantedScopes))
+                .claim("scp", grantedScopes)
+                .issuedAt(Date.from(now))
+                .notBefore(Date.from(now.minusSeconds(1)))
+                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())));
+        String token = sign(builder);
+        return new IssuedInternalToken(token, grantedScopes, properties.ttlSeconds());
+    }
+
+    private IssuedInternalToken issueUser(ResolvedIdentity identity, String audience, String requestedScope,
+                                          String authorizedParty) {
+        Instant now = Instant.now();
+        List<Map<String, Object>> roleAssignments = roleAssignments(identity);
+        List<String> roles = roleAssignments.stream()
+                .map(role -> String.valueOf(role.get("code")))
+                .filter(role -> role != null && !role.isBlank() && !"null".equals(role))
+                .distinct()
+                .toList();
+        List<String> scopes = scopeMapper.scopesFor(roles, requestedScope);
+        JwtBuilder builder = Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .issuer(properties.internalJwtIssuer())
+                .subject(identity.userId())
+                .claim("aud", List.of(audience))
+                .claim("token_use", "internal")
+                .claim("actor_type", "user")
+                .claim("azp", authorizedParty)
+                .claim("uid", identity.userId())
+                .claim("email", identity.email())
+                .claim("tenant_id", "default")
+                .claim("roles", roles)
+                .claim("role_assignments", roleAssignments)
+                .claim("scope", String.join(" ", scopes))
+                .claim("scp", scopes)
+                .claim("external_iss", identity.externalIssuer())
+                .claim("external_sub", identity.externalSubject())
+                .issuedAt(Date.from(now))
+                .notBefore(Date.from(now.minusSeconds(1)))
+                .expiration(Date.from(now.plusSeconds(properties.ttlSeconds())));
+        String token = sign(builder);
+        return new IssuedInternalToken(token, scopes, properties.ttlSeconds());
+    }
+
+    private String sign(JwtBuilder builder) {
+        if (properties.internalJwtRs256()) {
+            return builder.header()
+                    .keyId(properties.internalJwtKeyId())
+                    .and()
+                    .signWith(properties.internalJwtPrivateKey())
+                    .compact();
+        }
+        return builder.signWith(properties.internalJwtKey()).compact();
+    }
+
+    private List<Map<String, Object>> roleAssignments(ResolvedIdentity identity) {
+        if (identity.roleAssignments() == null || identity.roleAssignments().isEmpty()) {
+            return List.of();
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        return identity.roleAssignments().stream()
+                .filter(role -> role.code() != null && !role.code().isBlank())
+                .map(role -> {
+                    Map<String, Object> assignment = new LinkedHashMap<>();
+                    assignment.put("code", role.code());
+                    assignment.put("scopeType",
+                            role.scopeType() == null || role.scopeType().isBlank() ? "PLATFORM" : role.scopeType());
+                    assignment.put("scopeId", role.scopeId());
+                    return assignment;
+                })
+                .filter(role -> seen.add(role.get("code") + ":" + role.get("scopeType") + ":" + role.get("scopeId")))
+                .toList();
     }
 
     public record IssuedInternalToken(String token, List<String> scopes, long expiresInSeconds) {

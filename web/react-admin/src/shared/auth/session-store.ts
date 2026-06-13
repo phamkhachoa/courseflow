@@ -2,6 +2,7 @@ export type AuthUser = {
   id: number;
   email: string;
   fullName: string;
+  avatarUrl?: string;
   role: string;
   status: string;
 };
@@ -17,6 +18,7 @@ export type TokenResponse = {
 export type StoredSession = {
   accessToken: string;
   refreshToken: string;
+  idToken?: string;
   user: AuthUser;
 };
 
