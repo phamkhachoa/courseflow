@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, Download, Plus, ShieldAlert, UserX } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/shared/api/query-keys";
 import {
@@ -17,9 +17,17 @@ import {
   Spinner,
   Table,
   Td,
+  Textarea,
   Th
 } from "@/shared/ui";
-import { createUser, getUser, listUsers, type CreateUserInput } from "./api";
+import {
+  createUser,
+  deactivateUser,
+  downloadUserPrivacyExport,
+  getUser,
+  listUsers,
+  type CreateUserInput
+} from "./api";
 
 export function UserListPage() {
   const { data, isLoading, isError, error } = useQuery({
@@ -64,7 +72,7 @@ export function UserListPage() {
                     </Link>
                   </Td>
                   <Td>{u.email}</Td>
-                  <Td>{u.role}</Td>
+                  <Td>{u.role ?? "—"}</Td>
                   <Td>
                     <Badge value={u.status} />
                   </Td>
@@ -80,34 +88,117 @@ export function UserListPage() {
 
 export function UserDetailPage() {
   const { id = "" } = useParams();
+  const qc = useQueryClient();
+  const [deactivationReason, setDeactivationReason] = useState("");
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.users.detail(id),
     queryFn: () => getUser(id),
     enabled: Boolean(id)
   });
+  const privacyExport = useMutation({
+    mutationFn: () => downloadUserPrivacyExport(id)
+  });
+  const deactivate = useMutation({
+    mutationFn: () => deactivateUser(id, deactivationReason.trim()),
+    onSuccess: (user) => {
+      qc.setQueryData(queryKeys.users.detail(id), user);
+      qc.invalidateQueries({ queryKey: queryKeys.users.all });
+      setDeactivationReason("");
+    }
+  });
 
   if (isLoading) return <Spinner />;
   if (isError) return <ErrorState error={error} />;
   if (!data) return null;
+  const isDeactivated = data.status === "DEACTIVATED";
 
   return (
     <div>
       <Link to=".." className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
         <ArrowLeft size={16} /> Quay lại
       </Link>
-      <PageHeader title={data.fullName} description={data.email} />
-      <Card className="max-w-lg">
-        <dl className="grid grid-cols-[120px_1fr] gap-y-3 p-4 text-sm">
-          <dt className="text-slate-500">ID</dt>
-          <dd>{data.id}</dd>
-          <dt className="text-slate-500">Vai trò</dt>
-          <dd>{data.role}</dd>
-          <dt className="text-slate-500">Trạng thái</dt>
-          <dd>
-            <Badge value={data.status} />
-          </dd>
-        </dl>
-      </Card>
+      <PageHeader
+        title={data.fullName}
+        description={data.email}
+        actions={
+          <Button
+            variant="secondary"
+            disabled={privacyExport.isPending}
+            onClick={() => privacyExport.mutate()}
+          >
+            <Download size={16} />
+            {privacyExport.isPending ? "Đang xuất" : "Xuất dữ liệu"}
+          </Button>
+        }
+      />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.75fr)]">
+        <Card>
+          <CardHeader title="Hồ sơ tài khoản" subtitle="Thông tin định danh và trạng thái vận hành." />
+          <dl className="grid grid-cols-[140px_1fr] gap-y-3 p-4 text-sm">
+            <dt className="text-slate-500">ID</dt>
+            <dd>{data.id}</dd>
+            <dt className="text-slate-500">Email</dt>
+            <dd>{data.email}</dd>
+            <dt className="text-slate-500">Vai trò</dt>
+            <dd>{data.role ?? "—"}</dd>
+            <dt className="text-slate-500">Trạng thái</dt>
+            <dd>
+              <Badge value={data.status} />
+            </dd>
+          </dl>
+          {privacyExport.isError && <ErrorState error={privacyExport.error} />}
+          {privacyExport.isSuccess && (
+            <div className="mx-4 mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">
+              Đã tải file export JSON cho user #{data.id}.
+            </div>
+          )}
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Privacy & lifecycle"
+            subtitle="Deactivation khóa đăng nhập, thu hồi phiên và role grants đang còn hiệu lực."
+            actions={<ShieldAlert size={18} className="text-amber-600" />}
+          />
+          <form
+            className="space-y-4 p-4"
+            onSubmit={(event: FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              deactivate.mutate();
+            }}
+          >
+            <FormField
+              label="Lý do deactivation"
+              htmlFor="deactivate-reason"
+              hint="Bắt buộc để giữ audit trail cho yêu cầu privacy/compliance."
+            >
+              <Textarea
+                id="deactivate-reason"
+                value={deactivationReason}
+                maxLength={255}
+                disabled={isDeactivated}
+                onChange={(event) => setDeactivationReason(event.target.value)}
+                placeholder="Ví dụ: User requested account deactivation under retention policy."
+                required
+              />
+            </FormField>
+            {deactivate.isError && <ErrorState error={deactivate.error} />}
+            {deactivate.isSuccess && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">
+                Đã deactivate và revoke phiên/role grants của tài khoản.
+              </div>
+            )}
+            <Button
+              type="submit"
+              variant="danger"
+              disabled={isDeactivated || deactivate.isPending || !deactivationReason.trim()}
+            >
+              <UserX size={16} />
+              {isDeactivated ? "Đã deactivate" : deactivate.isPending ? "Đang deactivate" : "Deactivate user"}
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

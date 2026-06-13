@@ -79,6 +79,18 @@ class JwtIdentityFilterTest {
     }
 
     @Test
+    void privacyExportRequiresAdminEvenThoughItIsReadOnly() throws Exception {
+        MockHttpServletRequest request = request("GET", "/backoffice/users/42/privacy-export",
+                token("operator@example.com", 7L, "TA", true, "courseflow-identity"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getContentAsString()).contains("ADMIN");
+    }
+
+    @Test
     void wrongIssuerIsRejected() throws Exception {
         MockHttpServletRequest request = request("GET", "/backoffice/users",
                 token("admin@example.com", 1L, "ADMIN", true, "wrong-issuer"));
@@ -87,6 +99,32 @@ class JwtIdentityFilterTest {
         filter.doFilter(request, response, new MockFilterChain());
 
         assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void prometheusActuatorEndpointIsPublicForScraping() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/prometheus");
+        request.setRequestURI("/actuator/prometheus");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isNotNull();
+    }
+
+    @Test
+    void emailVerificationEndpointIsPublic() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/email/verify");
+        request.setRequestURI("/auth/email/verify");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isNotNull();
     }
 
     private MockHttpServletRequest request(String method, String uri, String token) {

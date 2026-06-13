@@ -6,7 +6,9 @@ import edu.courseflow.quiz.dto.QuizDtos.ManualGradeAnswerRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptDetailDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizDto;
+import edu.courseflow.quiz.dto.QuizDtos.QuizReadinessDto;
 import edu.courseflow.quiz.dto.QuizDtos.SaveAnswersRequestDto;
+import edu.courseflow.quiz.dto.QuizDtos.StartAttemptResponseDto;
 import edu.courseflow.quiz.dto.QuizDtos.StartAttemptRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.SubmitAttemptRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.UpdateQuizRequestDto;
@@ -14,16 +16,19 @@ import edu.courseflow.quiz.dto.QuizDtos.UpsertQuizQuestionRequestDto;
 import edu.courseflow.quiz.service.QuizService;
 import edu.courseflow.quiz.web.Authz;
 import edu.courseflow.quiz.web.ForbiddenException;
+import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,9 +38,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class QuizController {
 
     private final QuizService quizzes;
+    private final CourseAccessClient courseAccess;
+    private final String serviceToken;
 
-    public QuizController(QuizService quizzes) {
+    public QuizController(QuizService quizzes,
+            CourseAccessClient courseAccess,
+            @Value("${courseflow.security.service-token:}") String serviceToken) {
         this.quizzes = quizzes;
+        this.courseAccess = courseAccess;
+        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
     }
 
     @GetMapping
@@ -43,8 +54,10 @@ public class QuizController {
         Authz.callerId(user);
         List<QuizDto> rows = quizzes.listCourseQuizzes(courseId);
         if (Authz.isStaff(user)) {
+            courseAccess.requireCourseStaffAccess(user, courseId);
             return rows;
         }
+        courseAccess.requireCourseAccess(user, courseId);
         return rows.stream()
                 .filter(quiz -> "PUBLISHED".equals(quiz.status()))
                 .map(quizzes::toStudentView)
@@ -53,7 +66,7 @@ public class QuizController {
 
     @PostMapping
     public QuizDto createQuiz(@Valid @RequestBody CreateQuizRequestDto request, CurrentUser user) {
-        Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, request.courseId());
         return quizzes.createQuiz(request);
     }
 
@@ -61,13 +74,20 @@ public class QuizController {
     public QuizDto updateQuiz(@PathVariable UUID quizId,
             @Valid @RequestBody UpdateQuizRequestDto request,
             CurrentUser user) {
-        Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, quizzes.quizCourseId(quizId));
         return quizzes.updateQuiz(quizId, request);
+    }
+
+    @GetMapping("/{quizId}/readiness")
+    public QuizReadinessDto readiness(@PathVariable UUID quizId,
+            @RequestHeader(value = CourseAccessClient.SERVICE_TOKEN_HEADER, required = false) String token) {
+        requireServiceToken(token);
+        return quizzes.readiness(quizId);
     }
 
     @GetMapping("/{quizId}/attempts")
     public List<QuizAttemptDto> listAttempts(@PathVariable UUID quizId, CurrentUser user) {
-        Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, quizzes.quizCourseId(quizId));
         return quizzes.listAttempts(quizId);
     }
 
@@ -81,6 +101,7 @@ public class QuizController {
             @Valid @RequestBody UpsertQuizQuestionRequestDto request,
             CurrentUser user) {
         Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, quizzes.quizCourseId(quizId));
         return quizzes.createQuestion(quizId, Authz.callerId(user), request);
     }
 
@@ -89,7 +110,7 @@ public class QuizController {
             @PathVariable UUID questionId,
             @Valid @RequestBody UpsertQuizQuestionRequestDto request,
             CurrentUser user) {
-        Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, quizzes.quizCourseId(quizId));
         return quizzes.updateQuestion(quizId, questionId, request);
     }
 
@@ -97,7 +118,7 @@ public class QuizController {
     public QuizDto removeQuestion(@PathVariable UUID quizId,
             @PathVariable UUID questionId,
             CurrentUser user) {
-        Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, quizzes.quizCourseId(quizId));
         return quizzes.removeQuestion(quizId, questionId);
     }
 
@@ -111,8 +132,10 @@ public class QuizController {
         Authz.callerId(user);
         QuizDto quiz = quizzes.getQuiz(quizId);
         if (Authz.isStaff(user)) {
+            courseAccess.requireCourseStaffAccess(user, UUID.fromString(quiz.courseId()));
             return quiz;
         }
+        courseAccess.requireCourseAccess(user, UUID.fromString(quiz.courseId()));
         if (!"PUBLISHED".equals(quiz.status())) {
             throw new ForbiddenException("QUIZ_NOT_PUBLISHED");
         }
@@ -121,9 +144,10 @@ public class QuizController {
     }
 
     @PostMapping("/{quizId}/attempts")
-    public QuizAttemptDto startAttempt(@PathVariable UUID quizId,
+    public StartAttemptResponseDto startAttempt(@PathVariable UUID quizId,
             @Valid @RequestBody(required = false) StartAttemptRequestDto request, CurrentUser user) {
         // studentId is the authenticated caller, never trusted from the body.
+        courseAccess.requireCourseAccess(user, quizzes.quizCourseId(quizId));
         return quizzes.startAttempt(quizId, Authz.callerId(user));
     }
 
@@ -131,7 +155,7 @@ public class QuizController {
     public QuizAttemptDto submitAttempt(@PathVariable UUID attemptId,
             @Valid @RequestBody SubmitAttemptRequestDto request, CurrentUser user) {
         // Only the student who owns the attempt may submit it (staff override allowed).
-        Authz.requireSelfOrStaff(user, quizzes.attemptStudentId(attemptId));
+        requireSelfOrScopedStaff(user, quizzes.attemptStudentId(attemptId), quizzes.attemptCourseId(attemptId));
         return quizzes.submitAttempt(attemptId, request);
     }
 
@@ -139,7 +163,7 @@ public class QuizController {
     public QuizAttemptDto saveAnswers(@PathVariable UUID attemptId,
             @Valid @RequestBody SaveAnswersRequestDto request, CurrentUser user) {
         // Save draft answers only for the owning student, with staff override for support.
-        Authz.requireSelfOrStaff(user, quizzes.attemptStudentId(attemptId));
+        requireSelfOrScopedStaff(user, quizzes.attemptStudentId(attemptId), quizzes.attemptCourseId(attemptId));
         return quizzes.saveAnswers(attemptId, request);
     }
 
@@ -147,7 +171,7 @@ public class QuizController {
     public QuizAttemptDetailDto getAttempt(@PathVariable UUID attemptId, CurrentUser user) {
         // A student may only read their own attempt; staff may read any.
         String studentId = quizzes.attemptStudentId(attemptId);
-        Authz.requireSelfOrStaff(user, studentId);
+        requireSelfOrScopedStaff(user, studentId, quizzes.attemptCourseId(attemptId));
         if (Authz.isStaff(user)) {
             return quizzes.getAttemptDetail(attemptId);
         }
@@ -161,7 +185,7 @@ public class QuizController {
     public QuizAttemptDto manualGrade(@PathVariable UUID attemptId,
             @PathVariable UUID questionId,
             @Valid @RequestBody ManualGradeAnswerRequestDto request, CurrentUser user) {
-        Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, quizzes.attemptCourseId(attemptId));
         return quizzes.manualGradeAnswer(attemptId, questionId, Authz.callerId(user), request);
     }
 
@@ -172,7 +196,22 @@ public class QuizController {
     public EffectiveScoreDto effectiveScore(@PathVariable UUID quizId, @PathVariable String studentId,
             CurrentUser user) {
         // A student may only read their own score; staff may read any.
-        Authz.requireSelfOrStaff(user, studentId);
+        requireSelfOrScopedStaff(user, studentId, quizzes.quizCourseId(quizId));
         return quizzes.effectiveScore(quizId, studentId);
+    }
+
+    private void requireSelfOrScopedStaff(CurrentUser user, String ownerStudentId, UUID courseId) {
+        if (Authz.isStaff(user)) {
+            courseAccess.requireCourseStaffAccess(user, courseId);
+            return;
+        }
+        Authz.requireSelfOrStaff(user, ownerStudentId);
+        courseAccess.requireCourseAccess(user, courseId);
+    }
+
+    private void requireServiceToken(String token) {
+        if (serviceToken.isBlank() || token == null || !serviceToken.equals(token.trim())) {
+            throw new ForbiddenException("Service token required");
+        }
     }
 }

@@ -9,9 +9,7 @@ export async function listCatalogCourses(): Promise<CatalogCourse[]> {
 
 export function courseModuleHref(course?: CatalogCourse | null): string {
   if (!course) return "/search";
-  return course.id
-    ? `/courses/${course.slug}/modules?courseId=${course.id}`
-    : `/courses/${course.slug}`;
+  return course.id ? `/courses/${course.slug}/modules` : `/courses/${course.slug}`;
 }
 
 export function courseDetailHref(course?: CatalogCourse | null): string {

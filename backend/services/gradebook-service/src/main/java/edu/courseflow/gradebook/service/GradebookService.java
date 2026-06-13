@@ -10,16 +10,19 @@ import edu.courseflow.gradebook.dto.GradebookDtos.FinalGradeDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeCategoryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeEntryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeItemDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradeOverrideDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradingSchemeDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradingSchemeEntryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.StudentGradebookDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.UpsertCategoryRequestDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.UpsertGradeEntryRequestDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.UpsertGradeItemRequestDto;
 import edu.courseflow.gradebook.mapper.GradebookMapper;
 import edu.courseflow.gradebook.model.FinalGrade;
 import edu.courseflow.gradebook.model.GradeCategory;
 import edu.courseflow.gradebook.model.GradeEntry;
 import edu.courseflow.gradebook.model.GradeItem;
+import edu.courseflow.gradebook.model.GradeOverride;
 import edu.courseflow.gradebook.model.GradingScheme;
 import edu.courseflow.gradebook.model.GradingSchemeEntry;
 import edu.courseflow.gradebook.model.OutboxEvent;
@@ -27,6 +30,7 @@ import edu.courseflow.gradebook.repository.FinalGradeRepository;
 import edu.courseflow.gradebook.repository.GradeCategoryRepository;
 import edu.courseflow.gradebook.repository.GradeEntryRepository;
 import edu.courseflow.gradebook.repository.GradeItemRepository;
+import edu.courseflow.gradebook.repository.GradeOverrideRepository;
 import edu.courseflow.gradebook.repository.GradingSchemeEntryRepository;
 import edu.courseflow.gradebook.repository.GradingSchemeRepository;
 import edu.courseflow.gradebook.repository.OutboxEventRepository;
@@ -56,6 +60,7 @@ public class GradebookService {
     private final GradeCategoryRepository categories;
     private final GradeItemRepository items;
     private final GradeEntryRepository entries;
+    private final GradeOverrideRepository overrides;
     private final GradingSchemeRepository schemes;
     private final GradingSchemeEntryRepository schemeEntries;
     private final FinalGradeRepository finalGrades;
@@ -66,6 +71,7 @@ public class GradebookService {
     public GradebookService(GradeCategoryRepository categories,
             GradeItemRepository items,
             GradeEntryRepository entries,
+            GradeOverrideRepository overrides,
             GradingSchemeRepository schemes,
             GradingSchemeEntryRepository schemeEntries,
             FinalGradeRepository finalGrades,
@@ -75,6 +81,7 @@ public class GradebookService {
         this.categories = categories;
         this.items = items;
         this.entries = entries;
+        this.overrides = overrides;
         this.schemes = schemes;
         this.schemeEntries = schemeEntries;
         this.finalGrades = finalGrades;
@@ -94,6 +101,46 @@ public class GradebookService {
                         .thenComparing(GradeItem::getTitle))
                 .map(item -> toGradeItemDto(item, categoryById.get(item.getCategoryId())))
                 .toList();
+    }
+
+    @Transactional
+    public GradeItemDto createGradeItem(UUID courseId, UpsertGradeItemRequestDto request) {
+        GradeItemInput input = validateGradeItemInput(courseId, request);
+        items.findBySourceTypeAndSourceId(input.sourceType(), input.sourceId())
+                .ifPresent(existing -> {
+                    throw new BadRequestException("GRADE_ITEM_SOURCE_ALREADY_EXISTS");
+                });
+        GradeItem item = new GradeItem(
+                UUID.randomUUID(),
+                courseId,
+                input.category().getId(),
+                input.sourceType(),
+                input.sourceId(),
+                input.title(),
+                input.maxScore(),
+                input.weightPercent(),
+                input.latePenaltyPercent());
+        item.update(input.category().getId(), input.sourceType(), input.sourceId(), input.title(),
+                input.maxScore(), input.weightPercent(), input.latePenaltyPercent(), input.published());
+        return toGradeItemDto(items.save(item), input.category());
+    }
+
+    @Transactional
+    public GradeItemDto updateGradeItem(UUID courseId, UUID itemId, UpsertGradeItemRequestDto request) {
+        GradeItem item = items.findById(itemId)
+                .orElseThrow(() -> new NotFoundException("Grade item not found: " + itemId));
+        if (!item.getCourseId().equals(courseId)) {
+            throw new BadRequestException("GRADE_ITEM_NOT_IN_COURSE");
+        }
+        GradeItemInput input = validateGradeItemInput(courseId, request);
+        items.findBySourceTypeAndSourceId(input.sourceType(), input.sourceId())
+                .filter(existing -> !existing.getId().equals(itemId))
+                .ifPresent(existing -> {
+                    throw new BadRequestException("GRADE_ITEM_SOURCE_ALREADY_EXISTS");
+                });
+        item.update(input.category().getId(), input.sourceType(), input.sourceId(), input.title(),
+                input.maxScore(), input.weightPercent(), input.latePenaltyPercent(), input.published());
+        return toGradeItemDto(items.save(item), input.category());
     }
 
     public StudentGradebookDto studentGradebook(UUID courseId, String studentId) {
@@ -235,10 +282,13 @@ public class GradebookService {
     // ---------- Upsert with late penalty ----------
 
     @Transactional
-    public StudentGradebookDto upsertEntry(UpsertGradeEntryRequestDto request) {
+    public StudentGradebookDto upsertEntry(UpsertGradeEntryRequestDto request, String actorId) {
         UUID gradeItemId = UUID.fromString(request.gradeItemId());
         GradeItem item = items.findById(gradeItemId)
                 .orElseThrow(() -> new NotFoundException("Grade item not found: " + gradeItemId));
+        if (request.rawScore().compareTo(BigDecimal.ZERO) < 0 || request.rawScore().compareTo(item.getMaxScore()) > 0) {
+            throw new BadRequestException("SCORE_OUT_OF_RANGE");
+        }
 
         boolean isLate = request.isLate() != null && request.isLate();
         int minutesLate = request.minutesLate() == null ? 0 : request.minutesLate();
@@ -253,12 +303,46 @@ public class GradebookService {
             adjusted = request.rawScore().subtract(penalty).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         }
 
-        GradeEntry entry = entries.findByGradeItemIdAndStudentId(gradeItemId, request.studentId())
-                .orElseGet(() -> new GradeEntry(UUID.randomUUID(), gradeItemId, request.studentId()));
+        Optional<GradeEntry> existingEntry = entries.findByGradeItemIdAndStudentId(gradeItemId, request.studentId());
+        GradeEntry entry = existingEntry.orElseGet(() -> new GradeEntry(UUID.randomUUID(), gradeItemId, request.studentId()));
+        BigDecimal oldScore = existingEntry.map(this::effectiveScore).orElse(null);
+        BigDecimal newScore = adjusted == null ? request.rawScore() : adjusted;
+        if (oldScore != null && oldScore.compareTo(newScore) != 0 && isBlank(request.reason())) {
+            throw new BadRequestException("GRADE_OVERRIDE_REASON_REQUIRED");
+        }
         entry.publish(request.rawScore(), adjusted, isLate, minutesLate, penaltyPct);
-        entries.save(entry);
+        entry = entries.save(entry);
+        if (oldScore != null && oldScore.compareTo(newScore) != 0) {
+            overrides.save(new GradeOverride(
+                    entry.getId(),
+                    oldScore,
+                    newScore,
+                    request.reason().trim(),
+                    actorId == null || actorId.isBlank() ? "system" : actorId));
+        }
 
         return studentGradebook(item.getCourseId(), request.studentId());
+    }
+
+    public UUID courseIdForGradeItem(UUID gradeItemId) {
+        return items.findById(gradeItemId)
+                .map(GradeItem::getCourseId)
+                .orElseThrow(() -> new NotFoundException("Grade item not found: " + gradeItemId));
+    }
+
+    public UUID courseIdForEntry(UUID entryId) {
+        GradeEntry entry = entries.findById(entryId)
+                .orElseThrow(() -> new NotFoundException("Grade entry not found: " + entryId));
+        return courseIdForGradeItem(entry.getGradeItemId());
+    }
+
+    public List<GradeOverrideDto> listOverrides(UUID gradeEntryId) {
+        if (!entries.existsById(gradeEntryId)) {
+            throw new NotFoundException("Grade entry not found: " + gradeEntryId);
+        }
+        return overrides.findByGradeEntryIdOrderByCreatedAtDesc(gradeEntryId).stream()
+                .map(this::toOverrideDto)
+                .toList();
     }
 
     // ---------- Final grade ----------
@@ -450,12 +534,65 @@ public class GradebookService {
         return mapper.toDto(item, category);
     }
 
+    private GradeItemInput validateGradeItemInput(UUID courseId, UpsertGradeItemRequestDto request) {
+        UUID categoryId = UUID.fromString(request.categoryId());
+        GradeCategory category = categories.findById(categoryId)
+                .orElseThrow(() -> new NotFoundException("Grade category not found: " + categoryId));
+        if (!category.getCourseId().equals(courseId)) {
+            throw new BadRequestException("CATEGORY_NOT_IN_COURSE");
+        }
+        if (request.maxScore().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("GRADE_ITEM_MAX_SCORE_INVALID");
+        }
+        if (request.weightPercent().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("GRADE_ITEM_WEIGHT_INVALID");
+        }
+        if (request.latePenaltyPercent().compareTo(BigDecimal.ZERO) < 0
+                || request.latePenaltyPercent().compareTo(ONE_HUNDRED) > 0) {
+            throw new BadRequestException("GRADE_ITEM_LATE_PENALTY_INVALID");
+        }
+        String sourceType = request.sourceType().trim().toUpperCase(Locale.ROOT);
+        String sourceId = request.sourceId().trim();
+        String title = request.title().trim();
+        if (sourceType.isBlank() || sourceId.isBlank() || title.isBlank()) {
+            throw new BadRequestException("GRADE_ITEM_REQUIRED_FIELDS_MISSING");
+        }
+        return new GradeItemInput(
+                category,
+                sourceType,
+                sourceId,
+                title,
+                request.maxScore(),
+                request.weightPercent(),
+                request.latePenaltyPercent(),
+                !Boolean.FALSE.equals(request.published()));
+    }
+
     private GradeCategoryDto toCategoryDto(GradeCategory category) {
         return mapper.toDto(category);
     }
 
     private FinalGradeDto toFinalGradeDto(FinalGrade grade) {
         return mapper.toDto(grade);
+    }
+
+    private GradeOverrideDto toOverrideDto(GradeOverride override) {
+        return new GradeOverrideDto(
+                override.getId().toString(),
+                override.getGradeEntryId().toString(),
+                override.getOldScore(),
+                override.getNewScore(),
+                override.getReason(),
+                override.getActorId(),
+                override.getCreatedAt());
+    }
+
+    private BigDecimal effectiveScore(GradeEntry entry) {
+        return entry.getAdjustedScore() == null ? entry.getRawScore() : entry.getAdjustedScore();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private String toJson(Object value) {
@@ -486,5 +623,16 @@ public class GradebookService {
             boolean isLate, int minutesLate, BigDecimal latePenaltyApplied,
             UUID categoryId, CategoryMeta category,
             String status, Instant gradedAt) {
+    }
+
+    private record GradeItemInput(
+            GradeCategory category,
+            String sourceType,
+            String sourceId,
+            String title,
+            BigDecimal maxScore,
+            BigDecimal weightPercent,
+            BigDecimal latePenaltyPercent,
+            boolean published) {
     }
 }

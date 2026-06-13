@@ -4,6 +4,7 @@ import edu.courseflow.notification.dto.NotificationDtos.CreateNotificationReques
 import edu.courseflow.notification.dto.NotificationDtos.NotificationDto;
 import edu.courseflow.notification.dto.NotificationDtos.NotificationPreferenceDto;
 import edu.courseflow.notification.dto.NotificationDtos.UpsertPreferenceRequestDto;
+import edu.courseflow.notification.model.Notification;
 import edu.courseflow.notification.repository.NotificationRepository;
 import edu.courseflow.notification.web.ForbiddenException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
@@ -16,9 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class NotificationService {
 
     private final NotificationRepository notifications;
+    private final NotificationDeliveryService delivery;
 
-    public NotificationService(NotificationRepository notifications) {
+    public NotificationService(NotificationRepository notifications, NotificationDeliveryService delivery) {
         this.notifications = notifications;
+        this.delivery = delivery;
     }
 
     public List<NotificationDto> listForUser(String userId, boolean unreadOnly) {
@@ -27,7 +30,10 @@ public class NotificationService {
 
     @Transactional
     public NotificationDto create(CreateNotificationRequestDto request) {
-        return notifications.create(request);
+        Notification notification = notifications.insertEntity(
+                request.userId(), request.notificationType(), request.title(), request.body());
+        delivery.deliver(notification);
+        return notifications.toDto(notification);
     }
 
     @Transactional

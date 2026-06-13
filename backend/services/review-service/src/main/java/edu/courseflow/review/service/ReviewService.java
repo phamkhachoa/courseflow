@@ -40,6 +40,10 @@ public class ReviewService {
         return reviews.summary(UUID.fromString(courseId));
     }
 
+    public ReviewDto get(UUID reviewId) {
+        return reviews.find(reviewId).orElseThrow(() -> new NotFoundException("Review not found: " + reviewId));
+    }
+
     @Transactional
     public ReviewDto create(CreateReviewRequestDto request) {
         ReviewDto review = reviews.upsert(request);
@@ -55,15 +59,14 @@ public class ReviewService {
 
     @Transactional
     public ReviewDto addHelpful(UUID reviewId, HelpfulRequestDto request) {
-        reviews.find(reviewId).orElseThrow(() -> new NotFoundException("Review not found: " + reviewId));
+        get(reviewId);
         reviews.addHelpful(reviewId, request.userId());
         return reviews.find(reviewId).orElseThrow();
     }
 
     @Transactional
     public ReviewDto moderate(UUID reviewId, ModerateRequestDto request) {
-        ReviewDto review = reviews.find(reviewId)
-                .orElseThrow(() -> new NotFoundException("Review not found: " + reviewId));
+        ReviewDto review = get(reviewId);
         reviews.updateStatus(reviewId, request.status());
         reviews.recomputeSummary(UUID.fromString(review.courseId()));
         return reviews.find(reviewId).orElseThrow();

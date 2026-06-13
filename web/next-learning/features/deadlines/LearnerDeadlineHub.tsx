@@ -157,7 +157,7 @@ export function LearnerDeadlineHub({ compact = false, maxItems }: LearnerDeadlin
           type: "ASSIGNMENT",
           dueAt: assignment.dueAt,
           href: course
-            ? `/courses/${course.slug}/assignments?courseId=${courseId}&assignmentId=${assignment.id}`
+            ? `/courses/${course.slug}/assignments?assignmentId=${assignment.id}`
             : `/search?q=${encodeURIComponent(courseId)}`,
           status: assignment.status
         });

@@ -35,7 +35,11 @@ class QuizRepository {
         '/v1/quizzes/$quizId/attempts',
         data: const <String, dynamic>{},
       );
-      return QuizAttempt.fromJson(ApiEnvelope.unwrapObject(res.data));
+      final body = ApiEnvelope.unwrapObject(res.data);
+      final attempt = body['attempt'];
+      return QuizAttempt.fromJson(
+        attempt is Map<String, dynamic> ? attempt : body,
+      );
     } on DioException catch (e) {
       throw ApiEnvelope.toApiException(e);
     }

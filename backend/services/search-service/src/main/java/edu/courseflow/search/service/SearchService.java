@@ -186,4 +186,8 @@ public class SearchService {
         CourseSearchDocument document = mapper.toDocument(request);
         return mapper.toDto(courses.save(document));
     }
+
+    public void deleteCourse(String courseId) {
+        courses.deleteById(courseId);
+    }
 }

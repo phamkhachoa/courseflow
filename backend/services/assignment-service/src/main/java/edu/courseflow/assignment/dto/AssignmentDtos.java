@@ -34,6 +34,12 @@ public final class AssignmentDtos {
                         String rubricId) {
         }
 
+        public record AssignmentReadinessDto(
+                        String id,
+                        String courseId,
+                        String status) {
+        }
+
         public record SubmissionAttachmentDto(
                         String id,
                         String mediaAssetId,

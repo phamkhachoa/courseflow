@@ -10,6 +10,7 @@ import edu.courseflow.deadline.model.ReminderPolicy;
 import edu.courseflow.deadline.model.ReminderRun;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
@@ -36,6 +37,10 @@ public class DeadlineRepository {
                 ? policies.findAllByOrderByNameAsc()
                 : policies.findByCourseIdOrderByNameAsc(courseId);
         return rows.stream().map(mapper::toDto).toList();
+    }
+
+    public Optional<ReminderPolicyDto> findPolicy(UUID policyId) {
+        return policies.findById(policyId).map(mapper::toDto);
     }
 
     public ReminderPolicyDto createPolicy(CreateReminderPolicyRequestDto request) {
@@ -68,6 +73,10 @@ public class DeadlineRepository {
 
     public java.util.Optional<ReminderRunDto> lockDuePending(UUID reminderRunId) {
         return runs.lockDuePending(reminderRunId, Instant.now()).map(mapper::toDto);
+    }
+
+    public Optional<ReminderRunDto> findRun(UUID reminderRunId) {
+        return runs.findById(reminderRunId).map(mapper::toDto);
     }
 
     public void outbox(UUID aggregateId, String eventType, String payload) {

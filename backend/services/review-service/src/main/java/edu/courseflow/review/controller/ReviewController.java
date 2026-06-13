@@ -59,6 +59,8 @@ public class ReviewController {
     @PostMapping("/internal/reviews/{reviewId}/helpful")
     public ReviewDto helpful(@PathVariable UUID reviewId, @Valid @RequestBody HelpfulRequestDto request,
                              CurrentUser user) {
+        ReviewDto review = reviews.get(reviewId);
+        courseAccess.requireCourseAccess(user, UUID.fromString(review.courseId()));
         return reviews.addHelpful(reviewId, new HelpfulRequestDto(callerId(user)));
     }
 
@@ -66,6 +68,8 @@ public class ReviewController {
     public ReviewDto moderate(@PathVariable UUID reviewId, @Valid @RequestBody ModerateRequestDto request,
                               CurrentUser user) {
         requireStaff(user);
+        ReviewDto review = reviews.get(reviewId);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(review.courseId()));
         return reviews.moderate(reviewId, request);
     }
 
@@ -78,8 +82,8 @@ public class ReviewController {
 
     private void requireStaff(CurrentUser user) {
         callerId(user);
-        if (!user.hasAnyRole("ADMIN", "INSTRUCTOR")) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires ADMIN or INSTRUCTOR role");
+        if (!user.hasAnyRole("ADMIN", "ORG_ADMIN", "TA", "INSTRUCTOR", "PROFESSOR")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires course staff role");
         }
     }
 }

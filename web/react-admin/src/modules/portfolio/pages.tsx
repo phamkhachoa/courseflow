@@ -95,18 +95,6 @@ export function PortfolioPage() {
           <div className="flex items-end">
             <Button type="submit" disabled={!studentId}>Xem hồ sơ</Button>
           </div>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600 lg:col-span-2">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập Học viên ID</summary>
-            <FormField label="Học viên ID" htmlFor="pf-student-manual">
-              <Input
-                id="pf-student-manual"
-                className="mt-3"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value.trim())}
-                placeholder="VD: 4"
-              />
-            </FormField>
-          </details>
         </form>
       </Card>
 

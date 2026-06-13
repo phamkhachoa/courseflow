@@ -21,6 +21,19 @@ export type Assignment = {
   rubricId?: string;
 };
 
+export type AssignmentLifecycleAction = "draft" | "publish" | "archive";
+
+const lifecycleStatus: Record<AssignmentLifecycleAction, string> = {
+  draft: "DRAFT",
+  publish: "PUBLISHED",
+  archive: "ARCHIVED"
+};
+
+function isLifecycleEndpointMissing(error: unknown) {
+  const status = (error as { response?: { status?: number } }).response?.status;
+  return status === 404 || status === 405;
+}
+
 export type SubmissionAttachment = {
   id: string;
   mediaAssetId?: string;
@@ -86,6 +99,22 @@ export async function createAssignment(input: {
 }): Promise<Assignment> {
   const { data } = await apiClient.post("/admin/v1/assignments", input);
   return unwrap<Assignment>(data);
+}
+
+export async function setAssignmentLifecycle(
+  assignmentId: string,
+  action: AssignmentLifecycleAction
+): Promise<Assignment> {
+  try {
+    const { data } = await apiClient.post(`/admin/v1/assignments/${assignmentId}/${action}`, {});
+    return unwrap<Assignment>(data);
+  } catch (error) {
+    if (!isLifecycleEndpointMissing(error)) throw error;
+    const { data } = await apiClient.patch(`/admin/v1/assignments/${assignmentId}/status`, {
+      status: lifecycleStatus[action]
+    });
+    return unwrap<Assignment>(data);
+  }
 }
 export async function submitAssignment(
   assignmentId: string,

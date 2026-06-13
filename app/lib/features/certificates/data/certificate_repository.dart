@@ -6,7 +6,7 @@ import '../../../core/api/dio_client.dart';
 import '../domain/certificate_models.dart';
 
 /// Certificate APIs:
-///  - `GET /learning/certificates`                 learner's certificates (auth)
+///  - `GET /v1/certificates/mine`              learner's certificates (auth)
 ///  - `GET /v1/certificates/verify/{code}`     public verification (no auth)
 class CertificateRepository {
   CertificateRepository(this._client);
@@ -16,7 +16,7 @@ class CertificateRepository {
 
   Future<List<Certificate>> myCertificates() async {
     try {
-      final res = await _dio.get<Object?>('/learning/certificates');
+      final res = await _dio.get<Object?>('/v1/certificates/mine');
       return ApiEnvelope.unwrapList(res.data)
           .map(Certificate.fromJson)
           .toList(growable: false);
@@ -46,5 +46,5 @@ final certificateRepositoryProvider = Provider<CertificateRepository>((ref) {
 
 final myCertificatesProvider =
     FutureProvider.autoDispose<List<Certificate>>((ref) {
-      return ref.watch(certificateRepositoryProvider).myCertificates();
-    });
+  return ref.watch(certificateRepositoryProvider).myCertificates();
+});

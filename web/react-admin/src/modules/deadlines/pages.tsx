@@ -186,18 +186,6 @@ export function DeadlinesPage() {
             <FormField label="Đến hạn (ISO)" htmlFor="dr-due">
               <Input id="dr-due" placeholder="2026-07-01T00:00:00Z" value={reminderForm.dueAt} onChange={(e) => setReminderForm({ ...reminderForm, dueAt: e.target.value })} required />
             </FormField>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập Policy ID thủ công</summary>
-              <FormField label="Policy ID" htmlFor="dr-policy-manual">
-                <Input
-                  id="dr-policy-manual"
-                  className="mt-3"
-                  value={reminderForm.policyId}
-                  onChange={(e) => setReminderForm({ ...reminderForm, policyId: e.target.value.trim() })}
-                  placeholder="UUID chính sách"
-                />
-              </FormField>
-            </details>
             {createR.isError && <ErrorState error={createR.error} />}
             <Button type="submit" disabled={createR.isPending}>
               {createR.isPending ? "Đang lưu" : "Tạo nhắc nhở"}

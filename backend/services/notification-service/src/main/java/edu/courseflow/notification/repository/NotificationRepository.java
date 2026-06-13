@@ -1,6 +1,5 @@
 package edu.courseflow.notification.repository;
 
-import edu.courseflow.notification.dto.NotificationDtos.CreateNotificationRequestDto;
 import edu.courseflow.notification.dto.NotificationDtos.NotificationDto;
 import edu.courseflow.notification.dto.NotificationDtos.NotificationPreferenceDto;
 import edu.courseflow.notification.dto.NotificationDtos.UpsertPreferenceRequestDto;
@@ -34,10 +33,6 @@ public class NotificationRepository {
         return rows.stream().map(mapper::toDto).toList();
     }
 
-    public NotificationDto create(CreateNotificationRequestDto request) {
-        return insert(request.userId(), request.notificationType(), request.title(), request.body());
-    }
-
     public Optional<NotificationDto> find(UUID notificationId) {
         return notifications.findById(notificationId).map(mapper::toDto);
     }
@@ -47,7 +42,23 @@ public class NotificationRepository {
      * event fan-out so both produce an identical row shape (and a DTO the push channel can emit).
      */
     public NotificationDto insert(String userId, String notificationType, String title, String body) {
-        return mapper.toDto(notifications.save(new Notification(userId, notificationType, title, body)));
+        return toDto(insertEntity(userId, notificationType, title, body));
+    }
+
+    public Notification insertEntity(String userId, String notificationType, String title, String body) {
+        return notifications.save(new Notification(userId, notificationType, title, body));
+    }
+
+    public Notification saveEntity(Notification notification) {
+        return notifications.save(notification);
+    }
+
+    public List<Notification> lockFailedForRetry(int maxAttempts, int limit) {
+        return notifications.lockFailedForRetry(maxAttempts, limit);
+    }
+
+    public NotificationDto toDto(Notification notification) {
+        return mapper.toDto(notification);
     }
 
     /**

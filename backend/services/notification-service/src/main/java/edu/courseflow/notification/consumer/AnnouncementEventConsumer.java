@@ -8,6 +8,7 @@ import edu.courseflow.notification.model.ProcessedEvent;
 import edu.courseflow.notification.push.NotificationStreamRegistry;
 import edu.courseflow.notification.repository.NotificationRepository;
 import edu.courseflow.notification.repository.ProcessedEventRepository;
+import edu.courseflow.notification.service.NotificationDeliveryService;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -47,15 +48,19 @@ public class AnnouncementEventConsumer {
     private final EnrollmentRosterClient roster;
     private final NotificationRepository notifications;
     private final NotificationStreamRegistry pushRegistry;
+    private final NotificationDeliveryService delivery;
 
     public AnnouncementEventConsumer(ProcessedEventRepository processedEvents, ObjectMapper objectMapper,
                                      EnrollmentRosterClient roster,
-                                     NotificationRepository notifications, NotificationStreamRegistry pushRegistry) {
+                                     NotificationRepository notifications,
+                                     NotificationStreamRegistry pushRegistry,
+                                     NotificationDeliveryService delivery) {
         this.processedEvents = processedEvents;
         this.objectMapper = objectMapper;
         this.roster = roster;
         this.notifications = notifications;
         this.pushRegistry = pushRegistry;
+        this.delivery = delivery;
     }
 
     @KafkaListener(topics = "announcement.published", groupId = "notification-service")
@@ -114,7 +119,9 @@ public class AnnouncementEventConsumer {
                 log.debug("notification: user {} opted out of {} channel; skipping", userId, CHANNEL);
                 continue;
             }
-            NotificationDto created = notifications.insert(userId, CHANNEL, title, body);
+            var notification = notifications.insertEntity(userId, CHANNEL, title, body);
+            delivery.deliver(notification);
+            NotificationDto created = notifications.toDto(notification);
             fannedOut++;
             // Best-effort realtime push to the user's open streams; the persisted row is the source of
             // truth, so a push failure (no active emitter, client gone) never affects the transaction.

@@ -11,6 +11,7 @@ import edu.courseflow.gradebook.repository.GradeEntryRepository;
 import edu.courseflow.gradebook.repository.GradeItemRepository;
 import edu.courseflow.gradebook.repository.ProcessedEventRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,11 +67,12 @@ public class GradeEventConsumer {
         String studentId = text(event, "studentId");
         BigDecimal score = bigDecimal(event, "score");
         BigDecimal maxScore = bigDecimal(event, "maxScore");
+        Instant gradedAt = instant(event, "gradedAt");
         if (quizId == null || courseId == null || studentId == null || score == null || maxScore == null) {
             log.warn("gradebook: quiz event {} missing required fields; skipping payload={}", eventId, payload);
             return;
         }
-        upsertFromSource(courseId, "QUIZ", quizId, "Quiz " + quizId, studentId, score, maxScore);
+        upsertFromSource(courseId, "QUIZ", quizId, "Quiz " + quizId, studentId, score, maxScore, eventId, gradedAt);
     }
 
     /**
@@ -91,6 +93,7 @@ public class GradeEventConsumer {
         String studentId = text(event, "studentId");
         BigDecimal finalScore = bigDecimal(event, "finalScore");
         BigDecimal maxScore = bigDecimal(event, "maxScore");
+        Instant gradedAt = instant(event, "gradedAt");
         if (assignmentId == null || studentId == null || finalScore == null) {
             log.warn("gradebook: peer-review event {} missing required fields; skipping payload={}", eventId, payload);
             return;
@@ -100,13 +103,13 @@ public class GradeEventConsumer {
         if (existing != null) {
             upsertFromSource(existing.getCourseId().toString(), "PEER_REVIEW", assignmentId,
                     "Peer Review " + assignmentId, studentId, finalScore,
-                    maxScore == null ? existing.getMaxScore() : maxScore);
+                    maxScore == null ? existing.getMaxScore() : maxScore, eventId, gradedAt);
             return;
         }
 
         if (courseId != null && maxScore != null) {
             upsertFromSource(courseId, "PEER_REVIEW", assignmentId,
-                    "Peer Review " + assignmentId, studentId, finalScore, maxScore);
+                    "Peer Review " + assignmentId, studentId, finalScore, maxScore, eventId, gradedAt);
             return;
         }
 
@@ -118,7 +121,7 @@ public class GradeEventConsumer {
         }
         upsertFromSource(assignmentItem.getCourseId().toString(), "PEER_REVIEW", assignmentId,
                 "Peer Review " + assignmentId, studentId, finalScore,
-                maxScore == null ? assignmentItem.getMaxScore() : maxScore);
+                maxScore == null ? assignmentItem.getMaxScore() : maxScore, eventId, gradedAt);
     }
 
     @KafkaListener(topics = "submission.graded", groupId = "gradebook-service")
@@ -134,12 +137,13 @@ public class GradeEventConsumer {
         String studentId = text(event, "studentId");
         BigDecimal finalScore = bigDecimal(event, "finalScore");
         BigDecimal maxScore = bigDecimal(event, "maxScore");
+        Instant gradedAt = instant(event, "gradedAt");
         if (assignmentId == null || courseId == null || studentId == null || finalScore == null || maxScore == null) {
             log.warn("gradebook: submission event {} missing required fields; skipping payload={}", eventId, payload);
             return;
         }
         upsertFromSource(courseId, "ASSIGNMENT", assignmentId, "Assignment " + assignmentId,
-                studentId, finalScore, maxScore);
+                studentId, finalScore, maxScore, eventId, gradedAt);
     }
 
     private boolean markProcessed(UUID eventId, String consumer) {
@@ -191,19 +195,35 @@ public class GradeEventConsumer {
         return text.isBlank() ? null : text;
     }
 
+    private static Instant instant(JsonNode node, String field) {
+        String text = text(node, field);
+        if (text == null) {
+            return null;
+        }
+        try {
+            return Instant.parse(text);
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
     /**
      * Upserts a grade entry from an auto-grade source. Finds or creates a Canvas-style category and a
      * grade item keyed on (source_type, source_id), then upserts the student's published entry.
      */
     private void upsertFromSource(String courseId, String sourceType, String sourceId, String title,
-            String studentId, BigDecimal score, BigDecimal maxScore) {
+            String studentId, BigDecimal score, BigDecimal maxScore, UUID eventId, Instant gradedAt) {
         UUID courseUuid = UUID.fromString(courseId);
         UUID categoryId = findOrCreateCategory(courseUuid, categoryName(sourceType));
         UUID gradeItemId = findOrCreateItem(courseUuid, categoryId, sourceType, sourceId, title, maxScore);
 
         GradeEntry entry = entries.findByGradeItemIdAndStudentId(gradeItemId, studentId)
                 .orElseGet(() -> new GradeEntry(UUID.randomUUID(), gradeItemId, studentId));
-        entry.publish(score, null, false, 0, BigDecimal.ZERO);
+        if (!entry.publishFromSource(score, null, false, 0, BigDecimal.ZERO, eventId, gradedAt)) {
+            log.info("Skipping stale {} grade event {} for student {} source {}:{}",
+                    sourceType, eventId, studentId, sourceType, sourceId);
+            return;
+        }
         entries.save(entry);
     }
 

@@ -9,7 +9,6 @@ import {
   FileCheck2,
   GraduationCap,
   Save,
-  Sparkles,
   Trophy,
   UserCheck
 } from "lucide-react";
@@ -32,7 +31,7 @@ import {
   Th
 } from "@/shared/ui";
 import { cn } from "@/shared/ui/cn";
-import { fallbackCourses, listCourses } from "../courses/api";
+import { listCourses } from "../courses/api";
 import type { Course } from "../courses/types";
 import { adminUserLabel, useLearnerUsers } from "../identity/useLearnerUsers";
 import {
@@ -48,34 +47,6 @@ import {
   type GradeItem,
   upsertEntry
 } from "./api";
-
-type DemoScope = {
-  label: string;
-  courseId: string;
-  studentId: string;
-  detail: string;
-};
-
-const DEMO_SCOPES: DemoScope[] = [
-  {
-    label: "AI210 - Minh Tran",
-    courseId: "30000000-0000-0000-0000-000000000002",
-    studentId: "4",
-    detail: "Có assignment, quiz, thang điểm và final grade mẫu."
-  },
-  {
-    label: "LX120 - An Le",
-    courseId: "30000000-0000-0000-0000-000000000004",
-    studentId: "5",
-    detail: "Có portfolio/studio work để kiểm thử nhập điểm."
-  },
-  {
-    label: "SE401 - Minh Tran",
-    courseId: "30000000-0000-0000-0000-000000000001",
-    studentId: "4",
-    detail: "Có final grade mẫu cho course backend production."
-  }
-];
 
 const AGGREGATION_OPTIONS = [
   { value: "WEIGHTED_MEAN", label: "Weighted mean" },
@@ -154,35 +125,6 @@ function MetricCard({
   );
 }
 
-function ScopeButton({
-  scope,
-  active,
-  onClick
-}: {
-  scope: DemoScope;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-lg border p-3 text-left transition",
-        active
-          ? "border-brand-300 bg-brand-50 text-brand-900"
-          : "border-slate-200 bg-white text-slate-700 hover:border-brand-200 hover:bg-brand-50/60"
-      )}
-    >
-      <span className="flex items-center gap-2 text-sm font-bold">
-        <Sparkles size={15} />
-        {scope.label}
-      </span>
-      <span className="mt-1 block text-xs leading-5 text-slate-500">{scope.detail}</span>
-    </button>
-  );
-}
-
 export function GradebookPage() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -219,7 +161,7 @@ export function GradebookPage() {
     staleTime: 60_000
   });
 
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const selectedCourse = courseRows.find((course) => course.id === courseId);
   const { learnerUsers, roleQueriesLoading, userById, usersQuery } = useLearnerUsers();
   const selectedLearner = userById.get(studentId);
@@ -281,7 +223,8 @@ export function GradebookPage() {
     gradeItemId: "",
     rawScore: "",
     isLate: false,
-    minutesLate: ""
+    minutesLate: "",
+    reason: ""
   });
   const selectedItem = gradeItems.find((item) => item.id === entry.gradeItemId);
   const rawScore = Number(entry.rawScore);
@@ -295,12 +238,13 @@ export function GradebookPage() {
         studentId,
         rawScore,
         isLate: entry.isLate,
-        minutesLate: entry.isLate && entry.minutesLate !== "" ? Number(entry.minutesLate) : undefined
+        minutesLate: entry.isLate && entry.minutesLate !== "" ? Number(entry.minutesLate) : undefined,
+        reason: entry.reason.trim() || undefined
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.gradebook.student(courseId, studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.gradebook.items(courseId) });
-      setEntry((current) => ({ ...current, rawScore: "", minutesLate: "" }));
+      setEntry((current) => ({ ...current, rawScore: "", minutesLate: "", reason: "" }));
     }
   });
 
@@ -397,7 +341,7 @@ export function GradebookPage() {
           title="Phạm vi chấm điểm"
           subtitle="Chọn course và học viên một lần, toàn bộ bảng điểm bên dưới sẽ bám theo scope này."
         />
-        <div className="grid gap-4 p-4 xl:grid-cols-[1.4fr_1fr]">
+        <div className="p-4">
           <div className="grid gap-3 lg:grid-cols-2">
             <FormField label="Khóa học" htmlFor="g-course-select">
               <Select
@@ -453,41 +397,10 @@ export function GradebookPage() {
               </div>
               {courses.isError && (
                 <p className="mt-3 text-xs font-semibold text-amber-700">
-                  Không tải được danh sách course, đang dùng fallback local.
+                  Không tải được danh sách course. Kiểm tra gateway hoặc thử tải lại trước khi chấm điểm.
                 </p>
               )}
             </div>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600 lg:col-span-2">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập ID thủ công</summary>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <FormField label="Course ID" htmlFor="g-course-manual" hint="Dùng khi course chưa có trong dropdown.">
-                  <Input
-                    id="g-course-manual"
-                    value={courseId}
-                    onChange={(event) => updateScope(event.target.value.trim())}
-                    placeholder="UUID khóa học"
-                  />
-                </FormField>
-                <FormField label="Học viên ID" htmlFor="g-student-manual" hint="Dùng khi learner chưa có trong dropdown.">
-                  <Input
-                    id="g-student-manual"
-                    value={studentId}
-                    onChange={(event) => updateScope(courseId, event.target.value.trim())}
-                    placeholder="VD: 4"
-                  />
-                </FormField>
-              </div>
-            </details>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
-            {DEMO_SCOPES.map((scope) => (
-              <ScopeButton
-                key={`${scope.courseId}-${scope.studentId}`}
-                scope={scope}
-                active={scope.courseId === courseId && scope.studentId === studentId}
-                onClick={() => updateScope(scope.courseId, scope.studentId)}
-              />
-            ))}
           </div>
         </div>
       </Card>
@@ -534,7 +447,7 @@ export function GradebookPage() {
         <Card>
           <CardHeader
             title="Hạng mục điểm"
-            subtitle="Chọn một dòng để đưa vào form nhập điểm, không cần copy UUID."
+            subtitle="Chọn một dòng để đưa vào form nhập điểm."
           />
           {!courseId && <EmptyState message="Chọn course để xem hạng mục điểm." />}
           {courseId && items.isLoading && <Spinner />}
@@ -644,10 +557,18 @@ export function GradebookPage() {
                 />
               </FormField>
             )}
+            <FormField label="Lý do chỉnh điểm" htmlFor="ge-reason">
+              <Input
+                id="ge-reason"
+                value={entry.reason}
+                onChange={(event) => setEntry({ ...entry, reason: event.target.value })}
+                placeholder="Ví dụ: chấm phúc khảo, late penalty, nhập bù"
+              />
+            </FormField>
             {scoreExceedsMax && (
               <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 <AlertTriangle size={17} className="mt-0.5 shrink-0" />
-                Điểm đang lớn hơn điểm tối đa của hạng mục. Bạn vẫn có thể lưu nếu đây là điểm bonus.
+                Điểm đang lớn hơn điểm tối đa của hạng mục nên backend sẽ từ chối lưu.
               </div>
             )}
             {create.isError && <ErrorState error={create.error} />}
@@ -664,7 +585,8 @@ export function GradebookPage() {
                 !courseId ||
                 !studentId ||
                 !entry.gradeItemId ||
-                scoreIsInvalid
+                scoreIsInvalid ||
+                scoreExceedsMax
               }
             >
               <Save size={16} />

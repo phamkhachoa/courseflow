@@ -44,8 +44,7 @@ class ModuleDetailScreen extends ConsumerStatefulWidget {
   final bool completed;
 
   @override
-  ConsumerState<ModuleDetailScreen> createState() =>
-      _ModuleDetailScreenState();
+  ConsumerState<ModuleDetailScreen> createState() => _ModuleDetailScreenState();
 }
 
 class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
@@ -82,13 +81,12 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
         value: media,
         onRetry: () => ref.invalidate(moduleMediaProvider(widget.moduleId)),
         isEmpty: (items) => items.isEmpty,
-        emptyMessage: 'No content in this module yet.',
+        emptyMessage: 'Module content is not available in the mobile app yet.',
         data: (assets) => ListView.separated(
           padding: const EdgeInsets.all(AppTheme.pagePadding),
           itemCount: assets.length,
           separatorBuilder: (_, __) => const SizedBox(height: AppTheme.gap),
-          itemBuilder: (context, index) =>
-              _MediaTile(asset: assets[index]),
+          itemBuilder: (context, index) => _MediaTile(asset: assets[index]),
         ),
       ),
       bottomNavigationBar: SafeArea(
@@ -109,12 +107,12 @@ class _MediaTile extends StatelessWidget {
   final MediaAsset asset;
 
   IconData get _icon => switch (asset.kind) {
-    MediaKind.video => Icons.play_circle_outline,
-    MediaKind.document => Icons.description_outlined,
-    MediaKind.audio => Icons.headphones_outlined,
-    MediaKind.image => Icons.image_outlined,
-    MediaKind.other => Icons.attachment_outlined,
-  };
+        MediaKind.video => Icons.play_circle_outline,
+        MediaKind.document => Icons.description_outlined,
+        MediaKind.audio => Icons.headphones_outlined,
+        MediaKind.image => Icons.image_outlined,
+        MediaKind.other => Icons.attachment_outlined,
+      };
 
   String? get _subtitle {
     if (asset.durationSeconds <= 0) return null;

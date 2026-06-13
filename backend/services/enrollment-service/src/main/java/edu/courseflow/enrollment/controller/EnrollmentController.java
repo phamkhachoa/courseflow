@@ -1,6 +1,5 @@
 package edu.courseflow.enrollment.controller;
 
-import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.AuditLogEntryDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.BatchEnrollRequestDto;
@@ -46,7 +45,7 @@ public class EnrollmentController {
     public List<EnrollmentDto> list(@RequestParam Optional<UUID> courseId,
                                     @RequestParam Optional<String> studentId,
                                     CurrentUser user) {
-        return enrollments.list(courseId, visibleStudentId(studentId, user));
+        return enrollments.list(courseId, studentId, user);
     }
 
     @PostMapping("/internal/enrollments")
@@ -64,8 +63,7 @@ public class EnrollmentController {
 
     @GetMapping("/internal/waitlist")
     public List<WaitlistEntryDto> waitlist(@RequestParam UUID courseId, CurrentUser user) {
-        requireStaff(user);
-        return enrollments.listWaitlist(courseId);
+        return enrollments.listWaitlist(courseId, user);
     }
 
     @PostMapping("/internal/waitlist")
@@ -75,10 +73,7 @@ public class EnrollmentController {
 
     @GetMapping("/internal/enrollments/{id}")
     public EnrollmentDto get(@PathVariable UUID id, CurrentUser user) {
-        EnrollmentDto enrollment = enrollments.get(id)
-                .orElseThrow(() -> new NotFoundException("Enrollment not found: " + id));
-        requireSelfOrStaff(user, enrollment.studentId());
-        return enrollment;
+        return enrollments.get(id, user);
     }
 
     @PatchMapping("/internal/enrollments/{id}/status")
@@ -102,54 +97,12 @@ public class EnrollmentController {
 
     @GetMapping("/internal/enrollments/stats")
     public EnrollmentStatsDto stats(@RequestParam UUID courseId, CurrentUser user) {
-        requireStaff(user);
-        return enrollments.stats(courseId);
+        return enrollments.stats(courseId, user);
     }
 
     @GetMapping("/internal/enrollments/{id}/audit")
     public List<AuditLogEntryDto> auditLog(@PathVariable UUID id, CurrentUser user) {
-        EnrollmentDto enrollment = enrollments.get(id)
-                .orElseThrow(() -> new NotFoundException("Enrollment not found: " + id));
-        requireSelfOrStaff(user, enrollment.studentId());
-        return enrollments.auditLog(id);
-    }
-
-    private Optional<String> visibleStudentId(Optional<String> requestedStudentId, CurrentUser user) {
-        if (isStaff(user)) {
-            return requestedStudentId;
-        }
-        String caller = callerId(user);
-        if (requestedStudentId.isPresent() && !requestedStudentId.get().equals(caller)) {
-            throw new ForbiddenException("Students may only read their own enrollment");
-        }
-        return Optional.of(caller);
-    }
-
-    private void requireSelfOrStaff(CurrentUser user, String studentId) {
-        if (isStaff(user)) {
-            return;
-        }
-        if (!callerId(user).equals(studentId)) {
-            throw new ForbiddenException("Students may only read their own enrollment");
-        }
-    }
-
-    private void requireStaff(CurrentUser user) {
-        callerId(user);
-        if (!isStaff(user)) {
-            throw new ForbiddenException("Requires INSTRUCTOR or ADMIN role");
-        }
-    }
-
-    private boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole("INSTRUCTOR", "ADMIN");
-    }
-
-    private String callerId(CurrentUser user) {
-        if (user == null || user.id() == null) {
-            throw new ForbiddenException("Authentication required");
-        }
-        return String.valueOf(user.id());
+        return enrollments.auditLog(id, user);
     }
 
     private void requireServiceToken(String token) {

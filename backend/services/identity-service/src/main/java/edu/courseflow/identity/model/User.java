@@ -90,6 +90,9 @@ public class User extends AbstractAuditEntity {
 
     public void markEmailVerified() {
         this.emailVerified = true;
+        if (this.status == UserStatus.PENDING_VERIFICATION) {
+            this.status = UserStatus.ACTIVE;
+        }
     }
 
     public String getPasswordHash() {
@@ -177,6 +180,11 @@ public class User extends AbstractAuditEntity {
 
     public String getMfaSecret() {
         return mfaSecret;
+    }
+
+    public void stageMfaSecret(String secret) {
+        this.mfaEnabled = false;
+        this.mfaSecret = secret;
     }
 
     public void enableMfa(String secret) {

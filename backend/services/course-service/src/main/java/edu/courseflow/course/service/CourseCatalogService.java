@@ -8,11 +8,18 @@ import edu.courseflow.course.dto.CourseDtos.AddCourseMaterialRequestDto;
 import edu.courseflow.course.dto.CourseDtos.CourseDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMaterialDto;
 import edu.courseflow.course.dto.CourseDtos.CreateCourseRequestDto;
+import edu.courseflow.course.dto.CourseDtos.CourseMetadataDto;
 import edu.courseflow.course.exception.ForbiddenException;
 import edu.courseflow.course.repository.CourseCatalogRepository;
+import edu.courseflow.events.common.EventMetadata;
+import edu.courseflow.events.course.CourseArchivedEvent;
+import edu.courseflow.events.course.CoursePublishedEvent;
+import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,12 +41,45 @@ public class CourseCatalogService {
         return courses.list(status);
     }
 
+    public List<CourseDto> list(Optional<String> status, CurrentUser user) {
+        requireAuthenticated(user);
+        if (isPlatformAdmin(user)) {
+            return courses.list(status);
+        }
+        List<UUID> orgAdminDepartments = scopedDepartmentIds(user, "ORG_ADMIN");
+        if (!orgAdminDepartments.isEmpty()) {
+            return courses.listByDepartmentIds(orgAdminDepartments, status);
+        }
+        if (user.hasAnyRole("INSTRUCTOR", "PROFESSOR", "TA")) {
+            return courses.listOwned(String.valueOf(user.id()), status);
+        }
+        if (status.isPresent() && !"PUBLISHED".equalsIgnoreCase(status.get())) {
+            throw new ForbiddenException("Only course staff may list non-published courses");
+        }
+        return courses.listPublished();
+    }
+
     public List<CourseDto> listPublished() {
         return courses.listPublished();
     }
 
     public CourseDto get(UUID courseId) {
         return courses.findById(courseId)
+                .orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
+    }
+
+    public CourseDto get(UUID courseId, CurrentUser user) {
+        requireAuthenticated(user);
+        CourseDto course = get(courseId);
+        if ("PUBLISHED".equals(course.status())) {
+            return course;
+        }
+        requireOwnerOrAdmin(course, user);
+        return course;
+    }
+
+    public CourseMetadataDto metadata(UUID courseId) {
+        return courses.metadata(courseId)
                 .orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
     }
 
@@ -50,7 +90,7 @@ public class CourseCatalogService {
 
     @Transactional
     public CourseDto create(CreateCourseRequestDto request, CurrentUser user) {
-        requireInstructorOrAdmin(user);
+        requireCourseCreator(user, request.departmentId());
         // ownerId is taken from the authenticated caller, never from the request body.
         String ownerId = String.valueOf(user.id());
         CourseDto created = courses.create(request, ownerId);
@@ -73,14 +113,19 @@ public class CourseCatalogService {
         // current course_version and stamp published_at before the course goes live.
         authoring.publishSnapshot(courseId, user);
         courses.updateStatus(courseId, "PUBLISHED");
-        courses.outbox(courseId, "course.published", toJson(Map.of(
-                "eventId", UUID.randomUUID().toString(),
-                "courseId", courseId.toString(),
-                "code", current.code(),
-                "title", current.title(),
-                "slug", current.slug(),
-                "departmentId", current.departmentId(),
-                "ownerId", current.ownerId())));
+        courses.outbox(courseId, "course.published", toJson(new CoursePublishedEvent(
+                UUID.randomUUID().toString(),
+                courseId.toString(),
+                current.code(),
+                current.title(),
+                current.slug(),
+                current.summary(),
+                current.departmentId(),
+                current.ownerId(),
+                current.level(),
+                "PUBLISHED",
+                Instant.now(),
+                metadata(user))));
         return get(courseId);
     }
 
@@ -89,16 +134,40 @@ public class CourseCatalogService {
         CourseDto current = get(courseId);
         requireOwnerOrAdmin(current, user);
         courses.updateStatus(courseId, "ARCHIVED");
+        courses.outbox(courseId, "course.archived", toJson(new CourseArchivedEvent(
+                UUID.randomUUID().toString(),
+                courseId.toString(),
+                current.code(),
+                current.title(),
+                current.slug(),
+                current.summary(),
+                current.departmentId(),
+                current.ownerId(),
+                current.level(),
+                "ARCHIVED",
+                Instant.now(),
+                metadata(user))));
         return get(courseId);
     }
 
-    private void requireInstructorOrAdmin(CurrentUser user) {
+    private void requireAuthenticated(CurrentUser user) {
         if (user == null || user.id() == null) {
             throw new ForbiddenException("Authentication required");
         }
-        if (!user.hasAnyRole("INSTRUCTOR", "ADMIN")) {
+    }
+
+    private void requireCourseCreator(CurrentUser user, UUID departmentId) {
+        requireAuthenticated(user);
+        if (isPlatformAdmin(user)
+                || user.hasAnyDepartmentRole(String.valueOf(departmentId), "INSTRUCTOR", "PROFESSOR")
+                || user.hasPlatformRole("INSTRUCTOR")
+                || user.hasPlatformRole("PROFESSOR")) {
+            return;
+        }
+        if (!user.hasAnyRole("INSTRUCTOR", "PROFESSOR", "ADMIN")) {
             throw new ForbiddenException("Requires INSTRUCTOR or ADMIN role");
         }
+        throw new ForbiddenException("Caller is not allowed to create courses in this department");
     }
 
     /**
@@ -106,16 +175,36 @@ public class CourseCatalogService {
      * Ownership is matched against {@code owner_id}, which stores the gateway user id as a string.
      */
     private void requireOwnerOrAdmin(CourseDto course, CurrentUser user) {
-        if (user == null || user.id() == null) {
-            throw new ForbiddenException("Authentication required");
-        }
-        if (user.hasRole("ADMIN")) {
+        requireAuthenticated(user);
+        if (isPlatformAdmin(user) || user.hasDepartmentRole("ORG_ADMIN", course.departmentId())) {
             return;
         }
-        boolean isOwner = user.hasRole("INSTRUCTOR") && String.valueOf(user.id()).equals(course.ownerId());
+        boolean isOwner = user.hasAnyRole("INSTRUCTOR", "PROFESSOR")
+                && String.valueOf(user.id()).equals(course.ownerId());
         if (!isOwner) {
-            throw new ForbiddenException("Only the owning instructor or an ADMIN may modify this course");
+            throw new ForbiddenException("Only the owning instructor, scoped ORG_ADMIN or platform ADMIN may modify this course");
         }
+    }
+
+    private boolean isPlatformAdmin(CurrentUser user) {
+        return user != null && user.hasPlatformRole("ADMIN");
+    }
+
+    private List<UUID> scopedDepartmentIds(CurrentUser user, String role) {
+        Set<UUID> departmentIds = new LinkedHashSet<>();
+        for (CurrentUser.RoleAssignment assignment : user.roleAssignments()) {
+            if (!role.equalsIgnoreCase(assignment.code())
+                    || !"DEPARTMENT".equalsIgnoreCase(assignment.scopeType())
+                    || assignment.scopeId() == null) {
+                continue;
+            }
+            try {
+                departmentIds.add(UUID.fromString(assignment.scopeId()));
+            } catch (IllegalArgumentException ignored) {
+                // Invalid scoped ids do not grant department access.
+            }
+        }
+        return List.copyOf(departmentIds);
     }
 
     private String toJson(Object value) {
@@ -124,5 +213,9 @@ public class CourseCatalogService {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Unable to serialize JSON payload", ex);
         }
+    }
+
+    private EventMetadata metadata(CurrentUser user) {
+        return new EventMetadata(null, null, String.valueOf(user.id()), Map.of());
     }
 }

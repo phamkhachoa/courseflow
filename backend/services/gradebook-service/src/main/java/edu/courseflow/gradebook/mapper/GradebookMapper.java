@@ -30,6 +30,7 @@ public interface GradebookMapper {
     @Mapping(target = "aggregationMethod", source = "category.aggregationMethod")
     @Mapping(target = "dropLowest", source = "category.dropLowest")
     @Mapping(target = "latePenaltyPercent", source = "item.latePenaltyPercent")
+    @Mapping(target = "published", source = "item.published")
     GradeItemDto toDto(GradeItem item, GradeCategory category);
 
     GradeCategoryDto toDto(GradeCategory category);

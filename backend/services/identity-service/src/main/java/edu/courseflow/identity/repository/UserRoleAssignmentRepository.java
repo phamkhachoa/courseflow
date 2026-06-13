@@ -46,6 +46,9 @@ public interface UserRoleAssignmentRepository extends JpaRepository<UserRoleAssi
             @Param("scopeId") String scopeId,
             @Param("now") Instant now);
 
+    @EntityGraph(attributePaths = { "role", "role.parentRole" })
+    List<UserRoleAssignment> findByUserIdOrderById(Long userId);
+
     @Query("""
             select a from UserRoleAssignment a
             where a.userId = :userId

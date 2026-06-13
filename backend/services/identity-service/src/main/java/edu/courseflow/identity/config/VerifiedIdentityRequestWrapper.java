@@ -26,18 +26,21 @@ public class VerifiedIdentityRequestWrapper extends HttpServletRequestWrapper {
             GatewayHeaders.USER_ID.toLowerCase(),
             GatewayHeaders.USER_ROLE.toLowerCase(),
             GatewayHeaders.USER_ROLES.toLowerCase(),
+            GatewayHeaders.USER_ROLE_SCOPES.toLowerCase(),
             GatewayHeaders.USER_EMAIL.toLowerCase());
 
     /** Verified values keyed by canonical (original-case) header name; null values mean "absent". */
     private final Map<String, String> overrides = new LinkedHashMap<>();
 
     public VerifiedIdentityRequestWrapper(HttpServletRequest request,
-                                          String userId, String email, String primaryRole, String rolesCsv) {
+                                          String userId, String email, String primaryRole, String rolesCsv,
+                                          String roleScopesCsv) {
         super(request);
         overrides.put(GatewayHeaders.USER_ID, userId);
         overrides.put(GatewayHeaders.USER_EMAIL, email);
         overrides.put(GatewayHeaders.USER_ROLE, primaryRole);
         overrides.put(GatewayHeaders.USER_ROLES, rolesCsv);
+        overrides.put(GatewayHeaders.USER_ROLE_SCOPES, roleScopesCsv);
     }
 
     @Override

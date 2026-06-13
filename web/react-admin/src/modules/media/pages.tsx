@@ -5,8 +5,6 @@ import * as Tooltip from "@radix-ui/react-tooltip";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle2,
-  Clipboard,
   FileText,
   Film,
   HardDrive,
@@ -44,7 +42,7 @@ import {
   type MediaAsset,
   type VideoAsset
 } from "./api";
-import { fallbackCourses, listCourses } from "../courses/api";
+import { listCourses } from "../courses/api";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -82,40 +80,6 @@ function metric(label: string, value: string | number, icon: ReactNode, tone: st
         <div className={`flex h-11 w-11 items-center justify-center rounded-md ${tone}`}>{icon}</div>
       </div>
     </Card>
-  );
-}
-
-function CopyButton({ value, label = "Copy" }: { value: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    await navigator.clipboard?.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
-  }
-
-  return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <button
-          type="button"
-          onClick={copy}
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-          aria-label={label}
-        >
-          {copied ? <CheckCircle2 size={15} /> : <Clipboard size={15} />}
-        </button>
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          side="top"
-          className="rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow"
-        >
-          {copied ? "Đã copy" : label}
-          <Tooltip.Arrow className="fill-slate-900" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
   );
 }
 
@@ -258,12 +222,12 @@ function AssetsTab() {
         <div className="border-b border-slate-100 p-4">
           <div className="relative max-w-md">
             <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={16} />
-            <Input
-              className="pl-9"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm theo tên, loại, ID"
-            />
+              <Input
+                className="pl-9"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Tìm theo tên hoặc loại"
+              />
           </div>
         </div>
         {assets.isLoading && <Spinner />}
@@ -277,7 +241,6 @@ function AssetsTab() {
                 <Th>Loại</Th>
                 <Th>Kích thước</Th>
                 <Th>Ngày tạo</Th>
-                <Th></Th>
               </tr>
             </thead>
             <tbody>
@@ -290,9 +253,6 @@ function AssetsTab() {
                   <Td><Badge value={asset.contentType} /></Td>
                   <Td>{formatBytes(asset.sizeBytes)}</Td>
                   <Td>{formatDate(asset.createdAt)}</Td>
-                  <Td>
-                    <CopyButton value={asset.id} label="Copy Media ID" />
-                  </Td>
                 </tr>
               ))}
             </tbody>
@@ -326,7 +286,7 @@ function AssetsTab() {
           {error && <ErrorState error={error} />}
           {uploaded && (
             <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
-              <p><span className="font-medium">Media ID: </span>{compactId(uploaded.id)}</p>
+              <p><span className="font-medium">Media: </span>{compactId(uploaded.id)}</p>
               <p className="mt-1 truncate"><span className="font-medium">Storage key: </span>{compactId(uploaded.storageKey)}</p>
             </div>
           )}
@@ -363,7 +323,7 @@ function VideoUploadTab({ initialCourseId = "" }: { initialCourseId?: string }) 
   const [progress, setProgress] = useState("");
   const [video, setVideo] = useState<VideoAsset | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const courseById = useMemo(() => new Map(courseRows.map((course) => [course.id, course])), [courseRows]);
   const selectedCourse = courseById.get(courseId);
   const selectedFilterCourse = courseById.get(courseFilter);
@@ -465,7 +425,7 @@ function VideoUploadTab({ initialCourseId = "" }: { initialCourseId?: string }) 
                 className="pl-9"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm video, khóa học, ID"
+                placeholder="Tìm video hoặc khóa học"
               />
             </div>
             <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -488,6 +448,7 @@ function VideoUploadTab({ initialCourseId = "" }: { initialCourseId?: string }) 
                 <option value={courseFilter}>Course {compactId(courseFilter)}</option>
               )}
             </Select>
+            {courses.isError && <ErrorState error={courses.error} />}
           </div>
 
           {videos.isLoading && <Spinner />}
@@ -538,7 +499,6 @@ function VideoUploadTab({ initialCourseId = "" }: { initialCourseId?: string }) 
                             </Tooltip.Content>
                           </Tooltip.Portal>
                         </Tooltip.Root>
-                        <CopyButton value={item.id} label="Copy Video ID" />
                       </div>
                     </Td>
                   </tr>
@@ -573,19 +533,9 @@ function VideoUploadTab({ initialCourseId = "" }: { initialCourseId?: string }) 
                 ))}
                 {courseId && !selectedCourse && <option value={courseId}>Course {compactId(courseId)}</option>}
               </Select>
+              {courses.isLoading && <span className="text-xs text-slate-400">Đang tải catalog khóa học...</span>}
             </FormField>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập Course ID thủ công</summary>
-              <FormField label="Course ID" htmlFor="v-course-manual">
-                <Input
-                  id="v-course-manual"
-                  className="mt-3"
-                  value={courseId}
-                  onChange={(event) => setCourseId(event.target.value.trim())}
-                  placeholder="UUID khóa học"
-                />
-              </FormField>
-            </details>
+            {courses.isError && <ErrorState error={courses.error} />}
             <FormField label="Tệp video" htmlFor="v-file">
               <input
                 ref={fileInputRef}

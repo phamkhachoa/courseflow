@@ -34,7 +34,13 @@ public class AnnouncementController {
                                       @RequestParam Optional<String> status,
                                       CurrentUser user) {
         callerId(user);
-        if (!isStaff(user)) {
+        if (isStaff(user)) {
+            if (courseId.isPresent()) {
+                courseAccess.requireCourseStaffAccess(user, courseId.get());
+            } else {
+                requirePlatformAdmin(user);
+            }
+        } else {
             UUID requiredCourseId = courseId.orElseThrow(() ->
                     new ResponseStatusException(HttpStatus.FORBIDDEN, "courseId is required for learner access"));
             courseAccess.requireCourseAccess(user, requiredCourseId);
@@ -46,6 +52,7 @@ public class AnnouncementController {
     @PostMapping("/internal/announcements")
     public AnnouncementDto create(@Valid @RequestBody CreateAnnouncementRequestDto request, CurrentUser user) {
         requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(request.courseId()));
         CreateAnnouncementRequestDto trusted = new CreateAnnouncementRequestDto(
                 request.courseId(),
                 callerId(user),
@@ -60,8 +67,14 @@ public class AnnouncementController {
     public AnnouncementDto get(@PathVariable UUID announcementId, CurrentUser user) {
         callerId(user);
         AnnouncementDto announcement = announcements.get(announcementId);
-        if (!isStaff(user)) {
-            courseAccess.requireCourseAccess(user, UUID.fromString(announcement.courseId()));
+        UUID courseId = UUID.fromString(announcement.courseId());
+        if (isStaff(user)) {
+            courseAccess.requireCourseStaffAccess(user, courseId);
+        } else {
+            courseAccess.requireCourseAccess(user, courseId);
+            if (!"PUBLISHED".equalsIgnoreCase(announcement.status())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found: " + announcementId);
+            }
         }
         return announcement;
     }
@@ -69,6 +82,8 @@ public class AnnouncementController {
     @PostMapping("/internal/announcements/{announcementId}/publish")
     public AnnouncementDto publish(@PathVariable UUID announcementId, CurrentUser user) {
         requireStaff(user);
+        AnnouncementDto announcement = announcements.get(announcementId);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(announcement.courseId()));
         return announcements.publish(announcementId);
     }
 
@@ -87,6 +102,13 @@ public class AnnouncementController {
     }
 
     private boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole("ADMIN", "INSTRUCTOR");
+        return user != null && user.hasAnyRole("ADMIN", "ORG_ADMIN", "TA", "INSTRUCTOR", "PROFESSOR");
+    }
+
+    private void requirePlatformAdmin(CurrentUser user) {
+        callerId(user);
+        if (!user.hasRole("ADMIN")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "courseId is required for course staff access");
+        }
     }
 }

@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.Base64;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,8 +53,11 @@ public class JwtIdentityFilter extends OncePerRequestFilter {
             "/auth/login",
             "/auth/register",
             "/auth/refresh",
-            "/auth/password/change",
-            "/actuator/health");
+            "/auth/email/verify",
+            "/auth/email/resend",
+            "/actuator/health",
+            "/actuator/info",
+            "/actuator/prometheus");
 
     private final SecretKey secretKey;
     private final String issuer;
@@ -154,7 +158,7 @@ public class JwtIdentityFilter extends OncePerRequestFilter {
         request.setAttribute(ACCESS_TOKEN_JTI_ATTRIBUTE, jti);
         request.setAttribute(ACCESS_TOKEN_EXPIRES_AT_ATTRIBUTE, expiresAt);
         VerifiedIdentityRequestWrapper wrapped = new VerifiedIdentityRequestWrapper(
-                request, userId, email, primaryRole, rolesCsv);
+                request, userId, email, primaryRole, rolesCsv, encodeRoleScopes(roleClaims));
         chain.doFilter(wrapped, response);
     }
 
@@ -207,6 +211,8 @@ public class JwtIdentityFilter extends OncePerRequestFilter {
      * operator.
      */
     private boolean requiresAdmin(String path, String method) {
+        if (path.matches("/backoffice/users/\\d+/privacy-export.*"))
+            return true;
         boolean mutating = !"GET".equalsIgnoreCase(method);
         if (!mutating)
             return false;
@@ -216,11 +222,13 @@ public class JwtIdentityFilter extends OncePerRequestFilter {
             return true;
         if (path.matches("/backoffice/users/\\d+/email-verification.*"))
             return true;
+        if (path.matches("/backoffice/users/\\d+/deactivate.*"))
+            return true;
         return path.startsWith("/internal/roles");
     }
 
     private HttpServletRequest blankIdentity(HttpServletRequest request) {
-        return new VerifiedIdentityRequestWrapper(request, null, null, null, null);
+        return new VerifiedIdentityRequestWrapper(request, null, null, null, null, null);
     }
 
     @SuppressWarnings("unchecked")
@@ -236,13 +244,34 @@ public class JwtIdentityFilter extends OncePerRequestFilter {
                         continue;
                     int rank = m.get("rank") instanceof Number n ? n.intValue() : 0;
                     boolean operator = Boolean.TRUE.equals(m.get("isOperator"));
-                    out.add(new RoleClaim(code.toString(), rank, operator));
+                    Object scopeType = m.get("scopeType");
+                    Object scopeId = m.get("scopeId");
+                    out.add(new RoleClaim(
+                            code.toString(),
+                            rank,
+                            operator,
+                            scopeType == null ? "PLATFORM" : scopeType.toString(),
+                            scopeId == null ? null : scopeId.toString()));
                 } else if (element != null && !element.toString().isBlank()) {
-                    out.add(new RoleClaim(element.toString(), 0, false));
+                    out.add(new RoleClaim(element.toString(), 0, false, "PLATFORM", null));
                 }
             }
         }
         return out;
+    }
+
+    private String encodeRoleScopes(List<RoleClaim> roleClaims) {
+        return roleClaims.stream()
+                .map(claim -> encode(claim.code()) + "." + encode(claim.scopeType()) + "." + encode(claim.scopeId()))
+                .collect(java.util.stream.Collectors.joining(","));
+    }
+
+    private String encode(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     private void deny(HttpServletResponse response, HttpStatus status, String detail) throws IOException {
@@ -255,7 +284,7 @@ public class JwtIdentityFilter extends OncePerRequestFilter {
         objectMapper.writeValue(response.getWriter(), body);
     }
 
-    private record RoleClaim(String code, int rank, boolean isOperator) {
+    private record RoleClaim(String code, int rank, boolean isOperator, String scopeType, String scopeId) {
     }
 
     @SuppressWarnings("unused")

@@ -36,10 +36,14 @@ public class DiscussionController {
                                                  @RequestParam Optional<UUID> assignmentId,
                                                  CurrentUser user) {
         callerId(user);
-        if (!isStaff(user)) {
-            UUID requiredCourseId = courseId.orElseThrow(() ->
-                    new ResponseStatusException(HttpStatus.FORBIDDEN, "courseId is required for learner access"));
-            courseAccess.requireCourseAccess(user, requiredCourseId);
+        if (courseId.isPresent()) {
+            if (isStaff(user)) {
+                courseAccess.requireCourseStaffAccess(user, courseId.get());
+            } else {
+                courseAccess.requireCourseAccess(user, courseId.get());
+            }
+        } else if (!isPlatformAdmin(user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "courseId is required for scoped discussion access");
         }
         return discussions.listThreads(courseId, assignmentId);
     }
@@ -60,7 +64,9 @@ public class DiscussionController {
     public DiscussionThreadDto getThread(@PathVariable UUID threadId, CurrentUser user) {
         callerId(user);
         DiscussionThreadDto thread = discussions.getThread(threadId);
-        if (!isStaff(user)) {
+        if (isStaff(user)) {
+            courseAccess.requireCourseStaffAccess(user, UUID.fromString(thread.courseId()));
+        } else {
             courseAccess.requireCourseAccess(user, UUID.fromString(thread.courseId()));
         }
         return thread;
@@ -69,9 +75,11 @@ public class DiscussionController {
     @PostMapping("/internal/discussions/threads/{threadId}/comments")
     public DiscussionCommentDto addComment(@PathVariable UUID threadId,
                                            @Valid @RequestBody CreateCommentRequestDto request,
-                                           CurrentUser user) {
+        CurrentUser user) {
         DiscussionThreadDto thread = discussions.getThread(threadId);
-        if (!isStaff(user)) {
+        if (isStaff(user)) {
+            courseAccess.requireCourseStaffAccess(user, UUID.fromString(thread.courseId()));
+        } else {
             courseAccess.requireCourseAccess(user, UUID.fromString(thread.courseId()));
         }
         CreateCommentRequestDto trusted = new CreateCommentRequestDto(callerId(user), request.body());
@@ -82,6 +90,8 @@ public class DiscussionController {
     public DiscussionThreadDto acceptComment(@PathVariable UUID threadId, @PathVariable UUID commentId,
                                              CurrentUser user) {
         requireStaff(user);
+        DiscussionThreadDto thread = discussions.getThread(threadId);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(thread.courseId()));
         return discussions.acceptComment(threadId, commentId);
     }
 
@@ -100,6 +110,10 @@ public class DiscussionController {
     }
 
     private boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole("ADMIN", "INSTRUCTOR");
+        return user != null && user.hasAnyRole("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA");
+    }
+
+    private boolean isPlatformAdmin(CurrentUser user) {
+        return user != null && user.hasPlatformRole("ADMIN");
     }
 }

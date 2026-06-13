@@ -1,24 +1,25 @@
 -- liquibase formatted sql
 
 -- changeset courseflow:identity-002-security-hardening
+--validCheckSum 9:ebec43560ed9f447d304526197e98385
 -- Security hardening for production identity authority:
 -- - access-token revocation by jti and user-wide cutoff
 -- - durable audit events for auth and role mutation activity
 
 ALTER TABLE users
-    ADD COLUMN access_tokens_valid_after TIMESTAMPTZ;
+    ADD COLUMN IF NOT EXISTS access_tokens_valid_after TIMESTAMPTZ;
 
-CREATE TABLE revoked_access_tokens (
+CREATE TABLE IF NOT EXISTS revoked_access_tokens (
     jti          VARCHAR(80)  PRIMARY KEY,
     user_id      BIGINT       REFERENCES users(id) ON DELETE CASCADE,
     expires_at   TIMESTAMPTZ  NOT NULL,
     revoked_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     reason       VARCHAR(80)  NOT NULL
 );
-CREATE INDEX idx_revoked_access_tokens_user ON revoked_access_tokens(user_id);
-CREATE INDEX idx_revoked_access_tokens_expires ON revoked_access_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_revoked_access_tokens_user ON revoked_access_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_revoked_access_tokens_expires ON revoked_access_tokens(expires_at);
 
-CREATE TABLE security_audit_logs (
+CREATE TABLE IF NOT EXISTS security_audit_logs (
     id          BIGSERIAL    PRIMARY KEY,
     event_type  VARCHAR(80)  NOT NULL,
     user_id     BIGINT       REFERENCES users(id) ON DELETE SET NULL,
@@ -28,8 +29,8 @@ CREATE TABLE security_audit_logs (
     detail      VARCHAR(255),
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_security_audit_logs_user_created ON security_audit_logs(user_id, created_at DESC);
-CREATE INDEX idx_security_audit_logs_event_created ON security_audit_logs(event_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_audit_logs_user_created ON security_audit_logs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_audit_logs_event_created ON security_audit_logs(event_type, created_at DESC);
 
 -- Role assignment mutation is intentionally ADMIN-only in JwtIdentityFilter.
 -- Keep the permission catalog honest so ORG_ADMIN does not advertise a capability it cannot use.

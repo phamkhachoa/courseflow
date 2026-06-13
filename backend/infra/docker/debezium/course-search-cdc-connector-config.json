@@ -1,0 +1,21 @@
+{
+  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+  "database.hostname": "postgres",
+  "database.port": "5432",
+  "database.user": "courseflow",
+  "database.password": "courseflow",
+  "database.dbname": "cf_course",
+  "topic.prefix": "courseflow.course",
+  "plugin.name": "pgoutput",
+  "slot.name": "courseflow_course_search_cdc",
+  "publication.name": "courseflow_course_search_cdc_publication",
+  "table.include.list": "public.courses",
+  "snapshot.mode": "initial",
+  "tombstones.on.delete": "false",
+  "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "key.converter.schemas.enable": "false",
+  "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+  "value.converter.schemas.enable": "false",
+  "topic.creation.default.replication.factor": "1",
+  "topic.creation.default.partitions": "3"
+}

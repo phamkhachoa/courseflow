@@ -19,7 +19,6 @@ import { listMyEnrollments } from "@/features/enrollments/api";
 import { clientFetch } from "@/shared/api/client";
 import { Badge, Button, Card, EmptyState, ProgressBar, SelectInput, TextInput, cn } from "@/shared/ui";
 
-const DEFAULT_GRADEBOOK_COURSE_ID = "30000000-0000-0000-0000-000000000002";
 const COURSE_ID_STORAGE_KEY = "courseflow.gradebook.courseId";
 
 type GradeEntry = {
@@ -186,7 +185,7 @@ export function GradebookView() {
 
   useEffect(() => {
     const stored = localStorage.getItem(COURSE_ID_STORAGE_KEY) ?? "";
-    const nextCourseId = queryCourseId || stored || DEFAULT_GRADEBOOK_COURSE_ID;
+    const nextCourseId = queryCourseId || stored;
     setCourseId(nextCourseId);
     setSubmitted(nextCourseId);
     setHydrated(true);
@@ -266,7 +265,11 @@ export function GradebookView() {
   function selectCourse(nextCourseId: string) {
     setCourseId(nextCourseId);
     setSubmitted(nextCourseId);
-    localStorage.setItem(COURSE_ID_STORAGE_KEY, nextCourseId);
+    if (nextCourseId) {
+      localStorage.setItem(COURSE_ID_STORAGE_KEY, nextCourseId);
+    } else {
+      localStorage.removeItem(COURSE_ID_STORAGE_KEY);
+    }
   }
 
   function courseTitle(courseIdValue: string): string {
@@ -311,6 +314,7 @@ export function GradebookView() {
                 onChange={(e) => selectCourse(e.target.value)}
                 className="mt-2"
               >
+                <option value="">Chọn khóa học</option>
                 {enrolledCourseIds.map((courseIdValue) => (
                   <option key={courseIdValue} value={courseIdValue}>
                     {courseTitle(courseIdValue)}
@@ -375,6 +379,13 @@ export function GradebookView() {
           </span>
         </p>
       </Card>
+
+      {!submitted && (
+        <EmptyState
+          title="Chọn khóa học để xem bảng điểm"
+          description="Bảng điểm chỉ tải sau khi bạn chọn một khóa từ danh sách ghi danh hoặc nhập Course ID hợp lệ."
+        />
+      )}
 
       {isFetching && <p className="text-ink-500">Đang tải bảng điểm...</p>}
       {isError && <p className="text-red-600">Không tải được điểm. Backend có thể chưa chạy.</p>}

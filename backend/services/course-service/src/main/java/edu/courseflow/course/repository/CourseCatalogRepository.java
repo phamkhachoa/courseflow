@@ -5,6 +5,7 @@ import edu.courseflow.course.dto.CourseDtos.AddCourseMaterialRequestDto;
 import edu.courseflow.course.dto.CourseDtos.CourseDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMaterialDto;
 import edu.courseflow.course.dto.CourseDtos.CreateCourseRequestDto;
+import edu.courseflow.course.dto.CourseDtos.CourseMetadataDto;
 import edu.courseflow.course.mapper.CourseMapper;
 import edu.courseflow.course.model.Course;
 import edu.courseflow.course.model.CourseMaterial;
@@ -39,12 +40,33 @@ public class CourseCatalogRepository {
         return rows.stream().map(this::toCourseDto).toList();
     }
 
+    public List<CourseDto> listOwned(String ownerId, Optional<String> status) {
+        List<Course> rows = status
+                .map(s -> courses.findByOwnerIdAndStatusOrderByCreatedAtDescTitleAsc(ownerId, s))
+                .orElseGet(() -> courses.findByOwnerIdOrderByCreatedAtDescTitleAsc(ownerId));
+        return rows.stream().map(this::toCourseDto).toList();
+    }
+
+    public List<CourseDto> listByDepartmentIds(List<UUID> departmentIds, Optional<String> status) {
+        if (departmentIds == null || departmentIds.isEmpty()) {
+            return List.of();
+        }
+        List<Course> rows = status
+                .map(s -> courses.findByDepartmentIdInAndStatusOrderByCreatedAtDescTitleAsc(departmentIds, s))
+                .orElseGet(() -> courses.findByDepartmentIdInOrderByCreatedAtDescTitleAsc(departmentIds));
+        return rows.stream().map(this::toCourseDto).toList();
+    }
+
     public List<CourseDto> listPublished() {
         return list(Optional.of("PUBLISHED"));
     }
 
     public Optional<CourseDto> findById(UUID courseId) {
         return courses.findById(courseId).map(this::toCourseDto);
+    }
+
+    public Optional<CourseMetadataDto> metadata(UUID courseId) {
+        return courses.findById(courseId).map(mapper::toMetadataDto);
     }
 
     public Optional<CourseDto> findPublishedBySlug(String slug) {

@@ -2,8 +2,10 @@ package edu.courseflow.identity.controller;
 
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.identity.dto.CreateUserRequestDto;
+import edu.courseflow.identity.dto.DeactivateUserRequestDto;
 import edu.courseflow.identity.dto.ResetPasswordRequestDto;
 import edu.courseflow.identity.dto.UserDto;
+import edu.courseflow.identity.dto.UserPrivacyExportDto;
 import edu.courseflow.identity.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -64,5 +66,17 @@ public class UserController {
     @PutMapping("/{id}/email-verification")
     public ResponseEntity<UserDto> verifyEmail(@PathVariable Long id, CurrentUser caller) {
         return ResponseEntity.ok(userService.markEmailVerified(id, caller));
+    }
+
+    @GetMapping("/{id}/privacy-export")
+    public ResponseEntity<UserPrivacyExportDto> privacyExport(@PathVariable Long id, CurrentUser caller) {
+        return ResponseEntity.ok(userService.exportPrivacy(id, caller));
+    }
+
+    @PostMapping("/{id}/deactivate")
+    public ResponseEntity<UserDto> deactivate(@PathVariable Long id,
+            @Valid @RequestBody DeactivateUserRequestDto request,
+            CurrentUser caller) {
+        return ResponseEntity.ok(userService.deactivate(id, request, caller));
     }
 }

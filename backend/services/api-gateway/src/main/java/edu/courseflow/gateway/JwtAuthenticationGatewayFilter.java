@@ -5,13 +5,16 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.crypto.SecretKey;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,7 +29,8 @@ import reactor.core.publisher.Mono;
  * <ol>
  *   <li>strips any client-supplied {@code X-User-*} headers so identity cannot be spoofed;</li>
  *   <li>validates the Bearer JWT (HS256, shared secret with identity-service);</li>
- *   <li>forwards a verified identity to downstream services via {@code X-User-*} headers.</li>
+ *   <li>forwards a verified identity to downstream services via {@code X-User-*} headers and an
+ *       internal {@code X-Service-Token} attestation header.</li>
  * </ol>
  * Downstream services are only reachable through the gateway (network isolation) and may read
  * these headers as trusted, e.g. via {@code CurrentUserArgumentResolver} in common-library.
@@ -38,7 +42,8 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/auth/refresh",
-            "/api/v1/auth/password/change"
+            "/api/v1/auth/email/verify",
+            "/api/v1/auth/email/resend"
     );
 
     /** Roles allowed through the operator-gated edge (user administration). */
@@ -49,9 +54,17 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             List.of("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA", "STUDENT");
 
     private final SecretKey secretKey;
+    private final String serviceToken;
 
-    public JwtAuthenticationGatewayFilter(JwtSecretProperties jwtSecretProperties) {
+    @Autowired
+    public JwtAuthenticationGatewayFilter(JwtSecretProperties jwtSecretProperties,
+            @Value("${courseflow.security.service-token:}") String serviceToken) {
         this.secretKey = jwtSecretProperties.secretKey();
+        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
+    }
+
+    JwtAuthenticationGatewayFilter(JwtSecretProperties jwtSecretProperties) {
+        this(jwtSecretProperties, "");
     }
 
     @Override
@@ -64,8 +77,9 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             headers.remove(GatewayHeaders.USER_ID);
             headers.remove(GatewayHeaders.USER_ROLE);
             headers.remove(GatewayHeaders.USER_ROLES);
+            headers.remove(GatewayHeaders.USER_ROLE_SCOPES);
             headers.remove(GatewayHeaders.USER_EMAIL);
-            headers.remove("X-Service-Token");
+            headers.remove(GatewayHeaders.SERVICE_TOKEN);
         });
 
         if (isPublic(path, request.getMethod().name())) {
@@ -91,7 +105,10 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             }
 
             // identity-service issues a `roles` claim: an array of {code, scopeType, scopeId}.
-            Set<String> roleCodes = extractRoleCodes(claims);
+            List<RoleClaim> roleClaims = extractRoleClaims(claims);
+            Set<String> roleCodes = roleClaims.stream()
+                    .map(RoleClaim::code)
+                    .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
             if (roleCodes.isEmpty()) {
                 return unauthorized(exchange, "Token carries no roles");
             }
@@ -104,7 +121,11 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             builder.header(GatewayHeaders.USER_ID, userId)
                     .header(GatewayHeaders.USER_ROLE, primaryRole)
                     .header(GatewayHeaders.USER_ROLES, String.join(",", roleCodes))
+                    .header(GatewayHeaders.USER_ROLE_SCOPES, encodeRoleScopes(roleClaims))
                     .header(GatewayHeaders.USER_EMAIL, email);
+            if (!serviceToken.isBlank()) {
+                builder.header(GatewayHeaders.SERVICE_TOKEN, serviceToken);
+            }
 
             return chain.filter(exchange.mutate().request(builder.build()).build());
         } catch (JwtException | IllegalArgumentException ex) {
@@ -152,24 +173,43 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
      * preserved so {@link #primaryRole} can pick deterministically.
      */
     @SuppressWarnings("unchecked")
-    private Set<String> extractRoleCodes(Claims claims) {
+    private List<RoleClaim> extractRoleClaims(Claims claims) {
         Object raw = claims.get("roles");
         if (!(raw instanceof List<?> list)) {
-            return Set.of();
+            return List.of();
         }
-        Set<String> codes = new LinkedHashSet<>();
+        List<RoleClaim> roles = new java.util.ArrayList<>();
         for (Object element : list) {
             if (element instanceof Map<?, ?> map) {
                 Object code = ((Map<String, Object>) map).get("code");
                 if (code != null && !code.toString().isBlank()) {
-                    codes.add(code.toString());
+                    Object scopeType = ((Map<String, Object>) map).get("scopeType");
+                    Object scopeId = ((Map<String, Object>) map).get("scopeId");
+                    roles.add(new RoleClaim(
+                            code.toString(),
+                            scopeType == null ? "PLATFORM" : scopeType.toString(),
+                            scopeId == null ? null : scopeId.toString()));
                 }
             } else if (element != null && !element.toString().isBlank()) {
                 // Tolerate a plain array of code strings.
-                codes.add(element.toString());
+                roles.add(new RoleClaim(element.toString(), "PLATFORM", null));
             }
         }
-        return codes;
+        return roles;
+    }
+
+    private String encodeRoleScopes(List<RoleClaim> roleClaims) {
+        return roleClaims.stream()
+                .map(claim -> encode(claim.code()) + "." + encode(claim.scopeType()) + "." + encode(claim.scopeId()))
+                .collect(java.util.stream.Collectors.joining(","));
+    }
+
+    private String encode(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -204,5 +244,8 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
     public int getOrder() {
         // Right after correlation-id propagation.
         return Ordered.HIGHEST_PRECEDENCE + 1;
+    }
+
+    private record RoleClaim(String code, String scopeType, String scopeId) {
     }
 }

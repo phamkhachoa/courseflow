@@ -15,6 +15,9 @@ public final class NotificationDtos {
             String title,
             String body,
             Instant readAt,
+            String deliveryStatus,
+            Instant deliveredAt,
+            String deliveryError,
             Instant createdAt
     ) {
     }

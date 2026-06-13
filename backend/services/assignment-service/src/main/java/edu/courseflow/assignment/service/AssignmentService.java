@@ -3,6 +3,7 @@ package edu.courseflow.assignment.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentReadinessDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.AttachmentRef;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
@@ -13,7 +14,9 @@ import edu.courseflow.assignment.dto.AssignmentDtos.RubricDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmissionDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmitAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.UpsertRubricRequestDto;
+import edu.courseflow.assignment.model.AttachmentUploadGrant;
 import edu.courseflow.assignment.repository.AssignmentRepository;
+import edu.courseflow.assignment.repository.AttachmentUploadGrantJpaRepository;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.security.CourseAccessClient;
@@ -42,15 +45,18 @@ public class AssignmentService {
     private final ObjectStorageClient storage;
     private final ObjectMapper objectMapper;
     private final CourseAccessClient courseAccess;
+    private final AttachmentUploadGrantJpaRepository uploadGrants;
 
     public AssignmentService(AssignmentRepository assignments,
             ObjectStorageClient storage,
             ObjectMapper objectMapper,
-            CourseAccessClient courseAccess) {
+            CourseAccessClient courseAccess,
+            AttachmentUploadGrantJpaRepository uploadGrants) {
         this.assignments = assignments;
         this.storage = storage;
         this.objectMapper = objectMapper;
         this.courseAccess = courseAccess;
+        this.uploadGrants = uploadGrants;
     }
 
     // ---------- Reads ----------
@@ -59,9 +65,21 @@ public class AssignmentService {
         return assignments.listByCourse(courseId);
     }
 
+    public List<AssignmentDto> listVisibleByCourse(UUID courseId) {
+        Instant now = Instant.now();
+        return assignments.listByCourse(courseId).stream()
+                .filter(assignment -> isLearnerVisible(assignment, now))
+                .toList();
+    }
+
     public AssignmentDto get(UUID assignmentId) {
         return assignments.find(assignmentId)
                 .orElseThrow(() -> new NotFoundException("Assignment not found: " + assignmentId));
+    }
+
+    public AssignmentReadinessDto readiness(UUID assignmentId) {
+        AssignmentDto assignment = get(assignmentId);
+        return new AssignmentReadinessDto(assignment.id(), assignment.courseId(), assignment.status());
     }
 
     public List<SubmissionDto> listSubmissions(UUID assignmentId, String studentId) {
@@ -82,18 +100,30 @@ public class AssignmentService {
     }
 
     @Transactional
+    public AssignmentDto publish(UUID assignmentId) {
+        get(assignmentId);
+        return assignments.updateStatus(assignmentId, "PUBLISHED");
+    }
+
+    @Transactional
+    public AssignmentDto draft(UUID assignmentId) {
+        get(assignmentId);
+        return assignments.updateStatus(assignmentId, "DRAFT");
+    }
+
+    @Transactional
+    public AssignmentDto archive(UUID assignmentId) {
+        get(assignmentId);
+        return assignments.updateStatus(assignmentId, "ARCHIVED");
+    }
+
+    @Transactional
     public SubmissionDto submit(UUID assignmentId, String studentId, SubmitAssignmentRequestDto request) {
         AssignmentDto assignment = get(assignmentId);
         courseAccess.requireStudentCourseAccess(studentId, UUID.fromString(assignment.courseId()));
         Instant now = Instant.now();
-
-        if (assignment.availableAt() != null && now.isBefore(assignment.availableAt())) {
-            throw new BadRequestException("ASSIGNMENT_NOT_AVAILABLE_YET");
-        }
-        if (assignment.lockAt() != null && now.isAfter(assignment.lockAt())) {
-            throw new BadRequestException("ASSIGNMENT_LOCKED");
-        }
-        validateSubmissionPayload(assignment, request);
+        requireLearnerOpen(assignment, now);
+        List<AttachmentRef> trustedAttachments = validateSubmissionPayload(assignment, studentId, request);
 
         int nextAttempt = assignments.nextAttemptNo(assignmentId, studentId);
         if (nextAttempt > 1 && !assignment.allowResubmission()) {
@@ -111,7 +141,8 @@ public class AssignmentService {
         SubmissionDto submission = assignments.insertSubmission(assignmentId, studentId, nextAttempt,
                 request.submissionText(), request.submissionUrl(),
                 isLate, minutesLate,
-                request.attachments());
+                trustedAttachments);
+        consumeAttachmentGrants(assignmentId, studentId, trustedAttachments, UUID.fromString(submission.id()), now);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("eventId", UUID.randomUUID().toString());
@@ -124,6 +155,34 @@ public class AssignmentService {
         payload.put("submittedAt", submission.submittedAt().toString());
         assignments.outbox(UUID.fromString(submission.id()), "submission", "submission.created", toJson(payload));
         return submission;
+    }
+
+    private void requireLearnerOpen(AssignmentDto assignment, Instant now) {
+        if (!isPublishedOrActive(assignment.status())) {
+            throw new BadRequestException("ASSIGNMENT_NOT_PUBLISHED");
+        }
+        if (assignment.availableAt() != null && now.isBefore(assignment.availableAt())) {
+            throw new BadRequestException("ASSIGNMENT_NOT_AVAILABLE_YET");
+        }
+        if (assignment.lockAt() != null && now.isAfter(assignment.lockAt())) {
+            throw new BadRequestException("ASSIGNMENT_LOCKED");
+        }
+    }
+
+    public void requireLearnerVisible(AssignmentDto assignment) {
+        if (!isLearnerVisible(assignment, Instant.now())) {
+            throw new BadRequestException("ASSIGNMENT_NOT_AVAILABLE");
+        }
+    }
+
+    private boolean isLearnerVisible(AssignmentDto assignment, Instant now) {
+        return isPublishedOrActive(assignment.status())
+                && (assignment.availableAt() == null || !now.isBefore(assignment.availableAt()))
+                && (assignment.lockAt() == null || !now.isAfter(assignment.lockAt()));
+    }
+
+    private boolean isPublishedOrActive(String status) {
+        return "PUBLISHED".equalsIgnoreCase(status) || "ACTIVE".equalsIgnoreCase(status);
     }
 
     @Transactional
@@ -178,26 +237,46 @@ public class AssignmentService {
 
     // ---------- Storage (MinIO direct upload) ----------
 
-    public PresignedUploadDto presignUpload(UUID assignmentId, RequestUploadUrlDto req) {
-        get(assignmentId);
-        String key = storage.buildKey(STORAGE_PREFIX + "/" + assignmentId, req.fileName());
-        PresignedUrl presigned = storage.presignPut(key, req.contentType());
+    public PresignedUploadDto presignUpload(UUID assignmentId, String studentId, RequestUploadUrlDto req) {
+        AssignmentDto assignment = get(assignmentId);
+        requireLearnerOpen(assignment, Instant.now());
+        String fileName = safeFileName(req.fileName());
+        String contentType = normalizeContentType(req.contentType());
+        String key = storage.buildKey(STORAGE_PREFIX + "/" + assignmentId + "/" + studentId, fileName);
+        PresignedUrl presigned = storage.presignPut(key, contentType);
+        uploadGrants.save(new AttachmentUploadGrant(
+                assignmentId,
+                studentId,
+                presigned.storageKey(),
+                fileName,
+                contentType,
+                null,
+                presigned.expiresAt()));
         return new PresignedUploadDto(presigned.storageKey(), presigned.url(), presigned.expiresAt());
     }
 
-    public AttachmentRef proxyUpload(UUID assignmentId, MultipartFile file) {
-        get(assignmentId);
+    public AttachmentRef proxyUpload(UUID assignmentId, String studentId, MultipartFile file) {
+        AssignmentDto assignment = get(assignmentId);
+        requireLearnerOpen(assignment, Instant.now());
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("Uploaded file is empty");
         }
-        String fileName = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
-        String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
-        String key = storage.buildKey(STORAGE_PREFIX + "/" + assignmentId, fileName);
+        String fileName = safeFileName(file.getOriginalFilename());
+        String contentType = normalizeContentType(file.getContentType());
+        String key = storage.buildKey(STORAGE_PREFIX + "/" + assignmentId + "/" + studentId, fileName);
         try {
             storage.put(key, file.getInputStream(), file.getSize(), contentType);
         } catch (IOException ex) {
             throw new BadRequestException("Failed to read uploaded file: " + ex.getMessage());
         }
+        uploadGrants.save(new AttachmentUploadGrant(
+                assignmentId,
+                studentId,
+                key,
+                fileName,
+                contentType,
+                file.getSize(),
+                null));
         return new AttachmentRef(null, fileName, key, contentType, file.getSize());
     }
 
@@ -213,7 +292,8 @@ public class AssignmentService {
 
     // ---------- Helpers ----------
 
-    private void validateSubmissionPayload(AssignmentDto assignment, SubmitAssignmentRequestDto request) {
+    private List<AttachmentRef> validateSubmissionPayload(AssignmentDto assignment, String studentId,
+            SubmitAssignmentRequestDto request) {
         List<String> allowed = List.of(assignment.submissionTypes().split(","));
         boolean hasFile = request.attachments() != null && !request.attachments().isEmpty();
         boolean hasText = request.submissionText() != null && !request.submissionText().isBlank();
@@ -231,6 +311,60 @@ public class AssignmentService {
         if (hasUrl && allowed.stream().noneMatch(t -> t.trim().equalsIgnoreCase("URL"))) {
             throw new BadRequestException("URL_SUBMISSION_NOT_ALLOWED");
         }
+        return hasFile
+                ? authorizeSubmissionAttachments(UUID.fromString(assignment.id()), studentId, request.attachments())
+                : List.of();
+    }
+
+    private List<AttachmentRef> authorizeSubmissionAttachments(UUID assignmentId, String studentId,
+            List<AttachmentRef> attachments) {
+        return attachments.stream()
+                .map(ref -> {
+                    if (ref == null || ref.storageKey() == null || ref.storageKey().isBlank()) {
+                        throw new BadRequestException("ATTACHMENT_STORAGE_KEY_REQUIRED");
+                    }
+                    AttachmentUploadGrant grant = uploadGrants
+                            .findByAssignmentIdAndStudentIdAndStorageKey(assignmentId, studentId, ref.storageKey())
+                            .orElseThrow(() -> new BadRequestException("ATTACHMENT_UPLOAD_NOT_OWNED"));
+                    if (grant.isConsumed()) {
+                        throw new BadRequestException("ATTACHMENT_UPLOAD_ALREADY_USED");
+                    }
+                    if (!storage.exists(grant.getStorageKey())) {
+                        throw new BadRequestException("ATTACHMENT_UPLOAD_NOT_FOUND");
+                    }
+                    return new AttachmentRef(
+                            ref.mediaAssetId(),
+                            grant.getFileName(),
+                            grant.getStorageKey(),
+                            grant.getContentType(),
+                            grant.getSizeBytes() == null ? ref.sizeBytes() : grant.getSizeBytes());
+                })
+                .toList();
+    }
+
+    private void consumeAttachmentGrants(UUID assignmentId, String studentId, List<AttachmentRef> attachments,
+            UUID submissionId, Instant consumedAt) {
+        for (AttachmentRef ref : attachments) {
+            uploadGrants.findByAssignmentIdAndStudentIdAndStorageKey(assignmentId, studentId, ref.storageKey())
+                    .ifPresent(grant -> {
+                        grant.consume(submissionId, consumedAt);
+                        uploadGrants.save(grant);
+                    });
+        }
+    }
+
+    private String safeFileName(String fileName) {
+        String safe = fileName == null ? "" : fileName.trim();
+        if (safe.isBlank()) {
+            return "file";
+        }
+        return safe.replaceAll("[\\\\/]+", "_");
+    }
+
+    private String normalizeContentType(String contentType) {
+        return contentType == null || contentType.isBlank()
+                ? "application/octet-stream"
+                : contentType.trim();
     }
 
     private BigDecimal resolveRawScore(AssignmentDto assignment, SubmissionDto submission,

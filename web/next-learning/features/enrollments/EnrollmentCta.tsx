@@ -22,7 +22,7 @@ function isActiveEnrollment(status?: string) {
 export function EnrollmentCta({ courseId, courseSlug, className, inverse = false }: EnrollmentCtaProps) {
   const qc = useQueryClient();
   const [session, setSession] = useState<StoredSession | null>(null);
-  const moduleHref = `/courses/${courseSlug}/modules?courseId=${courseId}`;
+  const moduleHref = `/courses/${courseSlug}/modules`;
   const loginHref = `/login?next=${encodeURIComponent(moduleHref)}`;
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import edu.courseflow.certificate.service.CertificateService;
 import edu.courseflow.certificate.dto.CertificateVerificationDto;
 import edu.courseflow.certificate.dto.IssueCertificateRequestDto;
 import edu.courseflow.certificate.dto.RevokeCertificateRequestDto;
+import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -23,12 +24,17 @@ import java.util.UUID;
 public class CertificateController {
 
     private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_ORG_ADMIN = "ORG_ADMIN";
+    private static final String ROLE_TA = "TA";
     private static final String ROLE_INSTRUCTOR = "INSTRUCTOR";
+    private static final String ROLE_PROFESSOR = "PROFESSOR";
 
     private final CertificateService certificates;
+    private final CourseAccessClient courseAccess;
 
-    public CertificateController(CertificateService certificates) {
+    public CertificateController(CertificateService certificates, CourseAccessClient courseAccess) {
         this.certificates = certificates;
+        this.courseAccess = courseAccess;
     }
 
     @GetMapping("/verify/{code}")
@@ -38,6 +44,7 @@ public class CertificateController {
                 && String.valueOf(user.id()).equals(certificate.studentId());
         if (!owner) {
             requirePrivileged(user);
+            courseAccess.requireCourseStaffAccess(user, UUID.fromString(certificate.courseId()));
         }
         return certificate;
     }
@@ -55,6 +62,7 @@ public class CertificateController {
     public CertificateVerificationDto issue(@Valid @RequestBody IssueCertificateRequestDto request,
                                             CurrentUser user) {
         requirePrivileged(user);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(request.courseId()));
         IssueCertificateRequestDto trusted = new IssueCertificateRequestDto(
                 request.studentId(), request.courseId(), request.finalGrade(), actorId(user));
         return certificates.issue(trusted);
@@ -69,13 +77,15 @@ public class CertificateController {
                                              @Valid @RequestBody RevokeCertificateRequestDto request,
                                              CurrentUser user) {
         requirePrivileged(user);
+        courseAccess.requireCourseStaffAccess(user, certificates.courseIdForCertificate(certificateId));
         return certificates.revoke(certificateId, actorId(user), request.reason());
     }
 
     private void requirePrivileged(CurrentUser user) {
-        if (user == null || user.id() == null || !user.hasAnyRole(ROLE_ADMIN, ROLE_INSTRUCTOR)) {
+        if (user == null || user.id() == null
+                || !user.hasAnyRole(ROLE_ADMIN, ROLE_ORG_ADMIN, ROLE_TA, ROLE_INSTRUCTOR, ROLE_PROFESSOR)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "Only ADMIN or INSTRUCTOR may issue or revoke certificates");
+                    "Only course staff may issue or revoke certificates");
         }
     }
 

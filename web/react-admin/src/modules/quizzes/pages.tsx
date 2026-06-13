@@ -33,7 +33,7 @@ import {
   Textarea,
   Th
 } from "@/shared/ui";
-import { fallbackCourses, listCourses } from "@/modules/courses/api";
+import { listCourses } from "@/modules/courses/api";
 import type { Course } from "@/modules/courses/types";
 import { listUsers, type AdminUser } from "@/modules/identity/api";
 import {
@@ -670,18 +670,17 @@ export function QuizzesPage() {
     staleTime: 60_000
   });
 
-  const courseRows = courses.data as Course[] | undefined;
+  const courseRows = (courses.data ?? []) as Course[];
   const userById = useMemo(
     () => new Map((users.data ?? []).map((user) => [String(user.id), user])),
     [users.data]
   );
-  const hasLoadedCourses = Boolean(courseRows?.length);
-  const availableCourses = hasLoadedCourses ? courseRows! : fallbackCourses;
+  const availableCourses = courseRows;
   const requestedCourseId = searchParams.get("courseId") ?? "";
 
   useEffect(() => {
     if (!availableCourses.length) return;
-    if (requestedCourseId && courses.isLoading && !hasLoadedCourses) return;
+    if (requestedCourseId && courses.isLoading) return;
 
     const firstCourseId = availableCourses[0].id;
     const requestedCourseExists = availableCourses.some((course) => course.id === requestedCourseId);
@@ -703,7 +702,7 @@ export function QuizzesPage() {
       setSelectedCourseId(firstCourseId);
       setSearchParams({ courseId: firstCourseId }, { replace: true });
     }
-  }, [availableCourses, courses.isLoading, hasLoadedCourses, requestedCourseId, selectedCourseId, setSearchParams]);
+  }, [availableCourses, courses.isLoading, requestedCourseId, selectedCourseId, setSearchParams]);
 
   const quizzes = useQuery({
     queryKey: queryKeys.quizzes.list(selectedCourseId),
@@ -835,7 +834,7 @@ export function QuizzesPage() {
           <Card>
             <CardHeader
               title="Khóa học"
-              subtitle={courses.isError ? "Đang dùng dữ liệu dự phòng khi API khóa học lỗi" : "Chọn khóa học để quản lý bài thi"}
+              subtitle={courses.isError ? "Không tải được catalog khóa học" : "Chọn khóa học để quản lý bài thi"}
             />
             <div className="space-y-4 p-4">
               <FormField label="Khóa học" htmlFor="course-select">
@@ -849,6 +848,7 @@ export function QuizzesPage() {
                     setSearchParams({ courseId: nextCourseId });
                   }}
                 >
+                  <option value="">Chọn khóa học</option>
                   {availableCourses.map((course: Course) => (
                     <option key={course.id} value={course.id}>
                       {course.code ? `${course.code} - ${course.title}` : course.title}
@@ -856,6 +856,7 @@ export function QuizzesPage() {
                   ))}
                 </Select>
               </FormField>
+              {courses.isError && <ErrorState error={courses.error} />}
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <Metric label="Bài thi" value={quizCount} />
                 <Metric label="Câu hỏi" value={questionCount} />
@@ -879,7 +880,7 @@ export function QuizzesPage() {
                     id="quiz-search"
                     value={quizSearch}
                     onChange={(event) => setQuizSearch(event.target.value)}
-                    placeholder="Tên bài thi hoặc ID"
+                    placeholder="Tên bài thi"
                   />
                 </FormField>
                 <div className="flex flex-wrap gap-2">
@@ -953,18 +954,6 @@ export function QuizzesPage() {
                   {attemptId && !selectedAttempt && <option value={attemptId}>Attempt {compactId(attemptId)}</option>}
                 </Select>
               </FormField>
-              <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                <summary className="cursor-pointer font-semibold text-slate-700">Nhập Attempt ID thủ công</summary>
-                <FormField label="Attempt ID" htmlFor="attempt-id-manual">
-                  <Input
-                    id="attempt-id-manual"
-                    className="mt-3"
-                    value={attemptId}
-                    onChange={(e) => setAttemptId(e.target.value.trim())}
-                    placeholder="UUID lượt làm"
-                  />
-                </FormField>
-              </details>
               <div>
                 <Button type="submit" variant="secondary" disabled={!attemptId}>
                   <Search size={16} /> Xem
@@ -1907,7 +1896,7 @@ export function EffectiveScorePage() {
     queryFn: listUsers,
     staleTime: 60_000
   });
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const userRows = users.data ?? [];
   const userById = useMemo(() => new Map(userRows.map((user) => [String(user.id), user])), [userRows]);
   const selectedCourse = courseRows.find((course) => course.id === courseId);
@@ -1937,7 +1926,7 @@ export function EffectiveScorePage() {
 
   function lookup(e: FormEvent) {
     e.preventDefault();
-    setSubmitted({ quizId: quizId.trim(), studentId: studentId.trim() });
+    setSubmitted({ quizId, studentId });
   }
 
   return (
@@ -1966,6 +1955,7 @@ export function EffectiveScorePage() {
               }}
               required
             >
+              <option value="">Chọn khóa học</option>
               {courseRows.map((course) => (
                 <option key={course.id} value={course.id}>
                   {course.code ? `${course.code} · ${course.title}` : course.title}
@@ -1981,7 +1971,6 @@ export function EffectiveScorePage() {
                   {quiz.title} · {quizStatusLabel(quiz.status)}
                 </option>
               ))}
-              {quizId && !selectedQuiz && <option value={quizId}>Quiz {compactId(quizId)}</option>}
             </Select>
           </FormField>
           <FormField label="Học viên" htmlFor="es-student">
@@ -1992,30 +1981,10 @@ export function EffectiveScorePage() {
                   {userLabel(userById, user.id)}
                 </option>
               ))}
-              {studentId && !selectedLearner && <option value={studentId}>Học viên {compactId(studentId)}</option>}
             </Select>
           </FormField>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập ID thủ công</summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <FormField label="Quiz ID" htmlFor="es-quiz-manual">
-                <Input
-                  id="es-quiz-manual"
-                  value={quizId}
-                  onChange={(e) => setQuizId(e.target.value.trim())}
-                  placeholder="UUID bài thi"
-                />
-              </FormField>
-              <FormField label="Học viên ID" htmlFor="es-student-manual">
-                <Input
-                  id="es-student-manual"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value.trim())}
-                  placeholder="ID học viên"
-                />
-              </FormField>
-            </div>
-          </details>
+          {courses.isError && <ErrorState error={courses.error} />}
+          {users.isError && <ErrorState error={users.error} />}
           <Button type="submit" disabled={!quizId || !studentId}>Tra cứu</Button>
         </form>
       </Card>

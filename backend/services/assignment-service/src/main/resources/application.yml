@@ -16,7 +16,7 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
   servlet:
@@ -24,6 +24,8 @@ spring:
       max-file-size: ${ASSIGNMENT_MAX_FILE_SIZE:200MB}
       max-request-size: ${ASSIGNMENT_MAX_REQUEST_SIZE:200MB}
 courseflow:
+  security:
+    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
   storage:
     provider: ${STORAGE_PROVIDER:minio}
     endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
@@ -37,4 +39,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

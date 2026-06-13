@@ -7,12 +7,11 @@ import {
   CardHeader,
   ErrorState,
   FormField,
-  Input,
   PageHeader,
   Select,
   Spinner
 } from "@/shared/ui";
-import { fallbackCourses, listCourses } from "../courses/api";
+import { listCourses } from "../courses/api";
 import { listDepartments } from "../organization/api";
 import { getCourseMetrics, recomputeMetrics, getCourseCompletion, getOrgDashboard } from "./api";
 
@@ -55,7 +54,7 @@ export function AnalyticsPage() {
     retry: 1,
     staleTime: 60_000
   });
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const courseById = useMemo(() => new Map(courseRows.map((course) => [course.id, course])), [courseRows]);
   const departmentRows = departments.data ?? [];
   const departmentById = useMemo(
@@ -110,7 +109,7 @@ export function AnalyticsPage() {
           className="grid gap-3 p-4 lg:grid-cols-[1fr_auto]"
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            setSubmitted(courseId.trim());
+            setSubmitted(courseId);
           }}
         >
           <FormField label="Khóa học" htmlFor="an-course">
@@ -127,24 +126,13 @@ export function AnalyticsPage() {
           <div className="flex items-end">
             <Button type="submit">Xem chỉ số</Button>
           </div>
+          {courses.isError && <ErrorState error={courses.error} />}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 lg:col-span-2">
             <p className="font-semibold text-slate-900">{courseLabel(selectedCourse, courseId)}</p>
             <p className="mt-1 line-clamp-2">
               {selectedCourse?.summary ?? "Chọn khóa học để tải metric học tập và tính lại chỉ số khi cần."}
             </p>
           </div>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600 lg:col-span-2">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập Course ID</summary>
-            <FormField label="Course ID" htmlFor="an-course-manual">
-              <Input
-                id="an-course-manual"
-                className="mt-3"
-                value={courseId}
-                onChange={(e) => setCourseId(e.target.value.trim())}
-                placeholder="UUID khóa học"
-              />
-            </FormField>
-          </details>
         </form>
       </Card>
 
@@ -175,7 +163,7 @@ export function AnalyticsPage() {
             className="grid gap-3 p-4 lg:grid-cols-[1fr_auto]"
             onSubmit={(e: FormEvent) => {
               e.preventDefault();
-              setSubmittedCompletion(completionCourseId.trim());
+              setSubmittedCompletion(completionCourseId);
             }}
           >
             <FormField label="Khóa học" htmlFor="an-completion-course">
@@ -202,18 +190,7 @@ export function AnalyticsPage() {
               </Button>
               <Button type="submit">Xem</Button>
             </div>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600 lg:col-span-2">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập Course ID</summary>
-              <FormField label="Course ID" htmlFor="an-completion-course-manual">
-                <Input
-                  id="an-completion-course-manual"
-                  className="mt-3"
-                  value={completionCourseId}
-                  onChange={(e) => setCompletionCourseId(e.target.value.trim())}
-                  placeholder="UUID khóa học"
-                />
-              </FormField>
-            </details>
+            {courses.isError && <ErrorState error={courses.error} />}
           </form>
         </Card>
         {completion.isLoading && <Spinner />}
@@ -239,7 +216,7 @@ export function AnalyticsPage() {
             className="grid gap-3 p-4 lg:grid-cols-[1fr_auto]"
             onSubmit={(e: FormEvent) => {
               e.preventDefault();
-              setSubmittedOrg(orgId.trim());
+              setSubmittedOrg(orgId);
             }}
           >
             <FormField label="Tổ chức" htmlFor="an-org">
@@ -256,18 +233,7 @@ export function AnalyticsPage() {
             <div className="flex items-end">
               <Button type="submit">Xem dashboard</Button>
             </div>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600 lg:col-span-2">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập Org ID</summary>
-              <FormField label="Org ID" htmlFor="an-org-manual">
-                <Input
-                  id="an-org-manual"
-                  className="mt-3"
-                  value={orgId}
-                  onChange={(e) => setOrgId(e.target.value.trim())}
-                  placeholder="ID tổ chức"
-                />
-              </FormField>
-            </details>
+            {departments.isError && <ErrorState error={departments.error} />}
           </form>
         </Card>
         {orgDashboard.isLoading && <Spinner />}

@@ -38,5 +38,6 @@ public class CertificateVerification {
 
     public UUID getCertificateId() { return certificateId; }
     public String getVerificationCode() { return verificationCode; }
+    public String getSignature() { return signature; }
     public String getPublicSlug() { return publicSlug; }
 }

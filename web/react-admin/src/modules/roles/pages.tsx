@@ -261,18 +261,6 @@ export function RoleCreatePage() {
               )}
             </Select>
           </FormField>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập Role ID cha thủ công</summary>
-            <FormField label="Role ID cha" htmlFor="role-parent-manual">
-              <Input
-                id="role-parent-manual"
-                className="mt-3"
-                value={form.parentRoleId}
-                onChange={(e) => setForm({ ...form, parentRoleId: e.target.value.trim() })}
-                placeholder="UUID vai trò cha"
-              />
-            </FormField>
-          </details>
           {create.isError && <ErrorState error={create.error} />}
           <div className="flex gap-2">
             <Button type="submit" disabled={create.isPending}>
@@ -454,20 +442,6 @@ export function RoleDetailPage() {
                 )}
               </Select>
             </FormField>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập Role ID cha thủ công</summary>
-              <FormField label="Role ID cha" htmlFor="edit-parent-manual">
-                <Input
-                  id="edit-parent-manual"
-                  className="mt-3"
-                  value={editForm.parentRoleId}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, parentRoleId: e.target.value.trim() })
-                  }
-                  placeholder="UUID vai trò cha"
-                />
-              </FormField>
-            </details>
             {updateMutation.isError && <ErrorState error={updateMutation.error} />}
             <div className="flex gap-2">
               <Button type="submit" disabled={updateMutation.isPending}>
@@ -750,18 +724,6 @@ export function UserAssignmentsPage() {
           <div className="flex items-end">
             <Button type="submit">Tra cứu</Button>
           </div>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 md:col-span-2">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập User ID thủ công</summary>
-            <FormField label="User ID" htmlFor="user-id-manual">
-              <Input
-                id="user-id-manual"
-                className="mt-3"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value.trim())}
-                placeholder="ID người dùng"
-              />
-            </FormField>
-          </details>
         </form>
       </Card>
 
@@ -923,35 +885,6 @@ export function UserAssignmentsPage() {
                   )}
                 </Select>
               </FormField>
-              <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 lg:col-span-2">
-                <summary className="cursor-pointer font-semibold text-slate-700">Nhập ID thủ công</summary>
-                <div className="mt-3 grid gap-3 md:grid-cols-3">
-                  <FormField label="Role ID" htmlFor="assign-role-manual">
-                    <Input
-                      id="assign-role-manual"
-                      value={assignForm.roleId}
-                      onChange={(e) => setAssignForm({ ...assignForm, roleId: e.target.value.trim() })}
-                      placeholder="UUID vai trò"
-                    />
-                  </FormField>
-                  <FormField label="Scope ID" htmlFor="assign-scope-id">
-                    <Input
-                      id="assign-scope-id"
-                      value={assignForm.scopeId}
-                      onChange={(e) => setAssignForm({ ...assignForm, scopeId: e.target.value.trim() })}
-                      placeholder="UUID phạm vi"
-                    />
-                  </FormField>
-                  <FormField label="Granted by" htmlFor="assign-granted-by-manual">
-                    <Input
-                      id="assign-granted-by-manual"
-                      value={assignForm.grantedBy}
-                      onChange={(e) => setAssignForm({ ...assignForm, grantedBy: e.target.value.trim() })}
-                      placeholder="ID admin"
-                    />
-                  </FormField>
-                </div>
-              </details>
               <div className="lg:col-span-2">
                 <Button type="submit" disabled={assignMutation.isPending || !assignForm.roleId}>
                   {assignMutation.isPending ? "Đang phân công..." : "Phân công"}

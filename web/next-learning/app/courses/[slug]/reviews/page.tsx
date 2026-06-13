@@ -56,7 +56,7 @@ export default async function CourseReviewsPage({ params }: Props) {
                 </div>
               </div>
               <LinkButton
-                href={`/courses/${course.slug}/modules?courseId=${course.id}`}
+                href={`/courses/${course.slug}/modules`}
                 variant="inverse"
                 className="mt-5 w-full"
               >

@@ -102,6 +102,7 @@ CREATE TABLE IF NOT EXISTS learner_module_progress (
 -- merged from 003-authoring.sql
 -- ============================================================
 -- changeset courseflow:course-003-authoring
+--validCheckSum 9:c24df443d29fa2a22bacaf2bfa99668c
 -- Instructor authoring: draft versions, review workflow and curriculum editing support.
 
 -- Snapshot of a course's curriculum at a point in time. Lets instructors keep a published
@@ -126,6 +127,9 @@ ALTER TABLE courses ADD COLUMN IF NOT EXISTS current_version_no INT NOT NULL DEF
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS review_state VARCHAR(40) NOT NULL DEFAULT 'DRAFT'; -- DRAFT, IN_REVIEW, APPROVED, REJECTED
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS last_authored_by VARCHAR(64);
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE course_modules ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE course_versions ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
 
 -- ============================================================
 -- merged from 900-demo-data.sql

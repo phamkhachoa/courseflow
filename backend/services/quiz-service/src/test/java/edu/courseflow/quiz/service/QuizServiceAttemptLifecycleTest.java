@@ -4,11 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptDto;
+import edu.courseflow.quiz.dto.QuizDtos.QuizDto;
+import edu.courseflow.quiz.dto.QuizDtos.QuizQuestionDto;
+import edu.courseflow.quiz.dto.QuizDtos.StartAttemptResponseDto;
 import edu.courseflow.quiz.mapper.QuizMapper;
 import edu.courseflow.quiz.model.Quiz;
 import edu.courseflow.quiz.model.QuizAttempt;
@@ -22,6 +26,7 @@ import edu.courseflow.quiz.repository.QuizQuestionRepository;
 import edu.courseflow.quiz.repository.QuizRepository;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +81,7 @@ class QuizServiceAttemptLifecycleTest {
     @Test
     void startAttemptReturnsExistingInProgressAttempt() {
         QuizAttempt existing = attempt(UUID.fromString("c3000000-0000-0000-0000-000000000001"), 1);
+        existing.setQuestionsSnapshot("[]");
 
         when(quizzes.findById(QUIZ_ID)).thenReturn(Optional.of(publishedQuiz()));
         when(attempts.findFirstByQuizIdAndStudentIdAndStatusInOrderByStartedAtDesc(
@@ -83,9 +89,9 @@ class QuizServiceAttemptLifecycleTest {
                 .thenReturn(Optional.of(existing));
         when(mapper.toDto(existing)).thenReturn(toDto(existing));
 
-        QuizAttemptDto result = service.startAttempt(QUIZ_ID, STUDENT_ID);
+        StartAttemptResponseDto result = service.startAttempt(QUIZ_ID, STUDENT_ID);
 
-        assertThat(result.id()).isEqualTo(existing.getId().toString());
+        assertThat(result.attempt().id()).isEqualTo(existing.getId().toString());
         verify(attempts, never()).nextAttemptNo(QUIZ_ID, STUDENT_ID);
         verify(attempts, never()).save(any(QuizAttempt.class));
     }
@@ -99,14 +105,16 @@ class QuizServiceAttemptLifecycleTest {
         when(attempts.nextAttemptNo(QUIZ_ID, STUDENT_ID)).thenReturn(2);
         when(attempts.save(any(QuizAttempt.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(mapper.toDto(any(QuizAttempt.class))).thenAnswer(invocation -> toDto(invocation.getArgument(0)));
+        when(mapper.toDto(any(Quiz.class), org.mockito.ArgumentMatchers.<List<QuizQuestionDto>>any()))
+                .thenAnswer(invocation -> toQuizDto(invocation.getArgument(0), invocation.getArgument(1)));
 
-        QuizAttemptDto result = service.startAttempt(QUIZ_ID, STUDENT_ID);
+        StartAttemptResponseDto result = service.startAttempt(QUIZ_ID, STUDENT_ID);
 
-        assertThat(result.quizId()).isEqualTo(QUIZ_ID.toString());
-        assertThat(result.studentId()).isEqualTo(STUDENT_ID);
-        assertThat(result.attemptNo()).isEqualTo(2);
-        assertThat(result.status()).isEqualTo("IN_PROGRESS");
-        verify(attempts).save(any(QuizAttempt.class));
+        assertThat(result.attempt().quizId()).isEqualTo(QUIZ_ID.toString());
+        assertThat(result.attempt().studentId()).isEqualTo(STUDENT_ID);
+        assertThat(result.attempt().attemptNo()).isEqualTo(2);
+        assertThat(result.attempt().status()).isEqualTo("IN_PROGRESS");
+        verify(attempts, times(2)).save(any(QuizAttempt.class));
     }
 
     private static Quiz publishedQuiz() {
@@ -150,5 +158,24 @@ class QuizServiceAttemptLifecycleTest {
                 attempt.getSubmittedAt(),
                 attempt.getDeadlineAt(),
                 attempt.isAutoSubmitted());
+    }
+
+    private static QuizDto toQuizDto(Quiz quiz, List<QuizQuestionDto> questions) {
+        return new QuizDto(
+                quiz.getId().toString(),
+                quiz.getCourseId().toString(),
+                quiz.getTitle(),
+                quiz.getOpenAt(),
+                quiz.getCloseAt(),
+                quiz.getDurationMinutes(),
+                quiz.getAttemptsAllowed(),
+                quiz.isRandomizeQuestions(),
+                quiz.isRandomizeOptions(),
+                quiz.getGracePeriodSeconds(),
+                quiz.getScoringMethod(),
+                quiz.isTimeLimitEnforced(),
+                quiz.isShowCorrectAnswers(),
+                quiz.getStatus(),
+                questions);
     }
 }

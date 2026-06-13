@@ -3,6 +3,7 @@ package edu.courseflow.commonlibrary.web;
 import edu.courseflow.commonlibrary.constants.GatewayHeaders;
 import edu.courseflow.commonlibrary.exception.UnauthorizedException;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -30,9 +31,10 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         String email = webRequest.getHeader(GatewayHeaders.USER_EMAIL);
         String role = webRequest.getHeader(GatewayHeaders.USER_ROLE);
         String rolesHeader = webRequest.getHeader(GatewayHeaders.USER_ROLES);
+        String roleScopesHeader = webRequest.getHeader(GatewayHeaders.USER_ROLE_SCOPES);
         Long userId = parseUserId(id);
         Set<String> roles = parseRoles(rolesHeader, role);
-        return new CurrentUser(userId, email, role, roles);
+        return new CurrentUser(userId, email, role, roles, parseRoleScopes(roleScopesHeader));
     }
 
     private Long parseUserId(String id) {
@@ -54,5 +56,37 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<CurrentUser.RoleAssignment> parseRoleScopes(String roleScopesHeader) {
+        if (roleScopesHeader == null || roleScopesHeader.isBlank()) {
+            return Set.of();
+        }
+        Set<CurrentUser.RoleAssignment> assignments = new LinkedHashSet<>();
+        for (String tuple : roleScopesHeader.split(",")) {
+            if (tuple.isBlank()) {
+                continue;
+            }
+            String[] parts = tuple.split("\\.", -1);
+            if (parts.length != 3) {
+                throw new UnauthorizedException("Invalid gateway role scope header");
+            }
+            assignments.add(new CurrentUser.RoleAssignment(
+                    decode(parts[0]),
+                    decode(parts[1]),
+                    decode(parts[2])));
+        }
+        return assignments;
+    }
+
+    private String decode(String encoded) {
+        if (encoded == null || encoded.isBlank()) {
+            return null;
+        }
+        try {
+            return new String(Base64.getUrlDecoder().decode(encoded), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            throw new UnauthorizedException("Invalid gateway role scope header");
+        }
     }
 }

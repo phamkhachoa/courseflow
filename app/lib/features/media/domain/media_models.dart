@@ -1,4 +1,4 @@
-/// Media asset attached to a course/module, from `GET /v1/media/assets`.
+/// Generic media asset from `GET /v1/media/assets`.
 enum MediaKind { video, document, audio, image, other }
 
 class MediaAsset {
@@ -19,18 +19,18 @@ class MediaAsset {
   final int durationSeconds;
 
   factory MediaAsset.fromJson(Map<String, dynamic> json) => MediaAsset(
-    id: json['id'] as String? ?? '',
-    title: json['title'] as String? ?? '',
-    kind: _kind(json['type'] as String? ?? json['kind'] as String?),
-    url: json['url'] as String? ?? '',
-    durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
-  );
+        id: json['id'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        kind: _kind(json['type'] as String? ?? json['kind'] as String?),
+        url: json['url'] as String? ?? '',
+        durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
+      );
 
   static MediaKind _kind(String? raw) => switch (raw?.toUpperCase()) {
-    'VIDEO' => MediaKind.video,
-    'DOCUMENT' || 'PDF' || 'DOC' => MediaKind.document,
-    'AUDIO' => MediaKind.audio,
-    'IMAGE' => MediaKind.image,
-    _ => MediaKind.other,
-  };
+        'VIDEO' => MediaKind.video,
+        'DOCUMENT' || 'PDF' || 'DOC' => MediaKind.document,
+        'AUDIO' => MediaKind.audio,
+        'IMAGE' => MediaKind.image,
+        _ => MediaKind.other,
+      };
 }

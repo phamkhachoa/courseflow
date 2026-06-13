@@ -195,6 +195,7 @@ public class PeerReviewService {
         payload.put("studentId", reviewed.getRevieweeId());
         payload.put("finalScore", finalScore);
         payload.put("maxScore", MAX_REVIEW_SCORE);
+        payload.put("gradedAt", java.time.Instant.now().toString());
         outbox(result.getId(), "peer_review.finalized", payload);
         return mapper.toDto(result);
     }

@@ -15,6 +15,7 @@ public final class Authz {
 
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_INSTRUCTOR = "INSTRUCTOR";
+    private static final String ROLE_ORG_ADMIN = "ORG_ADMIN";
 
     private Authz() {
     }
@@ -38,8 +39,19 @@ public final class Authz {
         }
     }
 
+    public static boolean isAdmin(CurrentUser user) {
+        return user != null && user.hasAnyRole(ROLE_ADMIN, ROLE_ORG_ADMIN);
+    }
+
+    public static void requireSelfOrAdmin(CurrentUser user, String targetUserId) {
+        if (isAdmin(user)) {
+            return;
+        }
+        requireSelf(user, targetUserId);
+    }
+
     public static boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole(ROLE_INSTRUCTOR, ROLE_ADMIN);
+        return user != null && user.hasAnyRole(ROLE_INSTRUCTOR, ROLE_ADMIN, ROLE_ORG_ADMIN);
     }
 
     public static void requireStaff(CurrentUser user) {

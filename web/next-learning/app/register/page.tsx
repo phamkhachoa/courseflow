@@ -4,7 +4,7 @@ import { RegisterForm } from "@/features/auth/RegisterForm";
 import { FeatureTile } from "@/shared/ui";
 
 const registerFeatures = [
-  { title: "Vào học ngay", icon: BookOpenCheck },
+  { title: "Xác minh email", icon: BookOpenCheck },
   { title: "Theo dõi tiến độ", icon: GraduationCap },
   { title: "Phiên đăng nhập an toàn", icon: ShieldCheck }
 ];
@@ -15,7 +15,7 @@ export default function RegisterPage() {
       <section>
         <p className="text-sm font-bold text-brand-600">Tạo tài khoản học viên</p>
         <h1 className="mt-3 max-w-2xl text-5xl font-bold leading-tight text-ink-900">
-          Tạo tài khoản học viên và tiếp tục vào khóa học trong một bước.
+          Tạo tài khoản học viên với phiên đăng nhập an toàn hơn ngay từ đầu.
         </h1>
         <div className="mt-8 grid max-w-2xl gap-4 sm:grid-cols-3">
           {registerFeatures.map(({ title, icon: Icon }) => (

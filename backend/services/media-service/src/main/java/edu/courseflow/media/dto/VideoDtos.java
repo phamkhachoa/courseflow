@@ -72,6 +72,14 @@ public final class VideoDtos {
     ) {
     }
 
+    public record VideoReadinessDto(
+            String id,
+            String courseId,
+            String status,
+            boolean usable
+    ) {
+    }
+
     // ---- requests ----
 
     public record RegisterVideoRequestDto(

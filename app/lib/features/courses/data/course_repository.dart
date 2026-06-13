@@ -8,7 +8,7 @@ import '../domain/course_models.dart';
 /// Course catalog + enrolled-course access.
 ///  - `GET /v1/courses`            public catalog (no auth)
 ///  - `GET /v1/courses/{slug}`     public course detail
-///  - `GET /learning/my-courses`       enrolled courses (auth, via learning-bff)
+///  - `GET /v1/enrollments?studentId=` enrolled course IDs (auth)
 ///  - `POST /v1/courses/{courseId}/modules/{moduleId}/progress`
 class CourseRepository {
   CourseRepository(this._client);
@@ -42,11 +42,27 @@ class CourseRepository {
     }
   }
 
-  Future<List<CourseSummary>> myCourses() async {
+  Future<List<CourseSummary>> myCourses(String studentId) async {
     try {
-      final res = await _dio.get<Object?>('/learning/my-courses');
-      return ApiEnvelope.unwrapList(res.data)
-          .map(CourseSummary.fromJson)
+      final res = await _dio.get<Object?>(
+        '/v1/enrollments',
+        queryParameters: {'studentId': studentId},
+      );
+      final enrolledCourseIds = ApiEnvelope.unwrapList(res.data)
+          .where((row) {
+            final status = (row['status'] as String? ?? '').toUpperCase();
+            return status == 'ACTIVE' ||
+                status == 'ENROLLED' ||
+                status == 'COMPLETED';
+          })
+          .map((row) => row['courseId'])
+          .whereType<String>()
+          .toSet();
+      if (enrolledCourseIds.isEmpty) return const [];
+
+      final courses = await publicCourses();
+      return courses
+          .where((course) => enrolledCourseIds.contains(course.id))
           .toList(growable: false);
     } on DioException catch (e) {
       throw ApiEnvelope.toApiException(e);

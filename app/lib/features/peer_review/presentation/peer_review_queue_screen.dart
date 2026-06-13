@@ -26,8 +26,7 @@ class PeerReviewQueueScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(AppTheme.pagePadding),
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppTheme.gap),
-            itemBuilder: (context, index) =>
-                _ReviewCard(review: items[index]),
+            itemBuilder: (context, index) => _ReviewCard(review: items[index]),
           ),
         ),
       ),
@@ -85,7 +84,7 @@ class _ReviewCard extends ConsumerWidget {
 
   Future<void> _showReviewSheet(BuildContext context, WidgetRef ref) {
     final commentCtrl = TextEditingController();
-    int score = 3;
+    int score = 80;
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -100,12 +99,12 @@ class _ReviewCard extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Score: $score / 5'),
+                Text('Score: $score / 100'),
                 Slider(
                   value: score.toDouble(),
-                  min: 1,
-                  max: 5,
-                  divisions: 4,
+                  min: 0,
+                  max: 100,
+                  divisions: 20,
                   label: '$score',
                   onChanged: (v) => setSheetState(() => score = v.round()),
                 ),
@@ -117,9 +116,7 @@ class _ReviewCard extends ConsumerWidget {
                 const SizedBox(height: AppTheme.gap),
                 FilledButton(
                   onPressed: () async {
-                    await ref
-                        .read(peerReviewRepositoryProvider)
-                        .submitReview(
+                    await ref.read(peerReviewRepositoryProvider).submitReview(
                           reviewAssignmentId: review.id,
                           score: score,
                           comment: commentCtrl.text.trim(),

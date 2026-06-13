@@ -26,7 +26,19 @@ public final class GradebookDtos {
             BigDecimal categoryWeightPercent,
             String aggregationMethod,
             int dropLowest,
-            BigDecimal latePenaltyPercent) {
+            BigDecimal latePenaltyPercent,
+            boolean published) {
+    }
+
+    public record UpsertGradeItemRequestDto(
+            @NotBlank String categoryId,
+            @NotBlank String sourceType,
+            @NotBlank String sourceId,
+            @NotBlank String title,
+            @NotNull @DecimalMin("0.01") BigDecimal maxScore,
+            @NotNull @DecimalMin("0.00") BigDecimal weightPercent,
+            @NotNull @DecimalMin("0.00") BigDecimal latePenaltyPercent,
+            Boolean published) {
     }
 
     public record GradeEntryDto(
@@ -70,7 +82,18 @@ public final class GradebookDtos {
             @NotBlank String studentId,
             @NotNull BigDecimal rawScore,
             Boolean isLate,
-            Integer minutesLate) {
+            Integer minutesLate,
+            String reason) {
+    }
+
+    public record GradeOverrideDto(
+            String id,
+            String gradeEntryId,
+            BigDecimal oldScore,
+            BigDecimal newScore,
+            String reason,
+            String actorId,
+            Instant createdAt) {
     }
 
     // ---- Grading schemes ----

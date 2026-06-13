@@ -90,12 +90,16 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 -- merged from 002-question-types-scoring.sql
 -- ============================================================
 -- changeset courseflow:quiz-002-question-types-scoring
+--validCheckSum 9:27d799048071269757a6c009c1149504
 
 -- Quizzes: scoring strategy across multiple attempts + time-limit enforcement
 ALTER TABLE quizzes
     ADD COLUMN IF NOT EXISTS scoring_method VARCHAR(20) NOT NULL DEFAULT 'HIGHEST',
-    ADD COLUMN IF NOT EXISTS time_limit_enforced BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS time_limit_enforced BOOLEAN NOT NULL DEFAULT TRUE,
     ADD COLUMN IF NOT EXISTS show_correct_answers BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE quizzes ALTER COLUMN time_limit_enforced SET DEFAULT TRUE;
+UPDATE quizzes SET time_limit_enforced = TRUE
+WHERE status = 'PUBLISHED' AND time_limit_enforced = FALSE;
 
 -- Questions: store reference answer for non-MCQ types as JSON
 --   SHORT_ANSWER : {"answers":["one","two"], "caseSensitive":false}

@@ -1,12 +1,15 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
+  Archive,
   ArrowLeft,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
+  EyeOff,
   FileText,
   Plus,
+  RotateCcw,
   Search,
   Star,
   UserCheck
@@ -22,6 +25,7 @@ import {
   ErrorState,
   FormField,
   Input,
+  Notice,
   PageHeader,
   Select,
   Spinner,
@@ -37,17 +41,14 @@ import {
   gradeSubmission,
   listAssignments,
   listSubmissions,
+  setAssignmentLifecycle,
   upsertRubric
 } from "./api";
-import { fallbackCourses, listCourses } from "../courses/api";
+import type { AssignmentLifecycleAction } from "./api";
+import { listCourses } from "../courses/api";
 import { adminUserLabel, useLearnerUsers } from "../identity/useLearnerUsers";
 
 const ASSIGNMENT_TYPES = ["ONLINE_TEXT", "FILE_UPLOAD", "CODE_PROJECT", "CASE_STUDY", "LAB_REPORT", "PORTFOLIO"];
-
-const DEMO_STUDENTS = [
-  { id: "4", label: "Minh Tran" },
-  { id: "5", label: "An Le" }
-];
 
 function formatDateTime(value?: string) {
   if (!value) return "—";
@@ -97,10 +98,32 @@ function courseLabel(course?: { code?: string; title?: string }, fallbackId?: st
   return fallbackId ? `Course ${compactId(fallbackId)}` : "Chưa chọn khóa học";
 }
 
+function assignmentStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    DRAFT: "Nháp - chưa hiển thị",
+    PUBLISHED: "Đã công khai",
+    ARCHIVED: "Đã lưu trữ"
+  };
+  return labels[status ?? ""] ?? status ?? "Nháp - chưa hiển thị";
+}
+
+function learnerVisibilityText(status?: string) {
+  if (status === "PUBLISHED") return "Learner có thể nhìn thấy và nộp bài.";
+  if (status === "ARCHIVED") return "Đã lưu trữ, không nên dùng trong curriculum đang publish.";
+  return "Nháp chưa hiển thị cho learner.";
+}
+
+function nextLifecycleAction(status?: string): { action: AssignmentLifecycleAction; label: string } {
+  if (status === "PUBLISHED") return { action: "archive", label: "Archive" };
+  if (status === "ARCHIVED") return { action: "draft", label: "Đưa về nháp" };
+  return { action: "publish", label: "Publish" };
+}
+
 export function AssignmentListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedCourseId = searchParams.get("courseId") ?? "";
   const [courseId, setCourseId] = useState(requestedCourseId);
+  const qc = useQueryClient();
   const courses = useQuery({
     queryKey: queryKeys.courses.list("assignments"),
     queryFn: () => listCourses(),
@@ -123,12 +146,20 @@ export function AssignmentListPage() {
     setSearchParams(nextCourseId ? { courseId: nextCourseId } : {}, { replace: true });
   }
 
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const selectedCourse = courseRows.find((course) => course.id === courseId);
   const assignments = data ?? [];
   const publishedCount = assignments.filter((assignment) => assignment.status === "PUBLISHED").length;
   const rubricCount = assignments.filter((assignment) => Boolean(assignment.rubricId)).length;
   const urgentCount = assignments.filter((assignment) => dueLabel(assignment.dueAt).urgent).length;
+  const lifecycle = useMutation({
+    mutationFn: ({ assignmentId, action }: { assignmentId: string; action: AssignmentLifecycleAction }) =>
+      setAssignmentLifecycle(assignmentId, action),
+    onSuccess: (assignment) => {
+      qc.invalidateQueries({ queryKey: queryKeys.assignments.list(assignment.courseId) });
+      qc.invalidateQueries({ queryKey: queryKeys.assignments.detail(assignment.id) });
+    }
+  });
 
   return (
     <div>
@@ -149,7 +180,7 @@ export function AssignmentListPage() {
           title="Chọn khóa học"
           subtitle="Course được giữ trên URL để chuyển qua bài thi, module, bảng điểm hoặc tạo assignment không mất context."
         />
-        <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1.2fr]">
+        <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr]">
           <FormField label="Khóa học" htmlFor="assignment-course">
             <Select id="assignment-course" value={courseId} onChange={(event) => changeCourseId(event.target.value)}>
               <option value="">Chọn khóa học</option>
@@ -169,18 +200,7 @@ export function AssignmentListPage() {
               {selectedCourse?.summary ?? "Chọn course để tải assignment, rubric và bài nộp."}
             </p>
           </div>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập Course ID</summary>
-            <FormField label="Course ID" htmlFor="assignment-course-id">
-              <Input
-                id="assignment-course-id"
-                className="mt-3"
-                placeholder="UUID khóa học"
-                value={courseId}
-                onChange={(event) => changeCourseId(event.target.value)}
-              />
-            </FormField>
-          </details>
+          {courses.isError && <ErrorState error={courses.error} />}
         </div>
       </Card>
 
@@ -226,6 +246,7 @@ export function AssignmentListPage() {
           title="Danh sách bài tập"
           subtitle="Mở chi tiết để xem hướng dẫn, rubric hoặc danh sách bài nộp."
         />
+        {lifecycle.isError && <ErrorState error={lifecycle.error} />}
         {!courseId && <EmptyState message="Chọn khóa học để xem assignment." />}
         {isLoading && <Spinner />}
         {isError && <ErrorState error={error} />}
@@ -245,6 +266,7 @@ export function AssignmentListPage() {
             <tbody>
               {data.map((assignment) => {
                 const deadline = dueLabel(assignment.dueAt);
+                const lifecycleAction = nextLifecycleAction(assignment.status);
                 return (
                   <tr key={assignment.id} className="hover:bg-slate-50">
                     <Td>
@@ -272,10 +294,22 @@ export function AssignmentListPage() {
                       </div>
                     </Td>
                     <Td>
-                      <Badge value={assignment.status} />
+                      <Badge value={assignment.status} label={assignmentStatusLabel(assignment.status)} />
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {learnerVisibilityText(assignment.status)}
+                      </p>
                     </Td>
                     <Td>
                       <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant={lifecycleAction.action === "archive" ? "ghost" : "secondary"}
+                          disabled={lifecycle.isPending}
+                          onClick={() => lifecycle.mutate({ assignmentId: assignment.id, action: lifecycleAction.action })}
+                        >
+                          {lifecycleAction.action === "archive" ? <Archive size={14} /> : lifecycleAction.action === "draft" ? <RotateCcw size={14} /> : <CheckCircle2 size={14} />}
+                          {lifecycleAction.label}
+                        </Button>
                         <Link to={assignment.id}>
                           <Button size="sm" variant="secondary">Chi tiết</Button>
                         </Link>
@@ -297,6 +331,7 @@ export function AssignmentListPage() {
 
 export function AssignmentDetailPage() {
   const { id = "" } = useParams();
+  const qc = useQueryClient();
   const { data, isLoading, isError, error } = useQuery({
     queryKey: queryKeys.assignments.detail(id),
     queryFn: () => getAssignment(id),
@@ -308,12 +343,19 @@ export function AssignmentDetailPage() {
     retry: 1,
     staleTime: 60_000
   });
+  const lifecycle = useMutation({
+    mutationFn: (action: AssignmentLifecycleAction) => setAssignmentLifecycle(id, action),
+    onSuccess: (assignment) => {
+      qc.invalidateQueries({ queryKey: queryKeys.assignments.detail(id) });
+      qc.invalidateQueries({ queryKey: queryKeys.assignments.list(assignment.courseId) });
+    }
+  });
 
   if (isLoading) return <Spinner />;
   if (isError) return <ErrorState error={error} />;
   if (!data) return null;
 
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const selectedCourse = courseRows.find((course) => course.id === data.courseId);
   const deadline = dueLabel(data.dueAt);
   const submissionTypes = (data.submissionTypes ?? "TEXT")
@@ -349,6 +391,29 @@ export function AssignmentDetailPage() {
         description={`Quản lý assignment thuộc ${courseLabel(selectedCourse, data.courseId)}`}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              disabled={data.status === "DRAFT" || lifecycle.isPending}
+              onClick={() => lifecycle.mutate("draft")}
+            >
+              <RotateCcw size={16} />
+              Đưa về nháp
+            </Button>
+            <Button
+              disabled={data.status === "PUBLISHED" || lifecycle.isPending}
+              onClick={() => lifecycle.mutate("publish")}
+            >
+              <CheckCircle2 size={16} />
+              Publish
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={data.status === "ARCHIVED" || lifecycle.isPending}
+              onClick={() => lifecycle.mutate("archive")}
+            >
+              <Archive size={16} />
+              Archive
+            </Button>
             <Link to={`/assignments/${id}/submissions`}>
               <Button>
                 <UserCheck size={16} />
@@ -365,15 +430,27 @@ export function AssignmentDetailPage() {
         }
       />
 
+      {lifecycle.isError && (
+        <div className="mb-4">
+          <ErrorState error={lifecycle.error} />
+        </div>
+      )}
+
       <div className="mb-4 grid gap-3 md:grid-cols-4">
         <Card className="p-4">
           <p className="text-sm font-semibold text-slate-500">Trạng thái</p>
           <div className="mt-3">
-            <Badge value={data.status} />
+            <Badge value={data.status} label={assignmentStatusLabel(data.status)} />
           </div>
           <p className="mt-3 text-xs font-semibold text-slate-500">
-            {data.status === "PUBLISHED" ? "Học viên có thể nhìn thấy." : "Kiểm tra trước khi publish."}
+            {learnerVisibilityText(data.status)}
           </p>
+          {data.status !== "PUBLISHED" && (
+            <p className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-amber-700">
+              <EyeOff size={13} />
+              Không learner-visible
+            </p>
+          )}
         </Card>
         <Card className="p-4">
           <p className="text-sm font-semibold text-slate-500">Hạn nộp</p>
@@ -482,7 +559,7 @@ export function AssignmentCreatePage() {
     maxScore: 100,
     submissionTypes: "TEXT"
   });
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const selectedCourse = courseRows.find((course) => course.id === form.courseId);
   const create = useMutation({
     mutationFn: () =>
@@ -536,18 +613,7 @@ export function AssignmentCreatePage() {
                 {form.courseId && !selectedCourse && <option value={form.courseId}>Course {compactId(form.courseId)}</option>}
               </Select>
             </FormField>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập Course ID</summary>
-              <FormField label="Course ID" htmlFor="a-course-manual">
-                <Input
-                  id="a-course-manual"
-                  className="mt-3"
-                  value={form.courseId}
-                  onChange={(e) => setForm({ ...form, courseId: e.target.value.trim() })}
-                  placeholder="UUID khóa học"
-                />
-              </FormField>
-            </details>
+            {courses.isError && <ErrorState error={courses.error} />}
             <FormField label="Tiêu đề" htmlFor="a-title">
               <Input
                 id="a-title"
@@ -567,6 +633,9 @@ export function AssignmentCreatePage() {
           </div>
 
           <div className="space-y-4">
+            <Notice tone="warning" title="Assignment mới sẽ là nháp">
+              Learner chưa nhìn thấy assignment draft. Publish assignment trước khi gắn vào curriculum đã sẵn sàng cho learner.
+            </Notice>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Loại bài tập" htmlFor="a-type">
                 <Select
@@ -696,7 +765,7 @@ export function SubmissionsPage() {
       : usersQuery.isError
         ? "Không tải được danh sách learner."
         : `${learnerRows.length} learner khả dụng`;
-  const courseRows = courses.data?.length ? courses.data : fallbackCourses;
+  const courseRows = courses.data ?? [];
   const selectedCourse = assignment.data
     ? courseRows.find((course) => course.id === assignment.data?.courseId)
     : undefined;
@@ -800,34 +869,25 @@ export function SubmissionsPage() {
               Xem bài nộp
             </Button>
           </div>
-          <div className="flex flex-wrap gap-2 md:col-span-2">
-            {(quickLearners.length
-              ? quickLearners.map((user) => ({ id: String(user.id), label: user.fullName || user.email }))
-              : DEMO_STUDENTS
-            ).map((student) => (
-              <Button
-                key={student.id}
-                type="button"
-                variant={searchedStudentId === student.id ? "primary" : "secondary"}
-                size="sm"
-                onClick={() => searchStudent(student.id)}
-              >
-                {student.label} · {student.id}
-              </Button>
-            ))}
-          </div>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600 md:col-span-2">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập Học viên ID</summary>
-            <FormField label="Học viên ID" htmlFor="sub-student-manual">
-              <Input
-                id="sub-student-manual"
-                className="mt-3"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                placeholder="VD: 4"
-              />
-            </FormField>
-          </details>
+          {quickLearners.length > 0 && (
+            <div className="flex flex-wrap gap-2 md:col-span-2">
+              {quickLearners.map((user) => {
+                const id = String(user.id);
+                return (
+                  <Button
+                    key={id}
+                    type="button"
+                    variant={searchedStudentId === id ? "primary" : "secondary"}
+                    size="sm"
+                    onClick={() => searchStudent(id)}
+                  >
+                    {(user.fullName || user.email)} · {id}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+          {usersQuery.isError && <ErrorState error={usersQuery.error} />}
         </form>
       </Card>
       {searchedStudentId && isLoading && <Spinner />}

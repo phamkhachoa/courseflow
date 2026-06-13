@@ -168,7 +168,7 @@ export function ReviewsPanel({
             <p className="mt-1 text-sm leading-6 text-ink-500">{courseTitle}</p>
           </div>
           <Button asChild variant="secondary">
-            <Link href={`/courses/${courseSlug}/modules?courseId=${courseId}`}>
+            <Link href={`/courses/${courseSlug}/modules`}>
               <MessageSquareText className="size-4" />
               Vào lớp học
             </Link>

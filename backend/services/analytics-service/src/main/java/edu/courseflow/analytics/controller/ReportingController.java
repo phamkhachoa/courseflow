@@ -6,6 +6,7 @@ import edu.courseflow.analytics.dto.ReportingDtos.RecommendationDto;
 import edu.courseflow.analytics.dto.ReportingDtos.RelatedCourseDto;
 import edu.courseflow.analytics.dto.ReportingDtos.TimeSpentDto;
 import edu.courseflow.analytics.service.ReportingService;
+import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import java.util.List;
 import java.util.UUID;
@@ -20,28 +21,30 @@ import org.springframework.web.server.ResponseStatusException;
 public class ReportingController {
 
     private final ReportingService reporting;
+    private final CourseAccessClient courseAccess;
 
-    public ReportingController(ReportingService reporting) {
+    public ReportingController(ReportingService reporting, CourseAccessClient courseAccess) {
         this.reporting = reporting;
+        this.courseAccess = courseAccess;
     }
 
     // ---- reporting ----
 
     @GetMapping("/internal/analytics/courses/{courseId}/completion")
     public CourseCompletionDto completion(@PathVariable UUID courseId, CurrentUser user) {
-        requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, courseId);
         return reporting.courseCompletion(courseId);
     }
 
     @GetMapping("/internal/analytics/students/{studentId}/time-spent")
     public List<TimeSpentDto> timeSpent(@PathVariable String studentId, CurrentUser user) {
-        requireSelfOrStaff(user, studentId);
+        requireSelfOrPlatformAdmin(user, studentId);
         return reporting.timeSpent(studentId);
     }
 
     @GetMapping("/internal/analytics/orgs/{orgId}/dashboard")
     public OrgDashboardDto orgDashboard(@PathVariable String orgId, CurrentUser user) {
-        requireStaff(user);
+        requireOrgDashboardAccess(user, orgId);
         return reporting.orgDashboard(orgId);
     }
 
@@ -51,7 +54,7 @@ public class ReportingController {
     public List<RecommendationDto> recommendations(@PathVariable String studentId,
                                                    @RequestParam(defaultValue = "10") int limit,
                                                    CurrentUser user) {
-        requireSelfOrStaff(user, studentId);
+        requireSelfOrPlatformAdmin(user, studentId);
         return reporting.recommendations(studentId, limit);
     }
 
@@ -68,19 +71,19 @@ public class ReportingController {
         return String.valueOf(user.id());
     }
 
-    private boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole("ADMIN", "INSTRUCTOR");
-    }
-
-    private void requireStaff(CurrentUser user) {
+    private void requireOrgDashboardAccess(CurrentUser user, String orgId) {
         callerId(user);
-        if (!isStaff(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires ADMIN or INSTRUCTOR role");
+        if (user.hasPlatformRole("ADMIN")) {
+            return;
         }
+        if (user.hasDepartmentRole("ORG_ADMIN", orgId)) {
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires scoped organization access");
     }
 
-    private void requireSelfOrStaff(CurrentUser user, String studentId) {
-        if (isStaff(user)) {
+    private void requireSelfOrPlatformAdmin(CurrentUser user, String studentId) {
+        if (user != null && user.hasPlatformRole("ADMIN")) {
             return;
         }
         if (!callerId(user).equals(studentId)) {

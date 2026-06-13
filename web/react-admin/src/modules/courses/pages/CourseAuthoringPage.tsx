@@ -204,7 +204,7 @@ export function CourseAuthoringPage() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   className="pl-9"
-                  placeholder="Tên, mã, slug hoặc course ID"
+                  placeholder="Tên, mã hoặc slug"
                 />
               </div>
             </FormField>

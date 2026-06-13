@@ -3,10 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle2, LogIn, UserPlus } from "lucide-react";
+import { CheckCircle2, LogIn, MailCheck, RefreshCw, UserPlus } from "lucide-react";
 import { learnerSession } from "@/shared/api/client";
 import { Button, Card, TextInput } from "@/shared/ui";
-import { registerLearner } from "./auth-api";
+import { registerLearner, resendEmailVerification } from "./auth-api";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -24,6 +24,10 @@ export function RegisterForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
+  const [verificationExpiresAt, setVerificationExpiresAt] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setHydrated(true);
@@ -42,19 +46,76 @@ export function RegisterForm() {
     }
     setLoading(true);
     try {
-      const session = await registerLearner({
+      const registration = await registerLearner({
         fullName: fullName.trim(),
         email: email.trim(),
         password
       });
-      learnerSession.write(session);
-      router.push(targetHref);
-      router.refresh();
+      setRegisteredEmail(registration.user.email);
+      setVerificationExpiresAt(registration.verificationExpiresAt);
+      setPassword("");
+      setConfirmPassword("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đăng ký thất bại");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleResend() {
+    if (!registeredEmail) return;
+    setResendNotice(null);
+    setResending(true);
+    try {
+      await resendEmailVerification(registeredEmail);
+      setResendNotice("Đã gửi lại email xác minh.");
+    } catch (err) {
+      setResendNotice(err instanceof Error ? err.message : "Chưa gửi lại được email xác minh.");
+    } finally {
+      setResending(false);
+    }
+  }
+
+  const expiryDate = verificationExpiresAt ? new Date(verificationExpiresAt) : null;
+  const expiryText =
+    expiryDate && !Number.isNaN(expiryDate.getTime())
+      ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(expiryDate)
+      : null;
+
+  if (registeredEmail) {
+    return (
+      <Card className="mx-auto w-full max-w-md" padding="lg">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-ink-900">Kiểm tra email</h1>
+            <p className="mt-2 text-sm leading-6 text-ink-500">
+              Liên kết xác minh đã được gửi tới {registeredEmail}.
+            </p>
+          </div>
+          <span className="grid size-11 shrink-0 place-items-center rounded-md bg-brand-50 text-brand-700">
+            <MailCheck className="size-5" />
+          </span>
+        </div>
+        <div className="mt-5 rounded-md border border-brand-100 bg-brand-50 px-3 py-3 text-sm leading-6 text-brand-800">
+          <CheckCircle2 className="mr-2 inline size-4 align-[-2px]" />
+          Sau khi xác minh email, bạn có thể đăng nhập và tiếp tục học.
+          {expiryText ? <span className="mt-1 block text-xs text-brand-700">Hết hạn: {expiryText}</span> : null}
+        </div>
+        <div className="mt-6 grid gap-3">
+          <Button asChild className="w-full">
+            <Link href={loginHref}>
+              <LogIn className="size-4" />
+              Đến trang đăng nhập
+            </Link>
+          </Button>
+          <Button type="button" variant="secondary" disabled={resending} className="w-full" onClick={handleResend}>
+            <RefreshCw className="size-4" />
+            {resending ? "Đang gửi lại" : "Gửi lại email xác minh"}
+          </Button>
+          {resendNotice && <p className="text-center text-sm text-ink-500">{resendNotice}</p>}
+        </div>
+      </Card>
+    );
   }
 
   return (
@@ -63,7 +124,7 @@ export function RegisterForm() {
         <div>
           <h1 className="text-2xl font-bold text-ink-900">Đăng ký học viên</h1>
           <p className="mt-2 text-sm leading-6 text-ink-500">
-            Tạo tài khoản và vào học ngay, chưa cần xác minh email.
+            Tạo tài khoản và xác minh email trước khi bắt đầu học.
           </p>
         </div>
         <span className="grid size-11 shrink-0 place-items-center rounded-md bg-accent-50 text-accent-600">
@@ -72,7 +133,7 @@ export function RegisterForm() {
       </div>
       <div className="mb-6 mt-5 rounded-md border border-brand-100 bg-brand-50 px-3 py-3 text-sm leading-6 text-brand-800">
         <CheckCircle2 className="mr-2 inline size-4 align-[-2px]" />
-        Sau khi đăng ký thành công, hệ thống tự đăng nhập bằng tài khoản mới.
+        Hệ thống sẽ gửi liên kết xác minh đến email của bạn.
       </div>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label htmlFor="learner-register-name" className="block text-sm font-semibold text-ink-700">
@@ -134,7 +195,7 @@ export function RegisterForm() {
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={!hydrated || loading} className="w-full">
           <UserPlus className="size-4" />
-          {!hydrated ? "Đang sẵn sàng" : loading ? "Đang tạo tài khoản" : "Đăng ký và vào học"}
+          {!hydrated ? "Đang sẵn sàng" : loading ? "Đang tạo tài khoản" : "Tạo tài khoản"}
         </Button>
         <Button asChild variant="ghost" className="w-full">
           <Link href={loginHref}>

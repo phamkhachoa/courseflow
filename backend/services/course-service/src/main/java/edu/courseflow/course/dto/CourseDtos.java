@@ -28,6 +28,17 @@ public final class CourseDtos {
     ) {
     }
 
+    public record CourseMetadataDto(
+            String id,
+            String status,
+            String reviewState,
+            String ownerId,
+            String departmentId,
+            String title,
+            String slug
+    ) {
+    }
+
     public record CourseMaterialDto(
             String id,
             String courseId,
@@ -53,6 +64,13 @@ public final class CourseDtos {
             @JsonAlias("type") @NotBlank String materialType,
             UUID mediaId,
             @PositiveOrZero Integer position
+    ) {
+    }
+
+    public record PresignedDownloadDto(
+            String storageKey,
+            String downloadUrl,
+            Instant expiresAt
     ) {
     }
 }

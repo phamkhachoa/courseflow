@@ -31,7 +31,7 @@ public class NotificationController {
     public List<NotificationDto> list(@RequestParam String userId,
                                       @RequestParam(defaultValue = "false") boolean unreadOnly,
                                       CurrentUser user) {
-        Authz.requireSelf(user, userId);
+        Authz.requireSelfOrAdmin(user, userId);
         return notifications.listForUser(userId, unreadOnly);
     }
 
@@ -49,15 +49,19 @@ public class NotificationController {
 
     @GetMapping("/internal/notifications/preferences")
     public List<NotificationPreferenceDto> preferences(@RequestParam String userId, CurrentUser user) {
-        Authz.requireSelf(user, userId);
+        Authz.requireSelfOrAdmin(user, userId);
         return notifications.preferences(userId);
     }
 
     @PostMapping("/internal/notifications/preferences")
     public NotificationPreferenceDto upsertPreference(@Valid @RequestBody UpsertPreferenceRequestDto request,
                                                      CurrentUser user) {
+        String targetUserId = Authz.isAdmin(user) && request.userId() != null && !request.userId().isBlank()
+                ? request.userId()
+                : Authz.callerId(user);
+        Authz.requireSelfOrAdmin(user, targetUserId);
         UpsertPreferenceRequestDto trusted = new UpsertPreferenceRequestDto(
-                Authz.callerId(user),
+                targetUserId,
                 request.channel(),
                 request.enabled());
         return notifications.upsertPreference(trusted);

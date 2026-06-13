@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BookOpen,
@@ -10,10 +12,14 @@ import {
   ChevronDown,
   ClipboardCheck,
   Clock3,
+  Download,
   ExternalLink,
   FileText,
+  ListFilter,
   ListChecks,
   PlayCircle,
+  RotateCcw,
+  Search,
   Video
 } from "lucide-react";
 import { VideoPlayer } from "@/features/video-player/VideoPlayer";
@@ -22,9 +28,23 @@ import { CourseQAPanel } from "@/features/discussions/CourseQAPanel";
 import { EnrollmentCta } from "@/features/enrollments/EnrollmentCta";
 import { CourseQuizList } from "@/features/quiz-attempts/CourseQuizList";
 import { useCourseModules, useCourseProgress, useMarkItemProgress, useMarkProgress } from "@/features/course-modules/hooks";
-import { learnerSession, type StoredSession } from "@/shared/api/client";
-import { Badge, Button, Card, EmptyState, ProgressBar, cn } from "@/shared/ui";
-import type { CourseModule, ItemProgress, ModuleItem, ModuleProgressSummary } from "./api";
+import { clientFetch, learnerSession, type StoredSession } from "@/shared/api/client";
+import { Badge, Button, Card, EmptyState, ProgressBar, TextInput, cn } from "@/shared/ui";
+import type { CourseModule, ItemProgress, ModuleItem } from "./api";
+import { getModuleItemKind, getModuleItemReadinessIssue, isModuleItemReady } from "./readiness";
+
+const lessonFilterOptions = [
+  { value: "ALL", label: "Tất cả" },
+  { value: "INCOMPLETE", label: "Chưa xong" },
+  { value: "REQUIRED", label: "Bắt buộc" },
+  { value: "VIDEO", label: "Video" },
+  { value: "ASSESSMENT", label: "Đánh giá" },
+  { value: "RESOURCES", label: "Tài nguyên" },
+  { value: "READY", label: "Sẵn sàng" },
+  { value: "PREPARING", label: "Đang bổ sung" }
+] as const;
+
+type LessonFilter = (typeof lessonFilterOptions)[number]["value"];
 
 type LessonWithContext = ModuleItem & {
   moduleId: string;
@@ -58,13 +78,7 @@ function flattenLessons(modules: CourseModule[]): LessonWithContext[] {
 }
 
 function lessonKind(item: ModuleItem): string {
-  const type = item.itemType?.toUpperCase();
-  if (type === "VIDEO" || item.videoMediaId) return "VIDEO";
-  if (type === "DOCUMENT" || type === "PDF" || type === "MATERIAL" || (item.documentMediaIds?.length ?? 0) > 0) {
-    return "DOCUMENT";
-  }
-  if (type === "LINK" || item.contentUrl) return "LINK";
-  return type ?? "LESSON";
+  return getModuleItemKind(item);
 }
 
 function itemTone(kind: string): "neutral" | "brand" | "amber" | "sky" | "coral" {
@@ -91,16 +105,74 @@ function kindLabel(kind: string) {
 
 function progressTypeForLesson(item: ModuleItem) {
   const kind = lessonKind(item);
-  if (kind === "VIDEO") return "VIDEO_CONFIRMED";
-  if (kind === "QUIZ") return "QUIZ_CONFIRMED";
-  if (kind === "ASSIGNMENT") return "ASSIGNMENT_CONFIRMED";
   if (kind === "DOCUMENT" || kind === "PDF" || kind === "MATERIAL") return "DOCUMENT_CONFIRMED";
   if (kind === "LINK") return "LINK_CONFIRMED";
-  return "MANUAL";
+  return "LESSON_CONFIRMED";
+}
+
+function requiresVerifiedCompletion(item: ModuleItem) {
+  const kind = lessonKind(item);
+  return kind === "VIDEO" || kind === "QUIZ" || kind === "ASSIGNMENT";
 }
 
 function isCompletedProgress(progress?: ItemProgress) {
   return progress?.status === "COMPLETED";
+}
+
+function isLessonEffectivelyCompleted(lesson: LessonWithContext, progressById: Map<string, ItemProgress>) {
+  return isModuleItemReady(lesson) && isCompletedProgress(progressById.get(lesson.id));
+}
+
+function findResumeLesson(lessons: LessonWithContext[], progressById: Map<string, ItemProgress>) {
+  const readyLessons = lessons.filter(isModuleItemReady);
+  return (
+    readyLessons.find((lesson) => lesson.required && !isLessonEffectivelyCompleted(lesson, progressById)) ??
+    readyLessons.find((lesson) => !isLessonEffectivelyCompleted(lesson, progressById)) ??
+    lessons.find((lesson) => lesson.required && !isLessonEffectivelyCompleted(lesson, progressById)) ??
+    lessons.find((lesson) => !isLessonEffectivelyCompleted(lesson, progressById)) ??
+    readyLessons.find((lesson) => lesson.videoMediaId) ??
+    readyLessons[0] ??
+    lessons[0]
+  );
+}
+
+function lessonMatchesSearch(lesson: LessonWithContext, keyword: string) {
+  const normalized = keyword.trim().toLowerCase();
+  if (!normalized) return true;
+  return [
+    lesson.title,
+    lesson.description,
+    lesson.moduleTitle,
+    lesson.moduleDescription,
+    lesson.itemType,
+    lesson.itemId,
+    lesson.videoMediaId,
+    lesson.contentUrl,
+    ...(lesson.documentMediaIds ?? [])
+  ]
+    .filter(Boolean)
+    .some((value) => value?.toLowerCase().includes(normalized));
+}
+
+function lessonMatchesFilter(lesson: LessonWithContext, filter: LessonFilter, completed: boolean) {
+  const kind = lessonKind(lesson);
+  if (filter === "INCOMPLETE") return !completed;
+  if (filter === "REQUIRED") return Boolean(lesson.required);
+  if (filter === "VIDEO") return kind === "VIDEO" || Boolean(lesson.videoMediaId);
+  if (filter === "ASSESSMENT") return kind === "QUIZ" || kind === "ASSIGNMENT";
+  if (filter === "READY") return isModuleItemReady(lesson);
+  if (filter === "PREPARING") return !isModuleItemReady(lesson);
+  if (filter === "RESOURCES") {
+    return (
+      kind === "DOCUMENT" ||
+      kind === "PDF" ||
+      kind === "MATERIAL" ||
+      kind === "LINK" ||
+      Boolean(lesson.contentUrl) ||
+      (lesson.documentMediaIds?.length ?? 0) > 0
+    );
+  }
+  return true;
 }
 
 function itemIcon(item: ModuleItem, className = "size-4") {
@@ -174,13 +246,14 @@ function lessonFocusText(lesson: ModuleItem) {
   return "Hoàn thành nội dung chính của bài học này.";
 }
 
-function lessonActionHref(lesson: ModuleItem, courseSlug: string, courseId: string) {
+function lessonActionHref(lesson: ModuleItem, courseSlug: string) {
   const kind = lessonKind(lesson);
   if (kind === "QUIZ" && lesson.itemId) return `/quizzes/${lesson.itemId}`;
   if (kind === "ASSIGNMENT") {
-    const params = new URLSearchParams({ courseId });
+    const params = new URLSearchParams();
     if (lesson.itemId) params.set("assignmentId", lesson.itemId);
-    return `/courses/${courseSlug}/assignments?${params.toString()}`;
+    const query = params.toString();
+    return `/courses/${courseSlug}/assignments${query ? `?${query}` : ""}`;
   }
   if (lesson.contentUrl) return lesson.contentUrl;
   return null;
@@ -210,6 +283,20 @@ function lessonPlaceholderText(lesson: ModuleItem) {
 
 function isExternalHref(href: string) {
   return href.startsWith("http://") || href.startsWith("https://");
+}
+
+type DocumentDownloadGrant = {
+  storageKey?: string;
+  downloadUrl: string;
+  expiresAt?: string;
+};
+
+function compactMediaId(mediaId: string) {
+  return mediaId.length > 12 ? `${mediaId.slice(0, 8)}...${mediaId.slice(-4)}` : mediaId;
+}
+
+function documentLabel(mediaId: string, index: number) {
+  return `Tài liệu ${index + 1} · ${compactMediaId(mediaId)}`;
 }
 
 function LessonMeta({ item, className }: { item: ModuleItem; className?: string }) {
@@ -264,7 +351,24 @@ function LessonPlayer({
     );
   }
 
-  const actionHref = lessonActionHref(lesson, courseSlug, courseId);
+  const actionHref = lessonActionHref(lesson, courseSlug);
+  const readinessIssue = getModuleItemReadinessIssue(lesson);
+
+  if (readinessIssue) {
+    return (
+      <div className="grid aspect-video place-items-center rounded-lg border border-white/10 bg-black text-center">
+        <div className="max-w-md px-6">
+          <span className="mx-auto grid size-16 place-items-center rounded-full bg-amber-400/15 text-amber-100">
+            <AlertTriangle className="size-8" />
+          </span>
+          <p className="mt-5 text-lg font-bold text-white">Nội dung đang được hoàn thiện</p>
+          <p className="mt-2 text-sm leading-6 text-white/65">
+            {readinessIssue}. Bài này vẫn nằm trong lộ trình để bạn biết thứ tự học, nhưng chưa được tính là nội dung sẵn sàng.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (lesson.videoMediaId) {
     return (
@@ -316,6 +420,7 @@ function LessonButton({
   onSelect: () => void;
 }) {
   const kind = lessonKind(lesson);
+  const readinessIssue = getModuleItemReadinessIssue(lesson);
   return (
     <button
       type="button"
@@ -349,6 +454,7 @@ function LessonButton({
           {completed && <Badge tone="brand">Đã xong</Badge>}
           {selected && <Badge tone="brand">Đang học</Badge>}
           {!selected && nextUp && <Badge tone="amber">Tiếp theo</Badge>}
+          {readinessIssue && <Badge tone="amber">{readinessIssue}</Badge>}
           {!lesson.required && <Badge tone="neutral">Tùy chọn</Badge>}
         </div>
       </div>
@@ -407,6 +513,7 @@ function LessonNavigator({
 }
 
 export function ModuleList({ courseId, courseSlug }: { courseId: string; courseSlug: string }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const modulesEnabled = Boolean(session?.accessToken);
@@ -420,12 +527,12 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
     () => new Map((progress?.items ?? []).map((itemProgress) => [itemProgress.itemId, itemProgress])),
     [progress?.items]
   );
-  const moduleProgressById = useMemo(
-    () => new Map((progress?.modules ?? []).map((moduleProgress) => [moduleProgress.moduleId, moduleProgress])),
-    [progress?.modules]
-  );
   const [selectedLessonId, setSelectedLessonId] = useState<string>("");
   const [userId, setUserId] = useState("");
+  const [lessonSearch, setLessonSearch] = useState("");
+  const [lessonFilter, setLessonFilter] = useState<LessonFilter>("ALL");
+  const [documentBusyId, setDocumentBusyId] = useState("");
+  const [documentError, setDocumentError] = useState("");
 
   useEffect(() => {
     const current = learnerSession.read();
@@ -443,29 +550,170 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
     if (lessons.length === 0) return;
     const selectedStillExists = lessons.some((lesson) => lesson.id === selectedLessonId);
     if (!selectedLessonId || !selectedStillExists) {
-      setSelectedLessonId(lessons.find((lesson) => lesson.videoMediaId)?.id ?? lessons[0].id);
+      setSelectedLessonId(findResumeLesson(lessons, itemProgressById)?.id ?? lessons[0].id);
     }
-  }, [lessons, selectedLessonId]);
+  }, [itemProgressById, lessons, selectedLessonId]);
 
   const activeLesson = lessons.find((lesson) => lesson.id === selectedLessonId) ?? lessons[0];
+  const resumeLesson = useMemo(() => findResumeLesson(lessons, itemProgressById), [itemProgressById, lessons]);
   const activeLessonIndex = activeLesson ? lessons.findIndex((lesson) => lesson.id === activeLesson.id) : -1;
   const previousLesson = activeLessonIndex > 0 ? lessons[activeLessonIndex - 1] : undefined;
   const nextLesson = activeLessonIndex >= 0 && activeLessonIndex < lessons.length - 1 ? lessons[activeLessonIndex + 1] : undefined;
   const activeKind = activeLesson ? lessonKind(activeLesson) : "LESSON";
-  const activeActionHref = activeLesson ? lessonActionHref(activeLesson, courseSlug, courseId) : null;
-  const activeItemProgress = activeLesson ? itemProgressById.get(activeLesson.id) : undefined;
-  const activeLessonCompleted = isCompletedProgress(activeItemProgress);
-  const activeModuleProgress = activeLesson ? moduleProgressById.get(activeLesson.moduleId) : undefined;
+  const activeActionHref = activeLesson ? lessonActionHref(activeLesson, courseSlug) : null;
+  const activeReadinessIssue = activeLesson ? getModuleItemReadinessIssue(activeLesson) : null;
   const activeDocs = activeLesson?.documentMediaIds ?? [];
   const courseMinutes = totalMinutes(lessons);
   const attachedVideoCount = lessons.filter((lesson) => lesson.videoMediaId).length;
   const videoLessonCount = lessons.filter((lesson) => lessonKind(lesson) === "VIDEO").length;
   const courseContentStats = useMemo(() => countContent(lessons), [lessons]);
   const courseContentLabels = useMemo(() => compactContentLabels(courseContentStats), [courseContentStats]);
-  const totalRequiredItems = progress?.totalRequiredItems ?? progress?.totalModules ?? 0;
-  const completedRequiredItems = progress?.completedRequiredItems ?? progress?.completedModules ?? 0;
-  const completedItems = progress?.completedItems ?? completedRequiredItems;
-  const totalItems = progress?.totalItems ?? lessons.length;
+  const preparingLessonCount = useMemo(() => lessons.filter((lesson) => !isModuleItemReady(lesson)).length, [lessons]);
+  const readyLessonCount = lessons.length - preparingLessonCount;
+  const effectiveProgress = useMemo(() => {
+    const moduleProgressById = new Map<
+      string,
+      {
+        completedItems: number;
+        completedRequiredItems: number;
+        completed: boolean;
+        percentComplete: number;
+        totalItems: number;
+        totalRequiredItems: number;
+      }
+    >();
+    let completedModules = 0;
+    const breakdownByKind = new Map<string, { itemType: string; completedRequired: number; required: number }>();
+
+    for (const module of modules) {
+      const moduleLessons = lessons.filter((lesson) => lesson.moduleId === module.id);
+      const requiredLessons = moduleLessons.filter((lesson) => lesson.required);
+      const completedRequiredLessons = requiredLessons.filter((lesson) =>
+        isLessonEffectivelyCompleted(lesson, itemProgressById)
+      );
+      const completedLessons = moduleLessons.filter((lesson) => isLessonEffectivelyCompleted(lesson, itemProgressById));
+      const totalRequiredItems = requiredLessons.length;
+      const completedRequiredItems = completedRequiredLessons.length;
+      const completed = totalRequiredItems > 0 && completedRequiredItems >= totalRequiredItems;
+      const percentComplete = totalRequiredItems > 0 ? Math.round((completedRequiredItems / totalRequiredItems) * 100) : 0;
+
+      if (completed) completedModules += 1;
+      moduleProgressById.set(module.id, {
+        completedItems: completedLessons.length,
+        completedRequiredItems,
+        completed,
+        percentComplete,
+        totalItems: moduleLessons.length,
+        totalRequiredItems
+      });
+    }
+
+    for (const lesson of lessons) {
+      if (!lesson.required) continue;
+      const kind = lessonKind(lesson);
+      const current = breakdownByKind.get(kind) ?? { itemType: kind, completedRequired: 0, required: 0 };
+      current.required += 1;
+      if (isLessonEffectivelyCompleted(lesson, itemProgressById)) current.completedRequired += 1;
+      breakdownByKind.set(kind, current);
+    }
+
+    const requiredLessons = lessons.filter((lesson) => lesson.required);
+    const completedLessons = lessons.filter((lesson) => isLessonEffectivelyCompleted(lesson, itemProgressById));
+    const completedRequiredLessons = requiredLessons.filter((lesson) =>
+      isLessonEffectivelyCompleted(lesson, itemProgressById)
+    );
+    const totalRequiredItems = requiredLessons.length;
+    const completedRequiredItems = completedRequiredLessons.length;
+    const percentComplete = totalRequiredItems > 0 ? Math.round((completedRequiredItems / totalRequiredItems) * 100) : 0;
+
+    return {
+      breakdown: Array.from(breakdownByKind.values()),
+      completedItems: completedLessons.length,
+      completedModules,
+      completedRequiredItems,
+      missingRequirements: requiredLessons
+        .filter((lesson) => !isLessonEffectivelyCompleted(lesson, itemProgressById))
+        .map((lesson) => ({ itemId: lesson.id, title: lesson.title })),
+      moduleProgressById,
+      percentComplete,
+      totalItems: lessons.length,
+      totalModules: modules.length,
+      totalRequiredItems
+    };
+  }, [itemProgressById, lessons, modules]);
+  const activeLessonCompleted = activeLesson ? isLessonEffectivelyCompleted(activeLesson, itemProgressById) : false;
+  const activeModuleProgress = activeLesson ? effectiveProgress.moduleProgressById.get(activeLesson.moduleId) : undefined;
+  const totalRequiredItems = effectiveProgress.totalRequiredItems;
+  const completedRequiredItems = effectiveProgress.completedRequiredItems;
+  const completedItems = effectiveProgress.completedItems;
+  const totalItems = effectiveProgress.totalItems;
+  const courseComplete = totalRequiredItems > 0 && completedRequiredItems >= totalRequiredItems;
+  const lessonFilterCounts = useMemo(() => {
+    return lessonFilterOptions.reduce<Record<LessonFilter, number>>(
+      (counts, option) => {
+        counts[option.value] = lessons.filter((lesson) =>
+          lessonMatchesFilter(lesson, option.value, isLessonEffectivelyCompleted(lesson, itemProgressById))
+        ).length;
+        return counts;
+      },
+      {
+        ALL: 0,
+        INCOMPLETE: 0,
+        REQUIRED: 0,
+        VIDEO: 0,
+        ASSESSMENT: 0,
+        RESOURCES: 0,
+        READY: 0,
+        PREPARING: 0
+      }
+    );
+  }, [itemProgressById, lessons]);
+  const visibleLessonIds = useMemo(() => {
+    return new Set(
+      lessons
+        .filter((lesson) =>
+          lessonMatchesFilter(lesson, lessonFilter, isLessonEffectivelyCompleted(lesson, itemProgressById))
+        )
+        .filter((lesson) => lessonMatchesSearch(lesson, lessonSearch))
+        .map((lesson) => lesson.id)
+    );
+  }, [itemProgressById, lessonFilter, lessonSearch, lessons]);
+  const visibleLessonCount = visibleLessonIds.size;
+  const hasLessonFilter = lessonFilter !== "ALL" || lessonSearch.trim().length > 0;
+  const activeLessonVisible = activeLesson ? visibleLessonIds.has(activeLesson.id) : true;
+
+  useEffect(() => {
+    if (!hasLessonFilter || visibleLessonIds.size === 0) return;
+    if (activeLesson && visibleLessonIds.has(activeLesson.id)) return;
+    const firstVisibleLesson = lessons.find((lesson) => visibleLessonIds.has(lesson.id));
+    if (firstVisibleLesson) setSelectedLessonId(firstVisibleLesson.id);
+  }, [activeLesson, hasLessonFilter, lessons, visibleLessonIds]);
+
+  useEffect(() => {
+    setDocumentError("");
+  }, [activeLesson?.id]);
+
+  async function openDocument(mediaId: string, mode: "open" | "download") {
+    setDocumentBusyId(mediaId);
+    setDocumentError("");
+    try {
+      const grant = await clientFetch<DocumentDownloadGrant>(
+        `/v1/courses/${courseId}/media/assets/${mediaId}/download-url`
+      );
+      const anchor = document.createElement("a");
+      anchor.href = grant.downloadUrl;
+      anchor.target = "_blank";
+      anchor.rel = "noreferrer";
+      if (mode === "download") anchor.download = `courseflow-${compactMediaId(mediaId)}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } catch (error) {
+      setDocumentError(error instanceof Error ? error.message : "Không mở được tài liệu.");
+    } finally {
+      setDocumentBusyId("");
+    }
+  }
 
   if (!courseId) return <p className="text-ink-500">Thiếu courseId.</p>;
   if (!sessionReady) return <p className="text-ink-500">Đang kiểm tra phiên đăng nhập...</p>;
@@ -510,7 +758,7 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="dark">Phòng học</Badge>
                 <span className="text-sm font-medium text-white/65">
-                  {lessons.length} bài học · {formatMinutes(courseMinutes)}
+                  {readyLessonCount}/{lessons.length} bài sẵn sàng · {formatMinutes(courseMinutes)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-white/75">
@@ -524,6 +772,7 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                 {courseContentStats.assignments > 0 && (
                   <Badge tone="dark">{courseContentStats.assignments} bài tập</Badge>
                 )}
+                {preparingLessonCount > 0 && <Badge tone="dark">{preparingLessonCount} đang bổ sung</Badge>}
               </div>
             </div>
 
@@ -533,12 +782,7 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
               courseSlug={courseSlug}
               courseId={courseId}
               onVideoCompleted={() => {
-                if (!activeLesson || activeLessonCompleted || markItem.isPending) return;
-                markItem.mutate({
-                  moduleId: activeLesson.moduleId,
-                  itemId: activeLesson.id,
-                  progressType: "VIDEO_ENDED"
-                });
+                void queryClient.invalidateQueries({ queryKey: ["course-progress", courseId] });
               }}
             />
 
@@ -549,6 +793,7 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                   <Badge tone="dark">Bài {activeLesson.itemIndex}</Badge>
                   <Badge tone={itemTone(activeKind)}>{kindLabel(activeKind)}</Badge>
                   {activeLesson.required && <Badge tone="dark">Bắt buộc</Badge>}
+                  {activeReadinessIssue && <Badge tone="amber">{activeReadinessIssue}</Badge>}
                 </div>
                 <h2 className="mt-4 max-w-3xl text-2xl font-bold leading-tight text-white">
                   {activeLesson.title}
@@ -575,6 +820,7 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                     <p className="text-xs font-bold uppercase text-white/45">Học liệu</p>
                     <p className="mt-1 text-sm font-semibold leading-5 text-white/80">
                       {[
+                        activeReadinessIssue ? "Đang bổ sung" : null,
                         activeLesson.videoMediaId ? "Video" : null,
                         activeDocs.length > 0 ? `${activeDocs.length} tài liệu` : null,
                         activeLesson.contentUrl ? "Link ngoài" : null
@@ -586,9 +832,11 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                   <div className="rounded-md border border-white/10 bg-white/[0.06] p-3 md:col-span-3">
                     <p className="text-xs font-bold uppercase text-white/45">Điều kiện hoàn thành</p>
                     <p className="mt-1 text-sm font-semibold leading-5 text-white/80">
-                      {activeLessonCompleted
-                        ? "Bài này đã được tính vào tiến độ khóa học."
-                        : activeLesson.required
+                      {activeReadinessIssue
+                        ? "Bài này sẽ được mở hoàn thành sau khi học liệu sẵn sàng."
+                        : activeLessonCompleted
+                          ? "Bài này đã được tính vào tiến độ khóa học."
+                          : activeLesson.required
                           ? "Hoàn thành bài này để tăng tiến độ mục bắt buộc."
                           : "Bài tùy chọn không chặn hoàn thành khóa học."}
                     </p>
@@ -640,20 +888,43 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                       </a>
                     </Button>
                   )}
-                  <Button
-                    variant="inverse"
-                    disabled={activeLessonCompleted || markItem.isPending}
-                    onClick={() =>
-                      markItem.mutate({
-                        moduleId: activeLesson.moduleId,
-                        itemId: activeLesson.id,
-                        progressType: progressTypeForLesson(activeLesson)
-                      })
-                    }
-                  >
-                    <CheckCircle2 className="size-4" />
-                    {activeLessonCompleted ? "Bài đã xong" : markItem.isPending ? "Đang lưu" : "Đánh dấu bài xong"}
-                  </Button>
+                  {activeDocs.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="inverse"
+                      disabled={Boolean(documentBusyId)}
+                      onClick={() => openDocument(activeDocs[0], "open")}
+                    >
+                      <FileText className="size-4" />
+                      {documentBusyId === activeDocs[0] ? "Đang mở tài liệu" : activeDocs.length > 1 ? "Mở tài liệu đầu" : "Mở tài liệu"}
+                    </Button>
+                  )}
+                  {requiresVerifiedCompletion(activeLesson) ? (
+                    <Badge tone={activeLessonCompleted ? "brand" : "neutral"}>
+                      {activeLessonCompleted ? "Bài đã xong" : "Tự cập nhật khi hoàn tất"}
+                    </Badge>
+                  ) : (
+                    <Button
+                      variant="inverse"
+                      disabled={activeLessonCompleted || markItem.isPending || Boolean(activeReadinessIssue)}
+                      onClick={() =>
+                        markItem.mutate({
+                          moduleId: activeLesson.moduleId,
+                          itemId: activeLesson.id,
+                          progressType: progressTypeForLesson(activeLesson)
+                        })
+                      }
+                    >
+                      <CheckCircle2 className="size-4" />
+                      {activeReadinessIssue
+                        ? "Chưa thể hoàn thành"
+                        : activeLessonCompleted
+                          ? "Bài đã xong"
+                          : markItem.isPending
+                            ? "Đang lưu"
+                            : "Đánh dấu bài xong"}
+                    </Button>
+                  )}
                   {activeModuleProgress && (
                     <Badge tone={activeModuleProgress.completed ? "brand" : "neutral"}>
                       Chương {activeModuleProgress.completedRequiredItems}/{activeModuleProgress.totalRequiredItems} mục bắt buộc
@@ -673,17 +944,19 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                 </div>
                 <Badge tone="brand">{modules.length} chương</Badge>
               </div>
-              {progress && (
+              {lessons.length > 0 && (
                 <div className="mt-4">
                   <div className="mb-2 flex items-center justify-between text-sm">
                     <span className="font-medium text-ink-500">
                       {completedRequiredItems}/{totalRequiredItems} mục bắt buộc
                     </span>
-                    <span className="font-bold text-ink-900">{progress.percentComplete}%</span>
+                    <span className="font-bold text-ink-900">{effectiveProgress.percentComplete}%</span>
                   </div>
-                  <ProgressBar value={progress.percentComplete} />
+                  <ProgressBar value={effectiveProgress.percentComplete} />
                   <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-ink-500">
-                    <span>{progress.completedModules}/{progress.totalModules} chương đủ điều kiện</span>
+                    <span>
+                      {effectiveProgress.completedModules}/{effectiveProgress.totalModules} chương đủ điều kiện
+                    </span>
                     <span className="text-right">{completedItems}/{totalItems} bài đã xong</span>
                   </div>
                 </div>
@@ -697,14 +970,138 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                   ))}
                 </div>
               )}
+              {resumeLesson && (
+                <div
+                  className={cn(
+                    "mt-4 rounded-md border p-3",
+                    courseComplete
+                      ? "border-signal-100 bg-signal-50"
+                      : "border-brand-100 bg-brand-50"
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={cn(
+                        "grid size-9 shrink-0 place-items-center rounded-md bg-white shadow-sm",
+                        courseComplete ? "text-signal-700" : "text-brand-700"
+                      )}
+                    >
+                      {itemIcon(resumeLesson)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p
+                          className={cn(
+                            "text-xs font-bold uppercase",
+                            courseComplete ? "text-signal-700" : "text-brand-700"
+                          )}
+                        >
+                          {courseComplete ? "Khóa học đã hoàn tất" : "Bài cần học tiếp"}
+                        </p>
+                        {courseComplete && <Badge tone="sky">Ôn tập</Badge>}
+                        {!courseComplete && resumeLesson.id === activeLesson?.id && <Badge tone="brand">Đang mở</Badge>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLessonId(resumeLesson.id)}
+                        className="mt-1 block w-full truncate text-left text-sm font-bold text-ink-900 hover:text-brand-700"
+                      >
+                        {resumeLesson.title}
+                      </button>
+                      <p className="mt-1 text-xs font-medium text-ink-500">
+                        {courseComplete ? "Ôn lại: " : ""}
+                        Chương {resumeLesson.moduleIndex} · Bài {resumeLesson.itemIndex} · {kindLabel(lessonKind(resumeLesson))}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="mt-4">
+                <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-ink-500">
+                  <ListFilter className="size-3.5" />
+                  Lọc nội dung
+                </div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-3 size-4 text-ink-500/55" />
+                  <TextInput
+                    value={lessonSearch}
+                    onChange={(event) => setLessonSearch(event.target.value)}
+                    placeholder="Tìm bài, mô tả, link..."
+                    className="min-h-10 rounded-md py-2 pl-9 pr-3"
+                  />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {lessonFilterOptions.map((option) => {
+                    const selected = lessonFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setLessonFilter(option.value)}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-bold transition",
+                          selected
+                            ? "border-brand-500 bg-brand-600 text-white shadow-sm"
+                            : "border-black/10 bg-white text-ink-600 hover:border-brand-200 hover:bg-brand-50"
+                        )}
+                      >
+                        <span>{option.label}</span>
+                        <span
+                          className={cn(
+                            "rounded bg-black/5 px-1.5 py-0.5 text-[10px]",
+                            selected && "bg-white/20 text-white"
+                          )}
+                        >
+                          {lessonFilterCounts[option.value]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {hasLessonFilter && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-ink-500">
+                    <span>
+                      Đang hiển thị {visibleLessonCount}/{lessons.length} bài
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLessonFilter("ALL");
+                        setLessonSearch("");
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-brand-700 hover:bg-brand-50"
+                    >
+                      <RotateCcw className="size-3.5" />
+                      Xóa lọc
+                    </button>
+                  </div>
+                )}
+                {hasLessonFilter && !activeLessonVisible && (
+                  <p className="mt-2 rounded-md bg-accent-50 px-3 py-2 text-xs font-semibold leading-5 text-accent-700">
+                    Bài đang mở không nằm trong bộ lọc hiện tại.
+                  </p>
+                )}
+              </div>
             </div>
 
             <div>
               {modules.map((module, moduleIndex) => {
                 const items = module.items ?? [];
+                const lessonsInModule = items.map<LessonWithContext>((item, itemIndex) => ({
+                  ...item,
+                  moduleId: module.id,
+                  moduleTitle: module.title,
+                  moduleDescription: module.description,
+                  moduleIndex: moduleIndex + 1,
+                  itemIndex: itemIndex + 1
+                }));
+                const visibleLessonsInModule = lessonsInModule.filter((lesson) => visibleLessonIds.has(lesson.id));
+                const hiddenLessonCount = lessonsInModule.length - visibleLessonsInModule.length;
                 const moduleDuration = totalMinutes(items);
                 const moduleContentLabels = compactContentLabels(countContent(items));
-                const moduleProgress = moduleProgressById.get(module.id);
+                const modulePreparingCount = items.filter((item) => !isModuleItemReady(item)).length;
+                const moduleProgress = effectiveProgress.moduleProgressById.get(module.id);
                 return (
                   <details key={module.id} open className="group border-b border-black/10 last:border-b-0">
                     <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-4 marker:hidden">
@@ -725,8 +1122,13 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                             <ProgressBar value={moduleProgress.percentComplete} />
                           </div>
                         )}
-                        {moduleContentLabels.length > 0 && (
+                        {(moduleContentLabels.length > 0 || modulePreparingCount > 0) && (
                           <p className="mt-2 flex flex-wrap gap-1.5">
+                            {modulePreparingCount > 0 && (
+                              <span className="rounded-md bg-accent-50 px-2 py-0.5 text-[11px] font-semibold text-accent-700">
+                                {modulePreparingCount} đang bổ sung
+                              </span>
+                            )}
                             {moduleContentLabels.slice(0, 4).map((label) => (
                               <span
                                 key={label}
@@ -749,27 +1151,33 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                       <p className="border-t border-black/10 px-4 py-4 text-sm text-ink-500">
                         Chương này chưa có bài học.
                       </p>
+                    ) : visibleLessonsInModule.length === 0 ? (
+                      <div className="border-t border-black/10 px-4 py-4">
+                        <p className="text-sm font-semibold text-ink-700">Không có bài phù hợp bộ lọc.</p>
+                        {hasLessonFilter && (
+                          <p className="mt-1 text-xs leading-5 text-ink-500">
+                            {items.length} bài trong chương này đang bị ẩn.
+                          </p>
+                        )}
+                      </div>
                     ) : (
-                      items.map((item, itemIndex) => {
-                        const lesson: LessonWithContext = {
-                          ...item,
-                          moduleId: module.id,
-                          moduleTitle: module.title,
-                          moduleDescription: module.description,
-                          moduleIndex: moduleIndex + 1,
-                          itemIndex: itemIndex + 1
-                        };
-                        return (
+                      <>
+                        {visibleLessonsInModule.map((lesson) => (
                           <LessonButton
                             key={lesson.id}
                             lesson={lesson}
                             selected={lesson.id === activeLesson?.id}
                             nextUp={lesson.id === nextLesson?.id}
-                            completed={isCompletedProgress(itemProgressById.get(lesson.id))}
+                            completed={isLessonEffectivelyCompleted(lesson, itemProgressById)}
                             onSelect={() => setSelectedLessonId(lesson.id)}
                           />
-                        );
-                      })
+                        ))}
+                        {hasLessonFilter && hiddenLessonCount > 0 && (
+                          <p className="border-t border-black/10 px-4 py-2 text-xs font-semibold text-ink-500">
+                            Đang ẩn {hiddenLessonCount} bài trong chương này.
+                          </p>
+                        )}
+                      </>
                     )}
 
                     <div className="border-t border-black/10 bg-[#fbfaf7] p-3">
@@ -781,7 +1189,11 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                         onClick={() => mark.mutate({ moduleId: module.id })}
                       >
                         <CheckCircle2 className="size-4" />
-                        {moduleProgress?.completed ? "Chương đã đủ điều kiện" : "Hoàn thành các bài bắt buộc trước"}
+                        {moduleProgress?.completed
+                          ? "Chương đã đủ điều kiện"
+                          : modulePreparingCount > 0
+                            ? "Chờ bổ sung nội dung"
+                            : "Hoàn thành các bài bắt buộc trước"}
                       </Button>
                     </div>
                   </details>
@@ -807,9 +1219,9 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                     "Giảng viên chưa thêm mô tả chi tiết cho bài học này. Bạn vẫn có thể học theo video, tài liệu hoặc liên kết được gắn trong curriculum."}
                 </p>
                 <LessonMeta item={activeLesson} className="mt-4" />
-                {progress?.breakdown && progress.breakdown.length > 0 && (
+                {effectiveProgress.breakdown.length > 0 && (
                   <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    {progress.breakdown.map((item) => (
+                    {effectiveProgress.breakdown.map((item) => (
                       <div key={item.itemType} className="rounded-md border border-black/10 bg-[#fbfaf7] p-3">
                         <p className="text-xs font-bold uppercase text-ink-500">{kindLabel(item.itemType)}</p>
                         <p className="mt-1 text-lg font-bold text-ink-900">
@@ -820,19 +1232,30 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                     ))}
                   </div>
                 )}
-                {progress?.missingRequirements && progress.missingRequirements.length > 0 && (
+                {effectiveProgress.missingRequirements.length > 0 && (
                   <div className="mt-5 rounded-md border border-accent-100 bg-accent-50 p-3">
                     <p className="text-sm font-bold text-accent-700">Còn thiếu để hoàn thành khóa</p>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {progress.missingRequirements.slice(0, 5).map((item) => (
+                      {effectiveProgress.missingRequirements.slice(0, 5).map((item) => (
                         <Badge key={item.itemId} tone="amber">
                           {item.title}
                         </Badge>
                       ))}
-                      {progress.missingRequirements.length > 5 && (
-                        <Badge tone="neutral">+{progress.missingRequirements.length - 5} mục</Badge>
+                      {effectiveProgress.missingRequirements.length > 5 && (
+                        <Badge tone="neutral">+{effectiveProgress.missingRequirements.length - 5} mục</Badge>
                       )}
                     </div>
+                  </div>
+                )}
+                {activeReadinessIssue && (
+                  <div className="mt-5 rounded-md border border-accent-100 bg-accent-50 p-3">
+                    <p className="inline-flex items-center gap-2 text-sm font-bold text-accent-700">
+                      <AlertTriangle className="size-4" />
+                      Nội dung chưa sẵn sàng
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-ink-700">
+                      {activeReadinessIssue}. Bạn có thể chuyển sang bài khác trong lộ trình và quay lại khi giảng viên cập nhật.
+                    </p>
                   </div>
                 )}
               </div>
@@ -861,6 +1284,47 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
                     {activeDocs.length > 0 ? `${activeDocs.length} tài liệu` : "Chưa có"}
                   </Badge>
                 </div>
+                {activeDocs.length > 0 && (
+                  <div className="space-y-2 rounded-md border border-black/10 bg-white p-3">
+                    {activeDocs.map((mediaId, index) => (
+                      <div
+                        key={mediaId}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-[#fbfaf7] px-3 py-2"
+                      >
+                        <span className="min-w-0 truncate text-sm font-semibold text-ink-800">
+                          {documentLabel(mediaId, index)}
+                        </span>
+                        <span className="flex shrink-0 gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={Boolean(documentBusyId)}
+                            onClick={() => openDocument(mediaId, "open")}
+                          >
+                            <ExternalLink className="size-4" />
+                            Mở
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={Boolean(documentBusyId)}
+                            onClick={() => openDocument(mediaId, "download")}
+                          >
+                            <Download className="size-4" />
+                            Tải
+                          </Button>
+                        </span>
+                      </div>
+                    ))}
+                    {documentError && (
+                      <p className="rounded-md bg-coral-50 px-3 py-2 text-xs font-semibold leading-5 text-coral-600">
+                        {documentError}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-3 rounded-md bg-[#fbfaf7] p-3">
                   <span className="inline-flex items-center gap-2 font-semibold text-ink-900">
                     <ExternalLink className="size-4 text-brand-700" /> Link ngoài

@@ -1,15 +1,20 @@
-"use client";
-
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { notFound } from "next/navigation";
+import { getCourseBySlug } from "@/features/course-catalog/api";
 import { AssignmentsView } from "@/features/assignments/AssignmentsView";
 import { SectionHeader } from "@/shared/ui";
 
-export default function CourseAssignmentsPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const searchParams = useSearchParams();
-  const courseId = searchParams.get("courseId") ?? "";
-  const assignmentId = searchParams.get("assignmentId") ?? "";
+export default async function CourseAssignmentsPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ assignmentId?: string }>;
+}) {
+  const { slug } = await params;
+  const { assignmentId = "" } = await searchParams;
+  const course = await getCourseBySlug(slug);
+  if (!course?.id) notFound();
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-8 sm:px-6 lg:px-8">
@@ -22,7 +27,7 @@ export default function CourseAssignmentsPage() {
         description="Theo dõi hạn nộp, đọc yêu cầu và nộp bài trong cùng một màn hình."
         className="mb-7 mt-3"
       />
-      <AssignmentsView courseId={courseId} initialAssignmentId={assignmentId} />
+      <AssignmentsView courseId={course.id} initialAssignmentId={assignmentId} />
     </main>
   );
 }

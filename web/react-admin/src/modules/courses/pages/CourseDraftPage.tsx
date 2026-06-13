@@ -1,6 +1,7 @@
 import { FormEvent, type ReactNode, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   CheckCircle2,
@@ -33,7 +34,8 @@ import {
   Table,
   Td,
   Textarea,
-  Th
+  Th,
+  Notice
 } from "@/shared/ui";
 import {
   getAssetUploadUrl,
@@ -41,6 +43,8 @@ import {
   registerAsset,
   registerVideo
 } from "@/modules/media/api";
+import { listAssignments } from "@/modules/assignments/api";
+import { listCourseQuizzes } from "@/modules/quizzes/api";
 import {
   approveCourseReview,
   createModule,
@@ -69,6 +73,16 @@ type ItemForm = {
 type UploadFiles = {
   videoFile?: File;
   documentFiles: File[];
+};
+
+type ContentIssue = {
+  id: string;
+  severity: "blocker" | "warning";
+  itemType: string;
+  title: string;
+  detail: string;
+  moduleTitle?: string;
+  itemTitle?: string;
 };
 
 const createEmptyItem = (): ItemForm => ({
@@ -121,6 +135,202 @@ function reviewStateLabel(value?: string) {
     PUBLISHED: "Đã publish"
   };
   return labels[value ?? ""] ?? value ?? "Đang biên soạn";
+}
+
+function itemTypeLabel(itemType: string) {
+  return contentTypeLabel(itemType === "MATERIAL" ? "DOCUMENT" : itemType);
+}
+
+function assignmentStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    DRAFT: "Nháp - chưa hiển thị",
+    PUBLISHED: "Đã công khai",
+    ARCHIVED: "Đã lưu trữ"
+  };
+  return labels[status ?? ""] ?? status ?? "Nháp - chưa hiển thị";
+}
+
+function referencedStatusLabel(status?: string) {
+  if (!status) return "không rõ trạng thái";
+  return assignmentStatusLabel(status);
+}
+
+function contentIssue(
+  item: CourseModuleItem,
+  module: CourseModule,
+  severity: ContentIssue["severity"],
+  title: string,
+  detail: string
+): ContentIssue {
+  return {
+    id: `${module.moduleId}:${item.itemId}:${title}`,
+    severity,
+    itemType: item.itemType,
+    title,
+    detail,
+    moduleTitle: module.title,
+    itemTitle: item.title
+  };
+}
+
+function buildContentIssues({
+  modules,
+  quizzes,
+  assignments,
+  canValidateQuizzes,
+  canValidateAssignments,
+  quizCheckFailed,
+  assignmentCheckFailed
+}: {
+  modules: CourseModule[];
+  quizzes: Array<{ id: string; title: string; status?: string }>;
+  assignments: Array<{ id: string; title: string; status?: string }>;
+  canValidateQuizzes: boolean;
+  canValidateAssignments: boolean;
+  quizCheckFailed: boolean;
+  assignmentCheckFailed: boolean;
+}): ContentIssue[] {
+  const issues: ContentIssue[] = [];
+  const quizById = new Map(quizzes.map((quiz) => [quiz.id, quiz]));
+  const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
+  const hasQuizItem = modules.some((module) => module.items?.some((item) => item.itemType === "QUIZ"));
+  const hasAssignmentItem = modules.some((module) => module.items?.some((item) => item.itemType === "ASSIGNMENT"));
+
+  if (modules.length === 0) {
+    issues.push({
+      id: "course:no-modules",
+      severity: "blocker",
+      itemType: "MODULE",
+      title: "Course chưa có chương",
+      detail: "Tạo ít nhất một chương và thêm nội dung học trước khi gửi duyệt."
+    });
+  }
+
+  if (hasQuizItem && quizCheckFailed) {
+    issues.push({
+      id: "quiz-catalog-check",
+      severity: "blocker",
+      itemType: "QUIZ",
+      title: "Không kiểm tra được bài thi",
+      detail: "Cần tải được danh sách quiz để xác nhận learner có thể mở bài thi trước khi gửi duyệt hoặc publish."
+    });
+  }
+
+  if (hasAssignmentItem && assignmentCheckFailed) {
+    issues.push({
+      id: "assignment-catalog-check",
+      severity: "blocker",
+      itemType: "ASSIGNMENT",
+      title: "Không kiểm tra được bài tập",
+      detail: "Cần tải được danh sách assignment để tránh publish course trỏ tới assignment nháp."
+    });
+  }
+
+  for (const module of modules) {
+    const items = module.items ?? [];
+    if (items.length === 0) {
+      issues.push({
+        id: `${module.moduleId}:empty`,
+        severity: "blocker",
+        itemType: "MODULE",
+        title: "Chương chưa có bài học",
+        detail: "Mỗi chương cần ít nhất một item sẵn sàng trước khi gửi duyệt.",
+        moduleTitle: module.title
+      });
+    }
+
+    for (const item of items) {
+      const type = item.itemType;
+      const docs = item.documentMediaIds ?? [];
+      const hasAnyPayload = Boolean(
+        item.description?.trim() ||
+          item.videoMediaId ||
+          docs.length > 0 ||
+          item.contentUrl ||
+          item.refId
+      );
+
+      if ((type === "LESSON" || !type) && !hasAnyPayload) {
+        issues.push(contentIssue(
+          item,
+          module,
+          "blocker",
+          "Bài học chưa có nội dung",
+          "Thêm mô tả, video, tài liệu hoặc link để learner không mở vào trang rỗng."
+        ));
+      }
+
+      if (type === "VIDEO" && !item.videoMediaId) {
+        issues.push(contentIssue(
+          item,
+          module,
+          "blocker",
+          "Video chưa gắn file phát",
+          "Upload hoặc chọn video media trước khi gửi duyệt."
+        ));
+      }
+
+      if ((type === "DOCUMENT" || type === "PDF" || type === "MATERIAL") && docs.length === 0 && !item.contentUrl) {
+        issues.push(contentIssue(
+          item,
+          module,
+          "blocker",
+          "Tài liệu chưa có file hoặc link",
+          "Gắn ít nhất một media asset hoặc link tài liệu."
+        ));
+      }
+
+      if (type === "LINK" && !item.contentUrl) {
+        issues.push(contentIssue(
+          item,
+          module,
+          "blocker",
+          "Liên kết đang trống",
+          "Thêm URL trước khi learner nhìn thấy bài này."
+        ));
+      }
+
+      if (type === "QUIZ") {
+        if (!item.refId) {
+          issues.push(contentIssue(item, module, "blocker", "Bài thi chưa được chọn", "Chọn quiz đã thuộc khóa học này."));
+        } else if (canValidateQuizzes) {
+          const quiz = quizById.get(item.refId);
+          if (!quiz) {
+            issues.push(contentIssue(item, module, "blocker", "Quiz reference không tìm thấy", `Không tìm thấy quiz ${shortId(item.refId)} trong khóa học.`));
+          } else if (quiz.status !== "PUBLISHED") {
+            issues.push(contentIssue(
+              item,
+              module,
+              "blocker",
+              "Quiz chưa công khai",
+              `${quiz.title} đang ở trạng thái ${referencedStatusLabel(quiz.status)}; learner sẽ không mở được quiz này.`
+            ));
+          }
+        }
+      }
+
+      if (type === "ASSIGNMENT") {
+        if (!item.refId) {
+          issues.push(contentIssue(item, module, "blocker", "Bài tập chưa được chọn", "Chọn assignment đã thuộc khóa học này."));
+        } else if (canValidateAssignments) {
+          const assignment = assignmentById.get(item.refId);
+          if (!assignment) {
+            issues.push(contentIssue(item, module, "blocker", "Assignment reference không tìm thấy", `Không tìm thấy assignment ${shortId(item.refId)} trong khóa học.`));
+          } else if (assignment.status !== "PUBLISHED") {
+            issues.push(contentIssue(
+              item,
+              module,
+              "blocker",
+              "Assignment chưa learner-visible",
+              `${assignment.title} đang ở trạng thái ${referencedStatusLabel(assignment.status)}; assignment nháp không hiển thị cho learner.`
+            ));
+          }
+        }
+      }
+    }
+  }
+
+  return issues;
 }
 
 async function putToUploadUrl(uploadUrl: string, file: File) {
@@ -253,39 +463,107 @@ function UploadTile({
   );
 }
 
-function ReadinessColumn({
-  title,
-  subtitle,
-  items
-}: {
-  title: string;
-  subtitle: string;
-  items: Array<{ done: boolean; label: string; detail: string }>;
-}) {
+function ContentIssueList({ issues, pending }: { issues: ContentIssue[]; pending?: boolean }) {
+  if (pending) {
+    return (
+      <Notice tone="warning" title="Đang kiểm tra nội dung tham chiếu">
+        Hệ thống đang tải quiz/assignment được gắn vào curriculum trước khi kết luận readiness.
+      </Notice>
+    );
+  }
+
+  if (issues.length === 0) {
+    return (
+      <Notice tone="success" title="Không còn blocker nội dung">
+        Course draft có đủ học liệu bắt buộc để đi tiếp trong lifecycle hiện tại.
+      </Notice>
+    );
+  }
+
   return (
-    <div className="rounded-lg border border-black/10 bg-slate-50/70 p-4">
-      <div className="mb-4">
-        <p className="font-bold text-slate-950">{title}</p>
-        <p className="mt-1 text-sm leading-5 text-slate-500">{subtitle}</p>
-      </div>
-      <div className="space-y-3">
-        {items.map((item) => (
-          <div key={item.label} className="flex items-start gap-3">
-            <span
-              className={
-                item.done
-                  ? "grid size-8 shrink-0 place-items-center rounded-md bg-emerald-50 text-emerald-700"
-                  : "grid size-8 shrink-0 place-items-center rounded-md bg-amber-50 text-amber-700"
-              }
-            >
-              {item.done ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-            </span>
-            <span>
-              <span className="block text-sm font-semibold text-slate-900">{item.label}</span>
-              <span className="mt-0.5 block text-xs leading-5 text-slate-500">{item.detail}</span>
-            </span>
+    <div className="space-y-3">
+      {issues.map((issue) => (
+        <div
+          key={issue.id}
+          className={
+            issue.severity === "blocker"
+              ? "rounded-md border border-red-200 bg-red-50 p-3"
+              : "rounded-md border border-amber-200 bg-amber-50 p-3"
+          }
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  value={issue.severity === "blocker" ? "REVOKED" : "DRAFT"}
+                  label={issue.severity === "blocker" ? "Blocker" : "Cảnh báo"}
+                />
+                <Badge value={issue.itemType} label={itemTypeLabel(issue.itemType)} />
+                {issue.moduleTitle && <span className="text-xs font-semibold text-slate-500">{issue.moduleTitle}</span>}
+              </div>
+              <p className="mt-2 text-sm font-bold text-slate-950">{issue.title}</p>
+              {issue.itemTitle && <p className="mt-0.5 text-xs font-semibold text-slate-600">{issue.itemTitle}</p>}
+              <p className="mt-1 text-sm leading-6 text-slate-600">{issue.detail}</p>
+            </div>
           </div>
-        ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReadinessGate({
+  label,
+  ready,
+  pending,
+  blockedText,
+  readyText,
+  issues
+}: {
+  label: string;
+  ready: boolean;
+  pending?: boolean;
+  blockedText: string;
+  readyText: string;
+  issues: ContentIssue[];
+}) {
+  const blockers = issues.filter((issue) => issue.severity === "blocker");
+  const tone = ready ? "success" : pending ? "warning" : "danger";
+
+  return (
+    <div
+      className={
+        ready
+          ? "rounded-lg border border-emerald-200 bg-emerald-50/70 p-4"
+          : pending
+            ? "rounded-lg border border-amber-200 bg-amber-50/70 p-4"
+            : "rounded-lg border border-red-200 bg-red-50/70 p-4"
+      }
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={
+            ready
+              ? "grid size-10 shrink-0 place-items-center rounded-md bg-white text-emerald-700 shadow-sm"
+              : pending
+                ? "grid size-10 shrink-0 place-items-center rounded-md bg-white text-amber-700 shadow-sm"
+                : "grid size-10 shrink-0 place-items-center rounded-md bg-white text-red-700 shadow-sm"
+          }
+        >
+          {ready ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-bold text-slate-950">{label}</p>
+            <Badge
+              tone={tone}
+              label={ready ? "Sẵn sàng" : pending ? "Đang kiểm tra" : `${blockers.length} blocker`}
+            />
+          </div>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            {ready ? readyText : pending ? "Đang kiểm tra quiz/assignment được gắn vào curriculum." : blockedText}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -328,6 +606,20 @@ export function CourseDraftPage() {
     queryKey: queryKeys.authoring.versions(courseId),
     queryFn: () => listCourseVersions(courseId),
     enabled: Boolean(courseId)
+  });
+  const quizzes = useQuery({
+    queryKey: queryKeys.quizzes.list(courseId),
+    queryFn: () => listCourseQuizzes(courseId),
+    enabled: Boolean(courseId),
+    retry: 1,
+    staleTime: 60_000
+  });
+  const assignments = useQuery({
+    queryKey: queryKeys.assignments.list(courseId),
+    queryFn: () => listAssignments(courseId),
+    enabled: Boolean(courseId),
+    retry: 1,
+    staleTime: 60_000
   });
 
   const [moduleForm, setModuleForm] = useState({ title: "", description: "" });
@@ -434,55 +726,32 @@ export function CourseDraftPage() {
 
   const d = draft.data;
   const modules = [...(d.modules ?? [])].sort((a, b) => a.position - b.position);
+  const quizRows = quizzes.data ?? [];
+  const assignmentRows = assignments.data ?? [];
   const lessonCount = modules.reduce((sum, module) => sum + (module.items?.length ?? 0), 0);
   const reviewState = d.reviewState ?? "DRAFT";
-  const canSubmitReview = d.status === "DRAFT" && reviewState === "DRAFT" && lessonCount > 0;
+  const hasQuizItems = modules.some((module) => module.items?.some((item) => item.itemType === "QUIZ"));
+  const hasAssignmentItems = modules.some((module) => module.items?.some((item) => item.itemType === "ASSIGNMENT"));
+  const readinessChecksPending = (hasQuizItems && quizzes.isLoading) || (hasAssignmentItems && assignments.isLoading);
+  const contentIssues = buildContentIssues({
+    modules,
+    quizzes: quizRows,
+    assignments: assignmentRows,
+    canValidateQuizzes: quizzes.isSuccess,
+    canValidateAssignments: assignments.isSuccess,
+    quizCheckFailed: quizzes.isError,
+    assignmentCheckFailed: assignments.isError
+  });
+  const contentBlockers = contentIssues.filter((issue) => issue.severity === "blocker");
+  const contentReady = !readinessChecksPending && modules.length > 0 && lessonCount > 0 && contentBlockers.length === 0;
+  const canSubmitReview = d.status === "DRAFT" && reviewState === "DRAFT" && contentReady;
   const canApprove = reviewState === "IN_REVIEW";
-  const canPublish = d.status === "DRAFT" && reviewState === "APPROVED";
-  const reviewRequirements = [
-    {
-      done: d.status === "DRAFT",
-      label: "Course còn ở trạng thái draft",
-      detail: d.status === "DRAFT" ? "Có thể tiếp tục chỉnh sửa và gửi duyệt." : "Course đã rời trạng thái draft."
-    },
-    {
-      done: modules.length > 0,
-      label: "Có ít nhất 1 chương",
-      detail: modules.length > 0 ? `${modules.length} chương đã được tạo.` : "Chưa có chương trong curriculum."
-    },
-    {
-      done: lessonCount > 0,
-      label: "Có ít nhất 1 bài học",
-      detail: lessonCount > 0 ? `${lessonCount} bài học đã có trong curriculum.` : "Thêm video, tài liệu, link hoặc bài học vào chương."
-    },
-    {
-      done: reviewState === "DRAFT",
-      label: "Chưa nằm trong hàng chờ duyệt",
-      detail: `Review hiện tại: ${reviewStateLabel(reviewState)}.`
-    }
-  ];
-  const publishRequirements = [
-    {
-      done: reviewState === "APPROVED",
-      label: "Đã được reviewer duyệt",
-      detail: reviewState === "APPROVED" ? "Course đủ điều kiện publish." : "Cần reviewer chuyển review sang Đã duyệt."
-    },
-    {
-      done: d.status === "DRAFT",
-      label: "Chưa publish",
-      detail: d.status === "DRAFT" ? "Publish sẽ đóng băng snapshot hiện tại." : "Course không còn ở trạng thái draft."
-    },
-    {
-      done: lessonCount > 0,
-      label: "Snapshot có nội dung học",
-      detail: lessonCount > 0 ? "Version publish sẽ có bài học cho learner." : "Thêm bài học trước khi gửi duyệt."
-    }
-  ];
+  const canPublish = d.status === "DRAFT" && reviewState === "APPROVED" && contentReady;
   const submitReviewTitle = canSubmitReview
     ? "Sẵn sàng gửi duyệt"
-    : "Cần course draft, review DRAFT và ít nhất một bài học";
+    : "Cần course draft, review DRAFT và không còn blocker nội dung";
   const approveTitle = canApprove ? "Sẵn sàng duyệt" : "Chỉ duyệt khi course đang IN_REVIEW";
-  const publishTitle = canPublish ? "Sẵn sàng publish" : "Cần review APPROVED trước khi publish";
+  const publishTitle = canPublish ? "Sẵn sàng publish" : "Cần review APPROVED và không còn blocker nội dung";
 
   return (
     <div>
@@ -546,26 +815,45 @@ export function CourseDraftPage() {
 
       <Card className="mb-4">
         <CardHeader
-          title="Checklist xuất bản"
-          subtitle="Trạng thái nội dung và duyệt trước khi mở khóa học cho learner."
+          title="Readiness gate"
+          subtitle="Blocker theo từng item type trước khi gửi duyệt hoặc mở khóa học cho learner."
           actions={
             <Badge
-              value={canPublish ? "READY" : canSubmitReview ? "DRAFT" : reviewState}
-              label={canPublish ? "Sẵn sàng publish" : canSubmitReview ? "Sẵn sàng gửi duyệt" : reviewStateLabel(reviewState)}
+              value={contentReady ? "READY" : "DRAFT"}
+              label={contentReady ? "Nội dung sẵn sàng" : `${contentBlockers.length} blocker`}
             />
           }
         />
-        <div className="grid gap-4 p-5 lg:grid-cols-2">
-          <ReadinessColumn
-            title="Gửi duyệt"
-            subtitle="Hoàn tất khung nội dung trước khi đưa vào hàng chờ reviewer."
-            items={reviewRequirements}
-          />
-          <ReadinessColumn
-            title="Publish"
-            subtitle="Chỉ publish sau khi reviewer đã duyệt version hiện tại."
-            items={publishRequirements}
-          />
+        <div className="grid gap-4 p-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+          <div className="space-y-3">
+            <ReadinessGate
+              label="Submit review"
+              ready={canSubmitReview}
+              pending={readinessChecksPending}
+              readyText="Course có thể được đưa vào hàng chờ review."
+              blockedText={
+                d.status !== "DRAFT"
+                  ? "Course phải ở trạng thái draft để gửi duyệt."
+                  : reviewState !== "DRAFT"
+                    ? `Review hiện tại: ${reviewStateLabel(reviewState)}.`
+                    : "Sửa các blocker nội dung trước khi gửi duyệt."
+              }
+              issues={contentIssues}
+            />
+            <ReadinessGate
+              label="Publish"
+              ready={canPublish}
+              pending={readinessChecksPending}
+              readyText="Snapshot đã duyệt có thể publish cho learner."
+              blockedText={
+                reviewState !== "APPROVED"
+                  ? "Reviewer cần duyệt course trước khi publish."
+                  : "Sửa các blocker nội dung trước khi publish."
+              }
+              issues={contentIssues}
+            />
+          </div>
+          <ContentIssueList issues={contentIssues} pending={readinessChecksPending} />
         </div>
       </Card>
 
@@ -649,7 +937,7 @@ export function CourseDraftPage() {
                       <Select
                         id={`item-type-${module.moduleId}`}
                         value={itemForm.itemType}
-                        onChange={(e) => updateItemForm(module.moduleId, { itemType: e.target.value })}
+                        onChange={(e) => updateItemForm(module.moduleId, { itemType: e.target.value, refId: "" })}
                       >
                         <option value="LESSON">Bài học</option>
                         <option value="VIDEO">Video</option>
@@ -690,14 +978,51 @@ export function CourseDraftPage() {
                         />
                       </FormField>
 
-                      <FormField label="Ref ID nội bộ" htmlFor={`item-ref-${module.moduleId}`} hint="Dùng khi nối với bài thi, bài tập hoặc đối tượng đã tồn tại trong hệ thống.">
-                        <Input
-                          id={`item-ref-${module.moduleId}`}
-                          value={itemForm.refId}
-                          onChange={(e) => updateItemForm(module.moduleId, { refId: e.target.value })}
-                          placeholder="UUID hoặc mã nội bộ"
-                        />
-                      </FormField>
+                      {itemForm.itemType === "QUIZ" && (
+                        <FormField label="Bài thi" htmlFor={`item-ref-${module.moduleId}`} hint="Chọn quiz đã thuộc khóa học này.">
+                          <Select
+                            id={`item-ref-${module.moduleId}`}
+                            value={itemForm.refId}
+                            onChange={(e) => updateItemForm(module.moduleId, { refId: e.target.value })}
+                            required
+                          >
+                            <option value="">Chọn bài thi</option>
+                            {quizRows.map((quiz) => (
+                              <option key={quiz.id} value={quiz.id}>
+                                {quiz.title} · {quiz.status ?? "DRAFT"}
+                              </option>
+                            ))}
+                            {itemForm.refId && !quizRows.some((quiz) => quiz.id === itemForm.refId) && (
+                              <option value={itemForm.refId}>Bài thi {shortId(itemForm.refId)}</option>
+                            )}
+                          </Select>
+                          {quizzes.isLoading && <span className="text-xs text-slate-400">Đang tải quiz...</span>}
+                          {quizzes.isError && <ErrorState error={quizzes.error} />}
+                        </FormField>
+                      )}
+
+                      {itemForm.itemType === "ASSIGNMENT" && (
+                        <FormField label="Bài tập" htmlFor={`item-ref-${module.moduleId}`} hint="Chọn assignment đã thuộc khóa học này.">
+                          <Select
+                            id={`item-ref-${module.moduleId}`}
+                            value={itemForm.refId}
+                            onChange={(e) => updateItemForm(module.moduleId, { refId: e.target.value })}
+                            required
+                          >
+                            <option value="">Chọn bài tập</option>
+                            {assignmentRows.map((assignment) => (
+                              <option key={assignment.id} value={assignment.id}>
+                                {assignment.title} · {assignment.status ?? "DRAFT"}
+                              </option>
+                            ))}
+                            {itemForm.refId && !assignmentRows.some((assignment) => assignment.id === itemForm.refId) && (
+                              <option value={itemForm.refId}>Bài tập {shortId(itemForm.refId)}</option>
+                            )}
+                          </Select>
+                          {assignments.isLoading && <span className="text-xs text-slate-400">Đang tải assignment...</span>}
+                          {assignments.isError && <ErrorState error={assignments.error} />}
+                        </FormField>
+                      )}
                     </div>
 
                     <UploadTile
@@ -731,7 +1056,10 @@ export function CourseDraftPage() {
                       />
                       Bắt buộc hoàn thành
                     </label>
-                    <Button type="submit" disabled={addItem.isPending}>
+                    <Button
+                      type="submit"
+                      disabled={addItem.isPending || ((itemForm.itemType === "QUIZ" || itemForm.itemType === "ASSIGNMENT") && !itemForm.refId)}
+                    >
                       <CheckCircle2 size={16} />
                       {addItem.isPending ? "Đang lưu/upload..." : "Lưu bài học"}
                     </Button>

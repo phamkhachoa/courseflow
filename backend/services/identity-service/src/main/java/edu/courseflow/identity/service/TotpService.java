@@ -1,6 +1,9 @@
 package edu.courseflow.identity.service;
 
 import java.nio.ByteBuffer;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Instant;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -11,6 +14,25 @@ public class TotpService {
 
     private static final int STEP_SECONDS = 30;
     private static final int DIGITS = 6;
+    private static final int SECRET_BYTES = 20;
+    private static final char[] BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".toCharArray();
+    private final SecureRandom secureRandom = new SecureRandom();
+
+    public String generateSecret() {
+        byte[] random = new byte[SECRET_BYTES];
+        secureRandom.nextBytes(random);
+        return encodeBase32(random);
+    }
+
+    public String provisioningUri(String issuer, String accountName, String secret) {
+        String safeIssuer = issuer == null || issuer.isBlank() ? "CourseFlow" : issuer.trim();
+        String label = safeIssuer + ":" + (accountName == null ? "account" : accountName.trim());
+        return "otpauth://totp/" + urlEncode(label)
+                + "?secret=" + urlEncode(secret)
+                + "&issuer=" + urlEncode(safeIssuer)
+                + "&digits=" + DIGITS
+                + "&period=" + STEP_SECONDS;
+    }
 
     public boolean verify(String base32Secret, String code) {
         if (base32Secret == null || base32Secret.isBlank() || code == null || !code.matches("\\d{6}")) {
@@ -79,5 +101,27 @@ public class TotpService {
             return c - '2' + 26;
         }
         return -1;
+    }
+
+    private String encodeBase32(byte[] value) {
+        StringBuilder out = new StringBuilder((value.length * 8 + 4) / 5);
+        int buffer = 0;
+        int bitsLeft = 0;
+        for (byte b : value) {
+            buffer = (buffer << 8) | (b & 0xff);
+            bitsLeft += 8;
+            while (bitsLeft >= 5) {
+                out.append(BASE32[(buffer >> (bitsLeft - 5)) & 0x1f]);
+                bitsLeft -= 5;
+            }
+        }
+        if (bitsLeft > 0) {
+            out.append(BASE32[(buffer << (5 - bitsLeft)) & 0x1f]);
+        }
+        return out.toString();
+    }
+
+    private String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 }

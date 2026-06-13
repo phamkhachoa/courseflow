@@ -6,7 +6,7 @@ import '../../../core/api/dio_client.dart';
 import '../domain/peer_review_models.dart';
 
 /// Peer review APIs:
-///  - `GET  /v1/peer-reviews/review-assignments`            assigned queue
+///  - `GET  /v1/peer-reviews/review-assignments/mine`       assigned queue
 ///  - `POST /v1/peer-reviews/review-assignments/{id}/submit`
 class PeerReviewRepository {
   PeerReviewRepository(this._client);
@@ -17,7 +17,7 @@ class PeerReviewRepository {
   Future<List<PeerReviewAssignment>> queue() async {
     try {
       final res = await _dio.get<Object?>(
-        '/v1/peer-reviews/review-assignments',
+        '/v1/peer-reviews/review-assignments/mine',
       );
       return ApiEnvelope.unwrapList(res.data)
           .map(PeerReviewAssignment.fromJson)
@@ -49,5 +49,5 @@ final peerReviewRepositoryProvider = Provider<PeerReviewRepository>((ref) {
 
 final peerReviewQueueProvider =
     FutureProvider.autoDispose<List<PeerReviewAssignment>>((ref) {
-      return ref.watch(peerReviewRepositoryProvider).queue();
-    });
+  return ref.watch(peerReviewRepositoryProvider).queue();
+});

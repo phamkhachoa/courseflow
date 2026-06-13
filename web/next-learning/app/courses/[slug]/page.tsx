@@ -109,7 +109,7 @@ export default async function CourseDetailPage({
               {course.id && <EnrollmentCta courseId={course.id} courseSlug={course.slug} inverse />}
               {course.id && (
                 <Link
-                  href={`/courses/${course.slug}/modules?courseId=${course.id}`}
+                  href={`/courses/${course.slug}/modules`}
                   className="inline-flex items-center justify-center gap-2 rounded-md border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
                 >
                   <PlayCircle className="size-4" />
@@ -221,7 +221,7 @@ export default async function CourseDetailPage({
                 eyebrow="Lộ trình"
                 title="Chương, bài học và học liệu"
                 action={
-                  <LinkButton href={`/courses/${course.slug}/modules?courseId=${course.id}`} variant="secondary">
+                  <LinkButton href={`/courses/${course.slug}/modules`} variant="secondary">
                     <BookOpenCheck className="size-4" />
                     Mở phòng học
                   </LinkButton>

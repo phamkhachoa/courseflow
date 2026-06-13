@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -40,6 +41,10 @@ public class CourseVersion {
 
     @Column(name = "published_at")
     private Instant publishedAt;
+
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     protected CourseVersion() {
     }
@@ -78,6 +83,10 @@ public class CourseVersion {
         this.state = "PUBLISHED";
         this.snapshot = snapshot;
         this.publishedAt = publishedAt;
+    }
+
+    public String getSnapshot() {
+        return snapshot;
     }
 
     public String getCreatedBy() {

@@ -16,6 +16,9 @@ public final class Authz {
     public static final String ROLE_STUDENT = "STUDENT";
     public static final String ROLE_INSTRUCTOR = "INSTRUCTOR";
     public static final String ROLE_ADMIN = "ADMIN";
+    public static final String ROLE_ORG_ADMIN = "ORG_ADMIN";
+    public static final String ROLE_PROFESSOR = "PROFESSOR";
+    public static final String ROLE_TA = "TA";
 
     private Authz() {
     }
@@ -29,13 +32,14 @@ public final class Authz {
     }
 
     public static boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole(ROLE_INSTRUCTOR, ROLE_ADMIN);
+        return user != null && user.hasAnyRole(
+                ROLE_INSTRUCTOR, ROLE_PROFESSOR, ROLE_TA, ROLE_ORG_ADMIN, ROLE_ADMIN);
     }
 
     /** Require the caller to be an instructor or admin (manual grading, etc.). */
     public static void requireStaff(CurrentUser user) {
         if (!isStaff(user)) {
-            throw new ForbiddenException("FORBIDDEN_REQUIRES_INSTRUCTOR_OR_ADMIN");
+            throw new ForbiddenException("FORBIDDEN_REQUIRES_COURSE_STAFF");
         }
     }
 

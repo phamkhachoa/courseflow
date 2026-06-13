@@ -19,6 +19,7 @@ import { learnerSession, type StoredSession } from "@/shared/api/client";
 import { Badge, Button, Card, EmptyState, cn } from "@/shared/ui";
 import { useCourseModules } from "./hooks";
 import type { CourseModule, ModuleItem } from "./api";
+import { getModuleItemKind, getModuleItemReadinessIssue, isModuleItemReady } from "./readiness";
 
 type CourseOverviewPanelProps = {
   courseId: string;
@@ -43,13 +44,7 @@ function flattenItems(modules: CourseModule[]) {
 }
 
 function lessonKind(item: ModuleItem): LessonKind {
-  const type = item.itemType?.toUpperCase();
-  if (type === "VIDEO" || item.videoMediaId) return "VIDEO";
-  if (type === "DOCUMENT" || type === "PDF" || type === "MATERIAL" || (item.documentMediaIds?.length ?? 0) > 0) {
-    return "DOCUMENT";
-  }
-  if (type === "LINK" || item.contentUrl) return "LINK";
-  return type ?? "LESSON";
+  return getModuleItemKind(item);
 }
 
 function kindLabel(kind: LessonKind) {
@@ -142,6 +137,7 @@ function ModulePreview({ module, index }: { module: CourseModule; index: number 
   const items = module.items ?? [];
   const stats = countByKind(items);
   const duration = totalMinutes(items);
+  const preparingCount = items.filter((item) => !isModuleItemReady(item)).length;
 
   return (
     <Card padding="none" className="overflow-hidden">
@@ -157,6 +153,7 @@ function ModulePreview({ module, index }: { module: CourseModule; index: number 
           <Badge tone="brand">{items.length} bài</Badge>
           <Badge tone="neutral">{formatMinutes(duration)}</Badge>
           {stats.required > 0 && <Badge tone="amber">{stats.required} bắt buộc</Badge>}
+          {preparingCount > 0 && <Badge tone="amber">{preparingCount} đang bổ sung</Badge>}
         </div>
       </div>
 
@@ -166,6 +163,7 @@ function ModulePreview({ module, index }: { module: CourseModule; index: number 
         <div className="border-t border-black/10">
           {items.slice(0, 5).map((item, itemIndex) => {
             const kind = lessonKind(item);
+            const readinessIssue = getModuleItemReadinessIssue(item);
             return (
               <div
                 key={item.id}
@@ -181,6 +179,7 @@ function ModulePreview({ module, index }: { module: CourseModule; index: number 
                     {item.videoMediaId && <span>Có video</span>}
                     {(item.documentMediaIds?.length ?? 0) > 0 && <span>{item.documentMediaIds?.length} tài liệu</span>}
                     {item.required && <span>Bắt buộc</span>}
+                    {readinessIssue && <span className="font-bold text-accent-700">{readinessIssue}</span>}
                   </p>
                 </div>
                 <Badge tone={kindTone(kind)} className="w-fit">
@@ -213,9 +212,12 @@ export function CourseOverviewPanel({ courseId, courseSlug, className }: CourseO
     const kind = lessonKind(lesson);
     return kind === "QUIZ" || kind === "ASSIGNMENT";
   });
-  const firstLesson = firstVideo ?? lessons[0];
-  const moduleHref = `/courses/${courseSlug}/modules?courseId=${courseId}`;
+  const firstReadyLesson = lessons.find(isModuleItemReady);
+  const firstLesson = firstVideo ?? firstReadyLesson ?? lessons[0];
+  const moduleHref = `/courses/${courseSlug}/modules`;
   const courseDuration = totalMinutes(lessons);
+  const preparingLessonCount = lessons.filter((lesson) => !isModuleItemReady(lesson)).length;
+  const readyLessonCount = lessons.length - preparingLessonCount;
 
   useEffect(() => {
     setSession(learnerSession.read());
@@ -327,12 +329,15 @@ export function CourseOverviewPanel({ courseId, courseSlug, className }: CourseO
                 Lộ trình thật
               </Badge>
               <Badge tone="neutral">{modules.length} chương</Badge>
+              <Badge tone={preparingLessonCount > 0 ? "amber" : "brand"}>
+                {readyLessonCount}/{lessons.length} bài sẵn sàng
+              </Badge>
               <Badge tone="neutral">{formatMinutes(courseDuration)}</Badge>
             </div>
             <h3 className="mt-4 text-2xl font-bold text-ink-900">Vào phòng học với video, bài đọc và đánh giá</h3>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-ink-500">
               Học viên có thể xem bài theo chương, chuyển lesson ngay trong player, làm quiz hoặc mở bài tập từ cùng
-              một lộ trình.
+              một lộ trình. Những bài còn thiếu học liệu sẽ được đánh dấu đang bổ sung để không bị tính nhầm vào tiến độ.
             </p>
           </div>
           <Button asChild size="lg">

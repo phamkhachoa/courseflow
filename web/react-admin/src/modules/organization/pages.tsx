@@ -193,27 +193,6 @@ export function OrganizationPage() {
                 )}
               </Select>
             </FormField>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập ID thủ công</summary>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <FormField label="Course ID" htmlFor="s-course-manual">
-                  <Input
-                    id="s-course-manual"
-                    value={form.courseId}
-                    onChange={(e) => setForm({ ...form, courseId: e.target.value.trim() })}
-                    placeholder="UUID khóa học"
-                  />
-                </FormField>
-                <FormField label="Term ID" htmlFor="s-term-manual">
-                  <Input
-                    id="s-term-manual"
-                    value={form.termId}
-                    onChange={(e) => setForm({ ...form, termId: e.target.value.trim() })}
-                    placeholder="ID kỳ học"
-                  />
-                </FormField>
-              </div>
-            </details>
             <FormField label="Mã lớp" htmlFor="s-code">
               <Input id="s-code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
             </FormField>

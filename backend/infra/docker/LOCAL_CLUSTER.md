@@ -71,7 +71,7 @@ Local Compose loads demo rows by default (`prod,demo`) so the admin and learner 
 to exercise. For a production-safe schema-only run:
 
 ```bash
-LIQUIBASE_CONTEXTS=prod docker compose \
+SPRING_LIQUIBASE_CONTEXTS=prod docker compose \
   -f infra/docker/docker-compose.yml \
   -f infra/docker/docker-compose.services.yml \
   up --build
@@ -80,17 +80,84 @@ LIQUIBASE_CONTEXTS=prod docker compose \
 Load demo rows explicitly:
 
 ```bash
-LIQUIBASE_CONTEXTS=prod,demo docker compose \
+SPRING_LIQUIBASE_CONTEXTS=prod,demo docker compose \
   -f infra/docker/docker-compose.yml \
   -f infra/docker/docker-compose.services.yml \
   up --build
+```
+
+## Debezium Search Sync
+
+Course catalog search is projected through Debezium directly from source tables. Business workflows
+still use transactional outbox and `outbox-relay`.
+
+```text
+cf_course.public.courses -> Debezium/Kafka Connect -> Kafka -> search-service -> Elasticsearch
+```
+
+The one-shot `debezium-course-search-setup` container registers/updates the Kafka Connect connector
+named `courseflow-course-search-cdc`.
+
+Useful local checks:
+
+```bash
+curl http://localhost:18083/connectors/courseflow-course-search-cdc/status
+```
+
+```bash
+docker exec courseflow-kafka kafka-console-consumer \
+  --bootstrap-server kafka:29092 \
+  --topic courseflow.course.public.courses \
+  --from-beginning
+```
+
+The `course.published` topic is still owned by the business outbox flow; the ES projection listens to
+the Debezium table topic above.
+
+## Observability
+
+Start the local cluster with Prometheus and Grafana:
+
+```bash
+docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.services.yml \
+  -f infra/docker/docker-compose.observability.yml \
+  up --build
+```
+
+Open:
+
+```text
+Prometheus: http://localhost:19090
+Grafana:    http://localhost:13000
+```
+
+Spring services expose metrics at `/actuator/prometheus`; Prometheus scrape targets are defined in
+`infra/observability/prometheus.yml`. Basic alert rules live in `infra/observability/alerts.yml`,
+and Grafana provisions the Prometheus datasource from `infra/observability/grafana/provisioning`.
+
+## Backup / Restore Drill
+
+Run a local dump of all service-owned Postgres databases:
+
+```bash
+scripts/postgres-backup-drill.sh backup
+```
+
+Validate a dump by restoring it into a temporary local database:
+
+```bash
+scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_identity
 ```
 
 ## Trust Boundary
 
 - Browser/client traffic goes through `api-gateway`.
 - The gateway strips `X-User-*` and `X-Service-Token` headers from inbound requests.
-- Internal entitlement checks use `COURSEFLOW_SERVICE_TOKEN` directly between services.
+- After validating JWTs, the gateway re-adds `X-User-*` plus `X-Service-Token`; downstream
+  services reject identity headers without that matching token.
+- Internal entitlement checks also use `COURSEFLOW_SERVICE_TOKEN` directly between services.
 - Default local token is only for this Compose cluster; override it for any shared environment.
 
 ## Course Chat

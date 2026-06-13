@@ -7,10 +7,12 @@ import {
   CardHeader,
   ErrorState,
   FormField,
-  Input,
   PageHeader,
+  Select,
   Spinner
 } from "@/shared/ui";
+import { listCourses } from "../courses/api";
+import { listDepartments } from "../organization/api";
 import { getCourseCompletion, getOrgDashboard } from "./api";
 
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
@@ -27,6 +29,19 @@ export function ReportingPage() {
   const [orgId, setOrgId] = useState("");
   const [submittedCourse, setSubmittedCourse] = useState("");
   const [submittedOrg, setSubmittedOrg] = useState("");
+
+  const courses = useQuery({
+    queryKey: queryKeys.courses.list("reporting"),
+    queryFn: () => listCourses(),
+    staleTime: 60_000
+  });
+  const departments = useQuery({
+    queryKey: queryKeys.organization.departments,
+    queryFn: () => listDepartments(),
+    staleTime: 60_000
+  });
+  const courseRows = courses.data ?? [];
+  const departmentRows = departments.data ?? [];
 
   const completion = useQuery({
     queryKey: queryKeys.analytics.completion(submittedCourse),
@@ -48,15 +63,23 @@ export function ReportingPage() {
         <CardHeader title="Hoàn thành khóa học" />
         <form
           className="flex items-end gap-3 p-4"
-          onSubmit={(e: FormEvent) => { e.preventDefault(); setSubmittedCourse(courseId.trim()); }}
+          onSubmit={(e: FormEvent) => { e.preventDefault(); setSubmittedCourse(courseId); }}
         >
           <div className="flex-1">
-            <FormField label="Khóa học (ID)" htmlFor="rp-course">
-              <Input id="rp-course" value={courseId} onChange={(e) => setCourseId(e.target.value)} required />
+            <FormField label="Khóa học" htmlFor="rp-course">
+              <Select id="rp-course" value={courseId} onChange={(e) => setCourseId(e.target.value)} required>
+                <option value="">Chọn khóa học</option>
+                {courseRows.map((course) => (
+                  <option key={course.id} value={course.id}>
+                    {[course.code, course.title].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </Select>
             </FormField>
           </div>
           <Button type="submit">Xem</Button>
         </form>
+        {courses.isError && <ErrorState error={courses.error} />}
         {completion.isLoading && <Spinner />}
         {completion.isError && <ErrorState error={completion.error} />}
         {completion.data && (
@@ -72,15 +95,23 @@ export function ReportingPage() {
         <CardHeader title="Dashboard tổ chức" />
         <form
           className="flex items-end gap-3 p-4"
-          onSubmit={(e: FormEvent) => { e.preventDefault(); setSubmittedOrg(orgId.trim()); }}
+          onSubmit={(e: FormEvent) => { e.preventDefault(); setSubmittedOrg(orgId); }}
         >
           <div className="flex-1">
-            <FormField label="Tổ chức (ID)" htmlFor="rp-org">
-              <Input id="rp-org" value={orgId} onChange={(e) => setOrgId(e.target.value)} required />
+            <FormField label="Tổ chức" htmlFor="rp-org">
+              <Select id="rp-org" value={orgId} onChange={(e) => setOrgId(e.target.value)} required>
+                <option value="">Chọn tổ chức</option>
+                {departmentRows.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {[department.code, department.name].filter(Boolean).join(" · ")}
+                  </option>
+                ))}
+              </Select>
             </FormField>
           </div>
           <Button type="submit">Xem</Button>
         </form>
+        {departments.isError && <ErrorState error={departments.error} />}
         {orgDash.isLoading && <Spinner />}
         {orgDash.isError && <ErrorState error={orgDash.error} />}
         {orgDash.data && (

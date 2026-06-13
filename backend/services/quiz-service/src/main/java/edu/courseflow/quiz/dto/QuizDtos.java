@@ -148,6 +148,12 @@ public final class QuizDtos {
             List<StudentQuizQuestionDto> questions) {
     }
 
+    public record QuizReadinessDto(
+            String id,
+            String courseId,
+            String status) {
+    }
+
     // studentId is taken from the authenticated caller, never from the body.
     public record StartAttemptRequestDto() {
     }

@@ -3,6 +3,7 @@ package edu.courseflow.enrollment.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.ConflictException;
+import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.AuditLogEntryDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.BatchEnrollRequestDto;
@@ -44,14 +45,29 @@ public class EnrollmentService {
 
     private final EnrollmentRepository enrollments;
     private final ObjectMapper objectMapper;
+    private final CourseAccessClient courseAccess;
 
-    public EnrollmentService(EnrollmentRepository enrollments, ObjectMapper objectMapper) {
+    public EnrollmentService(EnrollmentRepository enrollments, ObjectMapper objectMapper, CourseAccessClient courseAccess) {
         this.enrollments = enrollments;
         this.objectMapper = objectMapper;
+        this.courseAccess = courseAccess;
     }
 
-    public List<EnrollmentDto> list(Optional<UUID> courseId, Optional<String> studentId) {
-        return enrollments.list(courseId.orElse(null), studentId.orElse(null));
+    public List<EnrollmentDto> list(Optional<UUID> courseId, Optional<String> studentId, CurrentUser user) {
+        if (isPlatformAdmin(user)) {
+            return enrollments.list(courseId.orElse(null), studentId.orElse(null));
+        }
+        if (isStaff(user)) {
+            UUID scopedCourse = courseId.orElseThrow(() ->
+                    new ForbiddenException("Staff roster reads must be scoped to a course"));
+            courseAccess.requireCourseStaffAccess(user, scopedCourse);
+            return enrollments.list(scopedCourse, studentId.orElse(null));
+        }
+        String caller = callerId(user);
+        if (studentId.isPresent() && !studentId.get().equals(caller)) {
+            throw new ForbiddenException("Students may only read their own enrollment");
+        }
+        return enrollments.list(courseId.orElse(null), caller);
     }
 
     /**
@@ -62,8 +78,9 @@ public class EnrollmentService {
      */
     @Transactional
     public EnrollmentDto enroll(EnrollRequestDto request, CurrentUser user) {
-        String studentId = resolveTargetStudent(request.studentId(), user);
-        UUID courseId = UUID.fromString(request.courseId());
+        UUID courseId = parseUuid(request.courseId(), "courseId");
+        courseAccess.requirePublishedCourse(courseId);
+        String studentId = resolveTargetStudent(request.studentId(), user, courseId);
 
         enrollments.find(studentId, courseId).ifPresent(existing -> {
             if ("ACTIVE".equals(existing.status())) {
@@ -90,6 +107,14 @@ public class EnrollmentService {
 
     public Optional<EnrollmentDto> get(UUID id) {
         return enrollments.findById(id);
+    }
+
+    public EnrollmentDto get(UUID id, CurrentUser user) {
+        EnrollmentDto enrollment = enrollments.findById(id)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment not found: " + id));
+        requireSelfOrCourseStaff(enrollment, user);
+        return enrollment;
     }
 
     public CourseAccessDto courseAccess(UUID courseId, String studentId) {
@@ -130,7 +155,9 @@ public class EnrollmentService {
         authorizeTransition(existing, newStatus, user);
 
         if ("ACTIVE".equals(newStatus)) {
-            enforceCapacity(existing.courseId() == null ? null : UUID.fromString(existing.courseId()));
+            UUID courseId = parseUuid(existing.courseId(), "courseId");
+            courseAccess.requirePublishedCourse(courseId);
+            enforceCapacity(courseId);
         }
 
         String actorId = String.valueOf(user.id());
@@ -192,7 +219,12 @@ public class EnrollmentService {
 
     /** Batch enroll on behalf of other students: INSTRUCTOR/ADMIN only. */
     public BatchEnrollResultDto batchEnroll(BatchEnrollRequestDto req, CurrentUser user) {
-        requireInstructorOrAdmin(user);
+        requireAuthenticated(user);
+        for (BatchEnrollRequestDto.SingleEnrollDto entry : req.entries()) {
+            UUID courseId = parseUuid(entry.courseId(), "courseId");
+            courseAccess.requirePublishedCourse(courseId);
+            courseAccess.requireCourseStaffAccess(user, courseId);
+        }
         return enrollments.batchEnroll(req.entries(), String.valueOf(user.id()));
     }
 
@@ -200,11 +232,29 @@ public class EnrollmentService {
         return enrollments.stats(courseId);
     }
 
+    public EnrollmentStatsDto stats(UUID courseId, CurrentUser user) {
+        courseAccess.requireCourseStaffAccess(user, courseId);
+        return enrollments.stats(courseId);
+    }
+
     public List<AuditLogEntryDto> auditLog(UUID id) {
         return enrollments.auditLog(id);
     }
 
+    public List<AuditLogEntryDto> auditLog(UUID id, CurrentUser user) {
+        EnrollmentDto enrollment = enrollments.findById(id)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment not found: " + id));
+        requireSelfOrCourseStaff(enrollment, user);
+        return enrollments.auditLog(id);
+    }
+
     public List<WaitlistEntryDto> listWaitlist(UUID courseId) {
+        return enrollments.listWaitlist(courseId);
+    }
+
+    public List<WaitlistEntryDto> listWaitlist(UUID courseId, CurrentUser user) {
+        courseAccess.requireCourseStaffAccess(user, courseId);
         return enrollments.listWaitlist(courseId);
     }
 
@@ -215,8 +265,9 @@ public class EnrollmentService {
      */
     @Transactional
     public WaitlistEntryDto waitlist(WaitlistRequestDto request, CurrentUser user) {
-        String studentId = resolveTargetStudent(request.studentId(), user);
-        UUID courseId = UUID.fromString(request.courseId());
+        UUID courseId = parseUuid(request.courseId(), "courseId");
+        courseAccess.requirePublishedCourse(courseId);
+        String studentId = resolveTargetStudent(request.studentId(), user, courseId);
         if (!isFull(courseId)) {
             throw new ConflictException("Course is not full; enroll directly instead of waitlisting");
         }
@@ -226,11 +277,26 @@ public class EnrollmentService {
     /** Set or clear (null = unlimited) per-course capacity. ADMIN/INSTRUCTOR only. */
     @Transactional
     public void setCapacity(UUID courseId, SetCapacityRequestDto request, CurrentUser user) {
-        requireInstructorOrAdmin(user);
+        courseAccess.requireCourseStaffAccess(user, courseId);
         if (request.capacity() != null && request.capacity() < 0) {
             throw new BadRequestException("Capacity must be zero or positive");
         }
         enrollments.setCapacity(courseId, request.capacity());
+    }
+
+    @Transactional
+    public void initializePublishedCourse(UUID courseId, Integer defaultCapacity) {
+        if (courseId == null || enrollments.hasCapacityRow(courseId)) {
+            return;
+        }
+        enrollments.setCapacity(courseId, defaultCapacity);
+    }
+
+    @Transactional
+    public void archiveCourse(UUID courseId) {
+        if (courseId != null) {
+            enrollments.setCapacity(courseId, 0);
+        }
     }
 
     // ---- internals ----
@@ -303,17 +369,13 @@ public class EnrollmentService {
      * Resolve who an action targets: a non-privileged caller always acts on themselves, so any
      * studentId supplied in the body is ignored. Only INSTRUCTOR/ADMIN may target a different student.
      */
-    private String resolveTargetStudent(String requestedStudentId, CurrentUser user) {
-        if (user == null || user.id() == null) {
-            throw new ForbiddenException("Authentication required");
-        }
+    private String resolveTargetStudent(String requestedStudentId, CurrentUser user, UUID courseId) {
+        requireAuthenticated(user);
         String self = String.valueOf(user.id());
         if (requestedStudentId == null || requestedStudentId.isBlank() || requestedStudentId.equals(self)) {
             return self;
         }
-        if (!user.hasAnyRole("INSTRUCTOR", "ADMIN")) {
-            throw new ForbiddenException("Only INSTRUCTOR or ADMIN may act on behalf of another student");
-        }
+        courseAccess.requireCourseStaffAccess(user, courseId);
         return requestedStudentId;
     }
 
@@ -321,7 +383,8 @@ public class EnrollmentService {
         if (user == null || user.id() == null) {
             throw new ForbiddenException("Authentication required");
         }
-        boolean privileged = user.hasAnyRole("INSTRUCTOR", "ADMIN");
+        UUID courseId = parseUuid(enrollment.courseId(), "courseId");
+        boolean privileged = isStaff(user);
         boolean self = String.valueOf(user.id()).equals(enrollment.studentId());
         switch (newStatus) {
             case "DROPPED", "ACTIVE" -> {
@@ -329,22 +392,62 @@ public class EnrollmentService {
                 if (!self && !privileged) {
                     throw new ForbiddenException("Students may only change their own enrollment");
                 }
+                if (!self) {
+                    courseAccess.requireCourseStaffAccess(user, courseId);
+                }
             }
             case "COMPLETED" -> {
                 if (!privileged) {
                     throw new ForbiddenException("Only INSTRUCTOR or ADMIN may complete an enrollment");
                 }
+                courseAccess.requireCourseStaffAccess(user, courseId);
             }
             default -> throw new BadRequestException("Invalid status: " + newStatus);
         }
     }
 
+    private void requireSelfOrCourseStaff(EnrollmentDto enrollment, CurrentUser user) {
+        String self = callerId(user);
+        if (self.equals(enrollment.studentId())) {
+            return;
+        }
+        if (!isStaff(user)) {
+            throw new ForbiddenException("Students may only read their own enrollment");
+        }
+        courseAccess.requireCourseStaffAccess(user, parseUuid(enrollment.courseId(), "courseId"));
+    }
+
     private void requireInstructorOrAdmin(CurrentUser user) {
+        requireAuthenticated(user);
+        if (!isStaff(user)) {
+            throw new ForbiddenException("Requires INSTRUCTOR or ADMIN role");
+        }
+    }
+
+    private void requireAuthenticated(CurrentUser user) {
         if (user == null || user.id() == null) {
             throw new ForbiddenException("Authentication required");
         }
-        if (!user.hasAnyRole("INSTRUCTOR", "ADMIN")) {
-            throw new ForbiddenException("Requires INSTRUCTOR or ADMIN role");
+    }
+
+    private String callerId(CurrentUser user) {
+        requireAuthenticated(user);
+        return String.valueOf(user.id());
+    }
+
+    private boolean isStaff(CurrentUser user) {
+        return user != null && user.hasAnyRole("INSTRUCTOR", "PROFESSOR", "TA", "ORG_ADMIN", "ADMIN");
+    }
+
+    private boolean isPlatformAdmin(CurrentUser user) {
+        return user != null && user.hasRole("ADMIN");
+    }
+
+    private UUID parseUuid(String raw, String field) {
+        try {
+            return UUID.fromString(raw);
+        } catch (RuntimeException ex) {
+            throw new BadRequestException("Invalid " + field + ": " + raw);
         }
     }
 

@@ -118,13 +118,21 @@ class _QuestionCard extends StatelessWidget {
             Text('$index. ${question.stem}',
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            ...question.options.map(
-              (o) => RadioListTile<String>(
-                contentPadding: EdgeInsets.zero,
-                title: Text(o.label),
-                value: o.id,
-                groupValue: selectedOptionId,
-                onChanged: (v) => v == null ? null : onSelect(v),
+            RadioGroup<String>(
+              groupValue: selectedOptionId,
+              onChanged: (value) {
+                if (value != null) onSelect(value);
+              },
+              child: Column(
+                children: question.options
+                    .map(
+                      (o) => RadioListTile<String>(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(o.label),
+                        value: o.id,
+                      ),
+                    )
+                    .toList(growable: false),
               ),
             ),
           ],

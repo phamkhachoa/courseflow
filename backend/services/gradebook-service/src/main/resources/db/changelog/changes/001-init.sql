@@ -88,6 +88,7 @@ CREATE INDEX IF NOT EXISTS idx_outbox_unpublished
 -- merged from 002-scheme-policies.sql
 -- ============================================================
 -- changeset courseflow:gradebook-002-scheme-policies
+--validCheckSum 9:8cb65be4749490ee9554b2af169fda2e
 
 -- Category aggregation method (WEIGHTED_MEAN | SUM | MEAN) and drop-lowest support
 ALTER TABLE grade_categories
@@ -103,7 +104,13 @@ ALTER TABLE grade_entries
     ADD COLUMN IF NOT EXISTS is_late BOOLEAN NOT NULL DEFAULT FALSE,
     ADD COLUMN IF NOT EXISTS minutes_late INT NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS late_penalty_applied NUMERIC(5,2) NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS letter VARCHAR(5);
+    ADD COLUMN IF NOT EXISTS letter VARCHAR(5),
+    ADD COLUMN IF NOT EXISTS source_event_id VARCHAR(80),
+    ADD COLUMN IF NOT EXISTS source_graded_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_grade_overrides_entry_created
+    ON grade_overrides (grade_entry_id, created_at DESC);
 
 -- Grading schemes (letter -> percent ranges) scoped to course
 CREATE TABLE IF NOT EXISTS grading_schemes (
@@ -135,6 +142,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_grading_schemes_default
 -- merged from 003-final-grades.sql
 -- ============================================================
 -- changeset courseflow:gradebook-003-final-grades
+--validCheckSum 9:9f8c0dd489d709891d43603a00144945
 
 CREATE TABLE IF NOT EXISTS final_grades (
     id UUID PRIMARY KEY,
@@ -149,6 +157,16 @@ CREATE TABLE IF NOT EXISTS final_grades (
     version BIGINT NOT NULL DEFAULT 0,
     UNIQUE (course_id, student_id)
 );
+
+-- ============================================================
+-- grade entry source-event tracking for existing databases whose
+-- gradebook-002 changeset ran before these columns were introduced.
+-- ============================================================
+-- changeset courseflow:gradebook-004-grade-entry-source-tracking
+ALTER TABLE grade_entries
+    ADD COLUMN IF NOT EXISTS source_event_id VARCHAR(80),
+    ADD COLUMN IF NOT EXISTS source_graded_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 0;
 
 -- ============================================================
 -- merged from 900-demo-data.sql

@@ -132,7 +132,8 @@ export async function removeQuizQuestion(quizId: string, questionId: string): Pr
 export async function startAttempt(quizId: string): Promise<QuizAttempt> {
   // studentId is taken from the gateway identity, never sent in the body.
   const { data } = await apiClient.post(`/admin/v1/quizzes/${quizId}/attempts`, {});
-  return unwrap<QuizAttempt>(data);
+  const body = unwrap<QuizAttempt | { attempt: QuizAttempt }>(data);
+  return "attempt" in body ? body.attempt : body;
 }
 export async function submitAttempt(
   attemptId: string,

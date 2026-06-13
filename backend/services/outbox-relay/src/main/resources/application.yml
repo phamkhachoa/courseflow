@@ -17,7 +17,7 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -34,10 +34,15 @@ spring:
 #
 # announcement-service is intentionally absent: it runs its own in-process relay (see
 # announcement-service OutboxRelay). Listing it here too would double-drain the same table.
+# Elasticsearch sync does not use this relay; it uses Debezium CDC directly from source tables.
 courseflow:
   outbox:
     poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
     services:
+      - name: identity
+        jdbc-url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/cf_identity}
+        username: ${IDENTITY_DB_USERNAME:courseflow}
+        password: ${IDENTITY_DB_PASSWORD:courseflow}
       - name: enrollment
         jdbc-url: ${ENROLLMENT_DB_URL:jdbc:postgresql://localhost:5432/cf_enrollment}
         username: ${ENROLLMENT_DB_USERNAME:courseflow}
@@ -91,4 +96,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

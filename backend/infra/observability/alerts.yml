@@ -1,0 +1,20 @@
+groups:
+  - name: courseflow-service-health
+    rules:
+      - alert: CourseFlowServiceDown
+        expr: up{job=~"courseflow-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CourseFlow scrape target is down"
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 2 minutes."
+
+      - alert: CourseFlowNoScrapeTargets
+        expr: count(up{job=~"courseflow-.*"}) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No CourseFlow metrics targets are being scraped"
+          description: "Prometheus has no active CourseFlow scrape targets. Check compose networking and actuator exposure."

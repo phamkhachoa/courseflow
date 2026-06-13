@@ -68,6 +68,7 @@ export async function upsertEntry(input: {
   rawScore: number;
   isLate?: boolean;
   minutesLate?: number;
+  reason?: string;
 }): Promise<StudentGradebook> {
   // The grader is taken from the authenticated caller, never sent in the body.
   const { data } = await apiClient.post("/admin/v1/gradebook/entries", input);

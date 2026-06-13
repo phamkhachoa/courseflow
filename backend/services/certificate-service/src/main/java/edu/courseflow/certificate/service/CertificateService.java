@@ -16,6 +16,8 @@ import edu.courseflow.certificate.repository.CertificateRepository;
 import edu.courseflow.certificate.repository.CertificateVerificationRepository;
 import edu.courseflow.certificate.repository.OutboxEventRepository;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
+import jakarta.annotation.PostConstruct;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
@@ -23,30 +25,49 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CertificateService {
+    private static final String SIGNATURE_VERSION = "v1";
+    private static final String SIGNATURE_ALGORITHM = "HmacSHA256";
+
     private final CertificateRepository certificates;
     private final CertificateVerificationRepository verifications;
     private final CertificateAuditLogRepository auditLogs;
     private final OutboxEventRepository outboxEvents;
     private final ObjectMapper objectMapper;
     private final CertificateMapper mapper;
+    private final CertificateEligibilityClient eligibilityClient;
+    private final String signingSecret;
 
     public CertificateService(CertificateRepository certificates,
             CertificateVerificationRepository verifications,
             CertificateAuditLogRepository auditLogs,
             OutboxEventRepository outboxEvents,
             ObjectMapper objectMapper,
-            CertificateMapper mapper) {
+            CertificateMapper mapper,
+            CertificateEligibilityClient eligibilityClient,
+            @Value("${courseflow.certificate.signing-secret:}") String signingSecret) {
         this.certificates = certificates;
         this.verifications = verifications;
         this.auditLogs = auditLogs;
         this.outboxEvents = outboxEvents;
         this.objectMapper = objectMapper;
         this.mapper = mapper;
+        this.eligibilityClient = eligibilityClient;
+        this.signingSecret = signingSecret == null ? "" : signingSecret.trim();
+    }
+
+    @PostConstruct
+    void validateSigningSecret() {
+        if (signingSecret.isBlank()) {
+            throw new IllegalStateException("courseflow.certificate.signing-secret must be configured");
+        }
     }
 
     /**
@@ -90,12 +111,16 @@ public class CertificateService {
     private Optional<CertificateVerificationDto> findByCode(String code) {
         return verifications.findByVerificationCode(code)
                 .flatMap(verification -> certificates.findById(verification.getCertificateId())
+                        .filter(certificate -> hasValidSignature(certificate, verification))
                         .map(certificate -> mapper.toDto(certificate, verification)));
     }
 
     @Transactional
     public CertificateVerificationDto issue(IssueCertificateRequestDto request) {
         UUID courseId = UUID.fromString(request.courseId());
+        BigDecimal finalGrade = eligibilityClient
+                .requireEligible(request.studentId(), courseId, request.finalGrade())
+                .finalScore();
         Optional<Certificate> existing = certificates.findByStudentIdAndCourseIdAndStatus(
                 request.studentId(), courseId, "ISSUED");
         if (existing.isPresent()) {
@@ -108,10 +133,10 @@ public class CertificateService {
 
         UUID certificateId = UUID.randomUUID();
         String code = "CF-" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
-        String signature = sign(certificateId + ":" + request.studentId() + ":" + request.courseId() + ":" + request.finalGrade());
+        String signature = sign(certificateId, code, request.studentId(), courseId, finalGrade);
         String publicSlug = code.toLowerCase();
 
-        certificates.save(new Certificate(certificateId, request.studentId(), courseId, request.finalGrade()));
+        certificates.save(new Certificate(certificateId, request.studentId(), courseId, finalGrade));
         verifications.save(new CertificateVerification(certificateId, code, signature, publicSlug));
         audit(certificateId, "ISSUED", request.actorId(), "Certificate issued from final grade");
         outbox(certificateId, "certificate.issued", Map.of(
@@ -119,9 +144,15 @@ public class CertificateService {
                 "certificateId", certificateId.toString(),
                 "studentId", request.studentId(),
                 "courseId", request.courseId(),
-                "finalGrade", request.finalGrade(),
+                "finalGrade", finalGrade,
                 "verificationCode", code));
         return verify(code);
+    }
+
+    public UUID courseIdForCertificate(UUID certificateId) {
+        return certificates.findById(certificateId)
+                .map(Certificate::getCourseId)
+                .orElseThrow(() -> new NotFoundException("Certificate not found: " + certificateId));
     }
 
     @Transactional
@@ -144,13 +175,46 @@ public class CertificateService {
         outboxEvents.save(new OutboxEvent(aggregateId, "certificate", eventType, toJson(payload)));
     }
 
-    private String sign(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (Exception ex) {
-            throw new IllegalStateException("SHA-256 unavailable", ex);
+    private boolean hasValidSignature(Certificate certificate, CertificateVerification verification) {
+        if (verification.getSignature() == null || verification.getSignature().isBlank()) {
+            return false;
         }
+        String expected = sign(
+                certificate.getId(),
+                verification.getVerificationCode(),
+                certificate.getStudentId(),
+                certificate.getCourseId(),
+                certificate.getFinalGrade());
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                verification.getSignature().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String sign(UUID certificateId, String verificationCode, String studentId, UUID courseId, BigDecimal finalGrade) {
+        try {
+            Mac mac = Mac.getInstance(SIGNATURE_ALGORITHM);
+            mac.init(new SecretKeySpec(signingSecret.getBytes(StandardCharsets.UTF_8), SIGNATURE_ALGORITHM));
+            return SIGNATURE_VERSION + ":" + HexFormat.of().formatHex(mac.doFinal(signingPayload(
+                    certificateId,
+                    verificationCode,
+                    studentId,
+                    courseId,
+                    finalGrade).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to sign certificate", ex);
+        }
+    }
+
+    private String signingPayload(UUID certificateId, String verificationCode, String studentId,
+                                  UUID courseId, BigDecimal finalGrade) {
+        return String.join("\n",
+                "courseflow-certificate",
+                SIGNATURE_VERSION,
+                certificateId.toString(),
+                verificationCode,
+                studentId,
+                courseId.toString(),
+                finalGrade.toPlainString());
     }
 
     private String toJson(Object value) {

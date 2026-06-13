@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -33,6 +34,13 @@ public class GradeEntry {
     private BigDecimal latePenaltyApplied = BigDecimal.ZERO;
     @Column(length = 5)
     private String letter;
+    @Column(name = "source_event_id", length = 80)
+    private String sourceEventId;
+    @Column(name = "source_graded_at")
+    private Instant sourceGradedAt;
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     protected GradeEntry() {
     }
@@ -53,6 +61,8 @@ public class GradeEntry {
     public boolean isLate() { return late; }
     public int getMinutesLate() { return minutesLate; }
     public BigDecimal getLatePenaltyApplied() { return latePenaltyApplied; }
+    public Instant getSourceGradedAt() { return sourceGradedAt; }
+    public String getSourceEventId() { return sourceEventId; }
 
     public void publish(BigDecimal rawScore, BigDecimal adjustedScore,
             boolean late, int minutesLate, BigDecimal latePenaltyApplied) {
@@ -63,5 +73,19 @@ public class GradeEntry {
         this.late = late;
         this.minutesLate = minutesLate;
         this.latePenaltyApplied = latePenaltyApplied == null ? BigDecimal.ZERO : latePenaltyApplied;
+    }
+
+    public boolean publishFromSource(BigDecimal rawScore, BigDecimal adjustedScore,
+            boolean late, int minutesLate, BigDecimal latePenaltyApplied,
+            UUID eventId, Instant eventGradedAt) {
+        Instant effectiveGradedAt = eventGradedAt == null ? Instant.now() : eventGradedAt;
+        if (sourceGradedAt != null && effectiveGradedAt.isBefore(sourceGradedAt)) {
+            return false;
+        }
+        publish(rawScore, adjustedScore, late, minutesLate, latePenaltyApplied);
+        this.gradedAt = effectiveGradedAt;
+        this.sourceGradedAt = effectiveGradedAt;
+        this.sourceEventId = eventId == null ? null : eventId.toString();
+        return true;
     }
 }

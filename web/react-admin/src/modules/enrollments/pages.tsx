@@ -191,7 +191,7 @@ export function EnrollmentsPage() {
     <div>
       <PageHeader
         title="Ghi danh"
-        description="Quản lý enrollment, waitlist và sức chứa theo khóa học mà không cần tra UUID thủ công."
+        description="Quản lý enrollment, waitlist và sức chứa bằng bộ chọn khóa học, learner và trạng thái."
       />
 
       <div className="mb-4 grid gap-3 md:grid-cols-4">

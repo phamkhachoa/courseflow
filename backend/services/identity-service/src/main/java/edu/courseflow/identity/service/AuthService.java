@@ -3,15 +3,20 @@ package edu.courseflow.identity.service;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.DuplicatedException;
 import edu.courseflow.commonlibrary.exception.UnauthorizedException;
+import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.identity.dto.ChangePasswordRequestDto;
+import edu.courseflow.identity.dto.EmailVerificationDtos.RegistrationResponseDto;
 import edu.courseflow.identity.dto.LoginRequestDto;
+import edu.courseflow.identity.dto.MfaDtos.MfaEnrollmentDto;
 import edu.courseflow.identity.dto.RegisterRequestDto;
 import edu.courseflow.identity.dto.TokenResponseDto;
+import edu.courseflow.identity.dto.UserDto;
 import edu.courseflow.identity.mapper.IdentityMapper;
 import edu.courseflow.identity.model.Role;
 import edu.courseflow.identity.model.SystemRoles;
 import edu.courseflow.identity.model.User;
 import edu.courseflow.identity.model.UserRoleAssignment;
+import edu.courseflow.identity.model.UserStatus;
 import edu.courseflow.identity.repository.RoleRepository;
 import edu.courseflow.identity.repository.UserRepository;
 import edu.courseflow.identity.repository.UserRoleAssignmentRepository;
@@ -44,6 +49,7 @@ public class AuthService {
     private final SecurityAuditService audit;
     private final PasswordPolicy passwordPolicy;
     private final TotpService totpService;
+    private final EmailVerificationService emailVerificationService;
     private final boolean requireMfaForOperators;
     private final boolean requireVerifiedEmail;
     private final String dummyPasswordHash;
@@ -59,6 +65,7 @@ public class AuthService {
             SecurityAuditService audit,
             PasswordPolicy passwordPolicy,
             TotpService totpService,
+            EmailVerificationService emailVerificationService,
             @Value("${courseflow.security.require-mfa-for-operators:false}") boolean requireMfaForOperators,
             @Value("${courseflow.security.require-verified-email:false}") boolean requireVerifiedEmail) {
         this.users = users;
@@ -72,13 +79,14 @@ public class AuthService {
         this.audit = audit;
         this.passwordPolicy = passwordPolicy;
         this.totpService = totpService;
+        this.emailVerificationService = emailVerificationService;
         this.requireMfaForOperators = requireMfaForOperators;
         this.requireVerifiedEmail = requireVerifiedEmail;
         this.dummyPasswordHash = passwordEncoder.encode("courseflow-dummy-password-Do-Not-Use-1!");
     }
 
     @Transactional
-    public TokenResponseDto register(RegisterRequestDto request) {
+    public RegistrationResponseDto register(RegisterRequestDto request) {
         String email = request.email().trim().toLowerCase();
         if (users.existsByEmailIgnoreCase(email)) {
             audit.record("REGISTER_FAILED", null, email, null, false, "EMAIL_ALREADY_EXISTS");
@@ -89,15 +97,15 @@ public class AuthService {
                 .orElseThrow(() -> new BadRequestException("UNKNOWN_ROLE: " + SystemRoles.STUDENT));
 
         User user = new User(email, passwordEncoder.encode(request.password()), request.fullName().trim());
-        user.markEmailVerified();
+        user.setStatus(UserStatus.PENDING_VERIFICATION);
         users.save(user);
 
         assignments.save(new UserRoleAssignment(
                 user.getId(), studentRole, "PLATFORM", null, "self-register", null));
-        user.recordSuccessfulLogin();
+        var verification = emailVerificationService.issueVerification(user, "self-register");
         audit.record("USER_REGISTERED", user.getId(), user.getEmail(), "self-register", true,
                 "role=" + SystemRoles.STUDENT);
-        return issueTokens(user);
+        return new RegistrationResponseDto(mapper.toDto(user), true, verification.expiresAt());
     }
 
     @Transactional(noRollbackFor = UnauthorizedException.class)
@@ -150,6 +158,10 @@ public class AuthService {
         User user = users.findById(userId)
                 .filter(User::isActive)
                 .orElseThrow(() -> new UnauthorizedException(INVALID_CREDENTIALS));
+        if (requireVerifiedEmail && !user.isEmailVerified()) {
+            audit.record("REFRESH_FAILED", user.getId(), user.getEmail(), null, false, "EMAIL_NOT_VERIFIED");
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
+        }
         if (user.isMustChangePassword()) {
             throw new UnauthorizedException("PASSWORD_CHANGE_REQUIRED");
         }
@@ -166,13 +178,11 @@ public class AuthService {
     }
 
     @Transactional(noRollbackFor = UnauthorizedException.class)
-    public void changePassword(ChangePasswordRequestDto request) {
-        User user = users.findByEmailIgnoreCase(request.email()).orElse(null);
-        if (user == null) {
-            passwordEncoder.matches(request.currentPassword(), dummyPasswordHash);
-            audit.record("PASSWORD_CHANGE_FAILED", null, request.email(), null, false, INVALID_CREDENTIALS);
-            throw invalidCredentials();
+    public void changePassword(CurrentUser currentUser, ChangePasswordRequestDto request) {
+        if (currentUser == null || currentUser.id() == null) {
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
         }
+        User user = users.findById(currentUser.id()).orElseThrow(this::invalidCredentials);
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
             user.recordFailedLogin(LOGIN_LOCKOUT_THRESHOLD, LOGIN_LOCKOUT_DURATION);
             audit.record("PASSWORD_CHANGE_FAILED", user.getId(), user.getEmail(), null, false, INVALID_CREDENTIALS);
@@ -183,6 +193,60 @@ public class AuthService {
         refreshTokenService.revokeAll(user.getId(), "password-changed");
         accessTokenRevocations.revokeAllForUser(user.getId());
         audit.record("PASSWORD_CHANGED", user.getId(), user.getEmail(), "self", true, null);
+    }
+
+    @Transactional
+    public MfaEnrollmentDto startMfaEnrollment(CurrentUser currentUser) {
+        User user = requireCurrentUser(currentUser);
+        if (user.isMfaEnabled()) {
+            throw new BadRequestException("MFA_ALREADY_ENABLED");
+        }
+        String secret = totpService.generateSecret();
+        user.stageMfaSecret(secret);
+        audit.record("MFA_ENROLLMENT_STARTED", user.getId(), user.getEmail(), "self", true, null);
+        return new MfaEnrollmentDto(secret, totpService.provisioningUri("CourseFlow", user.getEmail(), secret));
+    }
+
+    @Transactional
+    public void confirmMfa(CurrentUser currentUser, String code) {
+        User user = requireCurrentUser(currentUser);
+        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new BadRequestException("MFA_ENROLLMENT_NOT_STARTED");
+        }
+        if (!totpService.verify(user.getMfaSecret(), code)) {
+            audit.record("MFA_CONFIRM_FAILED", user.getId(), user.getEmail(), "self", false, "INVALID_CODE");
+            throw new UnauthorizedException("INVALID_MFA_CODE");
+        }
+        user.enableMfa(user.getMfaSecret());
+        refreshTokenService.revokeAll(user.getId(), "mfa-enabled");
+        accessTokenRevocations.revokeAllForUser(user.getId());
+        audit.record("MFA_ENABLED", user.getId(), user.getEmail(), "self", true, null);
+    }
+
+    @Transactional
+    public void disableMfa(CurrentUser currentUser, String code) {
+        User user = requireCurrentUser(currentUser);
+        if (!user.isMfaEnabled() || user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new BadRequestException("MFA_NOT_ENABLED");
+        }
+        if (!totpService.verify(user.getMfaSecret(), code)) {
+            audit.record("MFA_DISABLE_FAILED", user.getId(), user.getEmail(), "self", false, "INVALID_CODE");
+            throw new UnauthorizedException("INVALID_MFA_CODE");
+        }
+        user.disableMfa();
+        refreshTokenService.revokeAll(user.getId(), "mfa-disabled");
+        accessTokenRevocations.revokeAllForUser(user.getId());
+        audit.record("MFA_DISABLED", user.getId(), user.getEmail(), "self", true, null);
+    }
+
+    @Transactional
+    public UserDto verifyEmail(String token) {
+        return emailVerificationService.verify(token);
+    }
+
+    @Transactional
+    public void resendEmailVerification(String email) {
+        emailVerificationService.resend(email);
     }
 
     private TokenResponseDto issueTokens(User user) {
@@ -204,6 +268,15 @@ public class AuthService {
             return !operator || !requireMfaForOperators;
         }
         return totpService.verify(user.getMfaSecret(), code);
+    }
+
+    private User requireCurrentUser(CurrentUser currentUser) {
+        if (currentUser == null || currentUser.id() == null) {
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
+        }
+        return users.findById(currentUser.id())
+                .filter(User::isActive)
+                .orElseThrow(this::invalidCredentials);
     }
 
     private UnauthorizedException invalidCredentials() {

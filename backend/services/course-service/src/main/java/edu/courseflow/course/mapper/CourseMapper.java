@@ -6,6 +6,7 @@ import edu.courseflow.course.dto.AuthoringDtos.ItemOutlineDto;
 import edu.courseflow.course.dto.AuthoringDtos.ModuleOutlineDto;
 import edu.courseflow.course.dto.CourseDtos.CourseDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMaterialDto;
+import edu.courseflow.course.dto.CourseDtos.CourseMetadataDto;
 import edu.courseflow.course.dto.CourseModuleDto;
 import edu.courseflow.course.dto.ModuleItemDto;
 import edu.courseflow.course.dto.ModuleProgressDto;
@@ -25,6 +26,8 @@ public interface CourseMapper {
 
     @Mapping(target = "materials", source = "materials")
     CourseDto toDto(Course course, List<CourseMaterialDto> materials);
+
+    CourseMetadataDto toMetadataDto(Course course);
 
     CourseMaterialDto toDto(CourseMaterial material);
 

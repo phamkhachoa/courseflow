@@ -73,8 +73,13 @@ public class QuizAttempt {
     public Instant getSubmittedAt() { return submittedAt; }
     public String getStatus() { return status; }
     public BigDecimal getScore() { return score; }
+    public String getQuestionsSnapshot() { return questionsSnapshot; }
     public Instant getDeadlineAt() { return deadlineAt; }
     public boolean isAutoSubmitted() { return autoSubmitted; }
+
+    public void setQuestionsSnapshot(String questionsSnapshot) {
+        this.questionsSnapshot = questionsSnapshot;
+    }
 
     public void submit(Instant submittedAt, String status, BigDecimal score) {
         submit(submittedAt, status, score, false);

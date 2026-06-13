@@ -12,5 +12,6 @@
 
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/002-security-hardening.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003-email-verification.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/900-demo-admin.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

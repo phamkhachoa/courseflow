@@ -5,16 +5,23 @@ import edu.courseflow.commonlibrary.exception.DuplicatedException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.identity.dto.CreateUserRequestDto;
+import edu.courseflow.identity.dto.DeactivateUserRequestDto;
 import edu.courseflow.identity.dto.ResetPasswordRequestDto;
 import edu.courseflow.identity.dto.UserDto;
+import edu.courseflow.identity.dto.UserPrivacyExportDto;
+import edu.courseflow.identity.dto.UserPrivacyExportDto.AccountSecuritySnapshotDto;
+import edu.courseflow.identity.dto.UserPrivacyExportDto.RoleGrantExportDto;
 import edu.courseflow.identity.model.Role;
 import edu.courseflow.identity.model.SystemRoles;
 import edu.courseflow.identity.model.User;
 import edu.courseflow.identity.model.UserRoleAssignment;
+import edu.courseflow.identity.model.UserStatus;
 import edu.courseflow.identity.mapper.IdentityMapper;
 import edu.courseflow.identity.repository.RoleRepository;
 import edu.courseflow.identity.repository.UserRepository;
 import edu.courseflow.identity.repository.UserRoleAssignmentRepository;
+import java.time.Instant;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -108,6 +115,7 @@ public class UserService {
     }
 
     public void resetPassword(Long userId, ResetPasswordRequestDto request, CurrentUser caller) {
+        requireAdmin(caller, "Only ADMIN may reset user passwords");
         passwordPolicy.validate(request.newPassword());
         User user = users.findById(userId)
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", userId));
@@ -122,6 +130,7 @@ public class UserService {
     }
 
     public UserDto markEmailVerified(Long userId, CurrentUser caller) {
+        requireAdmin(caller, "Only ADMIN may verify user email addresses");
         User user = users.findById(userId)
                 .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", userId));
         user.markEmailVerified();
@@ -129,8 +138,79 @@ public class UserService {
         return mapper.toDto(user);
     }
 
+    public UserPrivacyExportDto exportPrivacy(Long userId, CurrentUser caller) {
+        requireAdmin(caller, "Only ADMIN may export user privacy data");
+        User user = users.findById(userId)
+                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", userId));
+        List<RoleGrantExportDto> grants = assignments.findByUserIdOrderById(userId).stream()
+                .map(this::toRoleGrantExport)
+                .toList();
+        audit.record("USER_PRIVACY_EXPORTED", userId, user.getEmail(), callerTag(caller), true, null);
+        return new UserPrivacyExportDto(
+                mapper.toDto(user),
+                new AccountSecuritySnapshotDto(
+                        user.isMustChangePassword(),
+                        user.getPasswordChangedAt(),
+                        user.getLastLoginAt(),
+                        user.getLockedUntil(),
+                        user.getAccessTokensValidAfter(),
+                        user.isMfaEnabled(),
+                        user.getCreatedOn(),
+                        user.getCreatedBy(),
+                        user.getLastModifiedOn(),
+                        user.getLastModifiedBy()),
+                grants,
+                Instant.now());
+    }
+
+    public UserDto deactivate(Long userId, DeactivateUserRequestDto request, CurrentUser caller) {
+        requireAdmin(caller, "Only ADMIN may deactivate users");
+        if (caller.id() != null && caller.id().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Administrators cannot deactivate their own account");
+        }
+        String reason = request.reason().trim();
+        User user = users.findById(userId)
+                .orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", userId));
+        user.setStatus(UserStatus.DEACTIVATED);
+        refreshTokenService.revokeAll(userId, "user-deactivated");
+        accessTokenRevocations.revokeAllForUser(userId);
+        assignments.findLiveByUserId(userId).forEach(assignment -> assignment.revoke(callerTag(caller)));
+        audit.record("USER_DEACTIVATED", userId, user.getEmail(), callerTag(caller), true,
+                detail("reason=", reason));
+        return mapper.toDto(user);
+    }
+
     private boolean requiresAdminToGrant(Role role) {
         return !SystemRoles.STUDENT.equalsIgnoreCase(role.getCode()) || role.isOperator();
+    }
+
+    private void requireAdmin(CurrentUser caller, String message) {
+        if (caller == null || !caller.hasRole(SystemRoles.ADMIN)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, message);
+        }
+    }
+
+    private RoleGrantExportDto toRoleGrantExport(UserRoleAssignment assignment) {
+        Role role = assignment.getRole();
+        return new RoleGrantExportDto(
+                assignment.getId(),
+                role.getId().toString(),
+                role.getCode(),
+                role.getName(),
+                assignment.getScopeType(),
+                assignment.getScopeId(),
+                assignment.getGrantedBy(),
+                assignment.getGrantedAt(),
+                assignment.getExpiresAt(),
+                assignment.getRevokedAt(),
+                assignment.getRevokedBy(),
+                assignment.getCreatedAt());
+    }
+
+    private String detail(String prefix, String value) {
+        String detail = prefix + value;
+        return detail.length() > 255 ? detail.substring(0, 255) : detail;
     }
 
     private String callerTag(CurrentUser caller) {

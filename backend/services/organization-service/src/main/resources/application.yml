@@ -16,9 +16,9 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

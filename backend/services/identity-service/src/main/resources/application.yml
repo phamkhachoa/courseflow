@@ -18,11 +18,13 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
 courseflow:
   security:
     require-mfa-for-operators: ${REQUIRE_MFA_FOR_OPERATORS:false}
     require-verified-email: ${REQUIRE_VERIFIED_EMAIL:false}
+    email-verification-token-ttl-seconds: ${EMAIL_VERIFICATION_TOKEN_TTL_SECONDS:86400}
+    email-verification-url: ${EMAIL_VERIFICATION_URL:http://localhost:3000/verify-email}
     jwt:
       # No default: the service fails fast at startup (see JwtProperties) if COURSEFLOW_JWT_SECRET
       # is unset, blank, the old dev placeholder, or shorter than 32 bytes. Must match the gateway.
@@ -35,4 +37,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

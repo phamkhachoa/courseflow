@@ -20,7 +20,7 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
@@ -34,8 +34,17 @@ spring:
 courseflow:
   enrollment:
     base-url: ${ENROLLMENT_BASE_URL:http://localhost:8084}
+  notification:
+    delivery:
+      mode: ${NOTIFICATION_DELIVERY_MODE:log}
+      webhook-url: ${NOTIFICATION_DELIVERY_WEBHOOK_URL:}
+      retry:
+        enabled: ${NOTIFICATION_DELIVERY_RETRY_ENABLED:true}
+        interval-ms: ${NOTIFICATION_DELIVERY_RETRY_INTERVAL_MS:60000}
+        max-attempts: ${NOTIFICATION_DELIVERY_RETRY_MAX_ATTEMPTS:5}
+        batch-size: ${NOTIFICATION_DELIVERY_RETRY_BATCH_SIZE:100}
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import edu.courseflow.commonlibrary.exception.UnauthorizedException;
+import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.identity.dto.ChangePasswordRequestDto;
 import edu.courseflow.identity.dto.LoginRequestDto;
 import edu.courseflow.identity.dto.RegisterRequestDto;
@@ -22,6 +23,7 @@ import edu.courseflow.identity.model.UserRoleAssignment;
 import edu.courseflow.identity.repository.RoleRepository;
 import edu.courseflow.identity.repository.UserRepository;
 import edu.courseflow.identity.repository.UserRoleAssignmentRepository;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +57,8 @@ class AuthServiceTest {
     private SecurityAuditService audit;
     @Mock
     private TotpService totpService;
+    @Mock
+    private EmailVerificationService emailVerificationService;
 
     private AuthService service;
 
@@ -73,6 +77,7 @@ class AuthServiceTest {
                 audit,
                 new PasswordPolicy(),
                 totpService,
+                emailVerificationService,
                 false,
                 false);
     }
@@ -127,11 +132,11 @@ class AuthServiceTest {
     void changePasswordRevokesRefreshAndAccessTokens() {
         User user = new User("student@example.com", "stored-hash", "Student");
         ReflectionTestUtils.setField(user, "id", 5L);
-        when(users.findByEmailIgnoreCase("student@example.com")).thenReturn(Optional.of(user));
+        when(users.findById(5L)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("OldStrong1!", "stored-hash")).thenReturn(true);
         when(passwordEncoder.encode("NewStrong1!Pwd")).thenReturn("new-hash");
 
-        service.changePassword(new ChangePasswordRequestDto(
+        service.changePassword(new CurrentUser(5L, "student@example.com", "STUDENT"), new ChangePasswordRequestDto(
                 "student@example.com", "OldStrong1!", "NewStrong1!Pwd"));
 
         assertThat(user.getPasswordHash()).isEqualTo("new-hash");
@@ -143,10 +148,109 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerCreatesActiveStudentAndReturnsTokens() {
+    void refreshRejectsUnverifiedEmailWhenVerificationIsRequired() {
+        AuthService strictService = new AuthService(
+                users,
+                roles,
+                passwordEncoder,
+                jwtTokenProvider,
+                refreshTokenService,
+                mapper,
+                assignments,
+                accessTokenRevocations,
+                audit,
+                new PasswordPolicy(),
+                totpService,
+                emailVerificationService,
+                false,
+                true);
+        User user = new User("student@example.com", "stored-hash", "Student");
+        ReflectionTestUtils.setField(user, "id", 5L);
+        when(refreshTokenService.rotate("refresh-token")).thenReturn(5L);
+        when(users.findById(5L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> strictService.refresh("refresh-token"))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessageContaining("INVALID_CREDENTIALS");
+
+        verify(audit).record(eq("REFRESH_FAILED"), eq(5L), eq("student@example.com"), eq(null), eq(false),
+                eq("EMAIL_NOT_VERIFIED"));
+        verify(jwtTokenProvider, never()).generateAccessToken(any());
+    }
+
+    @Test
+    void startMfaEnrollmentStagesSecretWithoutEnablingMfa() {
+        User user = new User("student@example.com", "stored-hash", "Student");
+        ReflectionTestUtils.setField(user, "id", 5L);
+        when(users.findById(5L)).thenReturn(Optional.of(user));
+        when(totpService.generateSecret()).thenReturn("JBSWY3DPEHPK3PXP");
+        when(totpService.provisioningUri("CourseFlow", "student@example.com", "JBSWY3DPEHPK3PXP"))
+                .thenReturn("otpauth://totp/CourseFlow:student@example.com?secret=JBSWY3DPEHPK3PXP");
+
+        var enrollment = service.startMfaEnrollment(new CurrentUser(5L, "student@example.com", "STUDENT"));
+
+        assertThat(enrollment.secret()).isEqualTo("JBSWY3DPEHPK3PXP");
+        assertThat(enrollment.otpAuthUri()).startsWith("otpauth://totp/");
+        assertThat(user.getMfaSecret()).isEqualTo("JBSWY3DPEHPK3PXP");
+        assertThat(user.isMfaEnabled()).isFalse();
+        verify(audit).record(eq("MFA_ENROLLMENT_STARTED"), eq(5L), eq("student@example.com"), eq("self"), eq(true),
+                eq(null));
+    }
+
+    @Test
+    void startMfaEnrollmentRejectsAlreadyEnabledMfa() {
+        User user = new User("student@example.com", "stored-hash", "Student");
+        ReflectionTestUtils.setField(user, "id", 5L);
+        user.enableMfa("JBSWY3DPEHPK3PXP");
+        when(users.findById(5L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.startMfaEnrollment(new CurrentUser(5L, "student@example.com", "STUDENT")))
+                .isInstanceOf(edu.courseflow.commonlibrary.exception.BadRequestException.class)
+                .hasMessageContaining("MFA_ALREADY_ENABLED");
+
+        verify(totpService, never()).generateSecret();
+    }
+
+    @Test
+    void confirmMfaEnablesMfaAndRevokesSessions() {
+        User user = new User("student@example.com", "stored-hash", "Student");
+        ReflectionTestUtils.setField(user, "id", 5L);
+        user.stageMfaSecret("JBSWY3DPEHPK3PXP");
+        when(users.findById(5L)).thenReturn(Optional.of(user));
+        when(totpService.verify("JBSWY3DPEHPK3PXP", "123456")).thenReturn(true);
+
+        service.confirmMfa(new CurrentUser(5L, "student@example.com", "STUDENT"), "123456");
+
+        assertThat(user.isMfaEnabled()).isTrue();
+        assertThat(user.getMfaSecret()).isEqualTo("JBSWY3DPEHPK3PXP");
+        verify(refreshTokenService).revokeAll(5L, "mfa-enabled");
+        verify(accessTokenRevocations).revokeAllForUser(5L);
+        verify(audit).record(eq("MFA_ENABLED"), eq(5L), eq("student@example.com"), eq("self"), eq(true), eq(null));
+    }
+
+    @Test
+    void disableMfaRequiresCurrentCodeAndRevokesSessions() {
+        User user = new User("student@example.com", "stored-hash", "Student");
+        ReflectionTestUtils.setField(user, "id", 5L);
+        user.enableMfa("JBSWY3DPEHPK3PXP");
+        when(users.findById(5L)).thenReturn(Optional.of(user));
+        when(totpService.verify("JBSWY3DPEHPK3PXP", "123456")).thenReturn(true);
+
+        service.disableMfa(new CurrentUser(5L, "student@example.com", "STUDENT"), "123456");
+
+        assertThat(user.isMfaEnabled()).isFalse();
+        assertThat(user.getMfaSecret()).isNull();
+        verify(refreshTokenService).revokeAll(5L, "mfa-disabled");
+        verify(accessTokenRevocations).revokeAllForUser(5L);
+        verify(audit).record(eq("MFA_DISABLED"), eq(5L), eq("student@example.com"), eq("self"), eq(true), eq(null));
+    }
+
+    @Test
+    void registerCreatesPendingStudentAndRequestsEmailVerification() {
         Role studentRole = new Role(UUID.randomUUID(), SystemRoles.STUDENT, "Student", null, true, false, 10, null,
                 "seed");
-        UserDto userDto = new UserDto(9L, "new@example.com", "New Learner", "ACTIVE", true, false);
+        Instant expiresAt = Instant.parse("2026-06-14T03:00:00Z");
+        UserDto userDto = new UserDto(9L, "new@example.com", "New Learner", "PENDING_VERIFICATION", false, false);
         when(users.existsByEmailIgnoreCase("new@example.com")).thenReturn(false);
         when(roles.findByCode(SystemRoles.STUDENT)).thenReturn(Optional.of(studentRole));
         when(passwordEncoder.encode("StrongPass1!")).thenReturn("new-hash");
@@ -155,17 +259,18 @@ class AuthServiceTest {
             ReflectionTestUtils.setField(saved, "id", 9L);
             return saved;
         });
-        when(jwtTokenProvider.generateAccessToken(any(User.class))).thenReturn("access-token");
-        when(jwtTokenProvider.getAccessTtlSeconds()).thenReturn(900L);
-        when(refreshTokenService.issue(9L)).thenReturn("refresh-token");
+        when(emailVerificationService.issueVerification(any(User.class), eq("self-register")))
+                .thenReturn(new EmailVerificationService.EmailVerificationIssue(expiresAt));
         when(mapper.toDto(any(User.class))).thenReturn(userDto);
 
         var response = service.register(new RegisterRequestDto("NEW@example.com", "StrongPass1!", " New Learner "));
 
-        assertThat(response.accessToken()).isEqualTo("access-token");
-        assertThat(response.refreshToken()).isEqualTo("refresh-token");
+        assertThat(response.emailVerificationRequired()).isTrue();
+        assertThat(response.verificationExpiresAt()).isEqualTo(expiresAt);
         assertThat(response.user()).isEqualTo(userDto);
         verify(assignments).save(any(UserRoleAssignment.class));
+        verify(emailVerificationService).issueVerification(any(User.class), eq("self-register"));
+        verify(jwtTokenProvider, never()).generateAccessToken(any());
         verify(audit).record(eq("USER_REGISTERED"), eq(9L), eq("new@example.com"), eq("self-register"), eq(true),
                 eq("role=STUDENT"));
     }

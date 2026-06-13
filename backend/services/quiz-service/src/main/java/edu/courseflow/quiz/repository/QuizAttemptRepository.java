@@ -1,6 +1,7 @@
 package edu.courseflow.quiz.repository;
 
 import edu.courseflow.quiz.model.QuizAttempt;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +31,8 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, UUID> 
     long countByQuizIdAndStudentIdAndStatusIn(UUID quizId, String studentId, Collection<String> statuses);
 
     boolean existsByQuizIdAndStudentIdAndStatusIn(UUID quizId, String studentId, Collection<String> statuses);
+
+    List<QuizAttempt> findByStatusAndDeadlineAtLessThanEqualOrderByDeadlineAtAsc(String status, Instant deadlineAt);
 
     @Query("select coalesce(max(a.attemptNo), 0) + 1 from QuizAttempt a "
             + "where a.quizId = :quizId and a.studentId = :studentId")

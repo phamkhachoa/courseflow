@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/shared/api/query-keys";
 import {
   Badge,
   Button,
@@ -13,12 +15,24 @@ import {
   Select,
   Spinner
 } from "@/shared/ui";
+import { listAssets, listVideos } from "@/modules/media/api";
 import { useCourse, useCourseLifecycle } from "../hooks";
 
 export function CourseDetailPage() {
   const { courseId = "" } = useParams();
   const { data: course, isLoading, isError, error } = useCourse(courseId);
   const { publish, archive, addMaterial } = useCourseLifecycle(courseId);
+  const assets = useQuery({
+    queryKey: queryKeys.media.list,
+    queryFn: listAssets,
+    staleTime: 60_000
+  });
+  const videos = useQuery({
+    queryKey: queryKeys.media.videos(courseId),
+    queryFn: () => listVideos(courseId),
+    enabled: Boolean(courseId),
+    staleTime: 60_000
+  });
 
   const [title, setTitle] = useState("");
   const [materialType, setMaterialType] = useState("VIDEO");
@@ -100,21 +114,45 @@ export function CourseDetailPage() {
               <Input id="m-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
             </FormField>
             <FormField label="Loại" htmlFor="m-type">
-              <Select id="m-type" value={materialType} onChange={(e) => setMaterialType(e.target.value)}>
+              <Select
+                id="m-type"
+                value={materialType}
+                onChange={(e) => {
+                  setMaterialType(e.target.value);
+                  setMediaId("");
+                }}
+              >
                 <option value="VIDEO">VIDEO</option>
                 <option value="IMAGE">IMAGE</option>
                 <option value="PDF">PDF</option>
                 <option value="LINK">LINK</option>
               </Select>
             </FormField>
-            <FormField label="Media ID" htmlFor="m-media-id">
-              <Input
+            <FormField label="Media" htmlFor="m-media-id" hint="Chọn media đã upload; link ngoài có thể để trống.">
+              <Select
                 id="m-media-id"
                 value={mediaId}
                 onChange={(e) => setMediaId(e.target.value)}
-                placeholder="UUID trong media-service, có thể bỏ trống"
-              />
+                disabled={materialType === "LINK"}
+              >
+                <option value="">Không gắn media</option>
+                {materialType === "VIDEO"
+                  ? (videos.data ?? []).map((video) => (
+                    <option key={video.id} value={video.id}>
+                      {video.title} · {video.status}
+                    </option>
+                  ))
+                  : (assets.data ?? []).map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {asset.fileName} · {asset.contentType}
+                    </option>
+                  ))}
+              </Select>
+              {materialType === "VIDEO" && videos.isLoading && <span className="text-xs text-slate-400">Đang tải video...</span>}
+              {materialType !== "VIDEO" && materialType !== "LINK" && assets.isLoading && <span className="text-xs text-slate-400">Đang tải media...</span>}
             </FormField>
+            {videos.isError && materialType === "VIDEO" && <ErrorState error={videos.error} />}
+            {assets.isError && materialType !== "VIDEO" && materialType !== "LINK" && <ErrorState error={assets.error} />}
             {addMaterial.isError && <ErrorState error={addMaterial.error} />}
             <Button type="submit" disabled={addMaterial.isPending}>
               {addMaterial.isPending ? "Đang lưu" : "Thêm tài liệu"}

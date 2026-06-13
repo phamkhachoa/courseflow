@@ -13,15 +13,20 @@ class Certificate {
   final DateTime? issuedAt;
 
   factory Certificate.fromJson(Map<String, dynamic> json) => Certificate(
-    id: json['id'] as String? ?? '',
-    courseTitle: json['courseTitle'] as String? ?? '',
-    verificationCode: json['verificationCode'] as String? ??
-        json['code'] as String? ??
-        '',
-    issuedAt: json['issuedAt'] is String
-        ? DateTime.tryParse(json['issuedAt'] as String)
-        : null,
-  );
+        id: json['id'] as String? ?? json['certificateId'] as String? ?? '',
+        courseTitle: json['courseTitle'] as String? ??
+            json['courseName'] as String? ??
+            _courseFallback(json['courseId'] as String?),
+        verificationCode: json['verificationCode'] as String? ??
+            json['code'] as String? ??
+            '',
+        issuedAt: json['issuedAt'] is String
+            ? DateTime.tryParse(json['issuedAt'] as String)
+            : null,
+      );
+
+  static String _courseFallback(String? courseId) =>
+      courseId == null || courseId.isEmpty ? '' : 'Course $courseId';
 }
 
 /// Public verification result from `GET /v1/certificates/verify/{code}`.

@@ -13,4 +13,6 @@
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/002-rich-lesson-items.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/003-item-progress.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004-optimistic-lock-columns.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/005-backfill-published-course-snapshots.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

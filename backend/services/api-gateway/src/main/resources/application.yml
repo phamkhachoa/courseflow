@@ -188,6 +188,12 @@ spring:
             - Path=/api/v1/courses/*/modules,/api/v1/courses/*/modules/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
+        - id: course-user-media-download
+          uri: ${COURSE_SERVICE_URI:http://localhost:8083}
+          predicates:
+            - Path=/api/v1/courses/*/media/assets/*/download-url
+          filters:
+            - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: analytics-user-related-courses
           uri: ${ANALYTICS_SERVICE_URI:http://localhost:8093}
           predicates:
@@ -328,4 +334,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

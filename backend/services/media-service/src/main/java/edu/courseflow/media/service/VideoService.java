@@ -18,6 +18,7 @@ import edu.courseflow.media.dto.VideoDtos.VideoAssetDto;
 import edu.courseflow.media.dto.VideoDtos.VideoCaptionDto;
 import edu.courseflow.media.dto.VideoDtos.VideoManifestDto;
 import edu.courseflow.media.dto.VideoDtos.VideoProgressDto;
+import edu.courseflow.media.dto.VideoDtos.VideoReadinessDto;
 import edu.courseflow.media.dto.VideoDtos.VideoRenditionDto;
 import edu.courseflow.media.model.OutboxEvent;
 import edu.courseflow.media.repository.OutboxEventRepository;
@@ -41,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
 
 @Service
 public class VideoService {
@@ -48,6 +50,8 @@ public class VideoService {
     private static final Logger log = LoggerFactory.getLogger(VideoService.class);
     private static final String KEY_PREFIX = "videos";
     private static final String HMAC_ALGORITHM = "HmacSHA256";
+    private static final double COMPLETION_THRESHOLD = 0.9;
+    private static final int COMPLETION_GRACE_SECONDS = 5;
     private static final Set<String> ALLOWED_SOURCE_CONTENT_TYPES = Set.of(
             "video/mp4", "video/webm", "video/quicktime");
 
@@ -56,6 +60,8 @@ public class VideoService {
     private final ObjectMapper objectMapper;
     private final ObjectStorageClient storage;
     private final CourseAccessClient courseAccess;
+    private final RestClient courseClient;
+    private final String serviceToken;
     private final String storageProvider;
     private final String cdnBaseUrl;
     private final long signedUrlTtlSeconds;
@@ -67,6 +73,9 @@ public class VideoService {
                         ObjectMapper objectMapper,
                         ObjectStorageClient storage,
                         CourseAccessClient courseAccess,
+                        RestClient.Builder restClientBuilder,
+                        @Value("${courseflow.entitlement.course-service-url:http://localhost:8083}") String courseServiceUrl,
+                        @Value("${courseflow.security.service-token:}") String serviceToken,
                         @Value("${courseflow.storage.provider:minio}") String storageProvider,
                         @Value("${courseflow.media.cdn-base-url:https://cdn.local/media}") String cdnBaseUrl,
                         @Value("${courseflow.media.signed-url-ttl-seconds:3600}") long signedUrlTtlSeconds,
@@ -77,6 +86,8 @@ public class VideoService {
         this.objectMapper = objectMapper;
         this.storage = storage;
         this.courseAccess = courseAccess;
+        this.courseClient = restClientBuilder.baseUrl(courseServiceUrl).build();
+        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
         this.storageProvider = storageProvider;
         this.cdnBaseUrl = cdnBaseUrl;
         this.signedUrlTtlSeconds = signedUrlTtlSeconds;
@@ -116,6 +127,16 @@ public class VideoService {
         return videos.find(videoId)
                 .map(this::withEffectiveStatus)
                 .orElseThrow(() -> new NotFoundException("Video not found: " + videoId));
+    }
+
+    public VideoReadinessDto readiness(UUID videoId) {
+        VideoAssetDto video = get(videoId);
+        String status = effectiveStatus(video);
+        return new VideoReadinessDto(
+                video.id(),
+                video.courseId(),
+                status,
+                "READY".equalsIgnoreCase(status));
     }
 
     public List<VideoAssetDto> list(UUID courseId) {
@@ -163,14 +184,20 @@ public class VideoService {
 
     @Transactional
     public VideoProgressDto updateProgress(UUID videoId, UpdateProgressRequestDto request, boolean privileged) {
-        get(videoId, request.userId(), privileged);
-        VideoProgressDto progress = videos.upsertProgress(videoId, request);
+        VideoAssetDto video = get(videoId, request.userId(), privileged);
+        UpdateProgressRequestDto trusted = trustedProgress(video, request);
+        VideoProgressDto progress = videos.upsertProgress(videoId, trusted);
         if (progress.completed()) {
             saveOutbox(videoId, "video.progress.updated", Map.of(
+                    "eventId", UUID.randomUUID().toString(),
                     "videoId", videoId.toString(),
-                    "userId", request.userId(),
+                    "courseId", video.courseId() == null ? "" : video.courseId(),
+                    "userId", trusted.userId(),
                     "positionSeconds", progress.positionSeconds(),
-                    "completed", true));
+                    "durationSeconds", progress.durationSeconds() == null ? 0 : progress.durationSeconds(),
+                    "completed", true,
+                    "completedAt", progress.updatedAt().toString()));
+            recordCourseVideoCompletion(video, trusted.userId(), progress.updatedAt());
         }
         return progress;
     }
@@ -179,6 +206,56 @@ public class VideoService {
         get(videoId, userId, privileged);
         return videos.findProgress(videoId, userId)
                 .orElse(new VideoProgressDto(videoId.toString(), userId, 0, null, 1.0, false, Instant.now()));
+    }
+
+    private UpdateProgressRequestDto trustedProgress(VideoAssetDto video, UpdateProgressRequestDto request) {
+        int positionSeconds = Math.max(0, request.positionSeconds() == null ? 0 : request.positionSeconds());
+        Integer durationSeconds = request.durationSeconds() == null ? video.durationSeconds() : request.durationSeconds();
+        double playbackRate = request.playbackRate() == null || request.playbackRate() <= 0
+                ? 1.0
+                : request.playbackRate();
+        boolean completed = Boolean.TRUE.equals(request.completed())
+                && completionThresholdMet(positionSeconds, durationSeconds);
+        return new UpdateProgressRequestDto(
+                request.userId(),
+                positionSeconds,
+                durationSeconds,
+                playbackRate,
+                completed);
+    }
+
+    private boolean completionThresholdMet(int positionSeconds, Integer durationSeconds) {
+        if (durationSeconds == null || durationSeconds <= 0) {
+            return false;
+        }
+        int remaining = Math.max(0, durationSeconds - positionSeconds);
+        return remaining <= COMPLETION_GRACE_SECONDS
+                || positionSeconds >= Math.ceil(durationSeconds * COMPLETION_THRESHOLD);
+    }
+
+    private void recordCourseVideoCompletion(VideoAssetDto video, String userId, Instant completedAt) {
+        if (video.courseId() == null || video.courseId().isBlank()) {
+            return;
+        }
+        if (serviceToken.isBlank()) {
+            log.warn("Skipping course progress update for video {} because service token is not configured", video.id());
+            return;
+        }
+        try {
+            courseClient.post()
+                    .uri("/internal/courses/{courseId}/modules/items/progress/verified", video.courseId())
+                    .header(CourseAccessClient.SERVICE_TOKEN_HEADER, serviceToken)
+                    .body(Map.of(
+                            "studentId", userId,
+                            "sourceType", "VIDEO",
+                            "sourceId", video.id(),
+                            "completedAt", completedAt.toString()))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RuntimeException ex) {
+            log.warn("Unable to record verified course progress for video {} and learner {}: {}",
+                    video.id(), userId, ex.getMessage());
+        }
     }
 
     /**

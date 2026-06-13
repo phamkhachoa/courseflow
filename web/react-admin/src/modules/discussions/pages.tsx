@@ -177,18 +177,6 @@ export function DiscussionListPage() {
                 )}
               </Select>
             </FormField>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập Course ID</summary>
-              <FormField label="Course ID" htmlFor="d-course-manual">
-                <Input
-                  id="d-course-manual"
-                  className="mt-3"
-                  value={form.courseId}
-                  onChange={(e) => setForm({ ...form, courseId: e.target.value.trim() })}
-                  placeholder="UUID khóa học"
-                />
-              </FormField>
-            </details>
             <FormField label="Tiêu đề" htmlFor="d-title">
               <Input id="d-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
             </FormField>

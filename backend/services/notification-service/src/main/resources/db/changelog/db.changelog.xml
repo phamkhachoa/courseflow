@@ -11,4 +11,6 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/002-delivery-status.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003-delivery-retry.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

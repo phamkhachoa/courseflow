@@ -1,5 +1,6 @@
 package edu.courseflow.media.controller;
 
+import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.media.dto.MediaDtos.PresignedUploadDto;
 import edu.courseflow.media.dto.MediaDtos.RequestUploadUrlDto;
@@ -11,16 +12,19 @@ import edu.courseflow.media.dto.VideoDtos.VideoAssetDto;
 import edu.courseflow.media.dto.VideoDtos.VideoCaptionDto;
 import edu.courseflow.media.dto.VideoDtos.VideoManifestDto;
 import edu.courseflow.media.dto.VideoDtos.VideoProgressDto;
+import edu.courseflow.media.dto.VideoDtos.VideoReadinessDto;
 import edu.courseflow.media.service.VideoService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,20 +33,32 @@ import org.springframework.web.server.ResponseStatusException;
 public class VideoController {
 
     private final VideoService videos;
+    private final CourseAccessClient courseAccess;
+    private final String serviceToken;
 
-    public VideoController(VideoService videos) {
+    public VideoController(VideoService videos,
+            CourseAccessClient courseAccess,
+            @Value("${courseflow.security.service-token:}") String serviceToken) {
         this.videos = videos;
+        this.courseAccess = courseAccess;
+        this.serviceToken = serviceToken == null ? "" : serviceToken.trim();
     }
 
     @PostMapping("/internal/media/videos")
     public VideoAssetDto register(@Valid @RequestBody RegisterVideoRequestDto request, CurrentUser user) {
         requireStaff(user);
+        requireVideoCourseStaffAccess(user, request.courseId());
         return videos.register(request, callerId(user));
     }
 
     @GetMapping("/internal/media/videos")
     public List<VideoAssetDto> list(@RequestParam(required = false) UUID courseId, CurrentUser user) {
         requireStaff(user);
+        if (courseId == null) {
+            requirePlatformAdmin(user);
+        } else {
+            courseAccess.requireCourseStaffAccess(user, courseId);
+        }
         return videos.list(courseId);
     }
 
@@ -55,30 +71,46 @@ public class VideoController {
 
     @GetMapping("/internal/media/videos/{videoId}")
     public VideoAssetDto get(@PathVariable UUID videoId, CurrentUser user) {
-        return videos.get(videoId, callerId(user), isStaff(user));
+        VideoAssetDto video = videos.get(videoId);
+        if (isStaff(user)) {
+            requireVideoCourseStaffAccess(user, video.courseId());
+            return video;
+        }
+        return videos.get(videoId, callerId(user), false);
+    }
+
+    @GetMapping("/internal/media/videos/{videoId}/readiness")
+    public VideoReadinessDto readiness(@PathVariable UUID videoId,
+            @RequestHeader(value = CourseAccessClient.SERVICE_TOKEN_HEADER, required = false) String token) {
+        requireServiceToken(token);
+        return videos.readiness(videoId);
     }
 
     @PostMapping("/internal/media/videos/{videoId}/transcode")
     public VideoAssetDto transcode(@PathVariable UUID videoId, @Valid @RequestBody StartTranscodeRequestDto request,
                                    CurrentUser user) {
         requireStaff(user);
+        requireVideoCourseStaffAccess(user, videos.get(videoId).courseId());
         return videos.startTranscode(videoId, new StartTranscodeRequestDto(callerId(user)));
     }
 
     @GetMapping("/internal/media/videos/{videoId}/manifest")
     public VideoManifestDto manifest(@PathVariable UUID videoId, @RequestParam(required = false) String protocol,
                                      CurrentUser user) {
-        return videos.manifest(videoId, protocol, callerId(user), isStaff(user));
+        boolean privileged = scopedVideoPrivilege(videoId, user);
+        return videos.manifest(videoId, protocol, callerId(user), privileged);
     }
 
     @GetMapping("/internal/media/videos/{videoId}/captions")
     public List<VideoCaptionDto> captions(@PathVariable UUID videoId, CurrentUser user) {
-        return videos.captions(videoId, callerId(user), isStaff(user));
+        boolean privileged = scopedVideoPrivilege(videoId, user);
+        return videos.captions(videoId, callerId(user), privileged);
     }
 
     @GetMapping("/internal/media/videos/{videoId}/progress")
     public VideoProgressDto getProgress(@PathVariable UUID videoId, CurrentUser user) {
-        return videos.getProgress(videoId, callerId(user), isStaff(user));
+        boolean privileged = scopedVideoPrivilege(videoId, user);
+        return videos.getProgress(videoId, callerId(user), privileged);
     }
 
     @PutMapping("/internal/media/videos/{videoId}/progress")
@@ -90,13 +122,15 @@ public class VideoController {
                 request.durationSeconds(),
                 request.playbackRate(),
                 request.completed());
-        return videos.updateProgress(videoId, trusted, isStaff(user));
+        boolean privileged = scopedVideoPrivilege(videoId, user);
+        return videos.updateProgress(videoId, trusted, privileged);
     }
 
     @GetMapping("/internal/media/videos/{videoId}/playback-url")
     public PlaybackUrlDto playbackUrl(@PathVariable UUID videoId, @RequestParam(required = false) String protocol,
                                       CurrentUser user) {
-        return videos.playbackUrl(videoId, protocol, callerId(user), isStaff(user));
+        boolean privileged = scopedVideoPrivilege(videoId, user);
+        return videos.playbackUrl(videoId, protocol, callerId(user), privileged);
     }
 
     private String callerId(CurrentUser user) {
@@ -109,11 +143,40 @@ public class VideoController {
     private void requireStaff(CurrentUser user) {
         callerId(user);
         if (!isStaff(user)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires ADMIN or INSTRUCTOR role");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Requires course staff role");
         }
     }
 
     private boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole("ADMIN", "INSTRUCTOR");
+        return user != null && user.hasAnyRole("ADMIN", "ORG_ADMIN", "TA", "INSTRUCTOR", "PROFESSOR");
+    }
+
+    private void requireVideoCourseStaffAccess(CurrentUser user, String courseId) {
+        if (courseId == null || courseId.isBlank()) {
+            requirePlatformAdmin(user);
+            return;
+        }
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(courseId));
+    }
+
+    private boolean scopedVideoPrivilege(UUID videoId, CurrentUser user) {
+        if (!isStaff(user)) {
+            return false;
+        }
+        requireVideoCourseStaffAccess(user, videos.get(videoId).courseId());
+        return true;
+    }
+
+    private void requirePlatformAdmin(CurrentUser user) {
+        callerId(user);
+        if (!user.hasRole("ADMIN")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "courseId is required for course staff access");
+        }
+    }
+
+    private void requireServiceToken(String token) {
+        if (serviceToken.isBlank() || token == null || !serviceToken.equals(token.trim())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Service token required");
+        }
     }
 }

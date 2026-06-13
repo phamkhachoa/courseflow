@@ -4,6 +4,14 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: courseflow-postgres
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_replication_slots=10"
+      - "-c"
+      - "max_wal_senders=10"
     environment:
       POSTGRES_USER: courseflow
       POSTGRES_PASSWORD: courseflow
@@ -73,6 +81,29 @@ services:
       CONFIG_STORAGE_TOPIC: courseflow_connect_configs
       OFFSET_STORAGE_TOPIC: courseflow_connect_offsets
       STATUS_STORAGE_TOPIC: courseflow_connect_status
+      KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+
+  debezium-course-search-setup:
+    image: curlimages/curl:8.10.1
+    container_name: courseflow-debezium-course-search-setup
+    depends_on:
+      - kafka-connect
+    volumes:
+      - ./debezium/course-search-cdc-connector-config.json:/connector-config.json:ro
+    entrypoint: >
+      /bin/sh -c "
+      until curl -fsS http://kafka-connect:8083/connectors >/dev/null; do
+        echo 'waiting for kafka-connect...'; sleep 2;
+      done &&
+      curl -fsS -X PUT
+        -H 'Content-Type: application/json'
+        --data @/connector-config.json
+        http://kafka-connect:8083/connectors/courseflow-course-search-cdc/config &&
+      echo 'Debezium connector ready: courseflow-course-search-cdc'
+      "
+    restart: "no"
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3

@@ -16,6 +16,7 @@ import edu.courseflow.assignment.model.OutboxEvent;
 import edu.courseflow.assignment.model.Submission;
 import edu.courseflow.assignment.model.SubmissionAttachment;
 import edu.courseflow.assignment.model.SubmissionRubricScore;
+import edu.courseflow.commonlibrary.exception.NotFoundException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
@@ -62,6 +63,13 @@ public class AssignmentRepository {
 
     public Optional<AssignmentDto> find(UUID assignmentId) {
         return assignments.findById(assignmentId).map(this::toAssignmentDto);
+    }
+
+    public AssignmentDto updateStatus(UUID assignmentId, String status) {
+        Assignment assignment = assignments.findById(assignmentId)
+                .orElseThrow(() -> new NotFoundException("Assignment not found: " + assignmentId));
+        assignment.setStatus(status);
+        return toAssignmentDto(assignments.save(assignment));
     }
 
     public AssignmentDto create(CreateAssignmentRequestDto request) {

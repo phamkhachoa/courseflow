@@ -26,9 +26,14 @@ import reactor.core.publisher.Mono;
 class JwtAuthenticationGatewayFilterTest {
 
     private static final String SECRET = "test-secret-key-that-is-comfortably-over-32-bytes-long";
+    private static final String SERVICE_TOKEN = "trusted-gateway-to-service-token";
 
     private static JwtAuthenticationGatewayFilter newFilter() {
         return new JwtAuthenticationGatewayFilter(new JwtSecretProperties(SECRET));
+    }
+
+    private static JwtAuthenticationGatewayFilter newFilter(String serviceToken) {
+        return new JwtAuthenticationGatewayFilter(new JwtSecretProperties(SECRET), serviceToken);
     }
 
     @Test
@@ -44,7 +49,9 @@ class JwtAuthenticationGatewayFilterTest {
                 .header("Authorization", "Bearer " + accessToken("student@courseflow.local", "4", "STUDENT"))
                 .header(GatewayHeaders.USER_ID, "999")
                 .header(GatewayHeaders.USER_ROLE, "ADMIN")
+                .header(GatewayHeaders.USER_ROLE_SCOPES, "spoofed.scope.header")
                 .header(GatewayHeaders.USER_EMAIL, "spoofed@example.com")
+                .header(GatewayHeaders.SERVICE_TOKEN, "spoofed-service-token")
                 .build();
 
         filter.filter(MockServerWebExchange.from(request), chain).block();
@@ -53,8 +60,32 @@ class JwtAuthenticationGatewayFilterTest {
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.USER_ID)).isEqualTo("4");
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.USER_ROLE)).isEqualTo("STUDENT");
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.USER_ROLES)).isEqualTo("STUDENT");
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.USER_ROLE_SCOPES))
+                .doesNotContain("spoofed");
         assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.USER_EMAIL))
                 .isEqualTo("student@courseflow.local");
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.SERVICE_TOKEN)).isNull();
+    }
+
+    @Test
+    void stripsClientServiceTokenAndInjectsConfiguredAttestation() {
+        JwtAuthenticationGatewayFilter filter = newFilter(SERVICE_TOKEN);
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            forwarded.set(exchange);
+            return Mono.empty();
+        };
+
+        MockServerHttpRequest request = MockServerHttpRequest.get("/api/v1/assignments")
+                .header("Authorization", "Bearer " + accessToken("student@courseflow.local", "4", "STUDENT"))
+                .header(GatewayHeaders.SERVICE_TOKEN, "client-supplied-token")
+                .build();
+
+        filter.filter(MockServerWebExchange.from(request), chain).block();
+
+        assertThat(forwarded.get()).isNotNull();
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst(GatewayHeaders.SERVICE_TOKEN))
+                .isEqualTo(SERVICE_TOKEN);
     }
 
     @Test
@@ -116,6 +147,22 @@ class JwtAuthenticationGatewayFilterTest {
 
         filter.filter(MockServerWebExchange.from(MockServerHttpRequest.post("/api/v1/auth/register").build()), chain)
                 .block();
+
+        assertThat(forwarded.get()).isNotNull();
+    }
+
+    @Test
+    void allowsPublicEmailVerificationWithoutBearerToken() {
+        JwtAuthenticationGatewayFilter filter = newFilter();
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+        GatewayFilterChain chain = exchange -> {
+            forwarded.set(exchange);
+            return Mono.empty();
+        };
+
+        filter.filter(MockServerWebExchange.from(
+                        MockServerHttpRequest.post("/api/v1/auth/email/verify").build()),
+                chain).block();
 
         assertThat(forwarded.get()).isNotNull();
     }

@@ -16,11 +16,21 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+courseflow:
+  security:
+    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
+  deadline:
+    reminders:
+      auto-dispatch-enabled: ${DEADLINE_REMINDER_AUTO_DISPATCH_ENABLED:true}
+      dispatch-interval-ms: ${DEADLINE_REMINDER_DISPATCH_INTERVAL_MS:60000}
+  entitlement:
+    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
+    course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

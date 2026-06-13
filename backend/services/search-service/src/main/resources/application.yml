@@ -7,8 +7,18 @@ spring:
     uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${COURSEFLOW_SEARCH_KAFKA_GROUP_ID:search-service}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+courseflow:
+  search:
+    kafka:
+      group-id: ${COURSEFLOW_SEARCH_KAFKA_GROUP_ID:search-service}
+      course-cdc-topic: ${COURSEFLOW_SEARCH_COURSE_CDC_TOPIC:courseflow.course.public.courses}
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

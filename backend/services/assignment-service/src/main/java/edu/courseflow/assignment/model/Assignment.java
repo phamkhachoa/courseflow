@@ -106,6 +106,10 @@ public class Assignment {
     public BigDecimal getLatePenaltyMaxPercent() { return latePenaltyMaxPercent; }
     public UUID getRubricId() { return rubricId; }
 
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
     public void setRubricId(UUID rubricId) {
         this.rubricId = rubricId;
     }

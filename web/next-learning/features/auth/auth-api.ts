@@ -12,6 +12,21 @@ type RegisterInput = LoginInput & {
   fullName: string;
 };
 
+type UserDto = {
+  id: number;
+  email: string;
+  fullName: string;
+  status: string;
+  emailVerified: boolean;
+  mfaEnabled: boolean;
+};
+
+export type RegistrationResponse = {
+  user: UserDto;
+  emailVerificationRequired: boolean;
+  verificationExpiresAt: string;
+};
+
 type ApiErrorPayload = {
   detail?: string;
   message?: string;
@@ -25,6 +40,7 @@ function friendlyAuthMessage(raw: string, fallback: string) {
     return "Mật khẩu cần tối thiểu 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.";
   }
   if (raw.includes("INVALID_CREDENTIALS")) return "Email hoặc mật khẩu không đúng.";
+  if (raw.includes("EMAIL_VERIFICATION_TOKEN_INVALID")) return "Liên kết xác minh đã hết hạn hoặc không hợp lệ.";
   if (raw.includes("MFA_REQUIRED")) return "Tài khoản này cần mã xác thực bổ sung.";
   if (raw.includes("PASSWORD_CHANGE_REQUIRED")) return "Tài khoản này cần đổi mật khẩu trước khi tiếp tục.";
   return raw || fallback;
@@ -40,7 +56,11 @@ async function readError(response: Response, fallback: string) {
   }
 }
 
-async function authPost(path: string, body: LoginInput | RegisterInput, fallback: string) {
+async function authPost<T>(
+  path: string,
+  body: LoginInput | RegisterInput | { token: string } | { email: string },
+  fallback: string
+) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -49,13 +69,22 @@ async function authPost(path: string, body: LoginInput | RegisterInput, fallback
   if (!response.ok) {
     throw new Error(await readError(response, fallback));
   }
-  return unwrap<StoredSession>(await response.json());
+  const text = await response.text();
+  return text ? unwrap<T>(JSON.parse(text)) : (undefined as T);
 }
 
 export function loginLearner(input: LoginInput) {
-  return authPost("/v1/auth/login", input, "Đăng nhập thất bại.");
+  return authPost<StoredSession>("/v1/auth/login", input, "Đăng nhập thất bại.");
 }
 
 export function registerLearner(input: RegisterInput) {
-  return authPost("/v1/auth/register", input, "Đăng ký thất bại.");
+  return authPost<RegistrationResponse>("/v1/auth/register", input, "Đăng ký thất bại.");
+}
+
+export function verifyEmail(token: string) {
+  return authPost<UserDto>("/v1/auth/email/verify", { token }, "Xác minh email thất bại.");
+}
+
+export function resendEmailVerification(email: string) {
+  return authPost<void>("/v1/auth/email/resend", { email }, "Chưa gửi lại được email xác minh.");
 }

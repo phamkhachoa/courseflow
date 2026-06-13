@@ -16,7 +16,7 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
@@ -24,10 +24,15 @@ spring:
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
       acks: all
 courseflow:
+  security:
+    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
+  entitlement:
+    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
+    course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
   outbox:
     poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus

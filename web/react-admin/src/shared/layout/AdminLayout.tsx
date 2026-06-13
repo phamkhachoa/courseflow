@@ -15,8 +15,8 @@ export function AdminLayout() {
   const ActiveIcon = activeModule.icon;
 
   return (
-    <div className="grid min-h-screen grid-cols-[304px_minmax(0,1fr)] bg-[#f6f4ef] text-slate-800 max-lg:grid-cols-[272px_minmax(0,1fr)] max-md:grid-cols-1">
-      <aside className="sticky top-0 flex h-screen flex-col border-r border-black/10 bg-[#0d2724] text-white max-md:hidden">
+    <div className="grid min-h-screen grid-cols-[304px_minmax(0,1fr)] bg-surface-canvas text-slate-800 max-lg:grid-cols-[272px_minmax(0,1fr)] max-md:grid-cols-1">
+      <aside className="sticky top-0 flex h-screen flex-col border-r border-black/10 bg-brand-900 text-white max-md:hidden">
         <div className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-md bg-white/12">
@@ -54,7 +54,7 @@ export function AdminLayout() {
                       cn(
                         "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition",
                         isActive
-                          ? "bg-white text-[#0d2724] shadow-[0_14px_32px_rgba(0,0,0,0.22)]"
+                          ? "bg-white text-brand-900 shadow-[0_14px_32px_rgba(0,0,0,0.22)]"
                           : "text-white/68 hover:bg-white/10 hover:text-white"
                       )
                     }
@@ -64,7 +64,7 @@ export function AdminLayout() {
                         <span
                           className={cn(
                             "grid size-8 shrink-0 place-items-center rounded-md transition",
-                            isActive ? "bg-[#dff7ec] text-[#0b6b4f]" : "bg-white/8 text-white/62 group-hover:bg-white/12"
+                            isActive ? "bg-brand-100 text-brand-700" : "bg-white/8 text-white/62 group-hover:bg-white/12"
                           )}
                         >
                           <module.icon size={17} />
@@ -74,7 +74,7 @@ export function AdminLayout() {
                           <span
                             className={cn(
                               "block truncate text-xs",
-                              isActive ? "text-[#31524d]" : "text-white/38 group-hover:text-white/55"
+                              isActive ? "text-brand-900/70" : "text-white/38 group-hover:text-white/55"
                             )}
                           >
                             {module.description}

@@ -56,6 +56,25 @@ CREATE TABLE IF NOT EXISTS submission_attachments (
 CREATE INDEX IF NOT EXISTS idx_submission_attachments_submission
     ON submission_attachments (submission_id);
 
+-- Upload grants bind object-storage keys to the authenticated learner who requested them.
+-- Submissions may only reference an unconsumed grant for the same assignment/student.
+CREATE TABLE IF NOT EXISTS attachment_upload_grants (
+    id UUID PRIMARY KEY,
+    assignment_id UUID NOT NULL REFERENCES assignments(id),
+    student_id VARCHAR(64) NOT NULL,
+    storage_key VARCHAR(512) NOT NULL UNIQUE,
+    file_name VARCHAR(255) NOT NULL,
+    content_type VARCHAR(120),
+    size_bytes BIGINT,
+    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ,
+    consumed_at TIMESTAMPTZ,
+    submission_id UUID REFERENCES submissions(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_attachment_upload_grants_owner
+    ON attachment_upload_grants (assignment_id, student_id, storage_key);
+
 -- ============================================================
 -- merged from 003-thicken-assignments.sql
 -- ============================================================

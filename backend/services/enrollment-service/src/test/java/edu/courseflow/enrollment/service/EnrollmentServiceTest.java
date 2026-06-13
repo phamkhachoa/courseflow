@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.ConflictException;
+import edu.courseflow.commonlibrary.security.CourseAccessClient;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.ChangeStatusRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollRequestDto;
@@ -38,6 +39,8 @@ class EnrollmentServiceTest {
 
     @Mock
     private EnrollmentRepository repo;
+    @Mock
+    private CourseAccessClient courseAccess;
 
     private EnrollmentService service;
 
@@ -45,7 +48,7 @@ class EnrollmentServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EnrollmentService(repo, new ObjectMapper());
+        service = new EnrollmentService(repo, new ObjectMapper(), courseAccess);
     }
 
     private static CurrentUser student(long id) {

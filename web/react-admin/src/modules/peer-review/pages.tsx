@@ -15,9 +15,9 @@ import {
   Textarea
 } from "@/shared/ui";
 import { fallbackCourses, listCourses } from "../courses/api";
-import { listAssignments } from "../assignments/api";
+import { listAssignments, listSubmissions } from "../assignments/api";
 import { adminUserLabel, useLearnerUsers } from "../identity/useLearnerUsers";
-import { assignReview, finalizeResults, getSettings, submitReview } from "./api";
+import { assignReview, finalizeResults, getSettings, listMyReviewAssignments, submitReview } from "./api";
 
 function compactId(value?: string | number | null) {
   if (value === undefined || value === null) return "";
@@ -33,6 +33,24 @@ function courseLabel(course?: { code?: string; title?: string }, fallbackId?: st
 function assignmentLabel(assignment?: { title?: string; id?: string }, fallbackId?: string) {
   if (assignment?.title) return assignment.title;
   return fallbackId ? `Assignment ${compactId(fallbackId)}` : "Chưa chọn assignment";
+}
+
+function dateLabel(value?: string) {
+  return value ? new Date(value).toLocaleString("vi-VN") : "chưa nộp";
+}
+
+function submissionLabel(submission?: { id: string; attemptNo?: number; submittedAt?: string; status?: string }, fallbackId?: string) {
+  if (submission) {
+    return `Lần ${submission.attemptNo ?? 1} · ${submission.status ?? "SUBMITTED"} · ${dateLabel(submission.submittedAt)}`;
+  }
+  return fallbackId ? `Submission ${compactId(fallbackId)}` : "Chọn bài nộp";
+}
+
+function reviewAssignmentLabel(
+  reviewAssignment: { id: string; assignmentId: string; submissionId: string; status?: string; assignedAt?: string },
+  assignment?: { title?: string; id?: string }
+) {
+  return `${assignmentLabel(assignment, reviewAssignment.assignmentId)} · ${reviewAssignment.status ?? "ASSIGNED"} · ${dateLabel(reviewAssignment.assignedAt)}`;
 }
 
 export function PeerReviewPage() {
@@ -57,6 +75,12 @@ export function PeerReviewPage() {
     queryFn: () => getSettings(submitted),
     enabled: Boolean(submitted)
   });
+  const reviewAssignments = useQuery({
+    queryKey: ["peer-review", "review-assignments", "mine"],
+    queryFn: listMyReviewAssignments,
+    retry: 1,
+    staleTime: 60_000
+  });
 
   const [assignForm, setAssignForm] = useState({
     assignmentId: "",
@@ -71,8 +95,22 @@ export function PeerReviewPage() {
     mutationFn: () => submitReview(reviewForm.reviewAssignmentId, { score: reviewForm.score, comment: reviewForm.comment })
   });
 
-  const [finalizeSubmissionId, setFinalizeSubmissionId] = useState("");
+  const [finalizeForm, setFinalizeForm] = useState({ assignmentId: "", revieweeId: "", submissionId: "" });
   const finalize = useMutation({ mutationFn: (submissionId: string) => finalizeResults(submissionId) });
+  const assignSubmissions = useQuery({
+    queryKey: queryKeys.assignments.submissions(assignForm.assignmentId, assignForm.revieweeId),
+    queryFn: () => listSubmissions(assignForm.assignmentId, assignForm.revieweeId),
+    enabled: Boolean(assignForm.assignmentId && assignForm.revieweeId),
+    retry: 1,
+    staleTime: 30_000
+  });
+  const finalizeSubmissions = useQuery({
+    queryKey: queryKeys.assignments.submissions(finalizeForm.assignmentId, finalizeForm.revieweeId),
+    queryFn: () => listSubmissions(finalizeForm.assignmentId, finalizeForm.revieweeId),
+    enabled: Boolean(finalizeForm.assignmentId && finalizeForm.revieweeId),
+    retry: 1,
+    staleTime: 30_000
+  });
   const courseRows = courses.data?.length ? courses.data : fallbackCourses;
   const assignmentRows = assignments.data ?? [];
   const courseById = useMemo(() => new Map(courseRows.map((course) => [course.id, course])), [courseRows]);
@@ -80,6 +118,10 @@ export function PeerReviewPage() {
   const selectedCourse = courseById.get(courseId);
   const selectedAssignment = assignmentById.get(assignmentId);
   const assignAssignment = assignmentById.get(assignForm.assignmentId);
+  const selectedAssignSubmission = (assignSubmissions.data ?? []).find((submission) => submission.id === assignForm.submissionId);
+  const finalizeAssignment = assignmentById.get(finalizeForm.assignmentId);
+  const selectedFinalizeSubmission = (finalizeSubmissions.data ?? []).find((submission) => submission.id === finalizeForm.submissionId);
+  const selectedReviewAssignment = (reviewAssignments.data ?? []).find((assignment) => assignment.id === reviewForm.reviewAssignmentId);
   const learnerHint =
     usersQuery.isLoading || roleQueriesLoading
       ? "Đang tải danh sách learner..."
@@ -135,18 +177,6 @@ export function PeerReviewPage() {
           <div className="flex items-end">
             <Button type="submit" disabled={!assignmentId}>Xem</Button>
           </div>
-          <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600 lg:col-span-3">
-            <summary className="cursor-pointer font-semibold text-slate-700">Nhập Assignment ID</summary>
-            <FormField label="Assignment ID" htmlFor="pr-aid-manual">
-              <Input
-                id="pr-aid-manual"
-                className="mt-3"
-                value={assignmentId}
-                onChange={(e) => pickAssignment(e.target.value.trim())}
-                placeholder="UUID assignment"
-              />
-            </FormField>
-          </details>
         </form>
         {settings.isLoading && <Spinner />}
         {settings.isError && <ErrorState error={settings.error} />}
@@ -180,7 +210,7 @@ export function PeerReviewPage() {
               <Select
                 id="pa-aid"
                 value={assignForm.assignmentId}
-                onChange={(e) => setAssignForm({ ...assignForm, assignmentId: e.target.value })}
+                onChange={(e) => setAssignForm({ ...assignForm, assignmentId: e.target.value, submissionId: "" })}
                 required
               >
                 <option value="">Chọn assignment</option>
@@ -193,9 +223,6 @@ export function PeerReviewPage() {
                   <option value={assignForm.assignmentId}>Assignment {compactId(assignForm.assignmentId)}</option>
                 )}
               </Select>
-            </FormField>
-            <FormField label="Submission ID" htmlFor="pa-sid">
-              <Input id="pa-sid" value={assignForm.submissionId} onChange={(e) => setAssignForm({ ...assignForm, submissionId: e.target.value })} required />
             </FormField>
             <FormField label="Reviewer" htmlFor="pa-rev" hint={learnerHint}>
               <Select
@@ -219,7 +246,7 @@ export function PeerReviewPage() {
               <Select
                 id="pa-ree"
                 value={assignForm.revieweeId}
-                onChange={(e) => setAssignForm({ ...assignForm, revieweeId: e.target.value })}
+                onChange={(e) => setAssignForm({ ...assignForm, revieweeId: e.target.value, submissionId: "" })}
                 required
               >
                 <option value="">Chọn reviewee</option>
@@ -233,17 +260,27 @@ export function PeerReviewPage() {
                 )}
               </Select>
             </FormField>
-            <details className="rounded-lg border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập reviewer/reviewee ID</summary>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <FormField label="Reviewer ID" htmlFor="pa-rev-manual">
-                  <Input id="pa-rev-manual" value={assignForm.reviewerId} onChange={(e) => setAssignForm({ ...assignForm, reviewerId: e.target.value.trim() })} />
-                </FormField>
-                <FormField label="Reviewee ID" htmlFor="pa-ree-manual">
-                  <Input id="pa-ree-manual" value={assignForm.revieweeId} onChange={(e) => setAssignForm({ ...assignForm, revieweeId: e.target.value.trim() })} />
-                </FormField>
-              </div>
-            </details>
+            <FormField label="Bài nộp" htmlFor="pa-sid" hint="Danh sách lấy theo assignment và reviewee đã chọn.">
+              <Select
+                id="pa-sid"
+                value={assignForm.submissionId}
+                onChange={(e) => setAssignForm({ ...assignForm, submissionId: e.target.value })}
+                required
+                disabled={!assignForm.assignmentId || !assignForm.revieweeId}
+              >
+                <option value="">Chọn bài nộp</option>
+                {(assignSubmissions.data ?? []).map((submission) => (
+                  <option key={submission.id} value={submission.id}>
+                    {submissionLabel(submission)}
+                  </option>
+                ))}
+                {assignForm.submissionId && !selectedAssignSubmission && (
+                  <option value={assignForm.submissionId}>Submission {compactId(assignForm.submissionId)}</option>
+                )}
+              </Select>
+              {assignSubmissions.isLoading && <span className="text-xs text-slate-400">Đang tải bài nộp...</span>}
+              {assignSubmissions.isError && <ErrorState error={assignSubmissions.error} />}
+            </FormField>
             {assign.isError && <ErrorState error={assign.error} />}
             {assign.isSuccess && <p className="text-sm text-emerald-600">Đã phân công reviewer</p>}
             <Button type="submit" disabled={assign.isPending || !assignForm.assignmentId || !assignForm.submissionId || !assignForm.reviewerId || !assignForm.revieweeId}>
@@ -261,8 +298,25 @@ export function PeerReviewPage() {
               review.mutate();
             }}
           >
-            <FormField label="Review assignment ID" htmlFor="pr-raid">
-              <Input id="pr-raid" value={reviewForm.reviewAssignmentId} onChange={(e) => setReviewForm({ ...reviewForm, reviewAssignmentId: e.target.value })} required />
+            <FormField label="Review assignment" htmlFor="pr-raid">
+              <Select
+                id="pr-raid"
+                value={reviewForm.reviewAssignmentId}
+                onChange={(e) => setReviewForm({ ...reviewForm, reviewAssignmentId: e.target.value })}
+                required
+              >
+                <option value="">Chọn lượt review được phân công</option>
+                {(reviewAssignments.data ?? []).map((reviewAssignment) => (
+                  <option key={reviewAssignment.id} value={reviewAssignment.id}>
+                    {reviewAssignmentLabel(reviewAssignment, assignmentById.get(reviewAssignment.assignmentId))}
+                  </option>
+                ))}
+                {reviewForm.reviewAssignmentId && !selectedReviewAssignment && (
+                  <option value={reviewForm.reviewAssignmentId}>Review {compactId(reviewForm.reviewAssignmentId)}</option>
+                )}
+              </Select>
+              {reviewAssignments.isLoading && <span className="text-xs text-slate-400">Đang tải lượt review...</span>}
+              {reviewAssignments.isError && <ErrorState error={reviewAssignments.error} />}
             </FormField>
             <FormField label="Điểm" htmlFor="pr-score">
               <Input id="pr-score" type="number" value={reviewForm.score} onChange={(e) => setReviewForm({ ...reviewForm, score: Number(e.target.value) })} />
@@ -280,19 +334,73 @@ export function PeerReviewPage() {
 
         <Card className="lg:col-span-2">
           <CardHeader title="Chốt kết quả" />
-          <div className="flex items-end gap-3 p-4">
-            <FormField label="Submission ID" htmlFor="pf-sid">
-              <Input id="pf-sid" value={finalizeSubmissionId} onChange={(e) => setFinalizeSubmissionId(e.target.value)} />
+          <div className="grid gap-3 p-4 lg:grid-cols-[1fr_1fr_1fr_auto]">
+            <FormField label="Assignment" htmlFor="pf-aid">
+              <Select
+                id="pf-aid"
+                value={finalizeForm.assignmentId}
+                onChange={(e) => setFinalizeForm({ assignmentId: e.target.value, revieweeId: "", submissionId: "" })}
+              >
+                <option value="">Chọn assignment</option>
+                {assignmentRows.map((assignment) => (
+                  <option key={assignment.id} value={assignment.id}>
+                    {assignmentLabel(assignment)}
+                  </option>
+                ))}
+                {finalizeForm.assignmentId && !finalizeAssignment && (
+                  <option value={finalizeForm.assignmentId}>Assignment {compactId(finalizeForm.assignmentId)}</option>
+                )}
+              </Select>
             </FormField>
-            <Button
-              variant="danger"
-              disabled={finalize.isPending || !finalizeSubmissionId}
-              onClick={() => finalize.mutate(finalizeSubmissionId.trim())}
-            >
-              {finalize.isPending ? "Đang chốt" : "Chốt kết quả"}
-            </Button>
-            {finalize.isSuccess && <span className="text-sm text-emerald-600">Đã chốt</span>}
-            {finalize.isError && <span className="text-sm text-red-600">Lỗi khi chốt</span>}
+            <FormField label="Reviewee" htmlFor="pf-reviewee">
+              <Select
+                id="pf-reviewee"
+                value={finalizeForm.revieweeId}
+                onChange={(e) => setFinalizeForm({ ...finalizeForm, revieweeId: e.target.value, submissionId: "" })}
+                disabled={!finalizeForm.assignmentId}
+              >
+                <option value="">Chọn reviewee</option>
+                {learnerUsers.map((user) => (
+                  <option key={user.id} value={String(user.id)}>
+                    {adminUserLabel(user)}
+                  </option>
+                ))}
+                {finalizeForm.revieweeId && !userById.has(finalizeForm.revieweeId) && (
+                  <option value={finalizeForm.revieweeId}>User {compactId(finalizeForm.revieweeId)}</option>
+                )}
+              </Select>
+            </FormField>
+            <FormField label="Bài nộp" htmlFor="pf-sid">
+              <Select
+                id="pf-sid"
+                value={finalizeForm.submissionId}
+                onChange={(e) => setFinalizeForm({ ...finalizeForm, submissionId: e.target.value })}
+                disabled={!finalizeForm.assignmentId || !finalizeForm.revieweeId}
+              >
+                <option value="">Chọn bài nộp</option>
+                {(finalizeSubmissions.data ?? []).map((submission) => (
+                  <option key={submission.id} value={submission.id}>
+                    {submissionLabel(submission)}
+                  </option>
+                ))}
+                {finalizeForm.submissionId && !selectedFinalizeSubmission && (
+                  <option value={finalizeForm.submissionId}>Submission {compactId(finalizeForm.submissionId)}</option>
+                )}
+              </Select>
+              {finalizeSubmissions.isLoading && <span className="text-xs text-slate-400">Đang tải bài nộp...</span>}
+              {finalizeSubmissions.isError && <ErrorState error={finalizeSubmissions.error} />}
+            </FormField>
+            <div className="flex items-end">
+              <Button
+                variant="danger"
+                disabled={finalize.isPending || !finalizeForm.submissionId}
+                onClick={() => finalize.mutate(finalizeForm.submissionId)}
+              >
+                {finalize.isPending ? "Đang chốt" : "Chốt kết quả"}
+              </Button>
+            </div>
+            {finalize.isSuccess && <span className="text-sm text-emerald-600 lg:col-span-4">Đã chốt</span>}
+            {finalize.isError && <span className="text-sm text-red-600 lg:col-span-4">Lỗi khi chốt</span>}
           </div>
         </Card>
       </div>

@@ -1,6 +1,7 @@
 package edu.courseflow.quiz.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
@@ -15,8 +16,11 @@ import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptDetailDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizAttemptDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizDto;
 import edu.courseflow.quiz.dto.QuizDtos.QuizQuestionDto;
+import edu.courseflow.quiz.dto.QuizDtos.QuizReadinessDto;
 import edu.courseflow.quiz.dto.QuizDtos.SaveAnswersRequestDto;
+import edu.courseflow.quiz.dto.QuizDtos.StartAttemptResponseDto;
 import edu.courseflow.quiz.dto.QuizDtos.StudentQuizDto;
+import edu.courseflow.quiz.dto.QuizDtos.StudentQuizQuestionDto;
 import edu.courseflow.quiz.dto.QuizDtos.SubmitAttemptRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.UpdateQuizRequestDto;
 import edu.courseflow.quiz.dto.QuizDtos.UpsertQuizQuestionRequestDto;
@@ -41,6 +45,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -50,6 +56,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -103,6 +110,15 @@ public class QuizService {
         return mapper.toDto(quiz, listQuestions(quizId));
     }
 
+    public QuizReadinessDto readiness(UUID quizId) {
+        Quiz quiz = quizzes.findById(quizId)
+                .orElseThrow(() -> new NotFoundException("Quiz not found: " + quizId));
+        return new QuizReadinessDto(
+                quiz.getId().toString(),
+                quiz.getCourseId().toString(),
+                quiz.getStatus());
+    }
+
     public List<QuizDto> listCourseQuizzes(UUID courseId) {
         return quizzes.findByCourseIdOrderByTitleAsc(courseId).stream()
                 .map(quiz -> mapper.toDto(quiz, listQuestions(quiz.getId())))
@@ -129,6 +145,17 @@ public class QuizService {
                 .toList();
     }
 
+    public UUID quizCourseId(UUID quizId) {
+        return quizzes.findById(quizId)
+                .map(Quiz::getCourseId)
+                .orElseThrow(() -> new NotFoundException("Quiz not found: " + quizId));
+    }
+
+    public UUID attemptCourseId(UUID attemptId) {
+        QuizAttempt attempt = loadAttemptEntity(attemptId);
+        return quizCourseId(attempt.getQuizId());
+    }
+
     @Transactional
     public QuizDto createQuiz(CreateQuizRequestDto request) {
         String scoringMethod = normalizeScoringMethod(request.scoringMethod());
@@ -146,7 +173,7 @@ public class QuizService {
                 Boolean.TRUE.equals(request.randomizeOptions()),
                 request.gracePeriodSeconds() == null ? 60 : request.gracePeriodSeconds(),
                 scoringMethod,
-                Boolean.TRUE.equals(request.timeLimitEnforced()),
+                request.timeLimitEnforced() == null || Boolean.TRUE.equals(request.timeLimitEnforced()),
                 request.showCorrectAnswers() == null || Boolean.TRUE.equals(request.showCorrectAnswers()),
                 status));
         validatePublishable(quiz.getId(), quiz.getStatus());
@@ -282,14 +309,14 @@ public class QuizService {
     // ---------- Attempts ----------
 
     @Transactional
-    public QuizAttemptDto startAttempt(UUID quizId, String studentId) {
+    public StartAttemptResponseDto startAttempt(UUID quizId, String studentId) {
         Quiz quiz = quizzes.findById(quizId)
                 .orElseThrow(() -> new NotFoundException("Quiz not found: " + quizId));
         validateQuizCanStart(quiz);
         var existingOpenAttempt = attempts.findFirstByQuizIdAndStudentIdAndStatusInOrderByStartedAtDesc(
                 quizId, studentId, OPEN_ATTEMPT_STATUSES);
         if (existingOpenAttempt.isPresent()) {
-            return mapper.toDto(existingOpenAttempt.get());
+            return toStartAttemptResponse(existingOpenAttempt.get());
         }
 
         int nextAttemptNo = attempts.nextAttemptNo(quizId, studentId);
@@ -301,7 +328,9 @@ public class QuizService {
         Instant deadlineAt = computeDeadline(quiz, startedAt);
         QuizAttempt attempt = attempts.save(new QuizAttempt(
                 UUID.randomUUID(), quizId, studentId, nextAttemptNo, startedAt, deadlineAt));
-        return mapper.toDto(attempt);
+        attempt.setQuestionsSnapshot(toJson(buildAttemptSnapshot(getQuiz(quizId))));
+        attempt = attempts.save(attempt);
+        return toStartAttemptResponse(attempt);
     }
 
     /** Owner (student_id) of an attempt, for controller-level ownership checks. */
@@ -356,37 +385,95 @@ public class QuizService {
         return mapper.toStudentView(quiz);
     }
 
+    private StartAttemptResponseDto toStartAttemptResponse(QuizAttempt attempt) {
+        List<StudentQuizQuestionDto> questions = snapshotQuestions(attempt).stream()
+                .map(mapper::toStudentQuestion)
+                .toList();
+        return new StartAttemptResponseDto(mapper.toDto(attempt), questions);
+    }
+
+    private List<QuizQuestionDto> buildAttemptSnapshot(QuizDto quiz) {
+        List<QuizQuestionDto> questions = new ArrayList<>(quiz.questions());
+        if (quiz.randomizeQuestions()) {
+            Collections.shuffle(questions);
+        }
+        List<QuizQuestionDto> snapshot = new ArrayList<>(questions.size());
+        int position = 1;
+        for (QuizQuestionDto question : questions) {
+            List<QuestionOptionDto> options = new ArrayList<>(
+                    question.options() == null ? List.of() : question.options());
+            if (quiz.randomizeOptions()) {
+                Collections.shuffle(options);
+            }
+            snapshot.add(copyQuestion(question, position++, options));
+        }
+        return snapshot;
+    }
+
+    private QuizQuestionDto copyQuestion(QuizQuestionDto question, int position, List<QuestionOptionDto> options) {
+        return new QuizQuestionDto(
+                question.id(),
+                question.type(),
+                question.stem(),
+                question.difficulty(),
+                question.status(),
+                question.points(),
+                position,
+                question.correctAnswer(),
+                question.feedback(),
+                options);
+    }
+
+    private List<QuizQuestionDto> snapshotQuestions(QuizAttempt attempt) {
+        String snapshot = attempt.getQuestionsSnapshot();
+        if (snapshot == null || snapshot.isBlank()) {
+            return getQuiz(attempt.getQuizId()).questions();
+        }
+        try {
+            return objectMapper.readValue(snapshot, new TypeReference<List<QuizQuestionDto>>() {
+            });
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to parse quiz attempt snapshot: " + attempt.getId(), ex);
+        }
+    }
+
     @Transactional
     public QuizAttemptDto submitAttempt(UUID attemptId, SubmitAttemptRequestDto request) {
         QuizAttempt attempt = loadAttemptEntity(attemptId);
+        return submitAttemptInternal(attempt, request.answers(), false);
+    }
+
+    private QuizAttemptDto submitAttemptInternal(QuizAttempt attempt, Map<String, JsonNode> requestAnswers,
+            boolean forceAutoSubmit) {
         if (!"IN_PROGRESS".equals(attempt.getStatus())) {
             throw new BadRequestException("QUIZ_ATTEMPT_ALREADY_SUBMITTED");
         }
-        QuizDto quiz = getQuiz(attempt.getQuizId());
+        Quiz quiz = quizzes.findById(attempt.getQuizId())
+                .orElseThrow(() -> new NotFoundException("Quiz not found: " + attempt.getQuizId()));
+        List<QuizQuestionDto> snapshotQuestions = snapshotQuestions(attempt);
 
         Instant now = Instant.now();
-        boolean submittedAfterDeadline = false;
-        if (quiz.timeLimitEnforced()) {
+        boolean autoSubmitted = forceAutoSubmit;
+        if (quiz.isTimeLimitEnforced()) {
             Instant deadline = attempt.getDeadlineAt() != null
                     ? attempt.getDeadlineAt()
-                    : attempt.getStartedAt().plus(Duration.ofMinutes(quiz.durationMinutes()));
-            submittedAfterDeadline = now.isAfter(deadline);
-            Instant hardDeadline = deadline.plusSeconds(Math.max(0, quiz.gracePeriodSeconds()));
+                    : attempt.getStartedAt().plus(Duration.ofMinutes(quiz.getDurationMinutes()));
+            Instant hardDeadline = deadline.plusSeconds(Math.max(0, quiz.getGracePeriodSeconds()));
             if (now.isAfter(hardDeadline)) {
-                throw new BadRequestException("QUIZ_TIME_LIMIT_EXCEEDED");
+                autoSubmitted = true;
             }
         }
 
         BigDecimal totalAuto = BigDecimal.ZERO;
         boolean anyEssay = false;
-        Map<String, JsonNode> savedAnswers = answers.findByAttemptId(attemptId).stream()
+        Map<String, JsonNode> savedAnswers = answers.findByAttemptId(attempt.getId()).stream()
                 .collect(java.util.stream.Collectors.toMap(
                         answer -> answer.getQuestionId().toString(),
                         answer -> parseJson(answer.getAnswerPayload()),
                         (left, right) -> right));
-        for (QuizQuestionDto q : quiz.questions()) {
-            JsonNode answer = request.answers() != null && request.answers().containsKey(q.id())
-                    ? request.answers().get(q.id())
+        for (QuizQuestionDto q : snapshotQuestions) {
+            JsonNode answer = !autoSubmitted && requestAnswers != null && requestAnswers.containsKey(q.id())
+                    ? requestAnswers.get(q.id())
                     : savedAnswers.getOrDefault(q.id(), MissingNode.getInstance());
             BigDecimal auto;
             if ("ESSAY".equalsIgnoreCase(q.type())) {
@@ -396,17 +483,48 @@ public class QuizService {
                 auto = gradeAnswer(q, answer).setScale(2, RoundingMode.HALF_UP);
                 totalAuto = totalAuto.add(auto);
             }
-            saveAnswer(attemptId, UUID.fromString(q.id()), answer, auto);
+            saveAnswer(attempt.getId(), UUID.fromString(q.id()), answer, auto);
         }
 
         String status = anyEssay ? "PARTIALLY_GRADED" : "GRADED";
-        attempt.submit(now, status, totalAuto, submittedAfterDeadline);
+        attempt.submit(now, status, totalAuto, autoSubmitted);
         attempts.save(attempt);
 
         if ("GRADED".equals(status)) {
-            saveOutbox(attemptId, mapper.toDto(attempt), quiz, totalAuto);
+            saveOutbox(attempt.getId(), mapper.toDto(attempt), toQuizDto(quiz, snapshotQuestions), totalAuto);
         }
         return mapper.toDto(attempt);
+    }
+
+    private void enforceCanSave(Quiz quiz, QuizAttempt attempt) {
+        if (!quiz.isTimeLimitEnforced()) {
+            return;
+        }
+        Instant deadline = attempt.getDeadlineAt() != null
+                ? attempt.getDeadlineAt()
+                : attempt.getStartedAt().plus(Duration.ofMinutes(quiz.getDurationMinutes()));
+        if (Instant.now().isAfter(deadline)) {
+            throw new BadRequestException("QUIZ_TIME_LIMIT_EXCEEDED");
+        }
+    }
+
+    private QuizDto toQuizDto(Quiz quiz, List<QuizQuestionDto> questions) {
+        return new QuizDto(
+                quiz.getId().toString(),
+                quiz.getCourseId().toString(),
+                quiz.getTitle(),
+                quiz.getOpenAt(),
+                quiz.getCloseAt(),
+                quiz.getDurationMinutes(),
+                quiz.getAttemptsAllowed(),
+                quiz.isRandomizeQuestions(),
+                quiz.isRandomizeOptions(),
+                quiz.getGracePeriodSeconds(),
+                quiz.getScoringMethod(),
+                quiz.isTimeLimitEnforced(),
+                quiz.isShowCorrectAnswers(),
+                quiz.getStatus(),
+                questions);
     }
 
     @Transactional
@@ -415,8 +533,10 @@ public class QuizService {
         if (!"IN_PROGRESS".equals(attempt.getStatus())) {
             throw new BadRequestException("QUIZ_ATTEMPT_ALREADY_SUBMITTED");
         }
-        QuizDto quiz = getQuiz(attempt.getQuizId());
-        Set<String> validQuestionIds = quiz.questions().stream()
+        Quiz quiz = quizzes.findById(attempt.getQuizId())
+                .orElseThrow(() -> new NotFoundException("Quiz not found: " + attempt.getQuizId()));
+        enforceCanSave(quiz, attempt);
+        Set<String> validQuestionIds = snapshotQuestions(attempt).stream()
                 .map(QuizQuestionDto::id)
                 .collect(java.util.stream.Collectors.toSet());
         if (request.answers() == null) {
@@ -435,8 +555,8 @@ public class QuizService {
     public QuizAttemptDto manualGradeAnswer(UUID attemptId, UUID questionId, String graderId,
             ManualGradeAnswerRequestDto req) {
         QuizAttempt attempt = loadAttemptEntity(attemptId);
-        QuizDto quiz = getQuiz(attempt.getQuizId());
-        QuizQuestionDto question = quiz.questions().stream()
+        List<QuizQuestionDto> snapshot = snapshotQuestions(attempt);
+        QuizQuestionDto question = snapshot.stream()
                 .filter(q -> q.id().equals(questionId.toString()))
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException("Question not on quiz: " + questionId));
@@ -449,7 +569,9 @@ public class QuizService {
         answer.manualGrade(req.score(), req.feedback(), graderId);
         answers.save(answer);
 
-        recomputeAttemptScore(attempt, quiz);
+        Quiz quiz = quizzes.findById(attempt.getQuizId())
+                .orElseThrow(() -> new NotFoundException("Quiz not found: " + attempt.getQuizId()));
+        recomputeAttemptScore(attempt, toQuizDto(quiz, snapshot));
         return mapper.toDto(attempt);
     }
 
@@ -530,6 +652,24 @@ public class QuizService {
             default -> rows.get(rows.size() - 1).score();
         };
         return new EffectiveScoreDto(quizId.toString(), studentId, scoringMethod, effective, rows.size());
+    }
+
+    @Scheduled(fixedDelayString = "${courseflow.quiz.expiry-sweep-interval-ms:60000}")
+    @Transactional
+    public void sweepExpiredAttempts() {
+        Instant now = Instant.now();
+        List<QuizAttempt> expiredCandidates = attempts
+                .findByStatusAndDeadlineAtLessThanEqualOrderByDeadlineAtAsc("IN_PROGRESS", now);
+        for (QuizAttempt attempt : expiredCandidates) {
+            Quiz quiz = quizzes.findById(attempt.getQuizId()).orElse(null);
+            if (quiz == null || !quiz.isTimeLimitEnforced() || attempt.getDeadlineAt() == null) {
+                continue;
+            }
+            Instant hardDeadline = attempt.getDeadlineAt().plusSeconds(Math.max(0, quiz.getGracePeriodSeconds()));
+            if (!now.isBefore(hardDeadline)) {
+                submitAttemptInternal(attempt, Map.of(), true);
+            }
+        }
     }
 
     // ---------- Per-question grading ----------

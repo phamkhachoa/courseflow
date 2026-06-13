@@ -29,6 +29,21 @@ public class Notification {
     @Column(name = "read_at")
     private Instant readAt;
 
+    @Column(name = "delivery_status", nullable = false, length = 40)
+    private String deliveryStatus = "PENDING";
+
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
+    @Column(name = "delivery_error")
+    private String deliveryError;
+
+    @Column(name = "delivery_attempts", nullable = false)
+    private int deliveryAttempts = 0;
+
+    @Column(name = "last_delivery_attempt_at")
+    private Instant lastDeliveryAttemptAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -49,9 +64,30 @@ public class Notification {
     public String getTitle() { return title; }
     public String getBody() { return body; }
     public Instant getReadAt() { return readAt; }
+    public String getDeliveryStatus() { return deliveryStatus; }
+    public Instant getDeliveredAt() { return deliveredAt; }
+    public String getDeliveryError() { return deliveryError; }
+    public int getDeliveryAttempts() { return deliveryAttempts; }
+    public Instant getLastDeliveryAttemptAt() { return lastDeliveryAttemptAt; }
     public Instant getCreatedAt() { return createdAt; }
 
     public void markRead() {
         this.readAt = Instant.now();
+    }
+
+    public void markDeliveryAttempt() {
+        this.deliveryAttempts += 1;
+        this.lastDeliveryAttemptAt = Instant.now();
+    }
+
+    public void markDelivered() {
+        this.deliveryStatus = "DELIVERED";
+        this.deliveredAt = Instant.now();
+        this.deliveryError = null;
+    }
+
+    public void markDeliveryFailed(String error) {
+        this.deliveryStatus = "FAILED";
+        this.deliveryError = error == null ? null : error.substring(0, Math.min(error.length(), 255));
     }
 }

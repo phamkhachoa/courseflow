@@ -57,5 +57,18 @@ public class GradeItem {
     public BigDecimal getMaxScore() { return maxScore; }
     public BigDecimal getWeightPercent() { return weightPercent; }
     public BigDecimal getLatePenaltyPercent() { return latePenaltyPercent; }
+    public boolean isPublished() { return published; }
     public void setTitle(String title) { this.title = title; }
+
+    public void update(UUID categoryId, String sourceType, String sourceId, String title,
+            BigDecimal maxScore, BigDecimal weightPercent, BigDecimal latePenaltyPercent, boolean published) {
+        this.categoryId = categoryId;
+        this.sourceType = sourceType;
+        this.sourceId = sourceId;
+        this.title = title;
+        this.maxScore = maxScore;
+        this.weightPercent = weightPercent;
+        this.latePenaltyPercent = latePenaltyPercent;
+        this.published = published;
+    }
 }

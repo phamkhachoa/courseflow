@@ -12,6 +12,8 @@ public interface CourseVersionJpaRepository extends JpaRepository<CourseVersion,
 
     List<CourseVersion> findByCourseIdOrderByVersionNoDesc(UUID courseId);
 
+    List<CourseVersion> findByCourseIdAndStateOrderByVersionNoDesc(UUID courseId, String state);
+
     Optional<CourseVersion> findByCourseIdAndVersionNo(UUID courseId, int versionNo);
 
     boolean existsByCourseIdAndVersionNo(UUID courseId, int versionNo);

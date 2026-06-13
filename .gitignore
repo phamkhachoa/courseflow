@@ -92,6 +92,7 @@ gradle-app.setting
 # Spring Boot
 *.log
 logs/
+backend/backups/
 
 # ===========================================================================
 # Node / Next.js / React / Vite  (web/)

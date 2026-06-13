@@ -16,7 +16,7 @@ spring:
       ddl-auto: validate
   liquibase:
     change-log: classpath:db/changelog/db.changelog.xml
-    contexts: ${LIQUIBASE_CONTEXTS:prod}
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
@@ -31,4 +31,12 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus
+courseflow:
+  security:
+    service-token: ${COURSEFLOW_SERVICE_TOKEN:}
+  entitlement:
+    course-service-url: ${COURSE_SERVICE_URL:http://localhost:8083}
+    enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://localhost:8084}
+  enrollment:
+    default-capacity: ${ENROLLMENT_DEFAULT_CAPACITY:100}

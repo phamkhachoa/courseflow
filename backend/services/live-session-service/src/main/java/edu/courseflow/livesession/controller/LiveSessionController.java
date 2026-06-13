@@ -37,7 +37,13 @@ public class LiveSessionController {
     @GetMapping
     public List<LiveSessionDto> list(@RequestParam(required = false) String courseId, CurrentUser user) {
         callerId(user);
-        if (!isStaff(user)) {
+        if (isStaff(user)) {
+            if (courseId == null || courseId.isBlank()) {
+                requirePlatformAdmin(user);
+            } else {
+                courseAccess.requireCourseStaffAccess(user, UUID.fromString(courseId));
+            }
+        } else {
             if (courseId == null || courseId.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "courseId is required for learner access");
             }
@@ -50,8 +56,11 @@ public class LiveSessionController {
     public LiveSessionDto get(@PathVariable UUID sessionId, CurrentUser user) {
         callerId(user);
         LiveSessionDto session = sessions.get(sessionId);
-        if (!isStaff(user)) {
-            courseAccess.requireCourseAccess(user, UUID.fromString(session.courseId()));
+        UUID courseId = UUID.fromString(session.courseId());
+        if (isStaff(user)) {
+            courseAccess.requireCourseStaffAccess(user, courseId);
+        } else {
+            courseAccess.requireCourseAccess(user, courseId);
         }
         return session;
     }
@@ -59,6 +68,7 @@ public class LiveSessionController {
     @PostMapping
     public LiveSessionDto create(@Valid @RequestBody CreateLiveSessionRequestDto request, CurrentUser user) {
         requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(request.courseId()));
         CreateLiveSessionRequestDto trusted = new CreateLiveSessionRequestDto(
                 request.courseId(),
                 request.title(),
@@ -80,6 +90,8 @@ public class LiveSessionController {
     @PostMapping("/{sessionId}/start")
     public LiveSessionDto start(@PathVariable UUID sessionId, CurrentUser user) {
         requireStaff(user);
+        LiveSessionDto session = sessions.get(sessionId);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(session.courseId()));
         return sessions.start(sessionId, callerId(user), user.hasRole("ADMIN"));
     }
 
@@ -87,6 +99,8 @@ public class LiveSessionController {
     public LiveSessionDto end(@PathVariable UUID sessionId, @RequestBody(required = false) EndSessionRequestDto request,
                               CurrentUser user) {
         requireStaff(user);
+        LiveSessionDto session = sessions.get(sessionId);
+        courseAccess.requireCourseStaffAccess(user, UUID.fromString(session.courseId()));
         return sessions.end(sessionId, request, callerId(user), user.hasRole("ADMIN"));
     }
 
@@ -110,6 +124,13 @@ public class LiveSessionController {
     }
 
     private boolean isStaff(CurrentUser user) {
-        return user != null && user.hasAnyRole("ADMIN", "INSTRUCTOR");
+        return user != null && user.hasAnyRole("ADMIN", "ORG_ADMIN", "TA", "INSTRUCTOR", "PROFESSOR");
+    }
+
+    private void requirePlatformAdmin(CurrentUser user) {
+        callerId(user);
+        if (!user.hasRole("ADMIN")) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "courseId is required for course staff access");
+        }
     }
 }

@@ -1,18 +1,20 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft, BookOpen, GraduationCap } from "lucide-react";
+import { getCourseBySlug } from "@/features/course-catalog/api";
 import { ModuleList } from "@/features/course-modules/ModuleList";
 import { ScrollToTopOnMount } from "@/features/course-modules/ScrollToTopOnMount";
 import { Badge } from "@/shared/ui";
 
 export default async function CourseModulesPage({
-  params,
-  searchParams
+  params
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ courseId?: string }>;
 }) {
   const { slug } = await params;
-  const { courseId = "" } = await searchParams;
+  const course = await getCourseBySlug(slug);
+  if (!course) notFound();
+  const resolvedCourseId = course.id || "";
 
   return (
     <main className="min-h-screen bg-[#f7f4ee]">
@@ -49,7 +51,7 @@ export default async function CourseModulesPage({
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-6 sm:px-6 lg:px-8">
-        <ModuleList courseId={courseId} courseSlug={slug} />
+        <ModuleList courseId={resolvedCourseId} courseSlug={slug} />
       </section>
     </main>
   );

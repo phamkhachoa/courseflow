@@ -20,6 +20,7 @@ import {
 import { listUsers, type AdminUser } from "@/modules/identity/api";
 import {
   createNotification,
+  getPreferences,
   listNotifications,
   markRead,
   savePreferences
@@ -36,6 +37,19 @@ function userLabel(user?: Pick<AdminUser, "fullName" | "email">, fallbackId?: st
   return fallbackId ? `User ${compactId(fallbackId)}` : "Tất cả người dùng";
 }
 
+function notificationRead(notification: { read?: boolean; readAt?: string }) {
+  return Boolean(notification.readAt ?? notification.read);
+}
+
+function deliveryStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    PENDING: "Chờ gửi",
+    DELIVERED: "Đã gửi",
+    FAILED: "Lỗi gửi"
+  };
+  return labels[status ?? ""] ?? status ?? "Chưa rõ";
+}
+
 export function NotificationsPage() {
   const qc = useQueryClient();
   const [userId, setUserId] = useState("");
@@ -49,23 +63,32 @@ export function NotificationsPage() {
   const selectedFilterUser = userById.get(userId);
   const list = useQuery({
     queryKey: queryKeys.notifications.list(userId),
-    queryFn: () => listNotifications(userId || undefined)
+    queryFn: () => listNotifications(userId),
+    enabled: Boolean(userId)
   });
   const invalidate = () => qc.invalidateQueries({ queryKey: ["notifications"] });
 
   const read = useMutation({ mutationFn: (id: string) => markRead(id), onSuccess: invalidate });
-  const [form, setForm] = useState({ userId: "", title: "", body: "" });
+  const [form, setForm] = useState({ userId: "", notificationType: "SYSTEM", title: "", body: "" });
   const selectedFormUser = userById.get(form.userId);
   const create = useMutation({
     mutationFn: () => createNotification(form),
     onSuccess: () => {
       invalidate();
-      setForm({ userId: form.userId, title: "", body: "" });
+      setForm({ userId: form.userId, notificationType: form.notificationType, title: "", body: "" });
     }
   });
-  const [prefs, setPrefs] = useState({ userId: "", email: true, push: false, digest: "DAILY" });
+  const [prefs, setPrefs] = useState({ userId: "", channel: "EMAIL", enabled: true });
   const selectedPrefsUser = userById.get(prefs.userId);
-  const save = useMutation({ mutationFn: () => savePreferences(prefs) });
+  const prefsQuery = useQuery({
+    queryKey: queryKeys.notifications.preferences(prefs.userId),
+    queryFn: () => getPreferences(prefs.userId),
+    enabled: Boolean(prefs.userId)
+  });
+  const save = useMutation({
+    mutationFn: () => savePreferences(prefs),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.notifications.preferences(prefs.userId) })
+  });
 
   return (
     <div>
@@ -87,21 +110,8 @@ export function NotificationsPage() {
               </Select>
             }
           />
-          <div className="border-b border-slate-100 p-4">
-            <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-              <summary className="cursor-pointer font-semibold text-slate-700">Nhập User ID để lọc thủ công</summary>
-              <FormField label="User ID" htmlFor="n-filter-user-manual">
-                <Input
-                  id="n-filter-user-manual"
-                  className="mt-3"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value.trim())}
-                  placeholder="ID người nhận"
-                />
-              </FormField>
-            </details>
-          </div>
-          {list.isLoading && <Spinner />}
+          {!userId && <EmptyState message="Chọn một người dùng để xem inbox và trạng thái delivery." />}
+          {userId && list.isLoading && <Spinner />}
           {list.isError && <ErrorState error={list.error} />}
           {list.data && list.data.length === 0 && <EmptyState message="Không có thông báo" />}
           {list.data && list.data.length > 0 && (
@@ -111,6 +121,7 @@ export function NotificationsPage() {
                   <Th>Tiêu đề</Th>
                   <Th>Người nhận</Th>
                   <Th>Trạng thái</Th>
+                  <Th>Delivery</Th>
                   <Th />
                 </tr>
               </thead>
@@ -123,10 +134,23 @@ export function NotificationsPage() {
                       {n.userId && <div className="mt-1 text-xs text-slate-500">ID {compactId(n.userId)}</div>}
                     </Td>
                     <Td>
-                      <Badge value={n.read ? "READ" : "UNREAD"} />
+                      <Badge value={notificationRead(n) ? "READ" : "UNREAD"} />
                     </Td>
                     <Td>
-                      {!n.read && (
+                      <div className="space-y-1">
+                        <Badge value={n.deliveryStatus} label={deliveryStatusLabel(n.deliveryStatus)} />
+                        {n.deliveredAt && (
+                          <div className="text-xs text-slate-500">
+                            {new Date(n.deliveredAt).toLocaleString("vi-VN")}
+                          </div>
+                        )}
+                        {n.deliveryError && (
+                          <div className="max-w-xs text-xs text-red-600">{n.deliveryError}</div>
+                        )}
+                      </div>
+                    </Td>
+                    <Td>
+                      {!notificationRead(n) && (
                         <Button size="sm" variant="secondary" disabled={read.isPending} onClick={() => read.mutate(n.id)}>
                           Đánh dấu đã đọc
                         </Button>
@@ -160,24 +184,25 @@ export function NotificationsPage() {
                   {form.userId && !selectedFormUser && <option value={form.userId}>User {compactId(form.userId)}</option>}
                 </Select>
               </FormField>
+              <FormField label="Loại thông báo" htmlFor="n-type">
+                <Select
+                  id="n-type"
+                  value={form.notificationType}
+                  onChange={(e) => setForm({ ...form, notificationType: e.target.value })}
+                >
+                  <option value="SYSTEM">SYSTEM</option>
+                  <option value="ANNOUNCEMENT">ANNOUNCEMENT</option>
+                  <option value="DEADLINE">DEADLINE</option>
+                  <option value="GRADE">GRADE</option>
+                  <option value="CERTIFICATE">CERTIFICATE</option>
+                </Select>
+              </FormField>
               <FormField label="Tiêu đề" htmlFor="n-title">
                 <Input id="n-title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
               </FormField>
               <FormField label="Nội dung" htmlFor="n-body">
-                <Input id="n-body" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+                <Input id="n-body" value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} required />
               </FormField>
-              <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                <summary className="cursor-pointer font-semibold text-slate-700">Nhập User ID thủ công</summary>
-                <FormField label="User ID" htmlFor="n-user-manual">
-                  <Input
-                    id="n-user-manual"
-                    className="mt-3"
-                    value={form.userId}
-                    onChange={(e) => setForm({ ...form, userId: e.target.value.trim() })}
-                    placeholder="ID người nhận"
-                  />
-                </FormField>
-              </details>
               {create.isError && <ErrorState error={create.error} />}
               <Button type="submit" disabled={create.isPending}>
                 {create.isPending ? "Đang gửi" : "Gửi"}
@@ -186,7 +211,7 @@ export function NotificationsPage() {
           </Card>
 
           <Card>
-            <CardHeader title="Tùy chọn nhận" />
+            <CardHeader title="Tùy chọn nhận" subtitle="ADMIN có thể kiểm tra và cập nhật từng channel cho người dùng." />
             <form
               className="space-y-3 p-4"
               onSubmit={(e: FormEvent) => {
@@ -205,34 +230,36 @@ export function NotificationsPage() {
                   {prefs.userId && !selectedPrefsUser && <option value={prefs.userId}>User {compactId(prefs.userId)}</option>}
                 </Select>
               </FormField>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" checked={prefs.email} onChange={(e) => setPrefs({ ...prefs, email: e.target.checked })} />
-                Email
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" checked={prefs.push} onChange={(e) => setPrefs({ ...prefs, push: e.target.checked })} />
-                Push
-              </label>
-              <FormField label="Tần suất tổng hợp" htmlFor="p-digest">
-                <Select id="p-digest" value={prefs.digest} onChange={(e) => setPrefs({ ...prefs, digest: e.target.value })}>
-                  <option value="DAILY">Hằng ngày</option>
-                  <option value="WEEKLY">Hằng tuần</option>
-                  <option value="REALTIME">Ngay khi có thông báo</option>
-                  <option value="OFF">Tắt digest</option>
+              <FormField label="Channel" htmlFor="p-channel">
+                <Select id="p-channel" value={prefs.channel} onChange={(e) => setPrefs({ ...prefs, channel: e.target.value })}>
+                  <option value="IN_APP">IN_APP</option>
+                  <option value="EMAIL">EMAIL</option>
+                  <option value="PUSH">PUSH</option>
+                  <option value="ANNOUNCEMENT">ANNOUNCEMENT</option>
+                  <option value="DEADLINE">DEADLINE</option>
+                  <option value="GRADE">GRADE</option>
                 </Select>
               </FormField>
-              <details className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                <summary className="cursor-pointer font-semibold text-slate-700">Nhập User ID thủ công</summary>
-                <FormField label="User ID" htmlFor="p-user-manual">
-                  <Input
-                    id="p-user-manual"
-                    className="mt-3"
-                    value={prefs.userId}
-                    onChange={(e) => setPrefs({ ...prefs, userId: e.target.value.trim() })}
-                    placeholder="ID người dùng"
-                  />
-                </FormField>
-              </details>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={prefs.enabled} onChange={(e) => setPrefs({ ...prefs, enabled: e.target.checked })} />
+                Bật channel này
+              </label>
+              {prefsQuery.isLoading && <Spinner label="Đang tải preference" />}
+              {prefsQuery.isError && <ErrorState error={prefsQuery.error} />}
+              {prefsQuery.data && prefsQuery.data.length > 0 && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                  <p className="mb-2 font-semibold text-slate-700">Preference hiện tại</p>
+                  <div className="flex flex-wrap gap-2">
+                    {prefsQuery.data.map((pref) => (
+                      <Badge
+                        key={pref.id ?? pref.channel}
+                        value={pref.enabled ? "ACTIVE" : "SUSPENDED"}
+                        label={`${pref.channel}: ${pref.enabled ? "ON" : "OFF"}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
               {save.isError && <ErrorState error={save.error} />}
               {save.isSuccess && <p className="text-sm text-emerald-600">Đã lưu</p>}
               <Button type="submit" disabled={save.isPending}>

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_exception.dart';
-import 'app_theme.dart';
+import '../theme/app_theme.dart';
 
 /// Renders an [AsyncValue] with consistent loading / error / empty states so
 /// individual screens stay focused on the data case.

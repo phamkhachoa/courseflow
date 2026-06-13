@@ -26,7 +26,10 @@ import edu.courseflow.course.repository.CourseJpaRepository;
 import edu.courseflow.course.repository.CourseModuleJpaRepository;
 import edu.courseflow.course.repository.CourseVersionJpaRepository;
 import edu.courseflow.course.repository.ModuleItemJpaRepository;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -41,24 +44,27 @@ public class CourseAuthoringService {
     private final CourseVersionJpaRepository versions;
     private final ObjectMapper objectMapper;
     private final CourseMapper mapper;
+    private final CourseContentReadinessClient readinessClient;
 
     public CourseAuthoringService(CourseJpaRepository courses,
             CourseModuleJpaRepository modules,
             ModuleItemJpaRepository items,
             CourseVersionJpaRepository versions,
             ObjectMapper objectMapper,
-            CourseMapper mapper) {
+            CourseMapper mapper,
+            CourseContentReadinessClient readinessClient) {
         this.courses = courses;
         this.modules = modules;
         this.items = items;
         this.versions = versions;
         this.objectMapper = objectMapper;
         this.mapper = mapper;
+        this.readinessClient = readinessClient;
     }
 
     @Transactional
     public CourseDraftDto createDraft(CreateCourseDraftRequestDto request, CurrentUser user) {
-        requireInstructorOrAdmin(user);
+        requireCourseCreator(user, request.departmentId());
         // ownerId / last_authored_by come from the authenticated caller, never from the body.
         String ownerId = String.valueOf(user.id());
         UUID id = UUID.randomUUID();
@@ -161,6 +167,7 @@ public class CourseAuthoringService {
         Course course = findCourse(courseId);
         course.setCurrentVersionNo(nextVersion);
         course.setLastAuthoredBy(actorId);
+        course.setReviewState("DRAFT");
         return getVersion(versionId);
     }
 
@@ -179,12 +186,12 @@ public class CourseAuthoringService {
 
     /**
      * Reviewer approves a course that is currently IN_REVIEW. Moves the review_state to APPROVED so
-     * it becomes eligible for publishing. Staff-only (any INSTRUCTOR or ADMIN may review).
+     * it becomes eligible for publishing. Owners cannot approve their own course.
      */
     @Transactional
     public CourseDraftDto approve(UUID courseId, ReviewDecisionRequestDto request, CurrentUser user) {
-        requireInstructorOrAdmin(user);
         Course course = findCourse(courseId);
+        requireReviewer(course, user);
         String reviewState = course.getReviewState();
         if (!"IN_REVIEW".equals(reviewState)) {
             throw new BadRequestException("Only a course IN_REVIEW can be approved (current: " + reviewState + ")");
@@ -196,12 +203,12 @@ public class CourseAuthoringService {
 
     /**
      * Reviewer rejects a course that is currently IN_REVIEW, sending it back to DRAFT for further
-     * authoring. Staff-only.
+     * authoring. Owners cannot reject their own course.
      */
     @Transactional
     public CourseDraftDto reject(UUID courseId, ReviewDecisionRequestDto request, CurrentUser user) {
-        requireInstructorOrAdmin(user);
         Course course = findCourse(courseId);
+        requireReviewer(course, user);
         String reviewState = course.getReviewState();
         if (!"IN_REVIEW".equals(reviewState)) {
             throw new BadRequestException("Only a course IN_REVIEW can be rejected (current: " + reviewState + ")");
@@ -226,9 +233,12 @@ public class CourseAuthoringService {
         if (!"APPROVED".equals(reviewState)) {
             throw new BadRequestException("Course must be APPROVED before publishing (current: " + reviewState + ")");
         }
+        ensureReviewable(courseId);
         CourseVersion version = versions.findByCourseIdAndVersionNo(courseId, course.getCurrentVersionNo())
                 .orElseThrow(() -> new NotFoundException("Course version not found: " + courseId));
-        version.publish(toJson(getDraft(courseId).modules()), Instant.now());
+        List<ModuleOutlineDto> snapshotModules = getDraft(courseId).modules();
+        validatePublishSnapshot(snapshotModules);
+        version.publish(toJson(snapshotModules), Instant.now());
         course.setReviewState("PUBLISHED");
         publishModules(courseId);
         return toVersionDto(version);
@@ -252,7 +262,7 @@ public class CourseAuthoringService {
                 request.title(),
                 request.description(),
                 nextPosition,
-                request.status() == null ? "DRAFT" : request.status()));
+                "DRAFT"));
         touch(courseId);
         return getDraft(courseId);
     }
@@ -296,6 +306,10 @@ public class CourseAuthoringService {
         if (request.contentUrl() != null && !request.contentUrl().isBlank()) {
             return request.contentUrl().trim();
         }
+        if (requiresExternalRef(normalizeItemType(
+                request.itemType(), request.videoMediaId(), request.documentMediaIds(), request.contentUrl()))) {
+            return "";
+        }
         return itemUuid.toString();
     }
 
@@ -304,11 +318,165 @@ public class CourseAuthoringService {
         if (courseModules.isEmpty()) {
             throw new BadRequestException("Course must have at least one chapter before review");
         }
-        boolean hasLesson = courseModules.stream()
-                .anyMatch(module -> !items.findByModuleIdOrderByPositionAsc(module.getId()).isEmpty());
-        if (!hasLesson) {
-            throw new BadRequestException("Course must have at least one lesson before review");
+        List<String> issues = new ArrayList<>();
+        int requiredItems = 0;
+        for (CourseModule module : courseModules) {
+            List<ModuleItem> moduleItems = items.findByModuleIdOrderByPositionAsc(module.getId());
+            if (moduleItems.isEmpty()) {
+                issues.add("Module '" + module.getTitle() + "' has no learning items");
+                continue;
+            }
+            boolean moduleHasRequiredItem = false;
+            for (ModuleItem item : moduleItems) {
+                if (item.isRequired()) {
+                    moduleHasRequiredItem = true;
+                    requiredItems++;
+                }
+                validateItemReadiness(module, item, issues);
+            }
+            if (!moduleHasRequiredItem) {
+                issues.add("Module '" + module.getTitle() + "' must contain at least one required item");
+            }
         }
+        if (requiredItems == 0) {
+            issues.add("Course must contain at least one required learning item");
+        }
+        if (!issues.isEmpty()) {
+            throw new BadRequestException("Course is not ready for review: " + String.join("; ", issues));
+        }
+    }
+
+    private void validateItemReadiness(CourseModule module, ModuleItem item, List<String> issues) {
+        String label = "Module '" + module.getTitle() + "', item '" + item.getTitle() + "'";
+        String kind = normalizeItemType(item);
+        if (item.getEstimatedMinutes() != null && item.getEstimatedMinutes() < 0) {
+            issues.add(label + " has negative estimated minutes");
+        }
+        switch (kind) {
+            case "VIDEO" -> {
+                if (item.getVideoMediaId() == null) {
+                    issues.add(label + " is a video item without video media");
+                } else {
+                    addReadinessIssue(issues, label, () -> readinessClient.videoIssue(item.getVideoMediaId(), module.getCourseId()));
+                }
+            }
+            case "DOCUMENT", "PDF", "MATERIAL" -> {
+                if (!hasDocuments(item) && isBlank(item.getContentUrl())) {
+                    issues.add(label + " is a document item without document media or URL");
+                }
+                if (!isBlank(item.getContentUrl()) && !isHttpUrl(item.getContentUrl())) {
+                    issues.add(label + " has an invalid document URL");
+                }
+            }
+            case "LINK" -> {
+                if (isBlank(item.getContentUrl())) {
+                    issues.add(label + " is a link item without URL");
+                } else if (!isHttpUrl(item.getContentUrl())) {
+                    issues.add(label + " has an invalid URL");
+                }
+            }
+            case "QUIZ", "ASSIGNMENT" -> {
+                if (isBlank(item.getItemId()) || item.getId().toString().equals(item.getItemId().trim())) {
+                    issues.add(label + " is a " + kind.toLowerCase() + " item without a linked " + kind.toLowerCase());
+                } else if (!isUuid(item.getItemId())) {
+                    issues.add(label + " has an invalid " + kind.toLowerCase() + " reference");
+                } else if ("QUIZ".equals(kind)) {
+                    addReadinessIssue(issues, label,
+                            () -> readinessClient.quizIssue(UUID.fromString(item.getItemId().trim()), module.getCourseId()));
+                } else {
+                    addReadinessIssue(issues, label,
+                            () -> readinessClient.assignmentIssue(UUID.fromString(item.getItemId().trim()), module.getCourseId()));
+                }
+            }
+            case "LESSON" -> {
+                if (!hasLearningContent(item)) {
+                    issues.add(label + " has no learning content");
+                }
+            }
+            default -> issues.add(label + " has unsupported item type '" + kind + "'");
+        }
+    }
+
+    private void addReadinessIssue(List<String> issues, String label, ReadinessCheck check) {
+        try {
+            check.issue().ifPresent(issue -> issues.add(label + " " + issue));
+        } catch (CourseContentReadinessClient.ContentReadinessException ex) {
+            issues.add(label + " " + ex.getMessage());
+        }
+    }
+
+    private void validatePublishSnapshot(List<ModuleOutlineDto> snapshotModules) {
+        if (snapshotModules == null || snapshotModules.isEmpty()) {
+            throw new BadRequestException("Published course snapshot must include at least one module");
+        }
+        boolean hasRequiredItem = snapshotModules.stream()
+                .flatMap(module -> module.items() == null ? List.<ItemOutlineDto>of().stream() : module.items().stream())
+                .anyMatch(ItemOutlineDto::required);
+        if (!hasRequiredItem) {
+            throw new BadRequestException("Published course snapshot must include at least one required item");
+        }
+    }
+
+    @FunctionalInterface
+    private interface ReadinessCheck {
+        java.util.Optional<String> issue();
+    }
+
+    private String normalizeItemType(ModuleItem item) {
+        return normalizeItemType(item.getItemType(), item.getVideoMediaId(), item.getDocumentMediaIds(), item.getContentUrl());
+    }
+
+    private String normalizeItemType(String itemType, UUID videoMediaId, List<String> documentMediaIds, String contentUrl) {
+        if (videoMediaId != null) {
+            return "VIDEO";
+        }
+        String normalized = isBlank(itemType) ? "LESSON" : itemType.trim().toUpperCase();
+        if ((documentMediaIds != null && documentMediaIds.stream().anyMatch(id -> !isBlank(id)))
+                && ("LESSON".equals(normalized) || "MATERIAL".equals(normalized))) {
+            return "DOCUMENT";
+        }
+        if ("LINK".equals(normalized) || ("LESSON".equals(normalized) && !isBlank(contentUrl))) {
+            return "LINK";
+        }
+        return normalized;
+    }
+
+    private boolean requiresExternalRef(String kind) {
+        return "QUIZ".equals(kind) || "ASSIGNMENT".equals(kind);
+    }
+
+    private boolean hasLearningContent(ModuleItem item) {
+        return !isBlank(item.getDescription())
+                || !isBlank(item.getContentUrl())
+                || item.getVideoMediaId() != null
+                || hasDocuments(item)
+                || (!isBlank(item.getItemId()) && !item.getId().toString().equals(item.getItemId().trim()));
+    }
+
+    private boolean hasDocuments(ModuleItem item) {
+        return item.getDocumentMediaIds().stream().anyMatch(id -> !isBlank(id));
+    }
+
+    private boolean isHttpUrl(String value) {
+        try {
+            URI uri = new URI(value.trim());
+            return "http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme());
+        } catch (URISyntaxException ex) {
+            return false;
+        }
+    }
+
+    private boolean isUuid(String value) {
+        try {
+            UUID.fromString(value.trim());
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     public List<CourseVersionDto> listVersions(UUID courseId) {
@@ -347,7 +515,11 @@ public class CourseAuthoringService {
     }
 
     private void touch(UUID courseId) {
-        findCourse(courseId).touch();
+        Course course = findCourse(courseId);
+        course.setReviewState("DRAFT");
+        versions.findByCourseIdAndVersionNo(courseId, course.getCurrentVersionNo())
+                .ifPresent(version -> version.setState("DRAFT"));
+        course.touch();
     }
 
     private CourseVersionDto toVersionDto(CourseVersion version) {
@@ -359,13 +531,34 @@ public class CourseAuthoringService {
                 .orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
     }
 
-    private void requireInstructorOrAdmin(CurrentUser user) {
+    private void requireCourseCreator(CurrentUser user, UUID departmentId) {
         if (user == null || user.id() == null) {
             throw new ForbiddenException("Authentication required");
         }
-        if (!user.hasAnyRole("INSTRUCTOR", "ADMIN")) {
+        if (isPlatformAdmin(user)
+                || user.hasAnyDepartmentRole(String.valueOf(departmentId), "INSTRUCTOR", "PROFESSOR")
+                || user.hasPlatformRole("INSTRUCTOR")
+                || user.hasPlatformRole("PROFESSOR")) {
+            return;
+        }
+        if (!user.hasAnyRole("INSTRUCTOR", "PROFESSOR", "ADMIN")) {
             throw new ForbiddenException("Requires INSTRUCTOR or ADMIN role");
         }
+        throw new ForbiddenException("Caller is not allowed to create courses in this department");
+    }
+
+    private void requireReviewer(Course course, CurrentUser user) {
+        if (user == null || user.id() == null) {
+            throw new ForbiddenException("Authentication required");
+        }
+        if (isPlatformAdmin(user)) {
+            return;
+        }
+        boolean isOwner = String.valueOf(user.id()).equals(course.getOwnerId());
+        if (!isOwner && hasScopedReviewerRole(course, user)) {
+            return;
+        }
+        throw new ForbiddenException("Course review requires an independent reviewer");
     }
 
     /**
@@ -377,13 +570,24 @@ public class CourseAuthoringService {
             throw new ForbiddenException("Authentication required");
         }
         Course course = findCourse(courseId);
-        if (user.hasRole("ADMIN")) {
+        if (isPlatformAdmin(user) || user.hasDepartmentRole("ORG_ADMIN", String.valueOf(course.getDepartmentId()))) {
             return;
         }
-        boolean isOwner = user.hasRole("INSTRUCTOR") && String.valueOf(user.id()).equals(course.getOwnerId());
+        boolean isOwner = user.hasAnyRole("INSTRUCTOR", "PROFESSOR")
+                && String.valueOf(user.id()).equals(course.getOwnerId());
         if (!isOwner) {
             throw new ForbiddenException("Only the owning instructor or an ADMIN may author this course");
         }
+    }
+
+    private boolean isPlatformAdmin(CurrentUser user) {
+        return user != null && user.hasPlatformRole("ADMIN");
+    }
+
+    private boolean hasScopedReviewerRole(Course course, CurrentUser user) {
+        String departmentId = String.valueOf(course.getDepartmentId());
+        return user.hasAnyDepartmentRole(departmentId, "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA")
+                || user.hasAnyCourseRole(course.getId(), "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA");
     }
 
     private String toJson(Object value) {
