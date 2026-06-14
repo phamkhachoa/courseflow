@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courseflow.local/contracts/loyalty/loyalty-points-changed.v1.json",
+  "title": "LoyaltyPointsChangedV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "schemaVersion",
+    "tenantId",
+    "applicationId",
+    "programId",
+    "accountId",
+    "entryId",
+    "profileId",
+    "entryType",
+    "pointsDelta",
+    "sourceReference",
+    "occurredAt"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "applicationId": { "type": "string", "minLength": 1 },
+    "programId": { "type": "string", "minLength": 1 },
+    "accountId": { "type": "string", "format": "uuid" },
+    "entryId": { "type": "string", "format": "uuid" },
+    "profileId": { "type": "string", "minLength": 1 },
+    "entryType": { "type": "string", "enum": ["EARN", "BURN", "REVERSE", "ADJUST", "EXPIRE"] },
+    "pointsDelta": { "type": "integer" },
+    "sourceReference": { "type": "string", "minLength": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": ["string", "null"] },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    }
+  }
+}

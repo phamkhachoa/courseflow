@@ -34,6 +34,8 @@ type DraftTemplate = {
     summary: string;
     departmentId: string;
     level: string;
+    listPrice: number;
+    currency: string;
   };
 };
 
@@ -53,7 +55,9 @@ const templates: DraftTemplate[] = [
       title: "Production Backend Service Design",
       summary: "Design and build production backend services with clear boundaries, API contracts, resilient events, observability and secure delivery practices.",
       departmentId: "20000000-0000-0000-0000-000000000001",
-      level: "ADVANCED"
+      level: "ADVANCED",
+      listPrice: 199,
+      currency: "USD"
     }
   },
   {
@@ -65,7 +69,9 @@ const templates: DraftTemplate[] = [
       title: "Applied AI Product Delivery",
       summary: "Plan, evaluate and ship AI product features with measurable success metrics, offline eval sets, red-team scenarios, monitoring and rollback playbooks.",
       departmentId: "20000000-0000-0000-0000-000000000003",
-      level: "INTERMEDIATE"
+      level: "INTERMEDIATE",
+      listPrice: 149,
+      currency: "USD"
     }
   },
   {
@@ -77,7 +83,9 @@ const templates: DraftTemplate[] = [
       title: "Online Learning Experience Studio",
       summary: "Create a complete online course experience with learner personas, outcome mapping, video lesson planning, assessment design and feedback loops.",
       departmentId: "20000000-0000-0000-0000-000000000001",
-      level: "BEGINNER"
+      level: "BEGINNER",
+      listPrice: 99,
+      currency: "USD"
     }
   }
 ];
@@ -126,7 +134,9 @@ export function CourseAuthoringCreatePage() {
     { label: "Có mã khóa học", done: Boolean(form.code.trim()) },
     { label: "Có tiêu đề", done: Boolean(form.title.trim()) },
     { label: "Slug hợp lệ", done: /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) },
-    { label: "Tóm tắt đủ rõ", done: summaryWords >= 12 }
+    { label: "Tóm tắt đủ rõ", done: summaryWords >= 12 },
+    { label: "Giá không âm", done: Number.isFinite(form.listPrice) && form.listPrice >= 0 },
+    { label: "Currency ISO3", done: /^[A-Z]{3}$/.test(form.currency) }
   ];
 
   const create = useMutation({
@@ -249,6 +259,24 @@ export function CourseAuthoringCreatePage() {
                     <WandSparkles size={16} />
                   </Button>
                 </div>
+              </FormField>
+              <FormField label="List price" htmlFor="ac-list-price" hint="Nguồn giá dùng cho coupon checkout.">
+                <Input
+                  id="ac-list-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={String(form.listPrice ?? "")}
+                  onChange={(e) => setForm({ ...form, listPrice: e.target.value === "" ? 0 : Number(e.target.value) })}
+                />
+              </FormField>
+              <FormField label="Currency" htmlFor="ac-currency">
+                <Input
+                  id="ac-currency"
+                  value={form.currency}
+                  maxLength={3}
+                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                />
               </FormField>
               <FormField label="Phòng ban" htmlFor="ac-dept">
                 <Select

@@ -1,7 +1,11 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { LiveSessionDetailPage, LiveSessionsPage } from "./pages";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
+
+const LiveSessionDetailPage = lazy(() => import("./pages").then(({ LiveSessionDetailPage }) => ({ default: LiveSessionDetailPage })));
+const LiveSessionsPage = lazy(() => import("./pages").then(({ LiveSessionsPage }) => ({ default: LiveSessionsPage })));
 
 export const liveSessionsRoutes: RouteObject[] = [
-  { index: true, element: <LiveSessionsPage /> },
-  { path: ":sessionId", element: <LiveSessionDetailPage /> },
+  { index: true, element: lazyRouteElement(LiveSessionsPage) },
+  { path: ":sessionId", element: lazyRouteElement(LiveSessionDetailPage) },
 ];

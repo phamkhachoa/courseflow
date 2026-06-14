@@ -11,6 +11,7 @@ This follows the same architectural lesson from YAS: independent business servic
 | Service | Owns | Does Not Own |
 |---|---|---|
 | keycloak | external IAM/IdP: login, SSO, MFA, password policy, sessions, OAuth2/OIDC access tokens, federation, JWKS/key rotation | LMS course/section permissions, profile directory |
+| discovery-service | internal service registry for backend application services; lets gateway and services locate each other without static host ports | authentication, authorization, public routing policy |
 | identity-service | retired legacy/local compatibility surfaces only; excluded from the production Keycloak profile unless an operator explicitly enables a legacy profile | long-term password/session ownership, profile directory, LMS authorization |
 | access-control-service | CourseFlow product authorization, Keycloak `issuer + subject` mapping, scoped roles, permissions, role grants, authorization audit | login, password, MFA, SSO sessions, user profile content |
 | user-management-service | display name, avatar, bio, locale/timezone, public profile, profile summaries and user directory | login, password, token issuance, role/permission decisions |
@@ -60,10 +61,12 @@ No shared module may contain LMS business rules.
 
 The `api-gateway` is the single client entrypoint and trust boundary. It strips client-supplied
 `X-User-*` headers, verifies the external OAuth2/OIDC access token, exchanges it for a CourseFlow
-internal JWT, then injects verified identity headers for downstream services.
+internal JWT, then injects verified identity headers for downstream services. Gateway routes use
+service discovery (`lb://<service-id>`) instead of static internal ports; application containers all
+listen on internal port `8080` and are not published directly to clients.
 
 ```text
-Client -> api-gateway -> internal domain service route
+Client -> api-gateway -> discovery-service lookup -> internal domain service route
 ```
 
 Clients call domain services directly through the gateway. The Next.js server layer
@@ -101,12 +104,14 @@ locally from internal JWT claims. Denied authorization checks are persisted in
 `access_control_audit_logs` and counted through `courseflow.access_control.authz.checks`; allowed
 checks can also be audited by setting `ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED=true`.
 
-Supported role assignment scopes are `PLATFORM`, `ORG`, `DEPARTMENT`, `COURSE` and `SECTION`.
-`PLATFORM` scope must not include a `scopeId`; every other scope must include one. Permission
-definitions declare a `scopeType` of `ANY`, `PLATFORM`, `ORG`, `DEPARTMENT`, `COURSE` or `SECTION`,
-and `access-control-service` rejects authorization checks whose requested scope is wider than the
-permission allows. For example, an `ORG` permission can be checked at org, department, course or
-section scope, but a `PLATFORM` permission can only be checked at platform scope.
+Supported role assignment scopes are `PLATFORM`, `TENANT`, `APPLICATION`, `ORG`, `DEPARTMENT`,
+`COURSE` and `SECTION`. `PLATFORM` scope must not include a `scopeId`; every other scope must include
+one. `APPLICATION` scope ids use `tenantId:applicationId`. Permission definitions declare a
+`scopeType` of `ANY`, `PLATFORM`, `TENANT`, `APPLICATION`, `ORG`, `DEPARTMENT`, `COURSE` or
+`SECTION`, and `access-control-service` rejects authorization checks whose requested scope is wider
+than the permission allows. For example, an `ORG` permission can be checked at org, department,
+course or section scope, and a `TENANT` permission can be checked at tenant or application scope,
+but a `PLATFORM` permission can only be checked at platform scope.
 Domain services that own resource topology send server-derived `ancestorScopes` to
 `/internal/authz/check` when evaluating a child resource. For example, course-service can check a
 course-scoped action with the course id plus its department ancestor so a department-level role
@@ -244,7 +249,7 @@ review-service       --review.posted-----------> course-service, analytics-servi
 
 ## Outbox and Dedup
 
-Event-producing services use a local `outbox_events` table in the same transaction as domain changes. Events are published by Debezium CDC or the `outbox-relay` service under `services/outbox-relay`.
+Event-producing services use a local `outbox_events` table in the same transaction as domain changes. Events are published by Debezium CDC or the `outbox-relay` service under `services/outbox-relay`. The relay owns its own checkpoint, delivery-state, and dead-letter tables, exposes admin-only DLQ inspect/replay/discard endpoints, and does not migrate producer service schemas.
 
 Event-consuming services keep `processed_events` keyed by event id and consumer name. This makes Kafka at-least-once delivery safe.
 

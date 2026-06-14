@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courseflow.local/contracts/incentives/schemas/incentive-reconciliation-entry.v1.json",
+  "title": "IncentiveReconciliationEntryV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "operationType",
+    "operationId",
+    "reservationId",
+    "redemptionId",
+    "campaignId",
+    "campaignVersion",
+    "effectId",
+    "benefitType",
+    "actionType",
+    "targetType",
+    "amount",
+    "currency",
+    "unit",
+    "quantity",
+    "direction",
+    "occurredAt",
+    "correlationId",
+    "sourceClientId"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "operationType": { "type": "string", "enum": ["COMMIT", "REVERSE"] },
+    "operationId": {
+      "type": "string",
+      "description": "Event id or reconciliation run row id that uniquely identifies this operation."
+    },
+    "reservationId": { "type": "string", "format": "uuid" },
+    "redemptionId": { "type": "string", "format": "uuid" },
+    "reversalOfRedemptionId": { "type": ["string", "null"], "format": "uuid" },
+    "campaignId": { "type": "string", "format": "uuid" },
+    "campaignVersion": { "type": "integer", "minimum": 1 },
+    "couponId": { "type": ["string", "null"], "format": "uuid" },
+    "effectId": { "type": "string", "minLength": 1 },
+    "benefitType": { "type": "string" },
+    "actionType": { "type": "string" },
+    "targetType": { "type": "string" },
+    "targetId": { "type": ["string", "null"] },
+    "amount": { "type": "number" },
+    "currency": { "type": "string" },
+    "unit": { "type": "string" },
+    "quantity": { "type": "number" },
+    "direction": {
+      "type": "string",
+      "enum": ["APPLY", "COMPENSATE"],
+      "description": "COMMIT uses APPLY. REVERSE uses COMPENSATE and negates net benefit in consumers."
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "correlationId": {
+      "type": ["string", "null"],
+      "description": "Nullable for reconciliation rows projected from events that were accepted without X-Correlation-Id."
+    },
+    "sourceClientId": {
+      "type": ["string", "null"],
+      "description": "Nullable for reconciliation rows projected from events whose internal JWT did not contain a client id claim."
+    }
+  }
+}

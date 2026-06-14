@@ -18,3 +18,364 @@ groups:
         annotations:
           summary: "No CourseFlow metrics targets are being scraped"
           description: "Prometheus has no active CourseFlow scrape targets. Check compose networking and actuator exposure."
+
+  - name: courseflow-promotion-sre
+    rules:
+      - alert: PromotionRuntimeHighErrorRate
+        expr: |
+          (
+            sum(rate(promotion_runtime_operation_total{operation=~"evaluate|reserve|commit|cancel|reverse",result=~"error|conflict"}[10m]))
+            /
+            clamp_min(sum(rate(promotion_runtime_operation_total{operation=~"evaluate|reserve|commit|cancel|reverse"}[10m])), 1)
+          ) > 0.02
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Promotion runtime error rate is high"
+          description: "More than 2% of core promotion runtime operations are failing or conflicting."
+
+      - alert: PromotionRuntimeP95LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(promotion_runtime_operation_duration_seconds_bucket{operation=~"evaluate|reserve|commit|cancel|reverse"}[10m])) by (le, operation)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion runtime latency p95 is high"
+          description: "Promotion operation {{ $labels.operation }} has p95 latency above 1 second."
+
+      - alert: PromotionIdempotencyConflictSpike
+        expr: |
+          (
+            sum(rate(promotion_idempotency_total{result=~"payload_conflict|expired|not_replayable|acquire_failed"}[10m]))
+            /
+            clamp_min(sum(rate(promotion_idempotency_total[10m])), 1)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion idempotency conflicts are elevated"
+          description: "More than 5% of promotion idempotency events are conflicts or invalid replay states."
+
+      - alert: PromotionQuotaExhaustionSpike
+        expr: |
+          (
+            sum(rate(promotion_runtime_operation_total{result="quota_exhausted"}[15m]))
+            /
+            clamp_min(sum(rate(promotion_runtime_operation_total{operation=~"evaluate|reserve"}[15m])), 1)
+          ) > 0.30
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion quota exhaustion is elevated"
+          description: "More than 30% of evaluate/reserve operations are blocked by quota exhaustion."
+
+      - alert: PromotionQuotaReserveFallbackSpike
+        expr: sum(rate(promotion_quota_reserve_fallback_total{result=~"candidate_conflict|exhausted"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion reserve quota fallback is elevated"
+          description: "Reserve is frequently falling back because selected candidates lose quota races. Check hot campaigns and quota contention."
+
+      - alert: PromotionInvalidCouponSpike
+        expr: |
+          (
+            sum(rate(promotion_runtime_operation_total{result="invalid_coupon"}[15m]))
+            /
+            clamp_min(sum(rate(promotion_runtime_operation_total{operation=~"evaluate|reserve"}[15m])), 1)
+          ) > 0.20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion invalid coupon signal is elevated"
+          description: "A large share of evaluate/reserve operations with coupons are ending as invalid coupon/no match."
+
+      - alert: PromotionCouponMatchFailureSpike
+        expr: |
+          (
+            sum(rate(promotion_coupon_match_total{result=~"not_found|inactive|not_started|expired|holder_mismatch"}[15m]))
+            /
+            clamp_min(sum(rate(promotion_coupon_match_total{coupon_supplied="true"}[15m])), 1)
+          ) > 0.20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion coupon match failures are elevated"
+          description: "More than 20% of coupon-supplied promotion requests are failing detailed coupon validation."
+
+      - alert: PromotionCouponLegacyLookupInUse
+        expr: sum(rate(promotion_coupon_lookup_total{storage_path=~"legacy_sha|legacy_raw"}[30m])) > 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Promotion coupon legacy lookup fallback is still in use"
+          description: "Coupon requests are still matching legacy SHA/raw lookup paths. Keep fallback enabled until legacy traffic reaches zero and old coupons are reissued or migrated."
+
+      - alert: PromotionOutboxLagHigh
+        expr: promotion_outbox_oldest_unpublished_age_seconds{aggregate_type="incentive-redemption"} > 300
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Promotion outbox lag is high"
+          description: "The oldest unpublished promotion outbox event is older than 5 minutes."
+
+      - alert: PromotionOutboxBacklogHigh
+        expr: promotion_outbox_unpublished{aggregate_type="incentive-redemption"} > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion outbox backlog is high"
+          description: "More than 1000 promotion outbox events are waiting to be published."
+
+      - alert: LoyaltyPointsMutationHighErrorRate
+        expr: |
+          (
+            sum(rate(loyalty_points_mutation_total{operation=~"earn|burn|reverse",result="error"}[10m]))
+            /
+            clamp_min(sum(rate(loyalty_points_mutation_total{operation=~"earn|burn|reverse"}[10m])), 1)
+          ) > 0.02
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Loyalty points mutation error rate is high"
+          description: "More than 2% of loyalty earn/burn/reverse operations are failing."
+
+      - alert: LoyaltyOutboxLagHigh
+        expr: loyalty_outbox_oldest_unpublished_age_seconds{aggregate_type="loyalty-points-entry"} > 300
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Loyalty outbox lag is high"
+          description: "The oldest unpublished loyalty outbox event is older than 5 minutes."
+
+      - alert: LoyaltyOutboxBacklogHigh
+        expr: loyalty_outbox_unpublished{aggregate_type="loyalty-points-entry"} > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loyalty outbox backlog is high"
+          description: "More than 1000 loyalty outbox events are waiting to be published."
+
+      - alert: LoyaltyInboundDeadLettersOpen
+        expr: loyalty_inbound_dead_letter_unresolved > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Loyalty inbound Kafka DLT records are open"
+          description: "Promotion-to-loyalty consumer failures are waiting for operator action. Inspect /api/admin/v1/loyalty/dead-letters before replay or discard."
+
+      - alert: LoyaltyInboundDeadLetterReplayErrors
+        expr: increase(loyalty_inbound_dead_letter_total{action="replay",result="error"}[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loyalty inbound DLT replay errors detected"
+          description: "At least one loyalty DLT replay failed to publish. Check Kafka availability, source topic routing, and DLT detail lastReplayError."
+
+      - alert: OutboxRelayPromotionDeadLettersOpen
+        expr: outbox_relay_dead_letters_open{service="promotion"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Promotion outbox events are in the relay DLQ"
+          description: "At least one promotion event is dead-lettered. Use the outbox admin dead-letter endpoint to inspect and replay after fixing the downstream failure."
+
+      - alert: OutboxRelayLoyaltyDeadLettersOpen
+        expr: outbox_relay_dead_letters_open{service="loyalty"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Loyalty outbox events are in the relay DLQ"
+          description: "At least one loyalty ledger event is dead-lettered. Inspect, replay, or discard through the outbox admin dead-letter endpoint after fixing the downstream failure."
+
+      - alert: OutboxRelayDeadLetterOldestAgeHigh
+        expr: outbox_relay_dead_letter_oldest_age_seconds > 900
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox relay dead letters are aging"
+          description: "An open outbox relay dead letter has been unresolved for more than 15 minutes."
+
+      - alert: OutboxRelayPublishFailuresHigh
+        expr: sum(rate(outbox_relay_publish_failures_total[10m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbox relay publish failures are elevated"
+          description: "Kafka publish failures are increasing. Retryable broker errors remain unpublished; non-retryable poison events can enter DLQ after the attempt budget."
+
+      - alert: PromotionReservationExpiryStalled
+        expr: |
+          promotion_reservation_expiry_backlog > 0
+          and
+          increase(promotion_reservation_expiry_runs_total{result="success"}[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion reservation expiry appears stalled"
+          description: "Expired reservations are queued but no successful expiry run was observed for 5 minutes."
+
+      - alert: PromotionMetricsRefreshFailing
+        expr: increase(promotion_metrics_refresh_total{result="error"}[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion metrics refresh is failing"
+          description: "Promotion outbox or reservation backlog gauges could not be refreshed for at least 10 minutes."
+
+      - alert: LoyaltyMetricsRefreshFailing
+        expr: increase(loyalty_metrics_refresh_total{result="error"}[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loyalty metrics refresh is failing"
+          description: "Loyalty outbox backlog gauges could not be refreshed for at least 10 minutes."
+
+      - alert: PromotionReconciliationQueryFailures
+        expr: increase(promotion_reconciliation_query_requests_total{result="error"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion reconciliation query failures detected"
+          description: "Read-only finance/support reconciliation queries are failing. Check tenant scope filters, database health, and query latency."
+
+      - alert: PromotionCouponImportQueryFailures
+        expr: increase(promotion_coupon_import_query_requests_total{result="error"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion coupon import history query failures detected"
+          description: "Coupon import dry-run or operation history queries are failing. Check tenant/application scope, database health, and history query latency."
+
+      - alert: PromotionAdminOperationRateGuardLimited
+        expr: increase(promotion_admin_operation_rate_guard_total{result=~"limited|shadow_limited"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion admin operation rate guard is limiting traffic"
+          description: "Admin/import/generate operations are hitting the promotion admin operation rate guard. Check audit events and operator activity before raising limits."
+
+      - alert: PromotionAdminOperationRateGuardStoreError
+        expr: increase(promotion_admin_operation_rate_guard_total{result=~"error_allowed|error_denied"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion admin operation rate guard store failures detected"
+          description: "The promotion admin operation rate guard could not use its rate-limit store. Check Redis health and fail-policy before running large admin operations."
+
+      - alert: PromotionRetentionExecutionFailures
+        expr: increase(promotion_retention_execution_requests_total{result="failed"}[15m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Promotion retention execution failed"
+          description: "At least one destructive promotion retention execution failed. Inspect retention execution audit, approval status, and restore drill evidence before retrying."
+
+      - alert: PromotionRetentionExecutionStuckInProgress
+        expr: promotion_retention_execution_stale_in_progress > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Promotion retention execution is stuck in progress"
+          description: "A destructive promotion retention execution has stayed IN_PROGRESS beyond the 15 minute safety window."
+
+      - alert: PromotionReversalFailureSpike
+        expr: |
+          (
+            sum(rate(promotion_runtime_operation_total{operation="reverse",result=~"error|conflict"}[10m]))
+            /
+            clamp_min(sum(rate(promotion_runtime_operation_total{operation="reverse"}[10m])), 1)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promotion reversal failures are elevated"
+          description: "More than 5% of promotion reversal operations are failing or conflicting."
+
+  - name: courseflow-security-sre
+    rules:
+      - alert: TokenConverterFailuresDetected
+        expr: increase(courseflow_token_converter_failure_total[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Token converter failures detected"
+          description: "The internal STS/token-converter is rejecting or failing token exchange/client-credentials requests. Check issuer, audience, client secret, scope grants and access-control availability."
+
+      - alert: TokenConverterP95LatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(courseflow_token_converter_duration_seconds_bucket[10m])) by (le, grant_type)
+          ) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Token converter latency p95 is high"
+          description: "Token converter grant {{ $labels.grant_type }} has p95 latency above 800ms."
+
+      - alert: TokenConverterJwksFailuresDetected
+        expr: increase(courseflow_token_converter_jwks_requests_total{outcome!="success"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Token converter JWKS failures detected"
+          description: "Internal JWT JWKS requests are failing. Downstream services may be unable to verify STS-issued tokens or refresh rotated keys."
+
+      - alert: InternalJwtRejectionSpike
+        expr: sum(rate(courseflow_internal_jwt_rejections_total[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Internal JWT rejection rate is elevated"
+          description: "Downstream services are rejecting internal JWTs or protected identity headers. Check forged headers, actor type, audience, token_use and missing service scopes."
+
+      - alert: AccessControlAuthorizationDeniedSpike
+        expr: |
+          (
+            sum(rate(courseflow_access_control_authz_checks_total{result="denied"}[10m]))
+            /
+            clamp_min(sum(rate(courseflow_access_control_authz_checks_total[10m])), 1)
+          ) > 0.20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Access-control authorization denials are elevated"
+          description: "More than 20% of access-control authorization checks are denied. Check role/scope assignments, tenant/application scopes and service-supplied topology assertions."

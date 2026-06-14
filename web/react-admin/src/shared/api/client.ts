@@ -51,12 +51,15 @@ export async function hydrateSessionProfile(): Promise<StoredSession | null> {
 
 /** Attach the bearer token to every outgoing request. */
 apiClient.interceptors.request.use((config) => {
+  const headers = AxiosHeaders.from(config.headers);
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    headers.delete("Content-Type");
+  }
   const session = sessionStore.read();
   if (session?.accessToken) {
-    const headers = AxiosHeaders.from(config.headers);
     headers.set("Authorization", `Bearer ${session.accessToken}`);
-    config.headers = headers;
   }
+  config.headers = headers;
   return config;
 });
 

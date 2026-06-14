@@ -18,6 +18,19 @@ public final class InternalScopes {
     public static final String PROFILE_READ = "internal:profile:read";
     public static final String PROFILE_WRITE = "internal:profile:write";
     public static final String BACKOFFICE = "internal:backoffice";
+    public static final String PROMOTION_ADMIN = "internal:promotion:admin";
+    public static final String PROMOTION_EVALUATE = "internal:promotion:evaluate";
+    public static final String PROMOTION_RESERVE = "internal:promotion:reserve";
+    public static final String PROMOTION_COMMIT = "internal:promotion:commit";
+    public static final String PROMOTION_CANCEL = "internal:promotion:cancel";
+    public static final String PROMOTION_REVERSE = "internal:promotion:reverse";
+    public static final String LOYALTY_ADMIN = "internal:loyalty:admin";
+    public static final String LOYALTY_READ = "internal:loyalty:read";
+    public static final String LOYALTY_EARN = "internal:loyalty:earn";
+    public static final String LOYALTY_BURN = "internal:loyalty:burn";
+    public static final String LOYALTY_REVERSE = "internal:loyalty:reverse";
+    public static final String LOYALTY_ADJUST = "internal:loyalty:adjust";
+    public static final String LOYALTY_EXPIRE = "internal:loyalty:expire";
 
     private InternalScopes() {
     }

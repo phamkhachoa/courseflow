@@ -1,4 +1,7 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { SearchPage } from "./pages";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
 
-export const searchRoutes: RouteObject[] = [{ index: true, element: <SearchPage /> }];
+const SearchPage = lazy(() => import("./pages").then(({ SearchPage }) => ({ default: SearchPage })));
+
+export const searchRoutes: RouteObject[] = [{ index: true, element: lazyRouteElement(SearchPage) }];

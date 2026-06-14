@@ -23,7 +23,8 @@ spring:
     multipart:
       max-file-size: ${ASSIGNMENT_MAX_FILE_SIZE:200MB}
       max-request-size: ${ASSIGNMENT_MAX_REQUEST_SIZE:200MB}
-courseflow:  entitlement:
+courseflow:
+  entitlement:
     course-service-url: ${COURSE_SERVICE_URL:http://course-service:8080}
   storage:
     provider: ${STORAGE_PROVIDER:minio}

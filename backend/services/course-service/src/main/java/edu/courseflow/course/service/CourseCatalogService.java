@@ -2,6 +2,8 @@ package edu.courseflow.course.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.courseflow.commonlibrary.exception.BadRequestException;
+import edu.courseflow.commonlibrary.exception.ConflictException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.course.dto.CourseDtos.AddCourseMaterialRequestDto;
@@ -9,6 +11,8 @@ import edu.courseflow.course.dto.CourseDtos.CourseDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMaterialDto;
 import edu.courseflow.course.dto.CourseDtos.CreateCourseRequestDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMetadataDto;
+import edu.courseflow.course.dto.CourseDtos.CoursePricingDto;
+import edu.courseflow.course.dto.CourseDtos.UpdateCoursePricingRequestDto;
 import edu.courseflow.course.exception.ForbiddenException;
 import edu.courseflow.course.repository.CourseCatalogRepository;
 import edu.courseflow.events.common.EventMetadata;
@@ -83,6 +87,17 @@ public class CourseCatalogService {
                 .orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
     }
 
+    public CoursePricingDto pricing(UUID courseId) {
+        CoursePricingDto pricing = courses.pricing(courseId)
+                .orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
+        if (!pricing.purchasable()) {
+            throw ConflictException.coded(
+                    "COURSE_PRICING_NOT_CONFIGURED",
+                    "Course pricing is not configured: " + courseId);
+        }
+        return pricing;
+    }
+
     public CourseDto getPublishedBySlug(String slug) {
         return courses.findPublishedBySlug(slug)
                 .orElseThrow(() -> new NotFoundException("Published course not found: " + slug));
@@ -93,7 +108,12 @@ public class CourseCatalogService {
         requireCourseCreator(user, request.departmentId());
         // ownerId is taken from the authenticated caller, never from the request body.
         String ownerId = String.valueOf(user.id());
-        CourseDto created = courses.create(request, ownerId);
+        CourseDto created;
+        try {
+            created = courses.create(request, ownerId);
+        } catch (IllegalArgumentException ex) {
+            throw BadRequestException.coded("COURSE_PRICING_INVALID", ex.getMessage());
+        }
         authoring.ensureInitialVersion(UUID.fromString(created.id()), ownerId);
         return created;
     }
@@ -103,6 +123,17 @@ public class CourseCatalogService {
         CourseDto course = get(courseId);
         requireOwnerOrAdmin(course, user);
         return courses.addMaterial(courseId, request);
+    }
+
+    @Transactional
+    public CoursePricingDto updatePricing(UUID courseId, UpdateCoursePricingRequestDto request, CurrentUser user) {
+        CourseDto course = get(courseId);
+        requireOwnerOrAdmin(course, user);
+        try {
+            return courses.updatePricing(courseId, request);
+        } catch (IllegalArgumentException ex) {
+            throw BadRequestException.coded("COURSE_PRICING_INVALID", ex.getMessage());
+        }
     }
 
     @Transactional

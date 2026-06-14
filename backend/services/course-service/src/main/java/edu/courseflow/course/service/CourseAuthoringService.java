@@ -93,15 +93,22 @@ public class CourseAuthoringService {
         // ownerId / last_authored_by come from the authenticated caller, never from the body.
         String ownerId = String.valueOf(user.id());
         UUID id = UUID.randomUUID();
-        Course course = new Course(
-                id,
-                request.code(),
-                request.title(),
-                request.slug(),
-                request.summary(),
-                request.departmentId(),
-                ownerId,
-                request.level() == null ? "BEGINNER" : request.level());
+        Course course;
+        try {
+            course = new Course(
+                    id,
+                    request.code(),
+                    request.title(),
+                    request.slug(),
+                    request.summary(),
+                    request.departmentId(),
+                    ownerId,
+                    request.level() == null ? "BEGINNER" : request.level(),
+                    request.listPrice(),
+                    request.currency());
+        } catch (IllegalArgumentException ex) {
+            throw BadRequestException.coded("COURSE_PRICING_INVALID", ex.getMessage());
+        }
         courses.save(course);
         createVersionRow(id, 1, "DRAFT", ownerId, "Initial draft");
         recordReviewAudit(course, user, "CREATE_DRAFT", null, "DRAFT", "Initial draft", List.of());
@@ -662,6 +669,7 @@ public class CourseAuthoringService {
     }
 
     private void ensureReviewable(UUID courseId) {
+        Course course = findCourse(courseId);
         List<CourseModule> courseModules = modules.findByCourseIdOrderByPositionAsc(courseId).stream()
                 .filter(module -> !"ARCHIVED".equals(module.getStatus()))
                 .toList();
@@ -669,6 +677,9 @@ public class CourseAuthoringService {
             throw new BadRequestException("Course must have at least one chapter before review");
         }
         List<String> issues = new ArrayList<>();
+        if (!hasPurchasablePricing(course)) {
+            issues.add("Course pricing must be configured before review");
+        }
         int requiredItems = 0;
         for (CourseModule module : courseModules) {
             List<ModuleItem> moduleItems = items.findByModuleIdOrderByPositionAsc(module.getId()).stream()
@@ -696,6 +707,13 @@ public class CourseAuthoringService {
         if (!issues.isEmpty()) {
             throw new BadRequestException("Course is not ready for review: " + String.join("; ", issues));
         }
+    }
+
+    private boolean hasPurchasablePricing(Course course) {
+        String priceStatus = course.getPriceStatus();
+        return course.getListPrice() != null
+                && !isBlank(course.getCurrency())
+                && ("ACTIVE".equalsIgnoreCase(priceStatus) || "FREE".equalsIgnoreCase(priceStatus));
     }
 
     private void validateItemReadiness(CourseModule module, ModuleItem item, List<String> issues) {

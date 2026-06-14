@@ -196,6 +196,186 @@ class TrustedGatewayHeaderFilterTest {
     }
 
     @Test
+    void rejectsPromotionEvaluateWhenServiceOnlyHasGenericScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/incentives/evaluate");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsPromotionEvaluateWithEvaluateScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/incentives/evaluate");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.PROMOTION_EVALUATE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsPromotionReservationCommitWithReserveScopeOnly() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/incentives/reservations/00000000-0000-0000-0000-000000000001/commit");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.PROMOTION_RESERVE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsPromotionReservationCreateWithReserveScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/incentives/reservations");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.PROMOTION_RESERVE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void allowsPromotionReservationCommitWithCommitScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/incentives/reservations/00000000-0000-0000-0000-000000000001/commit");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.PROMOTION_COMMIT));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void allowsPromotionReservationCancelWithCancelScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/incentives/reservations/00000000-0000-0000-0000-000000000001/cancel");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.PROMOTION_CANCEL));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void allowsPromotionRedemptionReverseWithReverseScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/incentives/redemptions/00000000-0000-0000-0000-000000000001/reverse");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.PROMOTION_REVERSE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void allowsPromotionAdminEndpointWithPromotionAdminScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/incentives/campaigns");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.PROMOTION_ADMIN));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsLoyaltyEarnWhenServiceOnlyHasGenericScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/loyalty/points:earn");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsLoyaltyEarnWithEarnScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/loyalty/points:earn");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.LOYALTY_EARN));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsLoyaltyBurnWhenOnlyEarnScopeIsGranted() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/internal/loyalty/points:burn");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.LOYALTY_EARN));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsLoyaltyReadWithReadScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/loyalty/ledger");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.LOYALTY_READ));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
     void rejectsUserInternalJwtOnServiceOnlyInternalEndpointEvenWhenIdentityHeadersMatch()
             throws ServletException, IOException {
         SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();

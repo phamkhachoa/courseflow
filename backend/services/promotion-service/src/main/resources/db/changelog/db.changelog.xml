@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                            http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+
+    <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/002-hardening.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003-production-contract.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004-application-binding-backfill.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/005-production-operations-contract.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/006-production-invariants.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/007-trusted-runtime-access.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/008-campaign-version-immutability.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/009-coupon-inventory-indexes.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/010-retention-dry-run-indexes.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/011-client-binding-fail-closed.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/012-retention-redaction-execution.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/013-retention-operation-scoped-idempotency.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/014-retention-operation-scope-key-normalization.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/015-retention-approval-restore-drill.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/016-retention-execution-failure-hardening.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/017-coupon-import-dry-run.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/018-coupon-import-commit.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/019-operation-approval.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/020-coupon-import-query-indexes.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/021-retention-approval-query-indexes.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/022-enrollment-runtime-binding.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/023-enrollment-runtime-reverse-binding.sql" relativeToChangelogFile="false"/>
+</databaseChangeLog>

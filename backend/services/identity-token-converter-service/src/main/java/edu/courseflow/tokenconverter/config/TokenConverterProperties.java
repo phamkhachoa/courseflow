@@ -30,14 +30,19 @@ public class TokenConverterProperties {
             + "user-management-service,organization-service,course-service,enrollment-service,assignment-service,"
             + "deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,"
             + "chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,"
-            + "certificate-service,peer-review-service,live-session-service,review-service,outbox-relay";
+            + "certificate-service,peer-review-service,live-session-service,review-service,checkout-service,"
+            + "promotion-service,loyalty-service,outbox-relay";
     private static final String DEFAULT_STS_ALLOWED_SERVICE_SCOPES = "internal:service,internal:token-exchange,"
             + "internal:user,"
             + "internal:identity:resolve,internal:identity:provision,internal:authz:check,"
             + "internal:authz:assert-topology,"
             + "internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,"
             + "internal:role-assignment:write,internal:role-management:read,internal:role-management:write,"
-            + "internal:profile:read,internal:profile:write,internal:backoffice";
+            + "internal:profile:read,internal:profile:write,internal:backoffice,"
+            + "internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,"
+            + "internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,"
+            + "internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,"
+            + "internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire";
 
     private final ExternalTokenMode externalTokenMode;
     private final String externalJwtSecret;

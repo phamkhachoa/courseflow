@@ -222,6 +222,121 @@ class AccessControlServiceAuthorizationAuditTest {
     }
 
     @Test
+    void allowsApplicationScopedIncentivePermission() {
+        AccessControlService accessControl = service(false);
+        Role role = role("INCENTIVE_REVIEWER");
+        RolePermissionGrant allowGrant = grant(role, "incentive:campaign:review", "ALLOW");
+        when(permissions.findById("incentive:campaign:review"))
+                .thenReturn(Optional.of(permissionDefinition("incentive:campaign:review", "APPLICATION")));
+        when(assignments.findActiveByUserId(eq(42L), any(Instant.class)))
+                .thenReturn(List.of(new UserRoleAssignment(
+                        learner, role, "APPLICATION", "courseflow:lms", "admin", null)));
+        when(grants.findByRole_IdOrderByPermission_CategoryAscPermission_CodeAsc(role.getId()))
+                .thenReturn(List.of(allowGrant));
+
+        var result = accessControl.check(new AuthzCheckRequestDto(
+                "42", "incentive:campaign:review", "APPLICATION", "courseflow:lms"));
+
+        assertThat(result.allowed()).isTrue();
+        verify(auditLogs, never()).save(any(AccessControlAuditLog.class));
+    }
+
+    @Test
+    void allowsCouponImportManageForOperatorButNotReview() {
+        AccessControlService accessControl = service(false);
+        Role role = role("INCENTIVE_OPERATOR");
+        RolePermissionGrant readGrant = grant(role, "incentive:coupon:import:read", "ALLOW");
+        RolePermissionGrant manageGrant = grant(role, "incentive:coupon:import:manage", "ALLOW");
+        when(permissions.findById("incentive:coupon:import:manage"))
+                .thenReturn(Optional.of(permissionDefinition("incentive:coupon:import:manage", "APPLICATION")));
+        when(permissions.findById("incentive:coupon:import:review"))
+                .thenReturn(Optional.of(permissionDefinition("incentive:coupon:import:review", "APPLICATION")));
+        when(assignments.findActiveByUserId(eq(42L), any(Instant.class)))
+                .thenReturn(List.of(new UserRoleAssignment(
+                        learner, role, "APPLICATION", "courseflow:lms", "admin", null)));
+        when(grants.findByRole_IdOrderByPermission_CategoryAscPermission_CodeAsc(role.getId()))
+                .thenReturn(List.of(readGrant, manageGrant));
+
+        assertThat(accessControl.check(new AuthzCheckRequestDto(
+                "42", "incentive:coupon:import:manage", "APPLICATION", "courseflow:lms")).allowed())
+                .isTrue();
+        assertThat(accessControl.check(new AuthzCheckRequestDto(
+                "42", "incentive:coupon:import:review", "APPLICATION", "courseflow:lms")).allowed())
+                .isFalse();
+    }
+
+    @Test
+    void allowsCouponImportReviewForReviewerButNotManage() {
+        AccessControlService accessControl = service(false);
+        Role role = role("INCENTIVE_REVIEWER");
+        RolePermissionGrant readGrant = grant(role, "incentive:coupon:import:read", "ALLOW");
+        RolePermissionGrant reviewGrant = grant(role, "incentive:coupon:import:review", "ALLOW");
+        when(permissions.findById("incentive:coupon:import:review"))
+                .thenReturn(Optional.of(permissionDefinition("incentive:coupon:import:review", "APPLICATION")));
+        when(permissions.findById("incentive:coupon:import:manage"))
+                .thenReturn(Optional.of(permissionDefinition("incentive:coupon:import:manage", "APPLICATION")));
+        when(assignments.findActiveByUserId(eq(42L), any(Instant.class)))
+                .thenReturn(List.of(new UserRoleAssignment(
+                        learner, role, "APPLICATION", "courseflow:lms", "admin", null)));
+        when(grants.findByRole_IdOrderByPermission_CategoryAscPermission_CodeAsc(role.getId()))
+                .thenReturn(List.of(readGrant, reviewGrant));
+
+        assertThat(accessControl.check(new AuthzCheckRequestDto(
+                "42", "incentive:coupon:import:review", "APPLICATION", "courseflow:lms")).allowed())
+                .isTrue();
+        assertThat(accessControl.check(new AuthzCheckRequestDto(
+                "42", "incentive:coupon:import:manage", "APPLICATION", "courseflow:lms")).allowed())
+                .isFalse();
+    }
+
+    @Test
+    void allowsTenantScopedIncentivePermissionForApplicationWhenTrustedServiceSuppliesTenantAncestor() {
+        AccessControlService accessControl = service(false);
+        Role role = role("INCENTIVE_ADMIN");
+        RolePermissionGrant allowGrant = grant(role, "incentive:read", "ALLOW");
+        when(internalJwtService.verify("service-token")).thenReturn(serviceClaims(
+                InternalScopes.AUTHZ_CHECK,
+                InternalScopes.AUTHZ_ASSERT_TOPOLOGY));
+        when(permissions.findById("incentive:read"))
+                .thenReturn(Optional.of(permissionDefinition("incentive:read", "TENANT")));
+        when(assignments.findActiveByUserId(eq(42L), any(Instant.class)))
+                .thenReturn(List.of(new UserRoleAssignment(
+                        learner, role, "TENANT", "courseflow", "admin", null)));
+        when(grants.findByRole_IdOrderByPermission_CategoryAscPermission_CodeAsc(role.getId()))
+                .thenReturn(List.of(allowGrant));
+
+        var result = accessControl.check(new AuthzCheckRequestDto(
+                "42",
+                "incentive:read",
+                "APPLICATION",
+                "courseflow:lms",
+                List.of(new AuthzScopeDto("TENANT", "courseflow"))),
+                new CurrentUser(null, null, null, Set.of(), Set.of(), "service-token"));
+
+        assertThat(result.allowed()).isTrue();
+    }
+
+    @Test
+    void rejectsLmsAncestorForApplicationScopedIncentiveAuthorization() {
+        AccessControlService accessControl = service(false);
+        when(internalJwtService.verify("service-token")).thenReturn(serviceClaims(
+                InternalScopes.AUTHZ_CHECK,
+                InternalScopes.AUTHZ_ASSERT_TOPOLOGY));
+        when(permissions.findById("incentive:read"))
+                .thenReturn(Optional.of(permissionDefinition("incentive:read", "TENANT")));
+
+        assertThatThrownBy(() -> accessControl.check(new AuthzCheckRequestDto(
+                "42",
+                "incentive:read",
+                "APPLICATION",
+                "courseflow:lms",
+                List.of(new AuthzScopeDto("ORG", "org-1"))),
+                new CurrentUser(null, null, null, Set.of(), Set.of(), "service-token")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("INVALID_SCOPE_ANCESTOR");
+    }
+
+    @Test
     void rejectsRoleAssignmentReadsForUserCallerWithoutRoleManage() {
         AccessControlService accessControl = service(false);
         when(permissions.findById("role:manage")).thenReturn(Optional.of(permissionDefinition(
@@ -282,7 +397,7 @@ class AccessControlServiceAuthorizationAuditTest {
         Role admin = role("ADMIN");
         Role instructor = role("INSTRUCTOR");
         when(permissions.findById("user:assign-role")).thenReturn(Optional.of(permissionDefinition(
-                "user:assign-role", "ORG")));
+                "user:assign-role", "ANY")));
         when(assignments.findActiveByUserId(eq(1L), any(Instant.class)))
                 .thenReturn(List.of(new UserRoleAssignment(adminUser, admin, "PLATFORM", null, "seed", null)));
         when(grants.findByRole_IdOrderByPermission_CategoryAscPermission_CodeAsc(admin.getId()))
@@ -305,6 +420,49 @@ class AccessControlServiceAuthorizationAuditTest {
         AccessControlAuditLog audit = captureAudit();
         assertThat(audit.getEventType()).isEqualTo("ROLE_ASSIGNED");
         assertThat(audit.getActorId()).isEqualTo("user:1");
+    }
+
+    @Test
+    void assignsApplicationScopedIncentiveRoleUsingPlatformAdmin() {
+        AccessControlService accessControl = service(false);
+        AccessUser adminUser = new AccessUser(1L, "admin@courseflow.local");
+        Role admin = role("ADMIN");
+        Role reviewer = role("INCENTIVE_REVIEWER");
+        when(permissions.findById("user:assign-role")).thenReturn(Optional.of(permissionDefinition(
+                "user:assign-role", "ANY")));
+        when(assignments.findActiveByUserId(eq(1L), any(Instant.class)))
+                .thenReturn(List.of(new UserRoleAssignment(adminUser, admin, "PLATFORM", null, "seed", null)));
+        when(grants.findByRole_IdOrderByPermission_CategoryAscPermission_CodeAsc(admin.getId()))
+                .thenReturn(List.of(grant(admin, "user:assign-role", "ALLOW")));
+        when(users.findById(42L)).thenReturn(Optional.of(learner));
+        when(roles.findById(reviewer.getId())).thenReturn(Optional.of(reviewer));
+        when(assignments.findLiveExisting(42L, reviewer.getId(), "APPLICATION", "courseflow:lms"))
+                .thenReturn(Optional.empty());
+        when(assignments.save(any(UserRoleAssignment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = accessControl.assignRole(
+                42L,
+                new AssignRoleRequestDto(reviewer.getId().toString(), "APPLICATION", "courseflow:lms", null, null),
+                new CurrentUser(1L, "admin@courseflow.local", "ADMIN", java.util.Set.of("ADMIN")));
+
+        assertThat(result.roleCode()).isEqualTo("INCENTIVE_REVIEWER");
+        assertThat(result.scopeType()).isEqualTo("APPLICATION");
+        assertThat(result.scopeId()).isEqualTo("courseflow:lms");
+    }
+
+    @Test
+    void rejectsApplicationScopeIdWithoutTenantAndApplicationParts() {
+        AccessControlService accessControl = service(false);
+
+        assertThatThrownBy(() -> accessControl.assignRole(
+                42L,
+                new AssignRoleRequestDto(UUID.randomUUID().toString(), "APPLICATION", "lms", null, null),
+                new CurrentUser(1L, "admin@courseflow.local", "ADMIN", java.util.Set.of("ADMIN"))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("INVALID_APPLICATION_SCOPE_ID");
+
+        verify(permissions, never()).findById("user:assign-role");
     }
 
     @Test

@@ -7,366 +7,408 @@ spring:
     gateway:
       routes:
         - id: user-management-current-user
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/v1/users/me
           filters:
             - SetPath=/internal/users/me
         - id: user-management-me-profile
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/v1/users/me/profile
           filters:
             - SetPath=/internal/users/me/profile
         - id: user-management-profile-summaries
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/v1/profiles/summary:batch
           filters:
             - SetPath=/internal/profiles/summary:batch
         - id: user-management-public-profiles
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/v1/profiles/**
           filters:
             - RewritePath=/api/v1/(?<segment>profiles/.*), /public/$\{segment}
         - id: user-management-admin-directory
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/admin/v1/user-directory
           filters:
             - SetPath=/backoffice/users
         - id: access-control-admin-user-assignments
-          uri: ${ACCESS_CONTROL_SERVICE_URI:http://access-control-service:8080}
+          uri: ${ACCESS_CONTROL_SERVICE_URI:lb://access-control-service}
           predicates:
             - Path=/api/admin/v1/users/*/assignments,/api/admin/v1/users/*/assignments/**,/api/admin/v1/users/*/assignments:export
           filters:
             - RewritePath=/api/admin/v1/(?<segment>users/.+), /internal/$\{segment}
         - id: user-management-admin-users-root-read
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/admin/v1/users,/api/admin/v1/users/
             - Method=GET
           filters:
             - SetPath=/backoffice/admin-users
         - id: user-management-admin-users-root-create
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/admin/v1/users,/api/admin/v1/users/
             - Method=POST
           filters:
             - SetPath=/backoffice/admin-users
         - id: user-management-admin-users-detail-read
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/admin/v1/users/{userId}
             - Method=GET
           filters:
             - RewritePath=/api/admin/v1/users/(?<userId>[^/]+), /backoffice/admin-users/$\{userId}
         - id: user-management-admin-users-privacy-export
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/admin/v1/users/{userId}/privacy-export
             - Method=GET
           filters:
             - RewritePath=/api/admin/v1/users/(?<userId>[^/]+)/privacy-export, /backoffice/admin-users/$\{userId}/privacy-export
         - id: user-management-admin-users-deactivate
-          uri: ${USER_MANAGEMENT_SERVICE_URI:http://user-management-service:8080}
+          uri: ${USER_MANAGEMENT_SERVICE_URI:lb://user-management-service}
           predicates:
             - Path=/api/admin/v1/users/{userId}/deactivate
             - Method=POST
           filters:
             - RewritePath=/api/admin/v1/users/(?<userId>[^/]+)/deactivate, /backoffice/admin-users/$\{userId}/deactivate
         - id: access-control-admin-roles
-          uri: ${ACCESS_CONTROL_SERVICE_URI:http://access-control-service:8080}
+          uri: ${ACCESS_CONTROL_SERVICE_URI:lb://access-control-service}
           predicates:
             - Path=/api/admin/v1/roles,/api/admin/v1/roles/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>roles.*), /internal/$\{segment}
         - id: access-control-admin-permissions
-          uri: ${ACCESS_CONTROL_SERVICE_URI:http://access-control-service:8080}
+          uri: ${ACCESS_CONTROL_SERVICE_URI:lb://access-control-service}
           predicates:
             - Path=/api/admin/v1/permissions
           filters:
             - SetPath=/internal/permissions
         - id: organization-admin
-          uri: ${ORGANIZATION_SERVICE_URI:http://organization-service:8080}
+          uri: ${ORGANIZATION_SERVICE_URI:lb://organization-service}
           predicates:
             - Path=/api/admin/v1/organizations/**,/api/admin/v1/terms,/api/admin/v1/terms/**,/api/admin/v1/sections,/api/admin/v1/sections/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: enrollment-admin-capacity
-          uri: ${ENROLLMENT_SERVICE_URI:http://enrollment-service:8080}
+          uri: ${ENROLLMENT_SERVICE_URI:lb://enrollment-service}
           predicates:
             - Path=/api/admin/v1/courses/*/capacity
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: course-admin-authoring
-          uri: ${COURSE_SERVICE_URI:http://course-service:8080}
+          uri: ${COURSE_SERVICE_URI:lb://course-service}
           predicates:
             - Path=/api/admin/v1/authoring/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: course-admin
-          uri: ${COURSE_SERVICE_URI:http://course-service:8080}
+          uri: ${COURSE_SERVICE_URI:lb://course-service}
           predicates:
             - Path=/api/admin/v1/courses,/api/admin/v1/courses/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: enrollment-admin
-          uri: ${ENROLLMENT_SERVICE_URI:http://enrollment-service:8080}
+          uri: ${ENROLLMENT_SERVICE_URI:lb://enrollment-service}
           predicates:
             - Path=/api/admin/v1/enrollments,/api/admin/v1/enrollments/**,/api/admin/v1/waitlist,/api/admin/v1/waitlist/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: assignment-admin
-          uri: ${ASSIGNMENT_SERVICE_URI:http://assignment-service:8080}
+          uri: ${ASSIGNMENT_SERVICE_URI:lb://assignment-service}
           predicates:
             - Path=/api/admin/v1/assignments,/api/admin/v1/assignments/**,/api/admin/v1/submissions,/api/admin/v1/submissions/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: deadline-admin
-          uri: ${DEADLINE_SERVICE_URI:http://deadline-service:8080}
+          uri: ${DEADLINE_SERVICE_URI:lb://deadline-service}
           predicates:
             - Path=/api/admin/v1/deadlines,/api/admin/v1/deadlines/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: announcement-admin
-          uri: ${ANNOUNCEMENT_SERVICE_URI:http://announcement-service:8080}
+          uri: ${ANNOUNCEMENT_SERVICE_URI:lb://announcement-service}
           predicates:
             - Path=/api/admin/v1/announcements,/api/admin/v1/announcements/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: portfolio-admin
-          uri: ${PORTFOLIO_SERVICE_URI:http://portfolio-service:8080}
+          uri: ${PORTFOLIO_SERVICE_URI:lb://portfolio-service}
           predicates:
             - Path=/api/admin/v1/portfolios,/api/admin/v1/portfolios/**,/api/admin/v1/evidence,/api/admin/v1/evidence/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: discussion-admin
-          uri: ${DISCUSSION_SERVICE_URI:http://discussion-service:8080}
+          uri: ${DISCUSSION_SERVICE_URI:lb://discussion-service}
           predicates:
             - Path=/api/admin/v1/discussions,/api/admin/v1/discussions/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: chat-admin
-          uri: ${CHAT_SERVICE_URI:http://chat-service:8080}
+          uri: ${CHAT_SERVICE_URI:lb://chat-service}
           predicates:
             - Path=/api/admin/v1/chat,/api/admin/v1/chat/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: chat-websocket
-          uri: ${CHAT_SERVICE_WS_URI:ws://chat-service:8080}
+          uri: ${CHAT_SERVICE_WS_URI:lb:ws://chat-service}
           predicates:
             - Path=/ws/chat,/ws/chat/**
         - id: notification-websocket
-          uri: ${NOTIFICATION_SERVICE_URI:http://notification-service:8080}
+          uri: ${NOTIFICATION_SERVICE_WS_URI:lb:ws://notification-service}
           predicates:
             - Path=/ws/**
         - id: notification-admin
-          uri: ${NOTIFICATION_SERVICE_URI:http://notification-service:8080}
+          uri: ${NOTIFICATION_SERVICE_URI:lb://notification-service}
           predicates:
             - Path=/api/admin/v1/notifications,/api/admin/v1/notifications/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: media-admin
-          uri: ${MEDIA_SERVICE_URI:http://media-service:8080}
+          uri: ${MEDIA_SERVICE_URI:lb://media-service}
           predicates:
             - Path=/api/admin/v1/media,/api/admin/v1/media/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: search-admin
-          uri: ${SEARCH_SERVICE_URI:http://search-service:8080}
+          uri: ${SEARCH_SERVICE_URI:lb://search-service}
           predicates:
             - Path=/api/admin/v1/search,/api/admin/v1/search/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: analytics-admin
-          uri: ${ANALYTICS_SERVICE_URI:http://analytics-service:8080}
+          uri: ${ANALYTICS_SERVICE_URI:lb://analytics-service}
           predicates:
             - Path=/api/admin/v1/analytics,/api/admin/v1/analytics/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: gradebook-admin
-          uri: ${GRADEBOOK_SERVICE_URI:http://gradebook-service:8080}
+          uri: ${GRADEBOOK_SERVICE_URI:lb://gradebook-service}
           predicates:
             - Path=/api/admin/v1/gradebook,/api/admin/v1/gradebook/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: quiz-admin
-          uri: ${QUIZ_SERVICE_URI:http://quiz-service:8080}
+          uri: ${QUIZ_SERVICE_URI:lb://quiz-service}
           predicates:
             - Path=/api/admin/v1/quizzes,/api/admin/v1/quizzes/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: certificate-admin
-          uri: ${CERTIFICATE_SERVICE_URI:http://certificate-service:8080}
+          uri: ${CERTIFICATE_SERVICE_URI:lb://certificate-service}
           predicates:
             - Path=/api/admin/v1/certificates,/api/admin/v1/certificates/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: peer-review-admin
-          uri: ${PEER_REVIEW_SERVICE_URI:http://peer-review-service:8080}
+          uri: ${PEER_REVIEW_SERVICE_URI:lb://peer-review-service}
           predicates:
             - Path=/api/admin/v1/peer-reviews,/api/admin/v1/peer-reviews/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: live-session-admin
-          uri: ${LIVE_SESSION_SERVICE_URI:http://live-session-service:8080}
+          uri: ${LIVE_SESSION_SERVICE_URI:lb://live-session-service}
           predicates:
             - Path=/api/admin/v1/live-sessions,/api/admin/v1/live-sessions/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: review-admin
-          uri: ${REVIEW_SERVICE_URI:http://review-service:8080}
+          uri: ${REVIEW_SERVICE_URI:lb://review-service}
           predicates:
             - Path=/api/admin/v1/reviews,/api/admin/v1/reviews/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
         - id: course-user-modules
-          uri: ${COURSE_SERVICE_URI:http://course-service:8080}
+          uri: ${COURSE_SERVICE_URI:lb://course-service}
           predicates:
             - Path=/api/v1/courses/*/modules,/api/v1/courses/*/modules/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: course-user-media-download
-          uri: ${COURSE_SERVICE_URI:http://course-service:8080}
+          uri: ${COURSE_SERVICE_URI:lb://course-service}
           predicates:
             - Path=/api/v1/courses/*/media/assets/*/download-url
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: learning-next-action-user
-          uri: ${COURSE_SERVICE_URI:http://course-service:8080}
+          uri: ${COURSE_SERVICE_URI:lb://course-service}
           predicates:
             - Path=/api/v1/learning/next-action
           filters:
             - SetPath=/internal/learning/next-action
+        - id: loyalty-user-balances
+          uri: ${LOYALTY_SERVICE_URI:lb://loyalty-service}
+          predicates:
+            - Path=/api/v1/loyalty/balances
+          filters:
+            - SetPath=/internal/loyalty/me/balances
+        - id: loyalty-user-wallet
+          uri: ${LOYALTY_SERVICE_URI:lb://loyalty-service}
+          predicates:
+            - Path=/api/v1/loyalty/wallet
+          filters:
+            - SetPath=/internal/loyalty/me/wallet
+        - id: loyalty-user-rewards
+          uri: ${LOYALTY_SERVICE_URI:lb://loyalty-service}
+          predicates:
+            - Path=/api/v1/loyalty/rewards
+          filters:
+            - SetPath=/internal/loyalty/me/rewards
+        - id: loyalty-user-reward-redeem
+          uri: ${LOYALTY_SERVICE_URI:lb://loyalty-service}
+          predicates:
+            - Path=/api/v1/loyalty/rewards/*:redeem
+          filters:
+            - RewritePath=/api/v1/loyalty/rewards/(?<rewardId>[^/]+):redeem, /internal/loyalty/me/rewards/$\{rewardId}:redeem
         - id: analytics-user-related-courses
-          uri: ${ANALYTICS_SERVICE_URI:http://analytics-service:8080}
+          uri: ${ANALYTICS_SERVICE_URI:lb://analytics-service}
           predicates:
             - Path=/api/v1/courses/*/related
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /public/$\{segment}
         - id: course-user-public
-          uri: ${COURSE_SERVICE_URI:http://course-service:8080}
+          uri: ${COURSE_SERVICE_URI:lb://course-service}
           predicates:
             - Path=/api/v1/courses,/api/v1/courses/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /public/$\{segment}
         - id: assignment-user
-          uri: ${ASSIGNMENT_SERVICE_URI:http://assignment-service:8080}
+          uri: ${ASSIGNMENT_SERVICE_URI:lb://assignment-service}
           predicates:
             - Path=/api/v1/assignments,/api/v1/assignments/**,/api/v1/submissions,/api/v1/submissions/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: enrollment-user
-          uri: ${ENROLLMENT_SERVICE_URI:http://enrollment-service:8080}
+          uri: ${ENROLLMENT_SERVICE_URI:lb://enrollment-service}
           predicates:
             - Path=/api/v1/enrollments,/api/v1/enrollments/**,/api/v1/waitlist,/api/v1/waitlist/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: deadline-user
-          uri: ${DEADLINE_SERVICE_URI:http://deadline-service:8080}
+          uri: ${DEADLINE_SERVICE_URI:lb://deadline-service}
           predicates:
             - Path=/api/v1/deadlines,/api/v1/deadlines/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: announcement-user
-          uri: ${ANNOUNCEMENT_SERVICE_URI:http://announcement-service:8080}
+          uri: ${ANNOUNCEMENT_SERVICE_URI:lb://announcement-service}
           predicates:
             - Path=/api/v1/announcements,/api/v1/announcements/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: portfolio-user
-          uri: ${PORTFOLIO_SERVICE_URI:http://portfolio-service:8080}
+          uri: ${PORTFOLIO_SERVICE_URI:lb://portfolio-service}
           predicates:
             - Path=/api/v1/portfolios,/api/v1/portfolios/**,/api/v1/evidence,/api/v1/evidence/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: discussion-user
-          uri: ${DISCUSSION_SERVICE_URI:http://discussion-service:8080}
+          uri: ${DISCUSSION_SERVICE_URI:lb://discussion-service}
           predicates:
             - Path=/api/v1/discussions,/api/v1/discussions/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: chat-user
-          uri: ${CHAT_SERVICE_URI:http://chat-service:8080}
+          uri: ${CHAT_SERVICE_URI:lb://chat-service}
           predicates:
             - Path=/api/v1/chat,/api/v1/chat/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: notification-user
-          uri: ${NOTIFICATION_SERVICE_URI:http://notification-service:8080}
+          uri: ${NOTIFICATION_SERVICE_URI:lb://notification-service}
           predicates:
             - Path=/api/v1/notifications,/api/v1/notifications/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: media-user
-          uri: ${MEDIA_SERVICE_URI:http://media-service:8080}
+          uri: ${MEDIA_SERVICE_URI:lb://media-service}
           predicates:
             - Path=/api/v1/media,/api/v1/media/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: search-user-public
-          uri: ${SEARCH_SERVICE_URI:http://search-service:8080}
+          uri: ${SEARCH_SERVICE_URI:lb://search-service}
           predicates:
             - Path=/api/v1/search,/api/v1/search/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /public/$\{segment}
         - id: analytics-user
-          uri: ${ANALYTICS_SERVICE_URI:http://analytics-service:8080}
+          uri: ${ANALYTICS_SERVICE_URI:lb://analytics-service}
           predicates:
             - Path=/api/v1/analytics,/api/v1/analytics/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: gradebook-user
-          uri: ${GRADEBOOK_SERVICE_URI:http://gradebook-service:8080}
+          uri: ${GRADEBOOK_SERVICE_URI:lb://gradebook-service}
           predicates:
             - Path=/api/v1/gradebook,/api/v1/gradebook/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: quiz-user
-          uri: ${QUIZ_SERVICE_URI:http://quiz-service:8080}
+          uri: ${QUIZ_SERVICE_URI:lb://quiz-service}
           predicates:
             - Path=/api/v1/quizzes,/api/v1/quizzes/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: certificate-user
-          uri: ${CERTIFICATE_SERVICE_URI:http://certificate-service:8080}
+          uri: ${CERTIFICATE_SERVICE_URI:lb://certificate-service}
           predicates:
             - Path=/api/v1/certificates/mine
           filters:
             - RewritePath=/api/v1/(?<segment>certificates/mine), /internal/$\{segment}
         - id: certificate-user-public
-          uri: ${CERTIFICATE_SERVICE_URI:http://certificate-service:8080}
+          uri: ${CERTIFICATE_SERVICE_URI:lb://certificate-service}
           predicates:
             - Path=/api/v1/certificates,/api/v1/certificates/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /public/$\{segment}
         - id: peer-review-user
-          uri: ${PEER_REVIEW_SERVICE_URI:http://peer-review-service:8080}
+          uri: ${PEER_REVIEW_SERVICE_URI:lb://peer-review-service}
           predicates:
             - Path=/api/v1/peer-reviews,/api/v1/peer-reviews/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: live-session-user
-          uri: ${LIVE_SESSION_SERVICE_URI:http://live-session-service:8080}
+          uri: ${LIVE_SESSION_SERVICE_URI:lb://live-session-service}
           predicates:
             - Path=/api/v1/live-sessions,/api/v1/live-sessions/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: review-user-public
-          uri: ${REVIEW_SERVICE_URI:http://review-service:8080}
+          uri: ${REVIEW_SERVICE_URI:lb://review-service}
           predicates:
             - Path=/api/v1/reviews/courses,/api/v1/reviews/courses/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /public/$\{segment}
         - id: review-user
-          uri: ${REVIEW_SERVICE_URI:http://review-service:8080}
+          uri: ${REVIEW_SERVICE_URI:lb://review-service}
           predicates:
             - Path=/api/v1/reviews,/api/v1/reviews/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
+        - id: promotion-admin
+          uri: ${PROMOTION_SERVICE_URI:lb://promotion-service}
+          predicates:
+            - Path=/api/admin/v1/incentives,/api/admin/v1/incentives/**
+          filters:
+            - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
+        - id: loyalty-admin
+          uri: ${LOYALTY_SERVICE_URI:lb://loyalty-service}
+          predicates:
+            - Path=/api/admin/v1/loyalty,/api/admin/v1/loyalty/**
+          filters:
+            - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
+        - id: outbox-admin
+          uri: ${OUTBOX_RELAY_SERVICE_URI:lb://outbox-relay}
+          predicates:
+            - Path=/api/admin/v1/outbox,/api/admin/v1/outbox/**
+          filters:
+            - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
 courseflow:
   security:
     external-token:

@@ -6,6 +6,8 @@ import edu.courseflow.course.dto.CourseDtos.CourseDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMaterialDto;
 import edu.courseflow.course.dto.CourseDtos.CreateCourseRequestDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMetadataDto;
+import edu.courseflow.course.dto.CourseDtos.CoursePricingDto;
+import edu.courseflow.course.dto.CourseDtos.UpdateCoursePricingRequestDto;
 import edu.courseflow.course.mapper.CourseMapper;
 import edu.courseflow.course.model.Course;
 import edu.courseflow.course.model.CourseMaterial;
@@ -83,9 +85,21 @@ public class CourseCatalogRepository {
                 request.summary(),
                 request.departmentId(),
                 ownerId,
-                request.level());
+                request.level(),
+                request.listPrice(),
+                request.currency());
         courses.save(course);
         return toCourseDto(course);
+    }
+
+    public Optional<CoursePricingDto> pricing(UUID courseId) {
+        return courses.findById(courseId).map(this::toPricingDto);
+    }
+
+    public CoursePricingDto updatePricing(UUID courseId, UpdateCoursePricingRequestDto request) {
+        Course course = courses.findById(courseId).orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
+        course.updatePricing(request.listPrice(), request.currency());
+        return toPricingDto(courses.save(course));
     }
 
     public CourseMaterialDto addMaterial(UUID courseId, AddCourseMaterialRequestDto request) {
@@ -119,5 +133,17 @@ public class CourseCatalogRepository {
 
     private CourseMaterialDto toMaterialDto(CourseMaterial material) {
         return mapper.toDto(material);
+    }
+
+    private CoursePricingDto toPricingDto(Course course) {
+        boolean purchasable = "ACTIVE".equalsIgnoreCase(course.getPriceStatus())
+                || "FREE".equalsIgnoreCase(course.getPriceStatus());
+        return new CoursePricingDto(
+                course.getId().toString(),
+                course.getListPrice(),
+                course.getCurrency(),
+                course.getPriceStatus(),
+                purchasable,
+                "COURSE_CATALOG");
     }
 }

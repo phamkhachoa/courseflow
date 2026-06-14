@@ -1,4 +1,7 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { OrganizationPage } from "./pages";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
 
-export const organizationRoutes: RouteObject[] = [{ index: true, element: <OrganizationPage /> }];
+const OrganizationPage = lazy(() => import("./pages").then(({ OrganizationPage }) => ({ default: OrganizationPage })));
+
+export const organizationRoutes: RouteObject[] = [{ index: true, element: lazyRouteElement(OrganizationPage) }];

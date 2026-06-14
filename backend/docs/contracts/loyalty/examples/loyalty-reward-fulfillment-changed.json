@@ -1,0 +1,30 @@
+{
+  "eventId": "10000000-0000-4000-8000-000000000102",
+  "schemaVersion": 1,
+  "eventType": "loyalty.reward.fulfillment_status_changed",
+  "tenantId": "courseflow",
+  "applicationId": "learn",
+  "programId": "default",
+  "rewardId": "40000000-0000-4000-8000-000000000001",
+  "redemptionId": "50000000-0000-4000-8000-000000000001",
+  "accountId": "20000000-0000-4000-8000-000000000001",
+  "burnEntryId": "30000000-0000-4000-8000-000000000101",
+  "reversalEntryId": null,
+  "profileId": "learner-123",
+  "rewardCode": "CERT-FEE-WAIVER",
+  "pointsCost": 500,
+  "status": "COMMITTED",
+  "fulfillmentStatus": "ISSUED",
+  "fulfillmentRef": "certificate-waiver-7788",
+  "sourceReference": "reward:40000000-0000-4000-8000-000000000001:checkout-123",
+  "correlationId": "support-7788",
+  "actorId": "operator-9",
+  "note": "Issued manually",
+  "redeemedAt": "2026-06-14T08:10:00Z",
+  "fulfilledAt": "2026-06-14T08:30:00Z",
+  "reversedAt": null,
+  "metadata": {
+    "fulfillmentStatus": "ISSUED",
+    "fulfillmentRef": "certificate-waiver-7788"
+  }
+}

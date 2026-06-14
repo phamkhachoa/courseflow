@@ -4,7 +4,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import edu.courseflow.outboxrelay.config.OutboxRelayProperties;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,19 +27,16 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>After each batch, {@code relay_checkpoints} (in the relay's own DB) is updated with the
  *       last event UUID for observability.</li>
  *   <li><b>Poison-row handling:</b> a single row that repeatedly fails to publish used to abort the
- *       whole batch forever, freezing the entire stream behind it. We now keep an in-memory attempt
- *       counter per {@code (service, rowId)}. While a row is under budget we stop the batch and retry
- *       on the next poll (preserving ordering). Once a row exhausts {@code maxAttempts} we copy it to
+ *       whole batch forever, freezing the entire stream behind it. We now keep durable delivery state
+ *       per {@code (service, rowId)} in the relay database. While a row is under budget we stop the
+ *       batch and retry on the next poll (preserving ordering). Once a row exhausts {@code maxAttempts} we copy it to
  *       {@code relay_dead_letters} (in the relay's OWN DB — the relay must not migrate other services'
  *       tables) and mark its source row {@code published_at = NOW()} so the stream advances.</li>
  * </ul>
  *
- * <p>Trade-off: the attempt counter is in-memory, so a relay restart resets budgets and a poison row
- * may be retried a few more times before being dead-lettered again — acceptable since dead-lettering
- * is idempotent (UNIQUE on service+event id) and the alternative (migrating per-service schemas to add
- * an {@code attempts} column) violates table ownership. Dead-lettering a row also weakens strict
- * ordering for that one aggregate, but only after the broker has rejected it {@code maxAttempts} times,
- * which is preferable to blocking every other aggregate indefinitely.
+ * <p>Trade-off: dead-lettering a row weakens strict ordering for that one aggregate, but only after
+ * the broker has rejected it {@code maxAttempts} times. Retryable broker/network failures never enter
+ * DLQ; they keep the source row unpublished and rely on publish-failure metrics/alerts.
  */
 @Component
 public class MultiServiceOutboxPoller {
@@ -52,21 +49,27 @@ public class MultiServiceOutboxPoller {
     private final List<ServiceRelay> relays;
     private final JdbcClient checkpointClient;
     private final KafkaTemplate<String, String> kafka;
+    private final DeadLetterRepository deadLetters;
+    private final OutboxRelayMetrics metrics;
     private final int maxAttempts;
     private final int retentionDays;
-
-    /** In-memory failure budget keyed by "service:rowId". Reset on success or after dead-lettering. */
-    private final ConcurrentHashMap<String, Integer> attempts = new ConcurrentHashMap<>();
+    private final boolean purgeEnabled;
 
     public MultiServiceOutboxPoller(OutboxRelayProperties props,
                                     JdbcClient checkpointClient,
                                     KafkaTemplate<String, String> kafka,
+                                    DeadLetterRepository deadLetters,
+                                    OutboxRelayMetrics metrics,
                                     @Value("${courseflow.outbox.max-attempts:5}") int maxAttempts,
-                                    @Value("${courseflow.outbox.retention-days:7}") int retentionDays) {
+                                    @Value("${courseflow.outbox.retention-days:7}") int retentionDays,
+                                    @Value("${courseflow.outbox.purge-enabled:false}") boolean purgeEnabled) {
         this.checkpointClient = checkpointClient;
         this.kafka = kafka;
+        this.deadLetters = deadLetters;
+        this.metrics = metrics;
         this.maxAttempts = maxAttempts;
         this.retentionDays = retentionDays;
+        this.purgeEnabled = purgeEnabled;
         this.relays = props.getServices().stream().map(svc -> {
             HikariDataSource ds = DataSourceBuilder.create()
                     .type(HikariDataSource.class)
@@ -118,15 +121,16 @@ public class MultiServiceOutboxPoller {
         }
 
         for (OutboxRow row : rows) {
-            String key = relay.name() + ":" + row.id();
             try {
                 kafka.send(row.eventType(), row.aggregateId(), row.payload()).join();
             } catch (Exception ex) {
-                int failures = attempts.merge(key, 1, Integer::sum);
-                if (failures < maxAttempts) {
+                boolean retryable = retryable(ex);
+                int failures = deadLetters.recordDeliveryFailure(relay.name(), row.id(), rootMessage(ex));
+                metrics.publishFailure(relay.name(), row.eventType(), rootClass(ex), retryable);
+                if (retryable || failures < maxAttempts) {
                     log.warn("outbox-relay: failed to publish event {} → topic '{}' for service '{}' "
-                                    + "(attempt {}/{}), stopping batch and will retry",
-                            row.id(), row.eventType(), relay.name(), failures, maxAttempts, ex);
+                                    + "(attempt {}/{}, retryable={}), stopping batch and will retry",
+                            row.id(), row.eventType(), relay.name(), failures, maxAttempts, retryable, ex);
                     // Stop the batch to preserve ordering; the row is retried on the next poll.
                     return;
                 }
@@ -138,10 +142,11 @@ public class MultiServiceOutboxPoller {
                     return;
                 }
                 markPublished(relay, row.id());
-                attempts.remove(key);
+                deadLetters.clearDeliveryState(relay.name(), row.id());
+                updateCheckpoint(relay.name(), row.id());
                 continue;
             }
-            attempts.remove(key);
+            deadLetters.clearDeliveryState(relay.name(), row.id());
             markPublished(relay, row.id());
             updateCheckpoint(relay.name(), row.id());
         }
@@ -153,7 +158,7 @@ public class MultiServiceOutboxPoller {
 
     @Scheduled(fixedDelayString = "${courseflow.outbox.purge-interval-ms:3600000}")
     public void purgePublished() {
-        if (retentionDays <= 0) {
+        if (!purgeEnabled || retentionDays <= 0) {
             return;
         }
         for (ServiceRelay relay : relays) {
@@ -185,21 +190,16 @@ public class MultiServiceOutboxPoller {
     /** Persist a poison row to the relay's own dead-letter table for later inspection/replay. */
     private boolean deadLetter(ServiceRelay relay, OutboxRow row, int attemptCount, Exception ex) {
         try {
-            checkpointClient.sql("""
-                            INSERT INTO relay_dead_letters
-                                (service_name, source_event_id, event_type, aggregate_id, payload, attempts, last_error)
-                            VALUES (:service, :eventId, :eventType, :aggregateId, :payload, :attempts, :lastError)
-                            ON CONFLICT (service_name, source_event_id) DO UPDATE
-                              SET attempts = EXCLUDED.attempts, last_error = EXCLUDED.last_error
-                            """)
-                    .param("service", relay.name())
-                    .param("eventId", row.id())
-                    .param("eventType", row.eventType())
-                    .param("aggregateId", row.aggregateId())
-                    .param("payload", row.payload())
-                    .param("attempts", attemptCount)
-                    .param("lastError", ex.getMessage())
-                    .update();
+            deadLetters.recordDeadLetter(
+                    relay.name(),
+                    row.id(),
+                    row.eventType(),
+                    row.aggregateId(),
+                    row.payload(),
+                    attemptCount,
+                    rootMessage(ex),
+                    DeadLetterService.payloadHash(row.payload()));
+            metrics.deadLetterCreated(relay.name(), row.eventType());
             return true;
         } catch (Exception dlEx) {
             log.error("outbox-relay: FAILED to dead-letter event {} for service '{}'; leaving it unpublished",
@@ -218,5 +218,34 @@ public class MultiServiceOutboxPoller {
                 .param("service", serviceName)
                 .param("eventId", lastEventId)
                 .update();
+    }
+
+    private boolean retryable(Throwable ex) {
+        Throwable root = root(ex);
+        String name = root.getClass().getName().toLowerCase();
+        return name.contains("timeout")
+                || name.contains("retriable")
+                || name.contains("disconnect")
+                || name.contains("network")
+                || name.contains("broker")
+                || name.contains("notleader")
+                || root instanceof java.io.IOException;
+    }
+
+    private String rootClass(Throwable ex) {
+        return root(ex).getClass().getSimpleName();
+    }
+
+    private String rootMessage(Throwable ex) {
+        Throwable root = root(ex);
+        return root.getMessage() == null ? root.getClass().getSimpleName() : root.getMessage();
+    }
+
+    private Throwable root(Throwable ex) {
+        Throwable root = ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
+        while (root.getCause() != null) {
+            root = root.getCause();
+        }
+        return root;
     }
 }

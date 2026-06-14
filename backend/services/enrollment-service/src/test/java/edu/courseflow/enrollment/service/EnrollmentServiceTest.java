@@ -20,8 +20,12 @@ import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistEntryDto;
 import edu.courseflow.enrollment.exception.ForbiddenException;
+import edu.courseflow.enrollment.model.EnrollmentPromotionApplication;
+import edu.courseflow.enrollment.repository.EnrollmentPromotionApplicationJpaRepository;
 import edu.courseflow.enrollment.repository.EnrollmentRepository;
+import edu.courseflow.enrollment.service.PromotionEnrollmentClient.ReverseResult;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -41,6 +45,10 @@ class EnrollmentServiceTest {
     private EnrollmentRepository repo;
     @Mock
     private CourseAccessClient courseAccess;
+    @Mock
+    private EnrollmentPromotionApplicationJpaRepository promotionApplications;
+    @Mock
+    private PromotionEnrollmentClient promotions;
 
     private EnrollmentService service;
 
@@ -62,6 +70,22 @@ class EnrollmentServiceTest {
     private static EnrollmentDto enrollment(UUID id, String studentId, String status) {
         return new EnrollmentDto(id.toString(), studentId, COURSE.toString(), null, status,
                 Instant.parse("2026-01-01T00:00:00Z"), null, null, null);
+    }
+
+    private static EnrollmentPromotionApplication appliedPromotion(UUID enrollmentId, UUID redemptionId) {
+        return new EnrollmentPromotionApplication(
+                enrollmentId,
+                "7",
+                COURSE,
+                "APPLIED",
+                "SAVE10",
+                null,
+                UUID.randomUUID(),
+                redemptionId,
+                "flow-1",
+                "[]",
+                "[]",
+                "Coupon applied");
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -313,6 +337,31 @@ class EnrollmentServiceTest {
 
             verify(repo, never()).markWaitlistPromoted(any());
             verify(repo, never()).compactWaitlist(any());
+        }
+    }
+
+    @Nested
+    class PromotionCompensation {
+
+        @Test
+        void drop_reversesAppliedCouponRedemption() {
+            service = new EnrollmentService(repo, promotionApplications, new ObjectMapper(), courseAccess, promotions);
+            UUID id = UUID.randomUUID();
+            UUID redemptionId = UUID.randomUUID();
+            EnrollmentPromotionApplication application = appliedPromotion(id, redemptionId);
+            when(repo.findById(id)).thenReturn(Optional.of(enrollment(id, "7", "ACTIVE")));
+            when(repo.changeStatus(eq(id), anyString(), eq("DROPPED"), any()))
+                    .thenReturn(enrollment(id, "7", "DROPPED"));
+            when(repo.lockCapacity(COURSE)).thenReturn(Optional.empty());
+            when(promotionApplications.findByEnrollmentId(id)).thenReturn(Optional.of(application));
+            when(promotions.reverse(eq(redemptionId), anyString(), anyString()))
+                    .thenReturn(new ReverseResult(true, redemptionId, "REVERSED", List.of("REVERSED"), List.of()));
+
+            service.changeStatus(id, new ChangeStatusRequestDto("DROPPED", "refund"), student(7));
+
+            verify(promotions).reverse(eq(redemptionId), anyString(), anyString());
+            verify(promotionApplications).save(application);
+            assertThat(application.getStatus()).isEqualTo("REVERSED");
         }
     }
 

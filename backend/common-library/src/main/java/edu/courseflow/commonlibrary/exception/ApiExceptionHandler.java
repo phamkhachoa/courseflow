@@ -31,44 +31,44 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorDto> handleNotFound(NotFoundException ex) {
-        return build(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), ex, null);
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ErrorDto> handleUnauthorized(UnauthorizedException ex) {
-        return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), null);
+        return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), ex, null);
     }
 
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ErrorDto> handleForbidden(ForbiddenException ex) {
-        return build(HttpStatus.FORBIDDEN, ex.getMessage(), null);
+        return build(HttpStatus.FORBIDDEN, ex.getMessage(), ex, null);
     }
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ErrorDto> handleBadRequest(RuntimeException ex) {
-        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), ex, null);
     }
 
     @ExceptionHandler({ DuplicatedException.class, ConflictException.class })
     public ResponseEntity<ErrorDto> handleConflict(RuntimeException ex) {
-        return build(HttpStatus.CONFLICT, ex.getMessage(), null);
+        return build(HttpStatus.CONFLICT, ex.getMessage(), ex, null);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorDto> handleResponseStatus(ResponseStatusException ex) {
         HttpStatus status = HttpStatus.valueOf(ex.getStatusCode().value());
         String detail = ex.getReason() == null ? status.getReasonPhrase() : ex.getReason();
-        return build(status, detail, null);
+        return build(status, detail, ex, null);
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ErrorDto> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex) {
-        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage(), null);
+        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ex.getMessage(), ex, null);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorDto> handleUnsupportedMethod(HttpRequestMethodNotSupportedException ex) {
-        return build(HttpStatus.METHOD_NOT_ALLOWED, ex.getMessage(), null);
+        return build(HttpStatus.METHOD_NOT_ALLOWED, ex.getMessage(), ex, null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -76,12 +76,12 @@ public class ApiExceptionHandler {
         List<String> errors = ex.getBindingResult().getFieldErrors().stream()
                 .map(e -> e.getField() + " " + e.getDefaultMessage())
                 .toList();
-        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, errors);
+        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, ex, errors);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorDto> handleUnreadableBody(HttpMessageNotReadableException ex) {
-        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST,
+        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, ex,
                 List.of("request body contains malformed JSON or an invalid field type"));
     }
 
@@ -89,7 +89,7 @@ public class ApiExceptionHandler {
     public ResponseEntity<ErrorDto> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String field = ex.getName() == null ? "request value" : ex.getName();
         String type = ex.getRequiredType() == null ? "expected type" : ex.getRequiredType().getSimpleName();
-        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, List.of(field + " must be a valid " + type));
+        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, ex, List.of(field + " must be a valid " + type));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -97,19 +97,27 @@ public class ApiExceptionHandler {
         List<String> errors = ex.getConstraintViolations().stream()
                 .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                 .toList();
-        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, errors);
+        return build(HttpStatus.BAD_REQUEST, INVALID_REQUEST, ex, errors);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDto> handleOther(Exception ex) {
         log.error("Unhandled exception", ex);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", null);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", ex, null);
     }
 
-    private ResponseEntity<ErrorDto> build(HttpStatus status, String detail, List<String> fieldErrors) {
+    private ResponseEntity<ErrorDto> build(HttpStatus status, String detail, Throwable ex, List<String> fieldErrors) {
+        String errorCode = errorCode(ex);
         ErrorDto body = fieldErrors == null
-                ? new ErrorDto(status.toString(), status.getReasonPhrase(), detail)
-                : new ErrorDto(status.toString(), status.getReasonPhrase(), detail, fieldErrors);
+                ? new ErrorDto(status.toString(), status.getReasonPhrase(), detail, errorCode, null)
+                : new ErrorDto(status.toString(), status.getReasonPhrase(), detail, errorCode, fieldErrors);
         return ResponseEntity.status(status).body(body);
+    }
+
+    private String errorCode(Throwable ex) {
+        if (ex instanceof ErrorCodeCarrier carrier) {
+            return carrier.errorCode();
+        }
+        return null;
     }
 }

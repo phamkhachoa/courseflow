@@ -1,19 +1,24 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { CourseListPage } from "./pages/CourseListPage";
-import { CourseDetailPage } from "./pages/CourseDetailPage";
-import { CourseCreatePage } from "./pages/CourseCreatePage";
-import { CourseAuthoringPage } from "./pages/CourseAuthoringPage";
-import { CourseAuthoringCreatePage } from "./pages/CourseAuthoringCreatePage";
-import { CourseDraftPage } from "./pages/CourseDraftPage";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
+
+const CourseListPage = lazy(() => import("./pages/CourseListPage").then(({ CourseListPage }) => ({ default: CourseListPage })));
+const CourseDetailPage = lazy(() => import("./pages/CourseDetailPage").then(({ CourseDetailPage }) => ({ default: CourseDetailPage })));
+const CourseCreatePage = lazy(() => import("./pages/CourseCreatePage").then(({ CourseCreatePage }) => ({ default: CourseCreatePage })));
+const CourseAuthoringPage = lazy(() => import("./pages/CourseAuthoringPage").then(({ CourseAuthoringPage }) => ({ default: CourseAuthoringPage })));
+const CourseAuthoringCreatePage = lazy(() =>
+  import("./pages/CourseAuthoringCreatePage").then(({ CourseAuthoringCreatePage }) => ({ default: CourseAuthoringCreatePage }))
+);
+const CourseDraftPage = lazy(() => import("./pages/CourseDraftPage").then(({ CourseDraftPage }) => ({ default: CourseDraftPage })));
 
 export const coursesRoutes: RouteObject[] = [
-  { index: true, element: <CourseListPage /> },
-  { path: "new", element: <CourseCreatePage /> },
-  { path: ":courseId", element: <CourseDetailPage /> }
+  { index: true, element: lazyRouteElement(CourseListPage) },
+  { path: "new", element: lazyRouteElement(CourseCreatePage) },
+  { path: ":courseId", element: lazyRouteElement(CourseDetailPage) }
 ];
 
 export const authoringRoutes: RouteObject[] = [
-  { index: true, element: <CourseAuthoringPage /> },
-  { path: "new", element: <CourseAuthoringCreatePage /> },
-  { path: ":courseId/draft", element: <CourseDraftPage /> }
+  { index: true, element: lazyRouteElement(CourseAuthoringPage) },
+  { path: "new", element: lazyRouteElement(CourseAuthoringCreatePage) },
+  { path: ":courseId/draft", element: lazyRouteElement(CourseDraftPage) }
 ];

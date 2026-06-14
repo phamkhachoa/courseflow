@@ -1,0 +1,15 @@
+{
+  "eventId": "10000000-0000-4000-8000-000000000002",
+  "schemaVersion": 1,
+  "tenantId": "courseflow",
+  "applicationId": "learn",
+  "programId": "default",
+  "accountId": "20000000-0000-4000-8000-000000000001",
+  "entryId": "30000000-0000-4000-8000-000000000002",
+  "profileId": "learner-123",
+  "entryType": "REVERSE",
+  "pointsDelta": -100,
+  "sourceReference": "reverse:30000000-0000-4000-8000-000000000001",
+  "occurredAt": "2026-06-14T08:05:00Z",
+  "correlationId": "refund-123"
+}

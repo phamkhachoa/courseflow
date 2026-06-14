@@ -1,5 +1,6 @@
 -- liquibase formatted sql
 -- changeset courseflow:user-management-900-demo-profiles context:demo splitStatements:false
+--validCheckSum 9:11637ae9abb2394ebe1c327feca029d3
 
 INSERT INTO user_profiles (user_id, display_name, avatar_url, bio, locale, timezone, visibility) VALUES
     (1, 'CourseFlow Admin', NULL, 'Platform operator for the CourseFlow demo tenant.', 'vi-VN', 'Asia/Ho_Chi_Minh', 'PRIVATE'),

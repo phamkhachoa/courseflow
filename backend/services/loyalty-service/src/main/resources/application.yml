@@ -1,0 +1,59 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: loyalty-service
+  datasource:
+    url: ${LOYALTY_DB_URL:jdbc:postgresql://localhost:5432/cf_loyalty}
+    username: ${LOYALTY_DB_USERNAME:courseflow}
+    password: ${LOYALTY_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: loyalty-service
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+courseflow:
+  loyalty:
+    promotion-points-topic: ${LOYALTY_PROMOTION_POINTS_TOPIC:incentive.redemption.committed}
+    promotion-points-reversal-topic: ${LOYALTY_PROMOTION_POINTS_REVERSAL_TOPIC:incentive.redemption.reversed}
+    promotion-points-group: ${LOYALTY_PROMOTION_POINTS_GROUP:loyalty-service}
+    promotion-points-dlt-topic: ${LOYALTY_PROMOTION_POINTS_DLT_TOPIC:incentive.redemption.committed.DLT}
+    promotion-points-reversal-dlt-topic: ${LOYALTY_PROMOTION_POINTS_REVERSAL_DLT_TOPIC:incentive.redemption.reversed.DLT}
+    promotion-points-dlt-group: ${LOYALTY_PROMOTION_POINTS_DLT_GROUP:loyalty-service-dlt-ops}
+    promotion-service-actor:
+      token-converter-uri: ${TOKEN_CONVERTER_URI:http://identity-token-converter-service:8080}
+      client-id: ${LOYALTY_PROMOTION_SERVICE_ACTOR_CLIENT_ID:promotion-service}
+      client-secret: ${LOYALTY_PROMOTION_SERVICE_ACTOR_CLIENT_SECRET:${COURSEFLOW_STS_CLIENT_SECRET:}}
+      audience: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:courseflow-services}
+      refresh-skew-seconds: ${LOYALTY_PROMOTION_SERVICE_ACTOR_REFRESH_SKEW_SECONDS:30}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

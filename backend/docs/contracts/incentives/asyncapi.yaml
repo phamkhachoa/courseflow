@@ -1,0 +1,64 @@
+asyncapi: 2.6.0
+info:
+  title: CourseFlow Generic Incentive Events
+  version: 2.0.0-contract.2r
+  description: >
+    AsyncAPI contract for incentive outbox events. The producer writes local outbox rows in the same
+    transaction as domain state changes; the relay publishes using the `event_type` as the topic.
+defaultContentType: application/json
+servers:
+  localKafka:
+    url: localhost:9092
+    protocol: kafka
+    description: Local development Kafka.
+channels:
+  incentive.redemption.committed:
+    description: Published after a reserved incentive is committed into a redemption.
+    subscribe:
+      operationId: consumeIncentiveRedemptionCommitted
+      message:
+        $ref: "#/components/messages/IncentiveRedemptionCommitted"
+  incentive.redemption.reversed:
+    description: Published after a redemption is reversed through a compensating operation.
+    subscribe:
+      operationId: consumeIncentiveRedemptionReversed
+      message:
+        $ref: "#/components/messages/IncentiveRedemptionReversed"
+components:
+  messages:
+    IncentiveRedemptionCommitted:
+      name: IncentiveRedemptionCommitted
+      title: Incentive redemption committed
+      contentType: application/json
+      messageId: incentive.redemption.committed.v1
+      traits:
+        - $ref: "#/components/messageTraits/IncentiveEvent"
+      payload:
+        $ref: "schemas/incentive-redemption-committed.v1.json"
+      examples:
+        - name: committedWithCoupon
+          payload:
+            $ref: "examples/incentive-redemption-committed.json"
+    IncentiveRedemptionReversed:
+      name: IncentiveRedemptionReversed
+      title: Incentive redemption reversed
+      contentType: application/json
+      messageId: incentive.redemption.reversed.v1
+      traits:
+        - $ref: "#/components/messageTraits/IncentiveEvent"
+      payload:
+        $ref: "schemas/incentive-redemption-reversed.v1.json"
+      examples:
+        - name: reversedWithCoupon
+          payload:
+            $ref: "examples/incentive-redemption-reversed.json"
+  messageTraits:
+    IncentiveEvent:
+      headers:
+        type: object
+        additionalProperties: true
+        properties:
+          correlationId:
+            type: string
+          sourceClientId:
+            type: string

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courseflow.local/contracts/incentives/schemas/incentive-effect.v1.json",
+  "title": "IncentiveEffectPayloadV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effectId",
+    "type",
+    "benefitType",
+    "actionType",
+    "targetType",
+    "amount",
+    "currency",
+    "unit",
+    "quantity",
+    "campaignVersion"
+  ],
+  "properties": {
+    "effectId": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable per-effect identity used for idempotent apply/reconcile."
+    },
+    "type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Legacy effect/action type kept for compatibility."
+    },
+    "benefitType": {
+      "type": "string",
+      "enum": ["DISCOUNT", "CREDIT", "ENTITLEMENT", "POINTS_EARN_INTENT"]
+    },
+    "actionType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "targetId": {
+      "type": ["string", "null"]
+    },
+    "amount": {
+      "type": "number"
+    },
+    "currency": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 8
+    },
+    "unit": {
+      "type": "string",
+      "enum": ["MONEY", "COUNT", "POINT"]
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "campaignVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    }
+  }
+}

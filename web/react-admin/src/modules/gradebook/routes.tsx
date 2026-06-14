@@ -1,4 +1,7 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { GradebookPage } from "./pages";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
 
-export const gradebookRoutes: RouteObject[] = [{ index: true, element: <GradebookPage /> }];
+const GradebookPage = lazy(() => import("./pages").then(({ GradebookPage }) => ({ default: GradebookPage })));
+
+export const gradebookRoutes: RouteObject[] = [{ index: true, element: lazyRouteElement(GradebookPage) }];

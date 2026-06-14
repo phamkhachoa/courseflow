@@ -1,4 +1,7 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { NotificationsPage } from "./pages";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
 
-export const notificationsRoutes: RouteObject[] = [{ index: true, element: <NotificationsPage /> }];
+const NotificationsPage = lazy(() => import("./pages").then(({ NotificationsPage }) => ({ default: NotificationsPage })));
+
+export const notificationsRoutes: RouteObject[] = [{ index: true, element: lazyRouteElement(NotificationsPage) }];

@@ -23,6 +23,8 @@ export const queryKeys = {
       ["enrollments", "list", courseId ?? "", studentId ?? ""] as const,
     waitlist: (courseId?: string) => ["enrollments", "waitlist", courseId ?? ""] as const,
     stats: (courseId?: string) => ["enrollments", "stats", courseId ?? ""] as const,
+    promotionApplications: (filters?: Record<string, unknown>) =>
+      ["enrollments", "promotion-applications", filters ?? {}] as const,
     audit: (id: string) => ["enrollments", "audit", id] as const
   },
   assignments: {
@@ -44,6 +46,85 @@ export const queryKeys = {
     course: (courseId: string) => ["analytics", "course", courseId] as const,
     completion: (courseId: string) => ["analytics", "completion", courseId] as const,
     org: (orgId: string) => ["analytics", "org", orgId] as const
+  },
+  incentives: {
+    all: ["incentives"] as const,
+    applications: (filters?: Record<string, unknown>) =>
+      ["incentives", "applications", filters ?? {}] as const,
+    campaigns: (filters?: Record<string, unknown>) => ["incentives", "campaigns", filters ?? {}] as const,
+    campaign: (id: string) => ["incentives", "campaign", id] as const,
+    versions: (campaignId: string) => ["incentives", "campaign", campaignId, "versions"] as const,
+    version: (campaignId: string, versionNumber?: number) =>
+      ["incentives", "campaign", campaignId, "version", versionNumber ?? "selected"] as const,
+    validation: (campaignId: string, versionNumber?: number) =>
+      ["incentives", "campaign", campaignId, "validation", versionNumber ?? "selected"] as const,
+    diff: (campaignId: string, left?: number, right?: number) =>
+      ["incentives", "campaign", campaignId, "diff", left ?? "left", right ?? "right"] as const,
+    reviewQueue: (filters?: Record<string, unknown>) => ["incentives", "review-queue", filters ?? {}] as const,
+    coupons: (filters?: Record<string, unknown>) => ["incentives", "coupons", filters ?? {}] as const,
+    coupon: (id: string) => ["incentives", "coupon", id] as const,
+    couponStorageInventory: (filters?: Record<string, unknown>) =>
+      ["incentives", "coupons", "storage-inventory", filters ?? {}] as const,
+    couponImportDryRun: (dryRunId?: string) =>
+      ["incentives", "coupon-import", "dry-run", dryRunId ?? "selected"] as const,
+    couponImportDryRuns: (filters?: Record<string, unknown>) =>
+      ["incentives", "coupon-import", "dry-runs", filters ?? {}] as const,
+    couponImportApprovals: (filters?: Record<string, unknown>) =>
+      ["incentives", "coupon-import", "approvals", filters ?? {}] as const,
+    couponImportApproval: (approvalId?: string) =>
+      ["incentives", "coupon-import", "approval", approvalId ?? "selected"] as const,
+    couponImportOperations: (filters?: Record<string, unknown>) =>
+      ["incentives", "coupon-import", "operations", filters ?? {}] as const,
+    couponImportOperation: (importId?: string) =>
+      ["incentives", "coupon-import", "operation", importId ?? "selected"] as const,
+    reservations: (filters?: Record<string, unknown>) => ["incentives", "reservations", filters ?? {}] as const,
+    reservation: (id?: string) => ["incentives", "reservation", id ?? "selected"] as const,
+    redemptions: (filters?: Record<string, unknown>) => ["incentives", "redemptions", filters ?? {}] as const,
+    redemption: (id: string) => ["incentives", "redemption", id] as const,
+    reconciliation: (filters?: Record<string, unknown>) =>
+      ["incentives", "reconciliation", filters ?? {}] as const,
+    audit: (filters?: Record<string, unknown>) => ["incentives", "audit", filters ?? {}] as const,
+    timeline: (type: string, id: string) => ["incentives", "timeline", type, id] as const,
+    loyalty: ["incentives", "loyalty"] as const,
+    loyaltyPrograms: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "programs", filters ?? {}] as const,
+    loyaltyProgram: (id?: string) => ["incentives", "loyalty", "program", id ?? "selected"] as const,
+    loyaltyAccounts: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "accounts", filters ?? {}] as const,
+    loyaltyLedger: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "ledger", filters ?? {}] as const,
+    loyaltyBalanceBuckets: (accountId?: string, asOf?: string) =>
+      ["incentives", "loyalty", "balance-buckets", accountId ?? "selected", asOf ?? "now"] as const,
+    loyaltyPointLotBackfill: (scope?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "point-lot-backfill", scope ?? {}] as const,
+    loyaltyAdjustmentApprovals: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "adjustment-approvals", filters ?? {}] as const,
+    loyaltyReconciliation: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "reconciliation", filters ?? {}] as const,
+    loyaltyRewards: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "rewards", filters ?? {}] as const,
+    loyaltyReward: (id?: string) => ["incentives", "loyalty", "reward", id ?? "selected"] as const,
+    loyaltyRewardRedemptions: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "reward-redemptions", filters ?? {}] as const,
+    learnerLoyaltyRewards: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "learner-rewards", filters ?? {}] as const,
+    loyaltyDeadLetters: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "dead-letters", filters ?? {}] as const,
+    loyaltyDeadLetter: (id?: string) =>
+      ["incentives", "loyalty", "dead-letter", id ?? "selected"] as const,
+    loyaltyAudit: (filters?: Record<string, unknown>) => ["incentives", "loyalty", "audit", filters ?? {}] as const,
+    loyaltyTimeline: (type: string, id?: string) =>
+      ["incentives", "loyalty", "timeline", type, id ?? "selected"] as const,
+    retentionPolicies: ["incentives", "retention", "policies"] as const,
+    retentionDryRun: (scope?: Record<string, unknown>) => ["incentives", "retention", "dry-run", scope ?? {}] as const,
+    retentionRestoreDrill: (restoreDrillRef?: string) =>
+      ["incentives", "retention", "restore-drill", restoreDrillRef ?? "selected"] as const,
+    retentionApprovals: (filters?: Record<string, unknown>) =>
+      ["incentives", "retention", "approvals", filters ?? {}] as const,
+    retentionApproval: (approvalId?: string) =>
+      ["incentives", "retention", "approval", approvalId ?? "selected"] as const,
+    retentionEvidencePack: (approvalId?: string) =>
+      ["incentives", "retention", "evidence-pack", approvalId ?? "selected"] as const
   },
   gradebook: {
     items: (courseId: string) => ["gradebook", "items", courseId] as const,

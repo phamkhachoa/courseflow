@@ -32,11 +32,25 @@ management:
     web:
       exposure:
         include: health,info,prometheus
-courseflow:  entitlement:
+courseflow:
+  entitlement:
     course-service-url: ${COURSE_SERVICE_URL:http://course-service:8080}
     enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://enrollment-service:8080}
   enrollment:
     default-capacity: ${ENROLLMENT_DEFAULT_CAPACITY:100}
+    promotion-service-url: ${PROMOTION_SERVICE_URL:http://promotion-service:8080}
+    promotion-commit-retry:
+      enabled: ${ENROLLMENT_PROMOTION_COMMIT_RETRY_ENABLED:true}
+      fixed-delay-ms: ${ENROLLMENT_PROMOTION_COMMIT_RETRY_FIXED_DELAY_MS:60000}
+      batch-size: ${ENROLLMENT_PROMOTION_COMMIT_RETRY_BATCH_SIZE:25}
+    incentives:
+      enabled: ${ENROLLMENT_INCENTIVES_ENABLED:true}
+      tenant-id: ${ENROLLMENT_INCENTIVES_TENANT_ID:courseflow}
+      application-id: ${ENROLLMENT_INCENTIVES_APPLICATION_ID:lms}
+      currency: ${ENROLLMENT_INCENTIVES_CURRENCY:USD}
+      default-list-price: ${ENROLLMENT_INCENTIVES_DEFAULT_LIST_PRICE:100.00}
+      price-source: ${ENROLLMENT_INCENTIVES_PRICE_SOURCE:CONFIG_DEFAULT}
+      allow-config-default-price: ${ENROLLMENT_INCENTIVES_ALLOW_CONFIG_DEFAULT_PRICE:false}
 
 
 eureka:

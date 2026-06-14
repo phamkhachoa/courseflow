@@ -8,6 +8,9 @@ export type CatalogCourse = {
   summary: string;
   level?: string;
   status?: string;
+  listPrice?: number | string | null;
+  currency?: string | null;
+  priceStatus?: string | null;
 };
 
 const FALLBACK: CatalogCourse[] = [
@@ -18,9 +21,13 @@ const FALLBACK: CatalogCourse[] = [
     slug: "production-microservices-spring-boot",
     summary: "Demo course seeded by course-service for CourseFlow v2.",
     level: "ADVANCED",
-    status: "PUBLISHED"
+    status: "PUBLISHED",
+    listPrice: 100,
+    currency: "USD",
+    priceStatus: "ACTIVE"
   }
 ];
+
 
 /** Public catalog. Falls back to a seeded demo when the gateway is offline. */
 export async function getFeaturedCourses(): Promise<CatalogCourse[]> {

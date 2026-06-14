@@ -5,6 +5,7 @@ import {
   Bell,
   BookOpen,
   Building2,
+  BadgePercent,
   ClipboardCheck,
   ClipboardList,
   FileText,
@@ -52,6 +53,7 @@ export type ModuleGroup = {
 export const moduleRegistry: ModuleEntry[] = [
   { path: "dashboard", label: "Tổng quan", description: "Trung tâm điều phối", icon: LayoutDashboard, group: "operate" },
   { path: "analytics", label: "Phân tích", description: "Hoàn thành & rủi ro", icon: BarChart3, group: "operate" },
+  { path: "incentives", label: "Khuyến mãi", description: "Campaign, coupon & redemption ops", icon: BadgePercent, group: "operate" },
   { path: "search", label: "Tìm nhanh", description: "Nhảy tới khóa học", icon: Search, group: "operate" },
   { path: "courses", label: "Khóa học", description: "Danh mục, công khai, lưu trữ", icon: BookOpen, group: "content" },
   { path: "authoring", label: "Biên soạn", description: "Soạn thảo và duyệt khóa", icon: PenSquare, group: "content" },

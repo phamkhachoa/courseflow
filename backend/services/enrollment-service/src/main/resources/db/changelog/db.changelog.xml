@@ -11,4 +11,8 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/002-promotion-applications.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003-promotion-application-reversed-status.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004-checkout-attempts.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/005-promotion-application-retry-schedule.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

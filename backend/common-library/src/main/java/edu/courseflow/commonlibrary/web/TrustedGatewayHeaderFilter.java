@@ -179,10 +179,59 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
         if (path.equals("/internal/users") || path.startsWith("/internal/users/")) {
             return userDirectoryScopes(path, method);
         }
+        if (path.equals("/internal/incentives") || path.startsWith("/internal/incentives/")) {
+            return promotionScopes(path, method);
+        }
+        if (path.equals("/internal/loyalty") || path.startsWith("/internal/loyalty/")) {
+            return loyaltyScopes(path, method);
+        }
         if (path.startsWith("/internal/")) {
             return Set.of(InternalScopes.SERVICE);
         }
         return Set.of();
+    }
+
+    private Set<String> loyaltyScopes(String path, String method) {
+        if ("GET".equalsIgnoreCase(method)) {
+            return Set.of(InternalScopes.LOYALTY_READ);
+        }
+        if (path.equals("/internal/loyalty/points:earn")) {
+            return Set.of(InternalScopes.LOYALTY_EARN);
+        }
+        if (path.equals("/internal/loyalty/points:burn")) {
+            return Set.of(InternalScopes.LOYALTY_BURN);
+        }
+        if (path.matches("^/internal/loyalty/points/[^/]+:reverse$")) {
+            return Set.of(InternalScopes.LOYALTY_REVERSE);
+        }
+        if (path.equals("/internal/loyalty/points:adjust")) {
+            return Set.of(InternalScopes.LOYALTY_ADJUST);
+        }
+        if (path.equals("/internal/loyalty/points:expire")
+                || path.equals("/internal/loyalty/points:expire-dry-run")) {
+            return Set.of(InternalScopes.LOYALTY_EXPIRE);
+        }
+        return Set.of(InternalScopes.LOYALTY_ADMIN);
+    }
+
+    private Set<String> promotionScopes(String path, String method) {
+        if (path.equals("/internal/incentives/evaluate")) {
+            return Set.of(InternalScopes.PROMOTION_EVALUATE);
+        }
+        if (path.equals("/internal/incentives/reservations")
+                && "POST".equalsIgnoreCase(method)) {
+            return Set.of(InternalScopes.PROMOTION_RESERVE);
+        }
+        if (path.matches("^/internal/incentives/reservations/[^/]+/commit$")) {
+            return Set.of(InternalScopes.PROMOTION_COMMIT);
+        }
+        if (path.matches("^/internal/incentives/reservations/[^/]+/cancel$")) {
+            return Set.of(InternalScopes.PROMOTION_CANCEL);
+        }
+        if (path.matches("^/internal/incentives/redemptions/[^/]+/reverse$")) {
+            return Set.of(InternalScopes.PROMOTION_REVERSE);
+        }
+        return Set.of(InternalScopes.PROMOTION_ADMIN);
     }
 
     private Set<String> userDirectoryScopes(String path, String method) {

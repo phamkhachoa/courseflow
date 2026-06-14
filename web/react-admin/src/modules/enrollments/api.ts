@@ -52,6 +52,40 @@ export type BatchEnrollResult = {
   errors: string[];
 };
 
+export type PromotionEffect = {
+  type?: string | null;
+  benefitType?: string | null;
+  actionType?: string | null;
+  targetType?: string | null;
+  targetId?: string | null;
+  amount?: number | string | null;
+  currency?: string | null;
+  unit?: string | null;
+  quantity?: number | string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type EnrollmentPromotionApplicationState = {
+  id: string;
+  enrollmentId: string;
+  studentId: string;
+  courseId: string;
+  status: string;
+  couponCode?: string | null;
+  couponId?: string | null;
+  reservationId?: string | null;
+  redemptionId?: string | null;
+  idempotencyKey?: string | null;
+  reasonCodes: string[];
+  message?: string | null;
+  effects: PromotionEffect[];
+  retryCount: number;
+  nextRetryAt?: string | null;
+  lastRetryError?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export async function listEnrollments(params: {
   courseId?: string;
   studentId?: string;
@@ -59,6 +93,39 @@ export async function listEnrollments(params: {
   const { data } = await apiClient.get("/admin/v1/enrollments", { params });
   return unwrapList<Enrollment>(data);
 }
+
+export async function listPromotionApplications(params: {
+  status?: string;
+  courseId?: string;
+  studentId?: string;
+  limit?: number;
+}): Promise<EnrollmentPromotionApplicationState[]> {
+  const { data } = await apiClient.get("/admin/v1/enrollments/promotion-applications", { params });
+  return unwrapList<EnrollmentPromotionApplicationState>(data);
+}
+
+export async function retryPromotionApplicationCommit(
+  id: string,
+  input: { reason?: string; correlationId?: string } = {}
+): Promise<EnrollmentPromotionApplicationState> {
+  const { data } = await apiClient.post(
+    `/admin/v1/enrollments/promotion-applications/${id}:retry-commit`,
+    input
+  );
+  return unwrap<EnrollmentPromotionApplicationState>(data);
+}
+
+export async function cancelPromotionApplicationReservation(
+  id: string,
+  input: { reason?: string; correlationId?: string } = {}
+): Promise<EnrollmentPromotionApplicationState> {
+  const { data } = await apiClient.post(
+    `/admin/v1/enrollments/promotion-applications/${id}:cancel-reservation`,
+    input
+  );
+  return unwrap<EnrollmentPromotionApplicationState>(data);
+}
+
 export async function createEnrollment(input: {
   courseId: string;
   studentId?: string;

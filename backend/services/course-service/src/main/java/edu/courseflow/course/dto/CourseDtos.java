@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +24,9 @@ public final class CourseDtos {
             String ownerId,
             String level,
             String status,
+            BigDecimal listPrice,
+            String currency,
+            String priceStatus,
             Instant createdAt,
             List<CourseMaterialDto> materials
     ) {
@@ -35,7 +39,20 @@ public final class CourseDtos {
             String ownerId,
             String departmentId,
             String title,
-            String slug
+            String slug,
+            BigDecimal listPrice,
+            String currency,
+            String priceStatus
+    ) {
+    }
+
+    public record CoursePricingDto(
+            String courseId,
+            BigDecimal listPrice,
+            String currency,
+            String priceStatus,
+            boolean purchasable,
+            String priceSource
     ) {
     }
 
@@ -55,7 +72,24 @@ public final class CourseDtos {
             @NotBlank String slug,
             @NotBlank String summary,
             @NotNull UUID departmentId,
-            @NotBlank String level
+            @NotBlank String level,
+            @PositiveOrZero BigDecimal listPrice,
+            String currency
+    ) {
+        public CreateCourseRequestDto(
+                String code,
+                String title,
+                String slug,
+                String summary,
+                UUID departmentId,
+                String level) {
+            this(code, title, slug, summary, departmentId, level, null, null);
+        }
+    }
+
+    public record UpdateCoursePricingRequestDto(
+            @PositiveOrZero BigDecimal listPrice,
+            String currency
     ) {
     }
 

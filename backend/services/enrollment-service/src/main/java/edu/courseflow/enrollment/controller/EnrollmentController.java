@@ -7,8 +7,14 @@ import edu.courseflow.enrollment.dto.EnrollmentDtos.BatchEnrollResultDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.ChangeStatusRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.CourseAccessDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentCheckoutResponseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentPromotionApplicationStateDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentStatsDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.LearnerCouponWalletDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionApplicationActionRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionPreviewDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionPreviewRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.SetCapacityRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistEntryDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistRequestDto;
@@ -47,6 +53,22 @@ public class EnrollmentController {
         return enrollments.enroll(request, user);
     }
 
+    @PostMapping("/internal/enrollments/promotion-preview")
+    public PromotionPreviewDto promotionPreview(@Valid @RequestBody PromotionPreviewRequestDto request,
+                                                CurrentUser user) {
+        return enrollments.previewPromotion(request, user);
+    }
+
+    @GetMapping("/internal/enrollments/coupons")
+    public LearnerCouponWalletDto learnerCoupons(CurrentUser user) {
+        return enrollments.learnerCoupons(user);
+    }
+
+    @PostMapping("/internal/enrollments/checkout")
+    public EnrollmentCheckoutResponseDto checkout(@Valid @RequestBody EnrollRequestDto request, CurrentUser user) {
+        return enrollments.checkout(request, user);
+    }
+
     @GetMapping("/internal/enrollments/access")
     public CourseAccessDto access(@RequestParam UUID courseId,
                                   @RequestParam String studentId) {
@@ -77,6 +99,37 @@ public class EnrollmentController {
     @GetMapping("/internal/enrollments/{id}")
     public EnrollmentDto get(@PathVariable UUID id, CurrentUser user) {
         return enrollments.get(id, user);
+    }
+
+    @GetMapping("/internal/enrollments/{id}/promotion-application")
+    public EnrollmentPromotionApplicationStateDto promotionApplication(@PathVariable UUID id, CurrentUser user) {
+        return enrollments.promotionApplication(id, user);
+    }
+
+    @GetMapping("/internal/enrollments/promotion-applications")
+    public List<EnrollmentPromotionApplicationStateDto> promotionApplicationQueue(
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<UUID> courseId,
+            @RequestParam Optional<String> studentId,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return enrollments.promotionApplicationQueue(status, courseId, studentId, limit, user);
+    }
+
+    @PostMapping("/internal/enrollments/promotion-applications/{id}:retry-commit")
+    public EnrollmentPromotionApplicationStateDto retryPromotionApplicationCommit(
+            @PathVariable UUID id,
+            @RequestBody(required = false) PromotionApplicationActionRequestDto request,
+            CurrentUser user) {
+        return enrollments.retryPromotionApplicationCommit(id, request, user);
+    }
+
+    @PostMapping("/internal/enrollments/promotion-applications/{id}:cancel-reservation")
+    public EnrollmentPromotionApplicationStateDto cancelPromotionApplicationReservation(
+            @PathVariable UUID id,
+            @RequestBody(required = false) PromotionApplicationActionRequestDto request,
+            CurrentUser user) {
+        return enrollments.cancelPromotionApplicationReservation(id, request, user);
     }
 
     @PatchMapping("/internal/enrollments/{id}/status")

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courseflow.local/contracts/loyalty/loyalty-reward-redemption.v1.json",
+  "title": "LoyaltyRewardRedemptionV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "schemaVersion",
+    "eventType",
+    "tenantId",
+    "applicationId",
+    "programId",
+    "rewardId",
+    "redemptionId",
+    "accountId",
+    "burnEntryId",
+    "profileId",
+    "rewardCode",
+    "pointsCost",
+    "status",
+    "fulfillmentStatus",
+    "sourceReference",
+    "redeemedAt"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "format": "uuid" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "loyalty.reward.redeemed",
+        "loyalty.reward.reversed",
+        "loyalty.reward.fulfillment_status_changed"
+      ]
+    },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "applicationId": { "type": "string", "minLength": 1 },
+    "programId": { "type": "string", "minLength": 1 },
+    "rewardId": { "type": "string", "format": "uuid" },
+    "redemptionId": { "type": "string", "format": "uuid" },
+    "accountId": { "type": "string", "format": "uuid" },
+    "burnEntryId": { "type": "string", "format": "uuid" },
+    "reversalEntryId": { "type": ["string", "null"], "format": "uuid" },
+    "profileId": { "type": "string", "minLength": 1 },
+    "rewardCode": { "type": "string", "minLength": 1 },
+    "pointsCost": { "type": "integer", "minimum": 1 },
+    "status": { "type": "string", "enum": ["COMMITTED", "REVERSED"] },
+    "fulfillmentStatus": { "type": "string", "enum": ["PENDING", "ISSUED", "MANUAL_REQUIRED", "FAILED"] },
+    "fulfillmentRef": { "type": ["string", "null"] },
+    "sourceReference": { "type": "string", "minLength": 1 },
+    "correlationId": { "type": ["string", "null"] },
+    "actorId": { "type": ["string", "null"] },
+    "note": { "type": ["string", "null"] },
+    "redeemedAt": { "type": "string", "format": "date-time" },
+    "fulfilledAt": { "type": ["string", "null"], "format": "date-time" },
+    "reversedAt": { "type": ["string", "null"], "format": "date-time" },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,107 @@
+asyncapi: 2.6.0
+info:
+  title: CourseFlow Generic Loyalty Events
+  version: 1.0.0-contract.1
+  description: >
+    AsyncAPI contract for the loyalty bounded context. The producer writes local outbox rows in the
+    same transaction as account ledger mutations; the relay publishes using the `event_type` as the
+    topic.
+defaultContentType: application/json
+servers:
+  localKafka:
+    url: localhost:9092
+    protocol: kafka
+    description: Local development Kafka.
+channels:
+  loyalty.points.earned:
+    description: Published after points are credited to a loyalty account.
+    subscribe:
+      operationId: consumeLoyaltyPointsEarned
+      message:
+        $ref: "#/components/messages/LoyaltyPointsChanged"
+  loyalty.points.burned:
+    description: Published after points are debited from a loyalty account.
+    subscribe:
+      operationId: consumeLoyaltyPointsBurned
+      message:
+        $ref: "#/components/messages/LoyaltyPointsChanged"
+  loyalty.points.reversed:
+    description: Published after a ledger entry is reversed through a compensating entry.
+    subscribe:
+      operationId: consumeLoyaltyPointsReversed
+      message:
+        $ref: "#/components/messages/LoyaltyPointsChanged"
+  loyalty.points.adjusted:
+    description: Published after an operator/admin manual adjustment is written to the ledger.
+    subscribe:
+      operationId: consumeLoyaltyPointsAdjusted
+      message:
+        $ref: "#/components/messages/LoyaltyPointsChanged"
+  loyalty.points.expired:
+    description: Published after approved point expiry consumes expired materialized point lots.
+    subscribe:
+      operationId: consumeLoyaltyPointsExpired
+      message:
+        $ref: "#/components/messages/LoyaltyPointsChanged"
+  loyalty.reward.redeemed:
+    description: Published after a reward redemption commits and the matching loyalty burn ledger entry is recorded.
+    subscribe:
+      operationId: consumeLoyaltyRewardRedeemed
+      message:
+        $ref: "#/components/messages/LoyaltyRewardRedemption"
+  loyalty.reward.reversed:
+    description: Published after a reward redemption is reversed through a compensating ledger entry.
+    subscribe:
+      operationId: consumeLoyaltyRewardReversed
+      message:
+        $ref: "#/components/messages/LoyaltyRewardRedemption"
+  loyalty.reward.fulfillment_status_changed:
+    description: Published after an operator changes reward fulfillment status/reference/note.
+    subscribe:
+      operationId: consumeLoyaltyRewardFulfillmentChanged
+      message:
+        $ref: "#/components/messages/LoyaltyRewardRedemption"
+components:
+  messages:
+    LoyaltyPointsChanged:
+      name: LoyaltyPointsChanged
+      title: Loyalty points changed
+      contentType: application/json
+      messageId: loyalty.points.changed.v1
+      traits:
+        - $ref: "#/components/messageTraits/LoyaltyEvent"
+      payload:
+        $ref: "schemas/loyalty-points-changed.v1.json"
+      examples:
+        - name: earned
+          payload:
+            $ref: "examples/loyalty-points-earned.json"
+        - name: reversed
+          payload:
+            $ref: "examples/loyalty-points-reversed.json"
+    LoyaltyRewardRedemption:
+      name: LoyaltyRewardRedemption
+      title: Loyalty reward redemption lifecycle
+      contentType: application/json
+      messageId: loyalty.reward.redemption.v1
+      traits:
+        - $ref: "#/components/messageTraits/LoyaltyEvent"
+      payload:
+        $ref: "schemas/loyalty-reward-redemption.v1.json"
+      examples:
+        - name: redeemed
+          payload:
+            $ref: "examples/loyalty-reward-redeemed.json"
+        - name: fulfillmentChanged
+          payload:
+            $ref: "examples/loyalty-reward-fulfillment-changed.json"
+  messageTraits:
+    LoyaltyEvent:
+      headers:
+        type: object
+        additionalProperties: true
+        properties:
+          correlationId:
+            type: string
+          sourceClientId:
+            type: string

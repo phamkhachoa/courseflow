@@ -1,0 +1,100 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: promotion-service
+  servlet:
+    multipart:
+      max-file-size: ${PROMOTION_COUPON_IMPORT_MAX_FILE_SIZE:10MB}
+      max-request-size: ${PROMOTION_COUPON_IMPORT_MAX_REQUEST_SIZE:11MB}
+  datasource:
+    url: ${PROMOTION_DB_URL:jdbc:postgresql://localhost:5432/cf_promotion}
+    username: ${PROMOTION_DB_USERNAME:courseflow}
+    password: ${PROMOTION_DB_PASSWORD:courseflow}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:5}
+      minimum-idle: ${DB_POOL_MIN_IDLE:1}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog.xml
+    contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        promotion.runtime.operation.duration: true
+        promotion.reservation.expiry.duration: true
+        promotion.retention.execution.duration: true
+        promotion.coupon.import.dry_run.duration: true
+        promotion.coupon.import.dry_run.cleanup.duration: true
+        promotion.coupon.import.commit.duration: true
+
+courseflow:
+  promotion:
+    coupon:
+      fingerprint-key-id: ${PROMOTION_COUPON_FINGERPRINT_KEY_ID:local}
+      fingerprint-pepper: ${PROMOTION_COUPON_FINGERPRINT_PEPPER:courseflow-local-coupon-fingerprint-pepper-change-me}
+      previous-fingerprint-keys: ${PROMOTION_COUPON_PREVIOUS_FINGERPRINT_KEYS:}
+      legacy-fallback-enabled: ${PROMOTION_COUPON_LEGACY_FALLBACK_ENABLED:true}
+      import-dry-run:
+        cleanup-enabled: ${PROMOTION_COUPON_IMPORT_DRY_RUN_CLEANUP_ENABLED:true}
+        cleanup-fixed-delay-ms: ${PROMOTION_COUPON_IMPORT_DRY_RUN_CLEANUP_FIXED_DELAY_MS:3600000}
+        ttl-days: ${PROMOTION_COUPON_IMPORT_DRY_RUN_TTL_DAYS:30}
+      import-query:
+        issue-export:
+          max-rows: ${PROMOTION_COUPON_IMPORT_ISSUE_EXPORT_MAX_ROWS:10000}
+      abuse-guard:
+        mode: ${PROMOTION_COUPON_ABUSE_GUARD_MODE:disabled}
+        key-id: ${PROMOTION_COUPON_ABUSE_GUARD_KEY_ID:local}
+        pepper: ${PROMOTION_COUPON_ABUSE_GUARD_PEPPER:courseflow-local-coupon-abuse-guard-pepper-change-me}
+        window-seconds: ${PROMOTION_COUPON_ABUSE_GUARD_WINDOW_SECONDS:60}
+        profile-capacity: ${PROMOTION_COUPON_ABUSE_GUARD_PROFILE_CAPACITY:5}
+        client-capacity: ${PROMOTION_COUPON_ABUSE_GUARD_CLIENT_CAPACITY:100}
+        application-capacity: ${PROMOTION_COUPON_ABUSE_GUARD_APPLICATION_CAPACITY:500}
+        coupon-capacity: ${PROMOTION_COUPON_ABUSE_GUARD_COUPON_CAPACITY:20}
+        missing-identity-capacity: ${PROMOTION_COUPON_ABUSE_GUARD_MISSING_IDENTITY_CAPACITY:3}
+        fail-policy: ${PROMOTION_COUPON_ABUSE_GUARD_FAIL_POLICY:allow_with_alert}
+    admin-operation-guard:
+      mode: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_MODE:disabled}
+      key-id: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_KEY_ID:local}
+      pepper: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_PEPPER:courseflow-local-admin-operation-rate-guard-pepper-change-me}
+      window-seconds: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_WINDOW_SECONDS:60}
+      actor-capacity: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_ACTOR_CAPACITY:30}
+      source-client-capacity: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_SOURCE_CLIENT_CAPACITY:120}
+      application-capacity: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_APPLICATION_CAPACITY:500}
+      campaign-capacity: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_CAMPAIGN_CAPACITY:120}
+      content-capacity: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_CONTENT_CAPACITY:10}
+      missing-identity-capacity: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_MISSING_IDENTITY_CAPACITY:5}
+      fail-policy: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_FAIL_POLICY:deny}
+    request-snapshot:
+      hash-secret: ${PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET:${courseflow.security.internal-jwt.secret:local-request-snapshot-secret-change-me-32}}
+    retention:
+      dry-run:
+        enabled: ${PROMOTION_RETENTION_DRY_RUN_ENABLED:true}
+      execution:
+        enabled: ${PROMOTION_RETENTION_EXECUTION_ENABLED:false}
+        dry-run-ttl-minutes: ${PROMOTION_RETENTION_EXECUTION_DRY_RUN_TTL_MINUTES:60}
+
+eureka:
+  client:
+    enabled: ${SERVICE_DISCOVERY_ENABLED:false}
+    register-with-eureka: ${SERVICE_DISCOVERY_REGISTER:true}
+    fetch-registry: ${SERVICE_DISCOVERY_FETCH:true}
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}

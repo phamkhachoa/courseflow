@@ -92,17 +92,15 @@ services:
       - kafka-connect
     volumes:
       - ./debezium/course-search-cdc-connector-config.json:/connector-config.json:ro
-    entrypoint: >
-      /bin/sh -c "
-      until curl -fsS http://kafka-connect:8083/connectors >/dev/null; do
-        echo 'waiting for kafka-connect...'; sleep 2;
-      done &&
-      curl -fsS -X PUT
-        -H 'Content-Type: application/json'
-        --data @/connector-config.json
-        http://kafka-connect:8083/connectors/courseflow-course-search-cdc/config &&
-      echo 'Debezium connector ready: courseflow-course-search-cdc'
-      "
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until curl -fsS http://kafka-connect:8083/connectors >/dev/null; do
+          echo 'waiting for kafka-connect...'; sleep 2;
+        done &&
+        curl -fsS -X PUT -H 'Content-Type: application/json' --data @/connector-config.json http://kafka-connect:8083/connectors/courseflow-course-search-cdc/config &&
+        echo 'Debezium connector ready: courseflow-course-search-cdc'
     restart: "no"
 
   elasticsearch:

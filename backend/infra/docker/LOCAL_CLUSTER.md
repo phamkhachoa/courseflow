@@ -5,6 +5,9 @@ on the same Compose network. It is not production deployment; it is a local clus
 integration testing service boundaries, gateway routing, service-to-service entitlement checks and
 Kafka/outbox flow.
 
+Application services listen on internal port `8080`, register with `discovery-service`, and are not
+published directly to the host. Browser/app traffic should enter through `api-gateway`.
+
 ## Start
 
 From `v2/courseflow/backend`:
@@ -31,7 +34,9 @@ API_GATEWAY_PORT=8080 docker compose \
   up --build
 ```
 
-Each service is also exposed on its configured local port for debugging.
+Internal services are reachable by other containers through Docker DNS, for example
+`http://course-service:8080`. For host debugging, prefer gateway routes or run a temporary tool
+container on the Compose network.
 
 For production-shaped Compose validation, use `docker-compose.prod.yml` as an override instead of
 changing these local files. The prod profile removes direct host ports for internal services and
@@ -106,7 +111,7 @@ export COURSEFLOW_INTERNAL_JWT_ALGORITHM="RS256"
 export COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY="$(cat /tmp/courseflow-internal-jwt.key)"
 export COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY="$(cat /tmp/courseflow-internal-jwt.pub)"
 export COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE="jwks"
-export COURSEFLOW_INTERNAL_JWT_JWKS_URI="http://identity-token-converter-service:8105/oauth/jwks"
+export COURSEFLOW_INTERNAL_JWT_JWKS_URI="http://identity-token-converter-service:8080/oauth/jwks"
 export COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE="sts"
 
 sts_clients=(
@@ -126,6 +131,7 @@ COURSEFLOW_DB_PASSWORD="replace-with-generated-db-password" \
 COURSEFLOW_STORAGE_ACCESS_KEY="replace-with-object-storage-access-key" \
 COURSEFLOW_STORAGE_SECRET_KEY="replace-with-object-storage-secret-key" \
 COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.com \
+PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET="replace-with-generated-snapshot-hmac-secret" \
 KEYCLOAK_ADMIN_PASSWORD="replace-with-generated-keycloak-admin-password" \
 KEYCLOAK_PUBLIC_BASE_URL="https://auth.example.com" \
 KEYCLOAK_BASE_URL="https://auth.example.com" \
@@ -218,12 +224,18 @@ scripts/postgres-backup-drill.sh backup
 Validate a dump by restoring it into a temporary local database:
 
 ```bash
-scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_identity
+scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
 ```
+
+The restore check writes `restore-check-cf_promotion.json` in the backup directory. For promotion
+retention testing, register the restore drill from that file instead of typing the artifact hash by
+hand.
 
 ## Trust Boundary
 
 - Browser/client traffic goes through `api-gateway`.
+- Gateway routes use service discovery (`lb://<service-id>`), so it does not need static service
+  host ports.
 - The gateway strips client-supplied identity/internal headers from inbound requests.
 - After validating user JWTs, the gateway exchanges them for a short-lived internal JWT and forwards
   `X-User-*` plus `X-Internal-Authorization`.
@@ -238,14 +250,17 @@ scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_i
   `COURSEFLOW_STS_CLIENT_SECRETS` and `COURSEFLOW_STS_CLIENT_SCOPES` policy maps. Only the gateway
   and chat websocket adapter receive `internal:token-exchange` by default. Only topology-owning
   services such as organization-service and course-service receive `internal:authz:assert-topology`,
-  and role/permission policy reads require `internal:role-management:read` rather than generic `internal:service`. The
-  next hardening step is operational key rotation and e2e verification against the running cluster.
+  promotion runtime operation scopes are granted only to trusted source/integrating clients such as
+  `checkout-service` and `enrollment-service` while `promotion-service` keeps `internal:promotion:admin` by default,
+  and role/permission policy reads require `internal:role-management:read` rather than generic
+  `internal:service`. The next hardening step is operational key rotation and e2e verification
+  against the running cluster.
 - For a running OIDC cluster, run `node scripts/keycloak-security-smoke.mjs` from a context that can
   reach the gateway, token converter and one direct domain service.
 
 ## Course Chat
 
-- `chat-service` runs on `8104` and owns course chat rooms/messages in MongoDB database `cf_chat`.
+- `chat-service` runs as an internal `8080` service and owns course chat rooms/messages in MongoDB database `cf_chat`.
 - Learner/admin REST traffic goes through `/api/v1/chat/**` or `/api/admin/v1/chat/**`.
 - Realtime chat uses STOMP over WebSocket at `ws://localhost:28080/ws/chat`.
 - STOMP `CONNECT` must carry `Authorization: Bearer <accessToken>`; the service validates the JWT and checks course enrollment/staff access before allowing subscribe/send.

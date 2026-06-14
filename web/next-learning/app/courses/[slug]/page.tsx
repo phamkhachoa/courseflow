@@ -12,6 +12,7 @@ import {
   Video
 } from "lucide-react";
 import { getCourseBySlug } from "@/features/course-catalog/api";
+import { formatCoursePrice } from "@/features/course-catalog/pricing";
 import { CourseOverviewPanel } from "@/features/course-modules/CourseOverviewPanel";
 import { EnrollmentCta } from "@/features/enrollments/EnrollmentCta";
 import { RelatedCoursesSection } from "@/features/analytics/RelatedCoursesSection";
@@ -82,6 +83,7 @@ export default async function CourseDetailPage({
   const { slug } = await params;
   const course = await getCourseBySlug(slug);
   if (!course) notFound();
+  const priceLabel = formatCoursePrice(course);
 
   return (
     <main className="pb-12">
@@ -102,6 +104,7 @@ export default async function CourseDetailPage({
               <Badge tone="dark">{course.code}</Badge>
               <Badge tone="dark">{levelLabel(course.level)}</Badge>
               <Badge tone="dark">{statusLabel(course.status)}</Badge>
+              {priceLabel && <Badge tone="dark">{priceLabel}</Badge>}
             </div>
             <h1 className="mt-5 max-w-4xl text-4xl font-bold tracking-tight leading-tight sm:text-5xl">{course.title}</h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-white/78 sm:text-lg">{course.summary}</p>
@@ -154,6 +157,11 @@ export default async function CourseDetailPage({
                 <p className="mt-2 text-sm leading-6 text-white/70">
                   Mở phòng học để xem chapter, chuyển bài và cập nhật tiến độ.
                 </p>
+                {priceLabel && (
+                  <p className="mt-3 inline-flex rounded-md bg-white/15 px-2.5 py-1 text-sm font-bold text-white">
+                    Giá catalog: {priceLabel}
+                  </p>
+                )}
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-3">

@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.core.MethodParameter;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -32,10 +33,21 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
         String role = webRequest.getHeader(GatewayHeaders.USER_ROLE);
         String rolesHeader = webRequest.getHeader(GatewayHeaders.USER_ROLES);
         String roleScopesHeader = webRequest.getHeader(GatewayHeaders.USER_ROLE_SCOPES);
-        String internalToken = webRequest.getHeader(GatewayHeaders.INTERNAL_AUTHORIZATION);
+        String internalToken = firstBearerToken(
+                webRequest.getHeader(GatewayHeaders.INTERNAL_AUTHORIZATION),
+                webRequest.getHeader(HttpHeaders.AUTHORIZATION));
         Long userId = parseUserId(id);
         Set<String> roles = parseRoles(rolesHeader, role);
         return new CurrentUser(userId, email, role, roles, parseRoleScopes(roleScopesHeader), internalToken);
+    }
+
+    private String firstBearerToken(String... values) {
+        for (String value : values) {
+            if (value != null && value.regionMatches(true, 0, "Bearer ", 0, 7)) {
+                return value.substring(7).trim();
+            }
+        }
+        return null;
     }
 
     private Long parseUserId(String id) {

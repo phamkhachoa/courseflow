@@ -10,7 +10,9 @@ const EMPTY: CreateCourseInput = {
   slug: "",
   summary: "",
   departmentId: "20000000-0000-0000-0000-000000000001",
-  level: "BEGINNER"
+  level: "BEGINNER",
+  listPrice: 100,
+  currency: "USD"
 };
 
 const DEPARTMENT_OPTIONS = [
@@ -54,6 +56,24 @@ export function CourseCreatePage() {
           </FormField>
           <FormField label="Slug" htmlFor="slug">
             <Input id="slug" value={form.slug} onChange={(e) => update("slug", e.target.value)} required />
+          </FormField>
+          <FormField label="List price" htmlFor="listPrice">
+            <Input
+              id="listPrice"
+              type="number"
+              min="0"
+              step="0.01"
+              value={String(form.listPrice ?? "")}
+              onChange={(e) => update("listPrice", e.target.value === "" ? undefined : Number(e.target.value))}
+            />
+          </FormField>
+          <FormField label="Currency" htmlFor="currency">
+            <Input
+              id="currency"
+              value={form.currency ?? ""}
+              maxLength={3}
+              onChange={(e) => update("currency", e.target.value.toUpperCase())}
+            />
           </FormField>
           <FormField label="Phòng ban" htmlFor="dept">
             <Select id="dept" value={form.departmentId} onChange={(e) => update("departmentId", e.target.value)} required>

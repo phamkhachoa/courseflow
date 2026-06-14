@@ -65,11 +65,13 @@ public class AccessControlService {
 
     private static final int MAX_ROLE_DEPTH = 20;
     private static final Set<String> ASSIGNMENT_SCOPE_TYPES =
-            Set.of("PLATFORM", "ORG", "DEPARTMENT", "COURSE", "SECTION");
+            Set.of("PLATFORM", "TENANT", "APPLICATION", "ORG", "DEPARTMENT", "COURSE", "SECTION");
     private static final Set<String> PERMISSION_SCOPE_TYPES =
-            Set.of("ANY", "PLATFORM", "ORG", "DEPARTMENT", "COURSE", "SECTION");
+            Set.of("ANY", "PLATFORM", "TENANT", "APPLICATION", "ORG", "DEPARTMENT", "COURSE", "SECTION");
     private static final Map<String, Integer> SCOPE_DEPTH = Map.of(
             "PLATFORM", 0,
+            "TENANT", 1,
+            "APPLICATION", 2,
             "ORG", 1,
             "DEPARTMENT", 2,
             "COURSE", 3,
@@ -630,6 +632,8 @@ public class AccessControlService {
         boolean compatible = switch (permissionScope) {
             case "ANY" -> true;
             case "PLATFORM" -> "PLATFORM".equals(requestScopeType);
+            case "TENANT" -> Set.of("TENANT", "APPLICATION").contains(requestScopeType);
+            case "APPLICATION" -> "APPLICATION".equals(requestScopeType);
             case "ORG" -> Set.of("ORG", "DEPARTMENT", "COURSE", "SECTION").contains(requestScopeType);
             case "DEPARTMENT" -> Set.of("DEPARTMENT", "COURSE", "SECTION").contains(requestScopeType);
             case "COURSE" -> Set.of("COURSE", "SECTION").contains(requestScopeType);
@@ -705,6 +709,17 @@ public class AccessControlService {
 
     private void requireAncestorScope(String requestScopeType, String ancestorScopeType) {
         if ("PLATFORM".equals(ancestorScopeType)) {
+            throw new BadRequestException("INVALID_SCOPE_ANCESTOR");
+        }
+        if ("APPLICATION".equals(requestScopeType)) {
+            if (!"TENANT".equals(ancestorScopeType)) {
+                throw new BadRequestException("INVALID_SCOPE_ANCESTOR");
+            }
+            return;
+        }
+        if ("TENANT".equals(requestScopeType)
+                || "TENANT".equals(ancestorScopeType)
+                || "APPLICATION".equals(ancestorScopeType)) {
             throw new BadRequestException("INVALID_SCOPE_ANCESTOR");
         }
         if (SCOPE_DEPTH.get(ancestorScopeType) >= SCOPE_DEPTH.get(requestScopeType)) {
@@ -977,6 +992,12 @@ public class AccessControlService {
         }
         if (scopeId == null) {
             throw new BadRequestException("SCOPE_ID_REQUIRED");
+        }
+        if ("APPLICATION".equals(scopeType)) {
+            int separator = scopeId.indexOf(':');
+            if (separator <= 0 || separator != scopeId.lastIndexOf(':') || separator == scopeId.length() - 1) {
+                throw new BadRequestException("INVALID_APPLICATION_SCOPE_ID");
+            }
         }
         return scopeId;
     }

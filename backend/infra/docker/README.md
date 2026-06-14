@@ -35,10 +35,11 @@ See `infra/docker/LOCAL_CLUSTER.md` for details. Demo data is behind the Liquiba
 
 ## Production Compose security profile
 
-Local Compose is intentionally convenient for development and exposes service ports on the host. For
-a production-shaped Compose render, add `docker-compose.prod.yml` after the local files. The prod
-override keeps the gateway published, removes direct host port mappings for databases, brokers,
-object storage and backend services, disables demo storage credentials and requires non-default
+The local service cluster includes `discovery-service`; application services listen on internal port
+`8080`, register with discovery, and are not published directly to the host. Browser and app traffic
+goes through the gateway. For a production-shaped Compose render, add `docker-compose.prod.yml` after
+the local files. The prod override keeps the gateway published, removes direct host port mappings for
+databases, brokers and object storage, disables demo storage credentials and requires non-default
 secrets.
 
 Validate the prod profile without starting containers:
@@ -51,7 +52,7 @@ export COURSEFLOW_INTERNAL_JWT_ALGORITHM="RS256"
 export COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY="$(cat /tmp/courseflow-internal-jwt.key)"
 export COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY="$(cat /tmp/courseflow-internal-jwt.pub)"
 export COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE="jwks"
-export COURSEFLOW_INTERNAL_JWT_JWKS_URI="http://identity-token-converter-service:8105/oauth/jwks"
+export COURSEFLOW_INTERNAL_JWT_JWKS_URI="http://identity-token-converter-service:8080/oauth/jwks"
 export COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE="sts"
 
 sts_clients=(
@@ -71,6 +72,7 @@ COURSEFLOW_DB_PASSWORD="replace-with-generated-db-password" \
 COURSEFLOW_STORAGE_ACCESS_KEY="replace-with-object-storage-access-key" \
 COURSEFLOW_STORAGE_SECRET_KEY="replace-with-object-storage-secret-key" \
 COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.com \
+PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET="replace-with-generated-snapshot-hmac-secret" \
 KEYCLOAK_ADMIN_PASSWORD="replace-with-generated-keycloak-admin-password" \
 KEYCLOAK_PUBLIC_BASE_URL="https://auth.example.com" \
 KEYCLOAK_BASE_URL="https://auth.example.com" \
@@ -115,8 +117,8 @@ summary batch access and direct-service forged-header rejection:
 
 ```bash
 COURSEFLOW_API_URL=http://localhost:28080/api \
-COURSEFLOW_TOKEN_CONVERTER_URL=http://identity-token-converter-service:8105 \
-COURSEFLOW_DIRECT_SERVICE_URL=http://course-service:8083 \
+COURSEFLOW_TOKEN_CONVERTER_URL=http://identity-token-converter-service:8080 \
+COURSEFLOW_DIRECT_SERVICE_URL=http://course-service:8080 \
 COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN="<keycloak-access-token-from-approved-login>" \
 COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_ID=api-gateway \
 COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET="$COURSEFLOW_STS_API_GATEWAY_SECRET" \
@@ -205,8 +207,12 @@ scripts/postgres-backup-drill.sh backup
 Restore-check one dump into a temporary database:
 
 ```bash
-scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_identity
+scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
 ```
+
+For promotion retention approvals, use the generated
+`backups/postgres/<timestamp>/restore-check-cf_promotion.json` as the source for the restore-drill
+registration fields, including `artifactHash` and `checkedAt`.
 
 ## Trust boundary
 
@@ -225,10 +231,13 @@ remains the signing authority. Keep `COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES` expl
 scopes required by the common filter, such as `internal:identity:resolve`,
 `internal:identity:provision`, `internal:authz:check`, `internal:authz:assert-topology`,
 `internal:user-directory:*`, `internal:role-assignment:*`, `internal:role-management:*`, `internal:profile:*`,
-`internal:token-exchange` and `internal:backoffice`. Only the gateway and chat websocket adapter
+`internal:promotion:*`, `internal:token-exchange` and `internal:backoffice`. Only the gateway and chat websocket adapter
 should receive `internal:token-exchange` by default; only topology-owning services such as
-organization-service and course-service should receive `internal:authz:assert-topology`. The next enterprise
-hardening step is operational key rotation and e2e verification against the running cluster.
+organization-service and course-service should receive `internal:authz:assert-topology`. Promotion runtime
+operation scopes should be granted only to trusted source/integrating clients such as `checkout-service`
+and `enrollment-service` that also have matching application client bindings; `promotion-service` keeps only
+`internal:promotion:admin` by default. The next enterprise hardening step is operational key rotation and e2e
+verification against the running cluster.
 
 In `EXTERNAL_TOKEN_MODE=oidc`, Keycloak is the only supported edge login authority. The gateway
 blocks legacy `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/refresh`, and email
@@ -253,6 +262,9 @@ client credentials must identify the calling service instead of letting one shar
 any service name.
 Services running in STS mode also require `TOKEN_CONVERTER_URI`; chat WebSocket auth uses the same
 converter to exchange STOMP bearer tokens before trusting internal JWT claims.
+Service location is intentionally separate from authentication: gateway routing uses Eureka-backed
+`lb://<service-id>` routes, while direct internal service clients use Docker DNS URLs such as
+`http://course-service:8080` when they need explicit peer calls.
 `access-control-service` always audits denied authorization checks. Set
 `ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED=true` only when the environment needs full allow/deny decision
 audit, because this can produce high-volume audit rows.

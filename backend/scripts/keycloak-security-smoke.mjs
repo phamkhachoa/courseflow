@@ -8,17 +8,18 @@
  *   -> access-control-service resolved claims -> internal JWT -> JWKS verification.
  *
  * The script intentionally does not default to password grant. Provide a real Keycloak access token
- * through COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN, obtained by an approved login flow.
+ * through COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN, obtained by an approved login flow. Converter and
+ * direct service checks default to Docker-network DNS because internal services are not host-published.
  */
 
 import crypto from "node:crypto";
 
 const API_BASE = stripTrailingSlash(process.env.COURSEFLOW_API_URL ?? "http://localhost:28080/api");
 const TOKEN_CONVERTER_URL = stripTrailingSlash(
-  process.env.TOKEN_CONVERTER_URL ?? process.env.COURSEFLOW_TOKEN_CONVERTER_URL ?? "http://localhost:8105"
+  process.env.TOKEN_CONVERTER_URL ?? process.env.COURSEFLOW_TOKEN_CONVERTER_URL ?? "http://identity-token-converter-service:8080"
 );
 const DIRECT_SERVICE_URL = stripTrailingSlash(
-  process.env.COURSEFLOW_DIRECT_SERVICE_URL ?? "http://localhost:8083"
+  process.env.COURSEFLOW_DIRECT_SERVICE_URL ?? "http://course-service:8080"
 );
 const INTERNAL_AUDIENCE = process.env.COURSEFLOW_INTERNAL_JWT_AUDIENCE ?? "courseflow-services";
 const INTERNAL_ISSUER = process.env.COURSEFLOW_INTERNAL_JWT_ISSUER ?? "courseflow-token-converter";

@@ -4,8 +4,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 public final class EnrollmentDtos {
 
@@ -41,7 +43,133 @@ public final class EnrollmentDtos {
      */
     public record EnrollRequestDto(
             String studentId,
-            @NotBlank String courseId
+            @NotBlank String courseId,
+            String couponCode,
+            String couponId,
+            String promotionPreviewId,
+            String idempotencyKey
+    ) {
+        public EnrollRequestDto(String studentId, String courseId) {
+            this(studentId, courseId, null, null, null, null);
+        }
+    }
+
+    public record PromotionPreviewRequestDto(
+            @NotBlank String courseId,
+            String couponCode,
+            String couponId
+    ) {
+    }
+
+    public record PromotionEffectDto(
+            String type,
+            String benefitType,
+            String actionType,
+            String targetType,
+            String targetId,
+            BigDecimal amount,
+            String currency,
+            String unit,
+            BigDecimal quantity,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record PromotionPreviewDto(
+            String previewId,
+            String courseId,
+            String couponCode,
+            String couponId,
+            String status,
+            boolean eligible,
+            List<String> reasonCodes,
+            String message,
+            BigDecimal originalAmount,
+            BigDecimal discountAmount,
+            BigDecimal finalAmount,
+            String currency,
+            String priceSource,
+            List<PromotionEffectDto> effects,
+            boolean promotionUnavailable
+    ) {
+    }
+
+    public record EnrollmentPromotionApplicationDto(
+            String status,
+            String reservationId,
+            String redemptionId,
+            String couponCode,
+            String couponId,
+            List<String> reasonCodes,
+            String message,
+            List<PromotionEffectDto> effects
+    ) {
+    }
+
+    public record EnrollmentPromotionApplicationStateDto(
+            String id,
+            String enrollmentId,
+            String studentId,
+            String courseId,
+            String status,
+            String couponCode,
+            String couponId,
+            String reservationId,
+            String redemptionId,
+            String idempotencyKey,
+            List<String> reasonCodes,
+            String message,
+            List<PromotionEffectDto> effects,
+            int retryCount,
+            Instant nextRetryAt,
+            String lastRetryError,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+    }
+
+    public record PromotionApplicationActionRequestDto(
+            String reason,
+            String correlationId
+    ) {
+    }
+
+    public record EnrollmentCheckoutResponseDto(
+            EnrollmentDto enrollment,
+            EnrollmentPromotionApplicationDto promotion,
+            String attemptId
+    ) {
+        public EnrollmentCheckoutResponseDto(EnrollmentDto enrollment, EnrollmentPromotionApplicationDto promotion) {
+            this(enrollment, promotion, null);
+        }
+    }
+
+    public record LearnerCouponDto(
+            String couponId,
+            String campaignId,
+            String campaignCode,
+            String campaignName,
+            String codeMask,
+            String status,
+            String walletStatus,
+            Instant startsAt,
+            Instant expiresAt,
+            String redemptionId,
+            Instant redeemedAt,
+            String message
+    ) {
+    }
+
+    public record LearnerCouponWalletDto(
+            String tenantId,
+            String applicationId,
+            String profileId,
+            Instant generatedAt,
+            int availableCount,
+            int expiringSoonCount,
+            int usedCount,
+            int expiredCount,
+            List<LearnerCouponDto> items
     ) {
     }
 

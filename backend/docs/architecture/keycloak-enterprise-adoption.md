@@ -264,10 +264,11 @@ configuration remain follow-up work.
   directory data. Profile summary batch responses preserve the requested user id order and omit
   missing profiles.
 - Token converter enriches internal JWT from CourseFlow roles and scoped assignments.
-- `access-control-service` enforces the supported assignment scopes (`PLATFORM`, `ORG`,
-  `DEPARTMENT`, `COURSE`, `SECTION`), requires non-platform `scopeId` values, and validates each
-  authorization check against the permission definition scope (`ANY`, `PLATFORM`, `ORG`,
-  `DEPARTMENT`, `COURSE`, `SECTION`). This keeps Keycloak coarse and CourseFlow precise.
+- `access-control-service` enforces the supported assignment scopes (`PLATFORM`, `TENANT`,
+  `APPLICATION`, `ORG`, `DEPARTMENT`, `COURSE`, `SECTION`), requires non-platform `scopeId` values,
+  and validates each authorization check against the permission definition scope (`ANY`, `PLATFORM`,
+  `TENANT`, `APPLICATION`, `ORG`, `DEPARTMENT`, `COURSE`, `SECTION`). `APPLICATION` scope ids use
+  `tenantId:applicationId`. This keeps Keycloak coarse and CourseFlow precise.
 - Authorization checks may include `ancestorScopes` supplied by the domain service that owns the
   resource topology, so department/org assignments can apply to course/section checks without
   turning access-control into a topology aggregator. Access-control accepts those ancestors only
@@ -329,9 +330,16 @@ configuration remain follow-up work.
   internal machine tokens. Examples include `internal:identity:resolve`,
   `internal:identity:provision`, `internal:authz:check`, `internal:authz:assert-topology`,
   `internal:user-directory:*`, `internal:role-assignment:*`, `internal:role-management:*`, `internal:profile:*`,
-  `internal:token-exchange` and `internal:backoffice`.
+  `internal:promotion:*`, `internal:token-exchange` and `internal:backoffice`.
 - Current implementation: external-token exchange requires STS client authentication plus
   `internal:token-exchange`; by default only `api-gateway` and `chat-service` receive that scope.
+- Current implementation: promotion service-to-service calls require the matching
+  `internal:promotion:<operation>` scope and a matching promotion application client binding. Runtime
+  operation scopes belong to trusted source clients such as `checkout-service` and `enrollment-service`;
+  `promotion-service` keeps only `internal:promotion:admin` by default.
+- Current implementation: event-driven service actors that need domain runtime scopes, such as the
+  promotion-to-loyalty points consumer, use STS `client_credentials` tokens and downstream services
+  verify internal JWT signature, audience, issuer and expiry before trusting actor claims.
 - Current implementation: user internal JWTs cannot call `/internal/**` directly unless
   gateway/service-propagated identity headers are present and match the token claims.
 - Current implementation: token converter exports token exchange success/failure/duration metrics

@@ -34,6 +34,9 @@ class TokenExchangeServiceTest {
     private static final String INTERNAL_SECRET = "internal-jwt-secret-that-is-at-least-32-bytes";
     private static final String STS_SECRET = "sts-client-secret-that-is-at-least-32-bytes";
     private static final String USER_MANAGEMENT_STS_SECRET = "user-management-sts-secret-32-byte-value";
+    private static final String CHECKOUT_STS_SECRET = "checkout-sts-secret-32-byte-value";
+    private static final String PROMOTION_STS_SECRET = "promotion-sts-secret-32-byte-value";
+    private static final String LOYALTY_STS_SECRET = "loyalty-sts-secret-32-byte-value";
     private static final String API_GATEWAY_CLIENT_ID = "api-gateway";
 
     private final TokenConverterProperties properties = new TokenConverterProperties(
@@ -274,6 +277,155 @@ class TokenExchangeServiceTest {
                 .getPayload();
         assertThat(claims.get("azp")).isEqualTo("user-management-service");
         assertThat(claims.get("scope")).isEqualTo("internal:identity:provision");
+    }
+
+    @Test
+    void acceptsPromotionRuntimeOperationScopeOnlyForTrustedSourceClient() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        TokenExchangeResponse response = stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:promotion:evaluate internal:promotion:reserve",
+                "checkout-service",
+                CHECKOUT_STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        Claims claims = Jwts.parser()
+                .verifyWith(internalKey())
+                .build()
+                .parseSignedClaims(response.access_token())
+                .getPayload();
+        assertThat(claims.get("azp")).isEqualTo("checkout-service");
+        assertThat(claims.get("scope").toString())
+                .contains("internal:promotion:evaluate")
+                .contains("internal:promotion:reserve");
+    }
+
+    @Test
+    void rejectsPromotionOperationScopeForUnmappedClient() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:promotion:evaluate",
+                "course-service",
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void rejectsPromotionRuntimeOperationScopeForPromotionServiceItself() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:promotion:evaluate",
+                "promotion-service",
+                PROMOTION_STS_SECRET,
+                null,
+                null,
+                null,
+                null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void acceptsLoyaltyRuntimeOperationScopesOnlyForCheckoutClient() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        TokenExchangeResponse response = stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:loyalty:earn internal:loyalty:burn internal:loyalty:reverse internal:loyalty:read",
+                "checkout-service",
+                CHECKOUT_STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        Claims claims = Jwts.parser()
+                .verifyWith(internalKey())
+                .build()
+                .parseSignedClaims(response.access_token())
+                .getPayload();
+        assertThat(claims.get("azp")).isEqualTo("checkout-service");
+        assertThat(claims.get("scope").toString())
+                .contains("internal:loyalty:earn")
+                .contains("internal:loyalty:burn")
+                .contains("internal:loyalty:reverse")
+                .contains("internal:loyalty:read");
+    }
+
+    @Test
+    void acceptsLoyaltyAdminReadScopesOnlyForLoyaltyService() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        TokenExchangeResponse response = stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:loyalty:admin internal:loyalty:read",
+                "loyalty-service",
+                LOYALTY_STS_SECRET,
+                null,
+                null,
+                null,
+                null);
+
+        Claims claims = Jwts.parser()
+                .verifyWith(internalKey())
+                .build()
+                .parseSignedClaims(response.access_token())
+                .getPayload();
+        assertThat(claims.get("azp")).isEqualTo("loyalty-service");
+        assertThat(claims.get("scope").toString())
+                .contains("internal:loyalty:admin")
+                .contains("internal:loyalty:read");
+    }
+
+    @Test
+    void rejectsLoyaltyOperationScopeForPromotionService() {
+        TokenExchangeService stsService = service(stsPropertiesWithClientPolicy());
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.CLIENT_CREDENTIALS_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:loyalty:earn",
+                "promotion-service",
+                PROMOTION_STS_SECRET,
+                null,
+                null,
+                null,
+                null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -655,11 +807,26 @@ class TokenExchangeServiceTest {
                 "courseflow-services",
                 "courseflow-services",
                 "",
-                "course-service=" + STS_SECRET + ";user-management-service=" + USER_MANAGEMENT_STS_SECRET,
-                "course-service,user-management-service",
-                "internal:service,internal:user,internal:identity:provision,internal:authz:check",
+                "course-service=" + STS_SECRET
+                        + ";user-management-service=" + USER_MANAGEMENT_STS_SECRET
+                        + ";checkout-service=" + CHECKOUT_STS_SECRET
+                        + ";promotion-service=" + PROMOTION_STS_SECRET
+                        + ";loyalty-service=" + LOYALTY_STS_SECRET,
+                "course-service,user-management-service,checkout-service,promotion-service,loyalty-service",
+                "internal:service,internal:user,internal:identity:provision,internal:authz:check,"
+                        + "internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,"
+                        + "internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,"
+                        + "internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,"
+                        + "internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:adjust,"
+                        + "internal:loyalty:expire",
                 "course-service=internal:service,internal:user;"
-                        + "user-management-service=internal:identity:provision,internal:authz:check",
+                        + "user-management-service=internal:identity:provision,internal:authz:check;"
+                        + "checkout-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,"
+                        + "internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,"
+                        + "internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,"
+                        + "internal:loyalty:read;"
+                        + "promotion-service=internal:service,internal:promotion:admin;"
+                        + "loyalty-service=internal:service,internal:loyalty:admin,internal:loyalty:read",
                 180,
                 30);
     }

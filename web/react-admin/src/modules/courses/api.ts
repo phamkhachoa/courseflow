@@ -26,6 +26,14 @@ export async function createCourse(input: CreateCourseInput): Promise<Course> {
   return unwrap<Course>(data);
 }
 
+export async function updateCoursePricing(
+  courseId: string,
+  input: { listPrice?: number; currency?: string }
+): Promise<Pick<Course, "id" | "listPrice" | "currency" | "priceStatus"> & { purchasable: boolean; priceSource: string }> {
+  const { data } = await apiClient.post(`/admin/v1/courses/${courseId}/pricing`, input);
+  return unwrap(data);
+}
+
 export async function addCourseMaterial(
   courseId: string,
   input: AddCourseMaterialInput
@@ -187,6 +195,8 @@ export async function createCourseDraft(input: {
   summary: string;
   departmentId: string;
   level: string;
+  listPrice?: number;
+  currency?: string;
 }): Promise<CourseDraft> {
   const { data } = await apiClient.post("/admin/v1/authoring/courses", input);
   return unwrap<CourseDraft>(data);
@@ -339,6 +349,9 @@ export const fallbackCourses: Course[] = [
     ownerId: "2",
     level: "ADVANCED",
     status: "PUBLISHED",
+    listPrice: 100,
+    currency: "USD",
+    priceStatus: "ACTIVE",
     createdAt: "2026-06-07T00:00:00Z",
     materials: []
   }

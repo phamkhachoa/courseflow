@@ -18,6 +18,8 @@ CREATE DATABASE cf_certificate;
 CREATE DATABASE cf_peer_review;
 CREATE DATABASE cf_live_session;
 CREATE DATABASE cf_review;
+CREATE DATABASE cf_promotion;
+CREATE DATABASE cf_loyalty;
 CREATE DATABASE cf_outbox;
 
 ALTER DATABASE cf_identity OWNER TO courseflow;
@@ -40,4 +42,6 @@ ALTER DATABASE cf_certificate OWNER TO courseflow;
 ALTER DATABASE cf_peer_review OWNER TO courseflow;
 ALTER DATABASE cf_live_session OWNER TO courseflow;
 ALTER DATABASE cf_review OWNER TO courseflow;
+ALTER DATABASE cf_promotion OWNER TO courseflow;
+ALTER DATABASE cf_loyalty OWNER TO courseflow;
 ALTER DATABASE cf_outbox OWNER TO courseflow;

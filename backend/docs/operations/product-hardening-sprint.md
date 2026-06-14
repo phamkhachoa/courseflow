@@ -46,6 +46,8 @@ Pull requests and pushes to `main`/`develop` run `.github/workflows/product-hard
 - admin web production build
 - learner mobile static analysis
 - gateway smoke script syntax validation
+- promotion runtime smoke script syntax validation
+- production Docker Compose/profile validation
 
 Backend unit/regression gate:
 
@@ -70,6 +72,15 @@ cd web/react-admin
 npm run build
 ```
 
+Loyalty control-plane regression gate:
+
+```bash
+cd backend
+mvn -q -pl services/loyalty-service,services/api-gateway -am \
+  -Dtest=LoyaltyServiceTest,LoyaltyMetricsTest,LoyaltyServiceJpaSmokeTest,GatewayRouteConfigurationTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
 Gateway smoke gate with disposable user data:
 
 ```bash
@@ -81,14 +92,15 @@ node scripts/product-hardening-smoke.mjs
 ```
 
 Keycloak security smoke gate against a running OIDC cluster. Run it from a runner/container that can
-reach the internal token converter and at least one direct domain service; in local non-prod Compose,
-the defaults can be host ports, while the prod profile normally uses internal DNS names.
+reach the internal token converter and at least one direct domain service. Application services are
+not host-published in the discovery-based Compose topology, so use internal DNS names or an approved
+temporary port-forward.
 
 ```bash
 cd backend
 COURSEFLOW_API_URL=http://localhost:28080/api \
-COURSEFLOW_TOKEN_CONVERTER_URL=http://identity-token-converter-service:8105 \
-COURSEFLOW_DIRECT_SERVICE_URL=http://course-service:8083 \
+COURSEFLOW_TOKEN_CONVERTER_URL=http://identity-token-converter-service:8080 \
+COURSEFLOW_DIRECT_SERVICE_URL=http://course-service:8080 \
 COURSEFLOW_SECURITY_SMOKE_ACCESS_TOKEN="<keycloak-access-token-from-approved-login>" \
 COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_ID=api-gateway \
 COURSEFLOW_SECURITY_SMOKE_TOKEN_EXCHANGE_CLIENT_SECRET="<api-gateway STS client secret>" \
@@ -105,6 +117,193 @@ with forged `X-User-*` headers is rejected. Do not use password grant for produc
 script only supports it when `COURSEFLOW_SECURITY_SMOKE_ALLOW_PASSWORD_GRANT=true` is explicitly set
 for local/demo realms.
 
+Promotion runtime smoke gate against the local Docker cluster:
+
+```bash
+cd backend
+node scripts/promotion-runtime-smoke.mjs
+```
+
+Default `local` mode seeds a disposable incentive application, checkout-service binding, campaign
+fixture, five negative application/client-binding fixtures, a coupon-required abuse fixture, and a
+dedicated hot quota fixture. The smoke first preflights the fixture shapes in Postgres, then proves
+the intended service-only runtime chain: gateway browser routes for
+`/api/v1/incentives/evaluate` and `/api/v1/incentives/reservations` stay closed, STS rejects the
+wrong checkout secret, STS rejects runtime scopes for `promotion-service`, `checkout-service` can mint
+only the explicit runtime scopes, direct runtime calls fail closed without a valid internal token,
+each runtime operation rejects a token missing its matching `internal:promotion:<operation>` scope,
+unknown incentive applications are rejected, unbound/suspended/empty/wrong-operation client binding
+fixtures return `403` with no reservation rows, coupon abuse cases for missing/invalid/inactive/
+not-started/expired/holder-mismatch/exhausted coupons fail closed without leaking raw coupon values
+or creating reservations, idempotency keys are required for mutating operations, idempotency payload
+conflicts return `409`, commit-after-cancel returns `committed=false` without a redemption,
+`evaluate -> reserve -> commit` succeeds, reserve/commit idempotency replay returns the same ids,
+cancel/reverse runtime operations are idempotent, committed and reversed redemption outbox events are
+published, run-scoped reconciliation evidence proves cancel and commit/reverse ledger/outbox/quota
+policy rows are balanced, hot quota parallel reserve has exactly one winner, and outbox relay has
+zero open promotion DLQ rows.
+
+Promotion runtime smoke gate against staging/pre-production:
+
+```bash
+cd backend
+PROMOTION_SMOKE_MODE=staging \
+PROMOTION_SMOKE_TOKEN_CONVERTER_URL=https://token-converter.internal.example \
+PROMOTION_SMOKE_PROMOTION_URL=https://promotion.internal.example \
+PROMOTION_SMOKE_GATEWAY_URL=https://api.example.com/api \
+PROMOTION_SMOKE_PROMETHEUS_URL=https://prometheus.internal.example \
+PROMOTION_OBSERVABILITY_REQUIRED_TARGETS="api-gateway|courseflow-api-gateway|api-gateway:8080,identity-token-converter-service|courseflow-services|identity-token-converter-service:8080,promotion-service|courseflow-services|promotion-service:8080,outbox-relay|courseflow-services|outbox-relay:8080" \
+PROMOTION_OBSERVABILITY_REQUIRED_COUPON_ABUSE_GUARD_RESULTS="limited" \
+PROMOTION_OBSERVABILITY_REQUIRED_COUPON_LOOKUP_STORAGE_PATHS="current_hmac" \
+PROMOTION_OBSERVABILITY_FORBIDDEN_COUPON_LOOKUP_STORAGE_PATHS="legacy_sha,legacy_raw" \
+PROMOTION_OBSERVABILITY_MAX_FORBIDDEN_COUPON_LOOKUP_INCREASE=0 \
+PROMOTION_OBSERVABILITY_ADMIN_OPERATION_RATE_GUARD_REQUIRED=true \
+PROMOTION_OBSERVABILITY_REQUIRED_ADMIN_OPERATION_RATE_GUARD_RESULTS=allowed \
+PROMOTION_OBSERVABILITY_REQUIRED_ADMIN_OPERATION_RATE_GUARD_OPERATIONS=coupon_import_dry_run \
+PROMOTION_OBSERVABILITY_CUTOVER_WINDOW=24h \
+PROMOTION_CUTOVER_ENVIRONMENT=staging \
+PROMOTION_CUTOVER_EVIDENCE_ENABLED=true \
+PROMOTION_CUTOVER_EVIDENCE_SCOPES="coupon_fixture|courseflow|<coupon fixture app>|<coupon fixture campaign UUID>|true|true" \
+PROMOTION_CUTOVER_EVIDENCE_FILE=promotion-runtime-smoke-artifacts/promotion-cutover-evidence.json \
+PROMOTION_SMOKE_CHECKOUT_CLIENT_SECRET="<checkout-service STS secret>" \
+PROMOTION_SMOKE_PROMOTION_CLIENT_SECRET="<promotion-service STS secret>" \
+PROMOTION_SMOKE_TENANT_ID=courseflow \
+PROMOTION_SMOKE_APPLICATION_ID=lms \
+PROMOTION_SMOKE_EXPECTED_CAMPAIGN_CODE="<pre-provisioned smoke campaign>" \
+PROMOTION_SMOKE_UNBOUND_APPLICATION_ID="<active app with no checkout binding>" \
+PROMOTION_SMOKE_SUSPENDED_APPLICATION_ID="<suspended app with active checkout binding>" \
+PROMOTION_SMOKE_SUSPENDED_BINDING_APPLICATION_ID="<active app with suspended checkout binding>" \
+PROMOTION_SMOKE_EMPTY_BINDING_APPLICATION_ID="<active app with checkout binding allowed_operations=[]>" \
+PROMOTION_SMOKE_EVALUATE_ONLY_APPLICATION_ID="<active app with checkout binding allowed_operations=[evaluate]>" \
+PROMOTION_SMOKE_COUPON_APPLICATION_ID="<active coupon-required fixture app>" \
+PROMOTION_SMOKE_COUPON_CAMPAIGN_CODE="<pre-provisioned coupon-required smoke campaign>" \
+PROMOTION_SMOKE_QUOTA_APPLICATION_ID="<active hot-quota fixture app>" \
+PROMOTION_SMOKE_QUOTA_CAMPAIGN_CODE="<pre-provisioned max-one quota campaign>" \
+PROMOTION_SMOKE_COUPON_FINGERPRINT_KEY_ID="<current coupon fingerprint key id>" \
+PROMOTION_SMOKE_COUPON_FINGERPRINT_PEPPER="<current coupon fingerprint pepper>" \
+PROMOTION_SMOKE_COUPON_VALID_CODE="<valid coupon code>" \
+PROMOTION_SMOKE_COUPON_INACTIVE_CODE="<paused coupon code>" \
+PROMOTION_SMOKE_COUPON_NOT_STARTED_CODE="<future coupon code>" \
+PROMOTION_SMOKE_COUPON_EXPIRED_CODE="<expired coupon code>" \
+PROMOTION_SMOKE_COUPON_HOLDER_MISMATCH_CODE="<holder-bound coupon code>" \
+PROMOTION_SMOKE_COUPON_EXHAUSTED_CODE="<zero-quota coupon code>" \
+PROMOTION_SMOKE_COUPON_INVALID_CODE="<nonexistent coupon code>" \
+PROMOTION_SMOKE_COUPON_ABUSE_GUARD_BURST_ATTEMPTS=6 \
+PROMOTION_SMOKE_HOT_QUOTA_PARALLEL_ATTEMPTS=12 \
+PROMOTION_SMOKE_HOT_QUOTA_SOAK_WAVES=1 \
+PROMOTION_SMOKE_HOT_QUOTA_SOAK_ARTIFACT_FILE=promotion-runtime-smoke-artifacts/promotion-hot-quota-soak.json \
+PROMOTION_SMOKE_REQUIRE_COUPON_INVENTORY_READY=true \
+PROMOTION_SMOKE_COUPON_IMPORT_GATEWAY_ENABLED=true \
+PROMOTION_SMOKE_COUPON_CAMPAIGN_ID="<coupon fixture campaign UUID>" \
+PROMOTION_SMOKE_ADMIN_ACCESS_TOKEN="<staging admin OAuth2 access token>" \
+PROMOTION_COUPON_IMPORT_ISSUE_EXPORT_MAX_ROWS=10000 \
+PROMOTION_SMOKE_PROMOTION_DATABASE_URL="<cf_promotion read connection>" \
+PROMOTION_SMOKE_OUTBOX_DATABASE_URL="<cf_outbox read connection>" \
+node scripts/promotion-runtime-smoke.mjs
+node scripts/promotion-observability-smoke.mjs
+```
+
+Staging mode must use a pre-provisioned disposable fixture; it does not seed or mutate admin
+configuration. `PROMOTION_SMOKE_EXPECTED_CAMPAIGN_CODE` and
+`PROMOTION_SMOKE_QUOTA_CAMPAIGN_CODE` are required in staging so the smoke cannot select and consume
+quota from arbitrary active campaigns. Database checks may only be skipped with
+`PROMOTION_SMOKE_ALLOW_SKIP_DB_CHECKS=true`, which makes the run a partial smoke and not a production
+readiness gate. The five `PROMOTION_SMOKE_*_APPLICATION_ID` negative fixtures must be reviewed,
+pre-provisioned staging applications: the unbound fixture has no checkout-service binding, the
+suspended-application fixture has status `SUSPENDED`, the suspended-binding fixture has a
+`SUSPENDED` checkout binding, the empty-binding fixture has an active checkout binding with
+`allowed_operations=[]`, and the evaluate-only fixture has an active checkout binding with exactly
+`["evaluate"]`. None of the negative applications may have a published campaign snapshot. The coupon
+fixture application must have exactly one active published coupon-required campaign for the configured
+campaign code and no active non-coupon fallback snapshot. Its coupons must use current HMAC storage,
+store only masks in `code`/`code_mask`, and cover valid, inactive, not-started, expired,
+holder-mismatch, exhausted, and invalid-missing scenarios. Treat raw coupon codes and fingerprint
+pepper as secrets. The runtime smoke also checks active coupon storage inventory for both the
+coupon fixture campaign and coupon fixture application: `legacy_sha`, `legacy_raw`, and `malformed`
+must be zero, and `current_hmac` must be present. This check is enabled by default through
+`PROMOTION_SMOKE_REQUIRE_COUPON_INVENTORY_READY=true`.
+
+Coupon import issue exports are intentionally bounded while the admin API still returns CSV content
+inside a JSON DTO. `PROMOTION_COUPON_IMPORT_ISSUE_EXPORT_MAX_ROWS` defaults to `10000`; an export
+request above that limit must fail with `EXPORT_TOO_LARGE` before loading row payloads into memory.
+The production profile validator requires this setting, when overridden, to be a positive integer.
+Use narrower row-status filters for operator evidence until a later sprint adds paged or streaming
+downloads.
+
+When `PROMOTION_SMOKE_COUPON_IMPORT_GATEWAY_ENABLED=true`, the runtime smoke also exercises the
+operator lane through the real gateway path `/api/admin/v1/incentives/**` using
+`PROMOTION_SMOKE_ADMIN_ACCESS_TOKEN`. That opt-in gate proves bearer enforcement, storage inventory,
+multipart coupon import dry-run, dry-run idempotency replay, history/detail lookup, and masked issue
+export without using direct `/internal/**` URLs or service STS tokens. The smoke asserts that the
+admin response/export does not leak raw coupon codes, normalized codes, fingerprints, or idempotency
+keys. Keep the gate disabled in local runs until an admin OAuth2 token is available.
+
+The hot quota fixture application must have an active checkout-service binding for
+`evaluate`, `reserve`, `commit`, `cancel`, and `reverse`, exactly one active published non-coupon
+campaign for `PROMOTION_SMOKE_QUOTA_CAMPAIGN_CODE`, `max_redemptions=1`, no active fallback
+campaign snapshot in the same fixture application, and no coupon requirement. The smoke fires
+parallel reserve attempts with distinct idempotency keys, profiles, and external references, then
+requires exactly one reserved response, all other attempts to return `QUOTA_EXHAUSTED`, exactly one
+reservation, one `RESERVE` ledger row, a bounded campaign quota counter, and zero quota counters with
+`used_count < 0` or `used_count > limit_count`. After capturing evidence, the smoke cancels the
+winning reservation and verifies a `CANCEL` ledger row plus `used_count=0`, so the staging fixture can
+be reused safely by the next release-candidate run.
+
+The staging guard fixture must be configured so the coupon abuse guard can prove a real limited
+decision within `PROMOTION_SMOKE_COUPON_ABUSE_GUARD_BURST_ATTEMPTS`. For release evidence, run the
+fixture environment with `PROMOTION_COUPON_ABUSE_GUARD_MODE=enforced` or an equivalent pre-production
+profile. Production may roll out the same guard in `shadow` first, but a release candidate is not
+proven unless staging shows burst invalid evaluate and reserve attempts return generic `RATE_LIMITED`
+declines without creating reservations or exposing coupon secrets.
+
+Database checks are part of the release gate, not optional evidence. The runtime smoke validates the
+run-scoped reconciliation trail after the money lifecycle: a cancelled reservation must have exactly
+one `RESERVE` ledger row, one `CANCEL` ledger row, no redemption, no commit/reverse ledger rows, and
+the `RELEASE_RESERVED_QUOTA` policy; a committed then reversed redemption must have exactly one
+`RESERVE`, one `COMMIT`, one `REVERSE`, no cancel row, published committed/reversed outbox events
+with the smoke correlation/source client, non-empty effects, status `REVERSED`, and the
+`NO_RELEASE_ON_COMMITTED_REVERSAL` policy. These checks also scan the ledger/outbox evidence for raw
+coupon-code or fingerprint leakage.
+
+The staging promotion smoke is also available as the `run_promotion_runtime_smoke` manual workflow
+input in `.github/workflows/product-hardening.yml`. Configure the `COURSEFLOW_PROMOTION_SMOKE_*`
+repository variables/secrets to the same values shown above. The workflow intentionally forces
+`PROMOTION_SMOKE_ALLOW_SKIP_DB_CHECKS=false`, installs `psql`, checks Prometheus target/metric/alert
+evidence, proves the hot quota concurrency fixture, and uploads the smoke log artifacts so pilot
+releases have durable evidence. The
+observability smoke also requires a recent promotion runtime metric increase within
+`PROMOTION_OBSERVABILITY_RUNTIME_RECENT_WINDOW` (default `15m`), no unpublished promotion outbox
+backlog above `PROMOTION_OBSERVABILITY_MAX_OUTBOX_UNPUBLISHED` (default `0`), no oldest unpublished
+outbox age above `PROMOTION_OBSERVABILITY_MAX_OUTBOX_OLDEST_AGE_SECONDS` (default `0`), and zero open
+promotion relay DLQ rows. It also verifies recent bounded coupon-match metrics for
+`not_supplied`, `not_found`, `inactive`, `not_started`, `expired`, `holder_mismatch`, and `matched`
+with `coupon_required=true`, plus recent bounded coupon abuse guard metrics such as
+`promotion_coupon_abuse_guard_total{result="limited"}`. For fresh deployments, the observability
+smoke accepts either a Prometheus `increase()` or a recent `max_over_time()` observation so a guard
+event that happened before the first scrape is still valid release evidence within the same smoke
+window. It also verifies coupon lookup cutover evidence: current HMAC storage paths must have recent
+runtime evidence, while forbidden legacy paths such as `legacy_sha` and `legacy_raw` must not
+increase in the same smoke window. Finally, it verifies recent quota evidence for
+`promotion_quota_total` consumed/exhausted/released results and
+`promotion_quota_reserve_fallback_total` candidate-conflict/exhausted results.
+When the coupon import gateway lane is enabled, the observability smoke also requires
+`promotion_admin_operation_rate_guard_total` evidence for
+`operation=coupon_import_dry_run,result=allowed`. This proves admin import traffic traversed the
+bounded-cardinality admin operation guard without requiring a deliberately rate-limited operator
+request.
+
+When `PROMOTION_CUTOVER_EVIDENCE_ENABLED=true`, the observability smoke writes a retained JSON
+artifact to `PROMOTION_CUTOVER_EVIDENCE_FILE`. Each entry in
+`PROMOTION_CUTOVER_EVIDENCE_SCOPES` is semicolon-separated and uses:
+`name|tenantId|applicationId|campaignId?|activeOnly?|requireNonEmpty?`. The artifact includes
+`schemaVersion`, `artifactType=promotion_coupon_hmac_cutover_evidence`, environment, GitHub run
+metadata when present, exact scope, gateway inventory counts, Prometheus lookup evidence for
+`PROMOTION_OBSERVABILITY_CUTOVER_WINDOW` (default `24h`), redaction evidence, failed check names, and
+`decision.status`. Staging fixture scopes should set `requireNonEmpty=true`; production read-only
+scopes may leave it false when proving an application that currently has no active coupons. The
+artifact must not contain raw coupon codes, normalized codes, HMAC fingerprints, coupon ids, key ids,
+holder profile ids, peppers, idempotency keys, or uploaded CSV content.
+
 This gate now covers the full disposable learning path through the gateway:
 public catalog, protected module access, authoring draft/module/item creation,
 review approval, publish, enrollment, learner login, learner module read, item
@@ -118,8 +317,13 @@ PostgreSQL backup/restore drill:
 ```bash
 cd backend
 scripts/postgres-backup-drill.sh backup
-scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_identity
+scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
 ```
+
+The restore-check writes `backups/postgres/<timestamp>/restore-check-cf_promotion.json` after a
+successful `pg_restore` probe. Register promotion retention restore drills from that evidence file's
+`restoreDrillRef`, `databaseName`, `backupPath`, `artifactHash`, `status`, and `checkedAt` values,
+not from manually typed hashes.
 
 Mobile static gate when Flutter is installed:
 
@@ -166,6 +370,9 @@ Then check:
 - Admin notifications can send a `SYSTEM` notification and show `DELIVERED` or `FAILED`.
 - Admin user detail can download privacy export JSON and deactivate a disposable account.
 - `node scripts/product-hardening-smoke.mjs` passes with `Smoke passed`.
+- `node scripts/promotion-runtime-smoke.mjs` passes with `Promotion runtime smoke passed`.
+- `promotion-cutover-evidence.json`, when enabled, has
+  `artifactType=promotion_coupon_hmac_cutover_evidence` and `decision.status=pass`.
 - Prometheus can scrape service `/actuator/prometheus` targets when the observability compose override is enabled.
 - Token converter metrics show token exchange request/success/failure/duration and JWKS request
   counters: `courseflow.token_converter.*`.
@@ -179,7 +386,13 @@ Then check:
   production profile.
 - Production STS service scopes are explicit; wildcard `COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES=*`
   is rejected, and the list must include the endpoint-level scopes enforced by
-  `TrustedGatewayHeaderFilter`.
+  `TrustedGatewayHeaderFilter`, including the concrete `internal:promotion:<operation>` scopes.
+- Promotion service-to-service calls are fail-closed twice: the common internal JWT filter rejects
+  generic `internal:service` tokens for `/internal/incentives/**`, and promotion access checks
+  require the matching `internal:promotion:<operation>` scope before honoring the client binding.
+  Runtime operation scopes are granted to trusted source clients such as `checkout-service` and
+  `enrollment-service`; the
+  `promotion-service` STS client keeps only `internal:promotion:admin` by default.
 - Downstream services expose internal JWT rejection counters through
   `courseflow.internal_jwt.rejections` for `/internal/**`, `/backoffice/**` and identity-header
   requests.
@@ -194,6 +407,91 @@ Then check:
 - Kafka Connect is verified through `GET /connectors/courseflow-course-search-cdc/status`; it is not a Spring actuator target.
 - Grafana starts with the CourseFlow Prometheus datasource provisioned.
 - Prometheus loads `infra/observability/alerts.yml` and evaluates basic service-down alerts.
+- Promotion coupon storage inventory is reachable through the gateway for an admin:
+  `GET /api/admin/v1/incentives/coupons/storage-inventory?tenantId=courseflow&applicationId=lms`.
+  The response must be aggregate-only, include all five storage buckets, and must not expose coupon
+  code, `normalizedCode`, fingerprint, coupon id, key id, or holder profile id.
+- Before disabling `PROMOTION_COUPON_LEGACY_FALLBACK_ENABLED`, coupon inventory must report
+  `legacyCoupons=0`, `malformedCoupons=0`, and `fallbackDisableReady=true` for the active scope, and
+  Prometheus must show no `legacy_sha` or `legacy_raw` lookup hits for the agreed observation window.
+  The production profile must set `PROMOTION_COUPON_LEGACY_FALLBACK_ENABLED` explicitly to `true` or
+  `false`; `true` means the migration window is still open, not that cutover is complete.
+  Local release smoke must also prove the internal admin inventory route rejects unauthenticated direct
+  calls and returns only aggregate cutover evidence when called through a trusted internal admin JWT.
+- Promotion retention policy registry is reachable through the gateway for an operator:
+  `GET /api/admin/v1/incentives/retention/policies`.
+- Promotion retention dry-run is reachable through the gateway for an admin:
+  `POST /api/admin/v1/incentives/retention/dry-runs`. It must be aggregate-only, non-destructive, and
+  must not expose raw request/response JSON, outbox payload, idempotency key, coupon code, fingerprint,
+  profile id, external reference, or row ids.
+- Promotion terminal reservation request snapshot redaction is reachable through the gateway for an
+  admin only after a fresh approved dry-run:
+  `POST /api/admin/v1/incentives/retention/executions`. It must require a persisted `approvalId`,
+  `idempotencyKey`, `confirm=true`, and `X-Correlation-Id`; it must return aggregate counts only.
+- Promotion retention approval requires a registered successful `cf_promotion` restore drill,
+  a fresh matching dry-run hash, reason, change ticket, and reviewer approval by a different human
+  actor before execution can run.
+- Promotion restore-drill registration must reject non-`cf_promotion` databases, malformed
+  `sha256:<64-hex>` artifact hashes, and `checkedAt` values in the future.
+- Promotion retention approval must be unique for an active dry-run scope
+  (`policyId + scopeKey + dryRunId + resultHash + batchLimit`) so a single dry-run cannot be
+  approved into multiple destructive executions.
+- Promotion retention execution must persist an `IN_PROGRESS` operation before destructive work,
+  transition failed attempts to `FAILED`, and transition the approval to `EXECUTION_FAILED` after
+  rollback.
+- Prometheus must expose `promotion_retention_execution_stale_in_progress`; alerts must fire for
+  failed and stuck destructive retention execution attempts.
+- `scripts/postgres-backup-drill.sh` must include `cf_promotion`, and the operator must run a
+  restore-check against `cf_promotion` before the first production redaction execution. The
+  generated `restore-check-cf_promotion.json` evidence must be retained with the release record and
+  used as the source for restore-drill registration.
+- Promotion application client bindings are fail-closed: a binding with `allowedOperations=[]` must
+  reject every operation. Runtime/admin operation smoke should grant only the needed explicit
+  operations, for example `admin`, `evaluate`, `reserve`, `commit`, `cancel`, or `reverse`.
+- Promotion coupon brute-force protection is active for coupon-required campaigns: repeated suspicious
+  invalid evaluate/reserve attempts must be keyed through HMAC/peppered Redis buckets, return a
+  generic `RATE_LIMITED` decline when enforced, create no reservation, and expose only bounded
+  `promotion_coupon_abuse_guard_total` metrics.
+- Promotion admin coupon operations are rate guarded before expensive preview, parsing, export,
+  approval, commit, or generation side effects. Admin preview, dry-run, issue export, approval
+  request, approval approve/reject, commit, and generate must key bounded HMAC/peppered Redis buckets
+  by application, campaign, actor, source client, and content where applicable, return only
+  `429 RATE_LIMITED` when enforced, and expose bounded
+  `promotion_admin_operation_rate_guard_total` metrics.
+- Promotion coupon import commit is database-concurrency gated through `PromotionServiceJpaSmokeTest`:
+  same dry-run/approval plus the same idempotency key must replay to one import operation and one
+  coupon write set, crash-window retries must replay from the durable import operation and heal an
+  `IN_PROGRESS` idempotency key to `SUCCEEDED`, and different-key double-submit must fail closed
+  after the first commit.
+- Promotion coupon import operation export is an audit-safe receipt only: CSV and audit payload must
+  exclude raw coupon codes, uploaded CSV content, normalized codes, request/content/idempotency
+  hashes, response JSON, metadata, fingerprints, and profile PII while preserving receipt fields such
+  as import/dry-run/approval ids, status, result hash, row counts, actor/source client, correlation,
+  reason, and change ticket.
+- Promotion hot quota correctness is release-gated: a dedicated `max_redemptions=1` fixture campaign
+  must allow exactly one successful parallel reserve, return `QUOTA_EXHAUSTED` for the rest, create
+  exactly one reservation/ledger pair, leave no quota counter outside `[0, limit_count]`, then cancel
+  the winning reservation and prove the quota counter is released for reruns. Staging/nightly can
+  raise `PROMOTION_SMOKE_HOT_QUOTA_SOAK_WAVES` above `1` to repeat the same bounded race and retain
+  `promotion_hot_quota_soak_evidence` JSON with wave counts, winner counts, release evidence, and
+  latency summary.
+- Outbox relay DLQ is operator-visible: `GET /api/admin/v1/outbox/dead-letters?status=OPEN`
+  returns metadata only and must not expose raw payload.
+- Outbox relay DLQ replay/discard requires platform `ADMIN`, an idempotency key, and a reason. Replay
+  uses the stored topic/key/payload and cannot be redirected by the request body.
+- Outbox relay Prometheus metrics include `outbox_relay_dead_letters_open`,
+  `outbox_relay_dead_letter_oldest_age_seconds`, `outbox_relay_replay_total`, and
+  `outbox_relay_publish_failures_total`.
+- Outbox-relay destructive published-row cleanup remains disabled unless `OUTBOX_PURGE_ENABLED=true`
+  is explicitly set after a separate retention execution approval.
+- Promotion reservation expiry is multi-replica safe: expired `RESERVED` rows are claimed through a
+  JPA native `FOR UPDATE SKIP LOCKED` query, ordered by `expires_at, id`, and each expired
+  reservation must produce at most one `EXPIRE` ledger entry.
+- Promotion reservation request snapshots are minimized at write time: raw profile ids, external
+  references, coupon codes, coupon fingerprints, item ids, item attributes, and free-form attribute
+  values must not appear in new `request_json` snapshots or preview audit payloads.
+- Production must configure a dedicated `courseflow.promotion.request-snapshot.hash-secret` for
+  deterministic HMAC fingerprints before treating snapshot minimization as enterprise-ready.
 - `scripts/postgres-backup-drill.sh restore-check ...` passes for at least one service database.
 
 ## No-Go Criteria
@@ -218,8 +516,75 @@ Do not call a build production-ready if any item below is true:
 - Chat/WebSocket accepts legacy CourseFlow JWTs directly instead of exchanging the bearer token
   through `identity-token-converter-service`.
 - Fresh Liquibase migration fails from an empty database.
+- Promotion legacy coupon fallback is disabled while active inventory still has `legacy_sha`,
+  `legacy_raw`, or `malformed` rows, or while `promotion_coupon_lookup_total` still reports legacy
+  runtime lookup hits in the cutover window.
+- Promotion coupon write paths, including coupon import commit, can acquire idempotency, re-evaluate
+  import rows, write coupons, write operations, execute approvals, or write audit events after the
+  fallback-disabled cutover guard detects active legacy or malformed inventory.
+- Any incentive application client binding with an empty `allowedOperations` list grants access to an
+  operation instead of denying all operations.
+- Gateway exposes browser-facing runtime incentive routes, or `promotion-service` can mint
+  `internal:promotion:evaluate|reserve|commit|cancel|reverse` runtime scopes intended for source
+  clients such as `checkout-service`.
+- Promotion runtime smoke cannot prove `evaluate -> reserve -> commit`, idempotency replay, a
+  cancelled reservation replay, reversed redemption replay, operation-scope denial, missing-key and
+  payload-conflict idempotency denial, client-binding fixture denials, coupon abuse declines without
+  raw coupon leakage, coupon abuse guard burst limiting for evaluate and reserve, commit-after-cancel
+  no-redemption behavior, published committed/reversed redemption outbox events, run-scoped
+  reconciliation evidence for cancel and commit/reverse, hot quota concurrent reserve evidence, and
+  zero open promotion outbox relay DLQ rows.
+- Promotion staging smoke runs without `PROMOTION_SMOKE_EXPECTED_CAMPAIGN_CODE`, skips database
+  checks, lacks the five required negative application fixtures, lacks the coupon abuse fixture
+  campaign/codes/fingerprint config, finds legacy or malformed active coupon inventory in the coupon
+  fixture campaign/application scope, lacks the hot quota fixture app/campaign config, cannot
+  trigger a bounded coupon abuse guard limit within the configured burst attempts, cannot prove
+  exactly one hot quota reserve winner under parallel attempts, finds a fixture shape mismatch, lacks
+  a retained log artifact, lacks a retained hot quota soak evidence JSON artifact when configured
+  waves exceed `1`, or lacks a retained cutover evidence JSON artifact for the release candidate.
+- Promotion observability smoke cannot prove gateway/token-converter/promotion/outbox-relay scrape
+  targets are up, promotion runtime metrics are present and increased recently after the run,
+  bounded coupon-match metrics increased for all smoke abuse outcomes, bounded coupon abuse guard
+  metric evidence exists for the configured guard results in the recent smoke window, current-HMAC
+  coupon lookup evidence exists while forbidden legacy lookup paths do not increase, quota
+  consumed/exhausted/released and fallback metrics have recent evidence, promotion outbox backlog/DLQ
+  metrics are healthy, and critical promotion/outbox/token-converter alerts are not firing.
+- Promotion admin import gateway lane is enabled but Prometheus cannot show recent
+  `promotion_admin_operation_rate_guard_total{operation="coupon_import_dry_run",result="allowed"}`
+  evidence, or guard evidence is required while the gateway lane is disabled.
+- Promotion admin gateway issue-export smoke returns a masked CSV but cannot prove a matching
+  `coupon.import_issue_export_downloaded` audit row in `incentive_audit_events`, or the audit payload
+  contains CSV content, raw coupon codes, normalized codes, HMAC/fingerprint text, idempotency keys, or
+  import content hashes.
+- Promotion cutover evidence artifact is enabled but missing, has `decision.status=fail`, omits exact
+  tenant/application/campaign scope, uses a skipped database check run as production evidence, or
+  contains raw coupon codes, normalized codes, HMAC fingerprints, key ids, coupon ids, holder profile
+  ids, peppers, idempotency keys, or uploaded CSV content.
+- Promotion admin operation guard is disabled in a production profile, has no dedicated key id or
+  pepper, accepts a weak/local pepper, or exposes actor/source-client/content identifiers in Redis
+  keys or metrics.
+- Promotion admin preview, coupon import approval approve/reject, import commit, issue export,
+  operation export, dry-run, or coupon generation can proceed to decisioning, batch validation,
+  mutation, audit, export generation, or writes after the admin operation rate guard denies the
+  request.
+- Any retention endpoint deletes, updates, purges, or redacts target business rows without a fresh
+  approved dry-run reference, audit event, change ticket, idempotency key, and restore drill.
+- Promotion retention execution can run without a persisted approved `approvalId`, with a stale
+  dry-run, mismatched result hash, missing `X-Correlation-Id`, invalid restore drill, same approver
+  and executor, or without `FOR UPDATE SKIP LOCKED` row claiming.
+- More than one active promotion retention approval can exist for the same dry-run/scope/batch.
+- A failed promotion retention execution leaves no durable `FAILED` operation, no
+  `EXECUTION_FAILED` approval state, or no failure alert surface.
+- New promotion reservation snapshots or preview audit payloads store raw profile id, external
+  reference, coupon code, coupon fingerprint, item id, item attributes, or free-form request
+  attribute values.
+- Promotion reservation expiry blocks or double-processes rows when more than one writer replica is
+  running.
+- Outbox-relay published-row purge is enabled in production without an approved retention execution
+  design.
 - No metrics endpoint exists for backend services.
-- No restore-checked backup artifact exists for Postgres service databases.
+- No restore-checked backup evidence JSON exists for the Postgres service database being used by a
+  destructive operation, or the restore-drill registration values do not match that evidence.
 - Backend tests or admin build fail.
 - Mobile `flutter analyze` fails.
 

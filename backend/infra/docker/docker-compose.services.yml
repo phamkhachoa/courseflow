@@ -5,6 +5,9 @@ x-build-common: &build-common
   dockerfile: infra/docker/service.Dockerfile
 
 x-service-env: &service-env
+  SERVER_PORT: 8080
+  SERVICE_DISCOVERY_ENABLED: "true"
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8080/eureka/
   COURSEFLOW_JWT_SECRET: ${COURSEFLOW_JWT_SECRET:-courseflow-local-cluster-jwt-secret-change-me-32}
   COURSEFLOW_INTERNAL_JWT_ALGORITHM: ${COURSEFLOW_INTERNAL_JWT_ALGORITHM:-HS256}
   COURSEFLOW_INTERNAL_JWT_SECRET: ${COURSEFLOW_INTERNAL_JWT_SECRET:-courseflow-local-internal-jwt-secret-change-me-32}
@@ -16,16 +19,16 @@ x-service-env: &service-env
   COURSEFLOW_INTERNAL_JWT_AUDIENCE: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:-courseflow-services}
   COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE: ${COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE:-local}
   COURSEFLOW_STS_CLIENT_SECRET: ${COURSEFLOW_STS_CLIENT_SECRET:-local-courseflow-sts-client-secret-change-me-32}
-  COURSEFLOW_STS_CLIENT_SECRETS: ${COURSEFLOW_STS_CLIENT_SECRETS:-api-gateway=local-courseflow-sts-client-secret-change-me-32;access-control-service=local-courseflow-sts-client-secret-change-me-32;user-management-service=local-courseflow-sts-client-secret-change-me-32;organization-service=local-courseflow-sts-client-secret-change-me-32;course-service=local-courseflow-sts-client-secret-change-me-32;enrollment-service=local-courseflow-sts-client-secret-change-me-32;assignment-service=local-courseflow-sts-client-secret-change-me-32;deadline-service=local-courseflow-sts-client-secret-change-me-32;announcement-service=local-courseflow-sts-client-secret-change-me-32;portfolio-service=local-courseflow-sts-client-secret-change-me-32;discussion-service=local-courseflow-sts-client-secret-change-me-32;notification-service=local-courseflow-sts-client-secret-change-me-32;chat-service=local-courseflow-sts-client-secret-change-me-32;media-service=local-courseflow-sts-client-secret-change-me-32;search-service=local-courseflow-sts-client-secret-change-me-32;analytics-service=local-courseflow-sts-client-secret-change-me-32;gradebook-service=local-courseflow-sts-client-secret-change-me-32;quiz-service=local-courseflow-sts-client-secret-change-me-32;certificate-service=local-courseflow-sts-client-secret-change-me-32;peer-review-service=local-courseflow-sts-client-secret-change-me-32;live-session-service=local-courseflow-sts-client-secret-change-me-32;review-service=local-courseflow-sts-client-secret-change-me-32;outbox-relay=local-courseflow-sts-client-secret-change-me-32}
-  COURSEFLOW_STS_ALLOWED_CLIENTS: ${COURSEFLOW_STS_ALLOWED_CLIENTS:-api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,outbox-relay}
-  COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES: ${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice}
-  COURSEFLOW_STS_CLIENT_SCOPES: ${COURSEFLOW_STS_CLIENT_SCOPES:-api-gateway=internal:service,internal:token-exchange;access-control-service=internal:service;user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;enrollment-service=internal:service;assignment-service=internal:service;deadline-service=internal:service;announcement-service=internal:service;portfolio-service=internal:service;discussion-service=internal:service;notification-service=internal:service;chat-service=internal:service,internal:token-exchange;media-service=internal:service;search-service=internal:service;analytics-service=internal:service;gradebook-service=internal:service;quiz-service=internal:service;certificate-service=internal:service;peer-review-service=internal:service;live-session-service=internal:service;review-service=internal:service;outbox-relay=internal:service}
-  TOKEN_CONVERTER_URI: ${TOKEN_CONVERTER_URI:-http://identity-token-converter-service:8105}
+  COURSEFLOW_STS_CLIENT_SECRETS: ${COURSEFLOW_STS_CLIENT_SECRETS:-api-gateway=local-courseflow-sts-client-secret-change-me-32;access-control-service=local-courseflow-sts-client-secret-change-me-32;user-management-service=local-courseflow-sts-client-secret-change-me-32;organization-service=local-courseflow-sts-client-secret-change-me-32;course-service=local-courseflow-sts-client-secret-change-me-32;enrollment-service=local-courseflow-sts-client-secret-change-me-32;assignment-service=local-courseflow-sts-client-secret-change-me-32;deadline-service=local-courseflow-sts-client-secret-change-me-32;announcement-service=local-courseflow-sts-client-secret-change-me-32;portfolio-service=local-courseflow-sts-client-secret-change-me-32;discussion-service=local-courseflow-sts-client-secret-change-me-32;notification-service=local-courseflow-sts-client-secret-change-me-32;chat-service=local-courseflow-sts-client-secret-change-me-32;media-service=local-courseflow-sts-client-secret-change-me-32;search-service=local-courseflow-sts-client-secret-change-me-32;analytics-service=local-courseflow-sts-client-secret-change-me-32;gradebook-service=local-courseflow-sts-client-secret-change-me-32;quiz-service=local-courseflow-sts-client-secret-change-me-32;certificate-service=local-courseflow-sts-client-secret-change-me-32;peer-review-service=local-courseflow-sts-client-secret-change-me-32;live-session-service=local-courseflow-sts-client-secret-change-me-32;review-service=local-courseflow-sts-client-secret-change-me-32;checkout-service=local-courseflow-sts-client-secret-change-me-32;promotion-service=local-courseflow-sts-client-secret-change-me-32;loyalty-service=local-courseflow-sts-client-secret-change-me-32;outbox-relay=local-courseflow-sts-client-secret-change-me-32}
+  COURSEFLOW_STS_ALLOWED_CLIENTS: ${COURSEFLOW_STS_ALLOWED_CLIENTS:-api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,checkout-service,promotion-service,loyalty-service,outbox-relay}
+  COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES: ${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice,internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire}
+  COURSEFLOW_STS_CLIENT_SCOPES: ${COURSEFLOW_STS_CLIENT_SCOPES:-api-gateway=internal:service,internal:token-exchange;access-control-service=internal:service;user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;enrollment-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse;assignment-service=internal:service;deadline-service=internal:service;announcement-service=internal:service;portfolio-service=internal:service;discussion-service=internal:service;notification-service=internal:service;chat-service=internal:service,internal:token-exchange;media-service=internal:service;search-service=internal:service;analytics-service=internal:service;gradebook-service=internal:service;quiz-service=internal:service;certificate-service=internal:service;peer-review-service=internal:service;live-session-service=internal:service;review-service=internal:service;checkout-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:read;promotion-service=internal:service,internal:promotion:admin,internal:loyalty:earn,internal:loyalty:reverse;loyalty-service=internal:service,internal:loyalty:admin,internal:loyalty:read;outbox-relay=internal:service}
+  TOKEN_CONVERTER_URI: ${TOKEN_CONVERTER_URI:-http://identity-token-converter-service:8080}
   EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-http://localhost:3000/verify-email}
-  COURSEFLOW_ENTITLEMENT_ENROLLMENT_SERVICE_URL: http://enrollment-service:8084
-  COURSEFLOW_ENTITLEMENT_COURSE_SERVICE_URL: http://course-service:8083
-  ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8106
-  USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8107
+  COURSEFLOW_ENTITLEMENT_ENROLLMENT_SERVICE_URL: http://enrollment-service:8080
+  COURSEFLOW_ENTITLEMENT_COURSE_SERVICE_URL: http://course-service:8080
+  ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8080
+  USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8080
   EXTERNAL_TOKEN_MODE: ${EXTERNAL_TOKEN_MODE:-oidc}
   KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:18080/realms/courseflow}
   KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-courseflow-api}
@@ -38,8 +41,9 @@ x-service-env: &service-env
   ACCESS_CONTROL_RESOLUTION_MODE: ${ACCESS_CONTROL_RESOLUTION_MODE:-required}
   ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP: ${ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP:-true}
   ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED: ${ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED:-false}
-  CERTIFICATE_ENROLLMENT_SERVICE_URL: http://enrollment-service:8084
-  CERTIFICATE_GRADEBOOK_SERVICE_URL: http://gradebook-service:8094
+  CERTIFICATE_COURSE_SERVICE_URL: http://course-service:8080
+  CERTIFICATE_ENROLLMENT_SERVICE_URL: http://enrollment-service:8080
+  CERTIFICATE_GRADEBOOK_SERVICE_URL: http://gradebook-service:8080
   CERTIFICATE_SIGNING_SECRET: ${CERTIFICATE_SIGNING_SECRET:-courseflow-local-certificate-signing-secret-change-me-32}
   SPRING_LIQUIBASE_CONTEXTS: ${SPRING_LIQUIBASE_CONTEXTS:-prod,demo}
   DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-3}
@@ -80,6 +84,8 @@ x-service-env: &service-env
   PEER_REVIEW_DB_URL: jdbc:postgresql://postgres:5432/cf_peer_review
   LIVE_SESSION_DB_URL: jdbc:postgresql://postgres:5432/cf_live_session
   REVIEW_DB_URL: jdbc:postgresql://postgres:5432/cf_review
+  PROMOTION_DB_URL: jdbc:postgresql://postgres:5432/cf_promotion
+  LOYALTY_DB_URL: jdbc:postgresql://postgres:5432/cf_loyalty
   OUTBOX_RELAY_DB_URL: jdbc:postgresql://postgres:5432/cf_outbox
   IDENTITY_DB_USERNAME: courseflow
   IDENTITY_DB_PASSWORD: courseflow
@@ -119,14 +125,22 @@ x-service-env: &service-env
   LIVE_SESSION_DB_PASSWORD: courseflow
   REVIEW_DB_USERNAME: courseflow
   REVIEW_DB_PASSWORD: courseflow
+  PROMOTION_DB_USERNAME: courseflow
+  PROMOTION_DB_PASSWORD: courseflow
+  LOYALTY_DB_USERNAME: courseflow
+  LOYALTY_DB_PASSWORD: courseflow
   OUTBOX_RELAY_DB_USERNAME: courseflow
   OUTBOX_RELAY_DB_PASSWORD: courseflow
 
 x-service-common: &service-common
   restart: unless-stopped
+  expose:
+    - "8080"
   environment:
     <<: *service-env
   depends_on:
+    discovery-service:
+      condition: service_started
     postgres:
       condition: service_healthy
     kafka:
@@ -141,6 +155,18 @@ x-service-common: &service-common
       condition: service_completed_successfully
 
 services:
+  discovery-service:
+    restart: unless-stopped
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/discovery-service
+    environment:
+      SERVER_PORT: 8080
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8080/eureka/
+    expose:
+      - "8080"
+
   api-gateway:
     <<: *service-common
     build:
@@ -149,29 +175,7 @@ services:
         MODULE: services/api-gateway
     environment:
       <<: *service-env
-      ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8106
-      USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8107
-      ORGANIZATION_SERVICE_URI: http://organization-service:8082
-      COURSE_SERVICE_URI: http://course-service:8083
-      ENROLLMENT_SERVICE_URI: http://enrollment-service:8084
-      ASSIGNMENT_SERVICE_URI: http://assignment-service:8085
-      DEADLINE_SERVICE_URI: http://deadline-service:8086
-      ANNOUNCEMENT_SERVICE_URI: http://announcement-service:8087
-      PORTFOLIO_SERVICE_URI: http://portfolio-service:8088
-      DISCUSSION_SERVICE_URI: http://discussion-service:8089
-      NOTIFICATION_SERVICE_URI: http://notification-service:8090
-      CHAT_SERVICE_URI: http://chat-service:8104
-      CHAT_SERVICE_WS_URI: ws://chat-service:8104
-      MEDIA_SERVICE_URI: http://media-service:8091
-      SEARCH_SERVICE_URI: http://search-service:8092
-      ANALYTICS_SERVICE_URI: http://analytics-service:8093
-      GRADEBOOK_SERVICE_URI: http://gradebook-service:8094
-      QUIZ_SERVICE_URI: http://quiz-service:8095
-      CERTIFICATE_SERVICE_URI: http://certificate-service:8096
-      PEER_REVIEW_SERVICE_URI: http://peer-review-service:8097
-      LIVE_SESSION_SERVICE_URI: http://live-session-service:8101
-      REVIEW_SERVICE_URI: http://review-service:8102
-      TOKEN_CONVERTER_URI: http://identity-token-converter-service:8105
+      TOKEN_CONVERTER_URI: http://identity-token-converter-service:8080
       TOKEN_CONVERTER_MODE: ${TOKEN_CONVERTER_MODE:-required}
     ports:
       - "${API_GATEWAY_PORT:-28080}:8080"
@@ -182,8 +186,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/identity-service
-    ports:
-      - "8081:8081"
 
   access-control-service:
     <<: *service-common
@@ -191,8 +193,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/access-control-service
-    ports:
-      - "8106:8106"
 
   user-management-service:
     <<: *service-common
@@ -200,8 +200,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/user-management-service
-    ports:
-      - "8107:8107"
 
   identity-token-converter-service:
     <<: *service-common
@@ -212,8 +210,6 @@ services:
     environment:
       <<: *service-env
       COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE: local
-    ports:
-      - "8105:8105"
 
   organization-service:
     <<: *service-common
@@ -221,8 +217,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/organization-service
-    ports:
-      - "8082:8082"
 
   course-service:
     <<: *service-common
@@ -230,8 +224,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/course-service
-    ports:
-      - "8083:8083"
 
   enrollment-service:
     <<: *service-common
@@ -239,8 +231,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/enrollment-service
-    ports:
-      - "8084:8084"
 
   assignment-service:
     <<: *service-common
@@ -248,8 +238,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/assignment-service
-    ports:
-      - "8085:8085"
 
   deadline-service:
     <<: *service-common
@@ -257,8 +245,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/deadline-service
-    ports:
-      - "8086:8086"
 
   announcement-service:
     <<: *service-common
@@ -266,8 +252,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/announcement-service
-    ports:
-      - "8087:8087"
 
   portfolio-service:
     <<: *service-common
@@ -275,8 +259,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/portfolio-service
-    ports:
-      - "8088:8088"
 
   discussion-service:
     <<: *service-common
@@ -284,8 +266,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/discussion-service
-    ports:
-      - "8089:8089"
 
   notification-service:
     <<: *service-common
@@ -293,8 +273,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/notification-service
-    ports:
-      - "8090:8090"
 
   chat-service:
     <<: *service-common
@@ -302,8 +280,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/chat-service
-    ports:
-      - "8104:8104"
 
   media-service:
     <<: *service-common
@@ -311,8 +287,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/media-service
-    ports:
-      - "8091:8091"
 
   search-service:
     <<: *service-common
@@ -320,8 +294,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/search-service
-    ports:
-      - "8092:8092"
 
   analytics-service:
     <<: *service-common
@@ -329,8 +301,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/analytics-service
-    ports:
-      - "8093:8093"
 
   gradebook-service:
     <<: *service-common
@@ -338,8 +308,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/gradebook-service
-    ports:
-      - "8094:8094"
 
   quiz-service:
     <<: *service-common
@@ -347,8 +315,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/quiz-service
-    ports:
-      - "8095:8095"
 
   certificate-service:
     <<: *service-common
@@ -356,8 +322,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/certificate-service
-    ports:
-      - "8096:8096"
 
   peer-review-service:
     <<: *service-common
@@ -365,8 +329,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/peer-review-service
-    ports:
-      - "8097:8097"
 
   live-session-service:
     <<: *service-common
@@ -374,8 +336,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/live-session-service
-    ports:
-      - "8101:8101"
 
   review-service:
     <<: *service-common
@@ -383,8 +343,43 @@ services:
       <<: *build-common
       args:
         MODULE: services/review-service
-    ports:
-      - "8102:8102"
+
+  promotion-service:
+    <<: *service-common
+    environment:
+      <<: *service-env
+      PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET: ${PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET:-courseflow-local-request-snapshot-hash-secret-change-me-32}
+      PROMOTION_RETENTION_EXECUTION_ENABLED: ${PROMOTION_RETENTION_EXECUTION_ENABLED:-true}
+      PROMOTION_COUPON_ABUSE_GUARD_MODE: ${PROMOTION_COUPON_ABUSE_GUARD_MODE:-enforced}
+      PROMOTION_COUPON_ABUSE_GUARD_KEY_ID: ${PROMOTION_COUPON_ABUSE_GUARD_KEY_ID:-local}
+      PROMOTION_COUPON_ABUSE_GUARD_PEPPER: ${PROMOTION_COUPON_ABUSE_GUARD_PEPPER:-courseflow-local-coupon-abuse-guard-pepper-change-me}
+      PROMOTION_COUPON_ABUSE_GUARD_PROFILE_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_PROFILE_CAPACITY:-3}
+      PROMOTION_COUPON_ABUSE_GUARD_COUPON_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_COUPON_CAPACITY:-3}
+      PROMOTION_COUPON_ABUSE_GUARD_CLIENT_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_CLIENT_CAPACITY:-100}
+      PROMOTION_COUPON_ABUSE_GUARD_APPLICATION_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_APPLICATION_CAPACITY:-500}
+      PROMOTION_COUPON_ABUSE_GUARD_MISSING_IDENTITY_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_MISSING_IDENTITY_CAPACITY:-2}
+      PROMOTION_COUPON_ABUSE_GUARD_FAIL_POLICY: ${PROMOTION_COUPON_ABUSE_GUARD_FAIL_POLICY:-allow_with_alert}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_MODE: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_MODE:-enforced}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_KEY_ID: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_KEY_ID:-local}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_PEPPER: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_PEPPER:-courseflow-local-admin-operation-rate-guard-pepper-change-me}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_ACTOR_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_ACTOR_CAPACITY:-20}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_SOURCE_CLIENT_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_SOURCE_CLIENT_CAPACITY:-100}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_APPLICATION_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_APPLICATION_CAPACITY:-500}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_CAMPAIGN_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_CAMPAIGN_CAPACITY:-100}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_CONTENT_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_CONTENT_CAPACITY:-5}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_MISSING_IDENTITY_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_MISSING_IDENTITY_CAPACITY:-5}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_FAIL_POLICY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_FAIL_POLICY:-deny}
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/promotion-service
+
+  loyalty-service:
+    <<: *service-common
+    build:
+      <<: *build-common
+      args:
+        MODULE: services/loyalty-service
 
   outbox-relay:
     <<: *service-common
@@ -392,5 +387,3 @@ services:
       <<: *build-common
       args:
         MODULE: services/outbox-relay
-    ports:
-      - "8103:8103"

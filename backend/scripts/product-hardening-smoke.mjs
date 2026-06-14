@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { spawnSync } from "node:child_process";
+
 /**
  * Gateway-level Product Hardening smoke test.
  *
@@ -22,13 +24,18 @@
  *   - identity privacy export
  *   - identity user deactivation
  *
- * Prerequisite: local backend cluster running with demo admin data.
+ * Prerequisite: local backend cluster running with demo admin data. Direct service checks run inside
+ * the Docker network by default because app services are intentionally not published to the host.
  */
 
 const API_BASE = stripTrailingSlash(process.env.COURSEFLOW_API_URL ?? "http://localhost:28080/api");
 const DIRECT_SERVICE_BASE = stripTrailingSlash(
-  process.env.COURSEFLOW_DIRECT_SERVICE_URL ?? "http://localhost:8083"
+  process.env.COURSEFLOW_DIRECT_SERVICE_URL ?? "http://course-service:8080"
 );
+const DIRECT_SERVICE_TRANSPORT = (process.env.COURSEFLOW_DIRECT_SERVICE_TRANSPORT ?? "auto").toLowerCase();
+const DIRECT_SERVICE_DOCKER_NETWORK =
+  process.env.COURSEFLOW_SMOKE_DOCKER_NETWORK ?? "courseflow-v2-backend_default";
+const CURL_IMAGE = process.env.COURSEFLOW_SMOKE_CURL_IMAGE ?? "curlimages/curl:8.10.1";
 const ADMIN_EMAIL = process.env.COURSEFLOW_SMOKE_ADMIN_EMAIL ?? "admin@courseflow.local";
 const ADMIN_PASSWORD = process.env.COURSEFLOW_SMOKE_ADMIN_PASSWORD ?? "password";
 const DEPARTMENT_ID =
@@ -120,7 +127,9 @@ async function runGoldenLearningFlow(user) {
     slug,
     summary: "Disposable course created by the Product Hardening gateway smoke test.",
     departmentId: DEPARTMENT_ID,
-    level: "BEGINNER"
+    level: "BEGINNER",
+    listPrice: 100,
+    currency: "USD"
   });
   const courseId = draft.courseId;
   record("authoring create disposable course", Boolean(courseId), `courseId=${courseId}`);
@@ -740,21 +749,71 @@ async function assertDirectIdentitySpoofRejected() {
     record("direct service spoof rejection", true, "skipped");
     return;
   }
-  const response = await fetch(`${DIRECT_SERVICE_BASE}/internal/courses`, {
-    method: "GET",
-    headers: {
-      Accept: "application/json",
-      "X-User-Id": "1",
-      "X-User-Email": "spoofed@example.com",
-      "X-User-Role": "ADMIN",
-      "X-User-Roles": "ADMIN"
-    }
+  const response = await directServiceRequest("GET", "/internal/courses", {
+    Accept: "application/json",
+    "X-User-Id": "1",
+    "X-User-Email": "spoofed@example.com",
+    "X-User-Role": "ADMIN",
+    "X-User-Roles": "ADMIN"
   });
   record(
     "direct service spoof rejection",
     response.status === 401,
     `course-service HTTP ${response.status}`
   );
+}
+
+async function directServiceRequest(method, path, headers) {
+  const url = `${DIRECT_SERVICE_BASE}${path}`;
+  if (DIRECT_SERVICE_TRANSPORT === "docker"
+      || (DIRECT_SERVICE_TRANSPORT === "auto" && shouldUseDockerDirectService(DIRECT_SERVICE_BASE))) {
+    return dockerCurlStatus(method, url, headers);
+  }
+  try {
+    return await fetch(url, { method, headers });
+  } catch (error) {
+    if (DIRECT_SERVICE_TRANSPORT === "auto") {
+      return dockerCurlStatus(method, url, headers);
+    }
+    throw error;
+  }
+}
+
+function dockerCurlStatus(method, url, headers) {
+  const args = [
+    "run",
+    "--rm",
+    "--network",
+    DIRECT_SERVICE_DOCKER_NETWORK,
+    CURL_IMAGE,
+    "-sS",
+    "-o",
+    "/dev/null",
+    "-w",
+    "%{http_code}",
+    "-X",
+    method
+  ];
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    args.push("-H", `${key}: ${value}`);
+  }
+  args.push(url);
+  const result = spawnSync("docker", args, { encoding: "utf8", maxBuffer: 1024 * 1024 });
+  if (result.status !== 0) {
+    throw new Error(`docker direct service request failed: ${(result.stderr || result.stdout || "").trim()}`);
+  }
+  return { status: Number(result.stdout.trim()) };
+}
+
+function shouldUseDockerDirectService(baseUrl) {
+  try {
+    const host = new URL(baseUrl).hostname;
+    return Boolean(host)
+      && !["localhost", "127.0.0.1", "::1"].includes(host)
+      && !host.includes(".");
+  } catch {
+    return false;
+  }
 }
 
 async function assertCourseModulesProtected(courseId) {

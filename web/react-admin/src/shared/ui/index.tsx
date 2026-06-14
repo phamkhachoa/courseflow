@@ -10,7 +10,8 @@ import {
   type TextareaHTMLAttributes,
   type ThHTMLAttributes
 } from "react";
-import { AlertTriangle, CheckCircle2, Info, XCircle } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { cn } from "./cn";
 
 // --- Button ----------------------------------------------------------------
@@ -194,6 +195,8 @@ const semanticBadgeTones: Record<string, BadgeTone> = {
   PUBLISHED: "success",
   READY: "success",
   ACTIVE: "success",
+  APPLIED: "success",
+  REVERSED: "success",
   UPLOADED: "info",
   VIDEO: "info",
   LESSON: "brand",
@@ -202,8 +205,14 @@ const semanticBadgeTones: Record<string, BadgeTone> = {
   PDF: "brand",
   LINK: "info",
   REQUIRED: "success",
+  RESERVED: "warning",
+  COMMIT_FAILED: "warning",
+  MANUAL_REVIEW: "warning",
   TRANSCODING: "brand",
   DRAFT: "warning",
+  SKIPPED: "slate",
+  UNAVAILABLE: "danger",
+  CANCELLED: "slate",
   ARCHIVED: "slate",
   REVOKED: "danger",
   SUSPENDED: "danger",
@@ -422,5 +431,104 @@ export function PageHeader({
       </div>
       {actions && <div className="shrink-0">{actions}</div>}
     </div>
+  );
+}
+
+// --- Drawer / Dialog -------------------------------------------------------
+export function Drawer({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  footer,
+  className
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: ReactNode;
+  description?: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-sm" />
+        <Dialog.Content
+          className={cn(
+            "fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l border-slate-200 bg-white shadow-2xl outline-none",
+            className
+          )}
+        >
+          <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <div className="min-w-0">
+              <Dialog.Title className="text-base font-bold text-slate-950">{title}</Dialog.Title>
+              {description && <Dialog.Description className="mt-1 text-sm text-slate-500">{description}</Dialog.Description>}
+            </div>
+            <Dialog.Close asChild>
+              <button
+                className="grid size-9 shrink-0 place-items-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                aria-label="Đóng"
+              >
+                <X size={16} />
+              </button>
+            </Dialog.Close>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+          {footer && <footer className="border-t border-slate-200 bg-slate-50 px-5 py-4">{footer}</footer>}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  confirmLabel = "Xác nhận",
+  cancelLabel = "Hủy",
+  tone = "primary",
+  isPending,
+  onConfirm
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: ReactNode;
+  description?: ReactNode;
+  children?: ReactNode;
+  confirmLabel?: ReactNode;
+  cancelLabel?: ReactNode;
+  tone?: ButtonVariant;
+  isPending?: boolean;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-sm" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-white shadow-2xl outline-none">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <Dialog.Title className="text-base font-bold text-slate-950">{title}</Dialog.Title>
+            {description && <Dialog.Description className="mt-1 text-sm leading-6 text-slate-500">{description}</Dialog.Description>}
+          </div>
+          {children && <div className="px-5 py-4">{children}</div>}
+          <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+            <Dialog.Close asChild>
+              <Button variant="secondary" disabled={isPending}>
+                {cancelLabel}
+              </Button>
+            </Dialog.Close>
+            <Button variant={tone} disabled={isPending} onClick={onConfirm}>
+              {isPending ? "Đang xử lý" : confirmLabel}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

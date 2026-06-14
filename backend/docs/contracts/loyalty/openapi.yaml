@@ -1,0 +1,1948 @@
+openapi: 3.0.3
+info:
+  title: CourseFlow Generic Loyalty API
+  version: 1.0.0-contract.5
+  description: >
+    Static OpenAPI contract for the loyalty bounded context. Loyalty owns program configuration,
+    account balances, immutable point ledger entries, operational audit, and support workflows.
+    Promotion services may emit points intent, but they must not mutate loyalty state directly
+    outside loyalty-owned service-to-service commands and consumers.
+servers:
+  - url: http://localhost:8094
+    description: Local loyalty-service
+security:
+  - internalJwt: []
+tags:
+  - name: Learner
+  - name: Programs
+  - name: Accounts
+  - name: Points
+  - name: Rewards
+  - name: Operations
+  - name: Audit
+paths:
+  "/internal/loyalty/me/balances":
+    get:
+      tags: [Learner]
+      operationId: getMyLoyaltyBalances
+      summary: List loyalty balances for the authenticated learner.
+      description: >
+        Uses the caller identity as profileId. The client cannot request another learner's profileId.
+        Optional tenant/application/program filters only narrow the caller's own loyalty accounts.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/programId"
+      responses:
+        "200":
+          description: Learner loyalty balances.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LearnerLoyaltyBalanceResponse" }
+  "/internal/loyalty/me/wallet":
+    get:
+      tags: [Learner]
+      operationId: getMyLoyaltyWallet
+      summary: Get learner loyalty wallet detail for web learn.
+      description: >
+        BFF-style learner read model for the wallet page. It resolves profileId from the caller and
+        returns totals, account balance summaries, expiry buckets, recent ledger entries, available
+        rewards and recent redemptions in one response.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/programId"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Learner wallet detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LearnerLoyaltyWalletResponse" }
+  "/internal/loyalty/me/rewards":
+    get:
+      tags: [Learner, Rewards]
+      operationId: getMyLoyaltyRewards
+      summary: List redeemable reward catalog entries for the authenticated learner.
+      description: >
+        Uses the caller identity as profileId. Tenant and application are required so learner
+        catalog reads cannot scan rewards across every tenant. Program may further narrow the
+        catalog. Eligibility is advisory; redemption rechecks balance, program status, inventory,
+        window and per-profile limit in a transaction.
+      parameters:
+        - $ref: "#/components/parameters/tenantIdRequired"
+        - $ref: "#/components/parameters/applicationIdRequired"
+        - $ref: "#/components/parameters/programId"
+      responses:
+        "200":
+          description: Learner reward catalog with eligibility reasons.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LearnerRewardCatalogResponse" }
+  "/internal/loyalty/me/rewards/{rewardId}:redeem":
+    post:
+      tags: [Learner, Rewards]
+      operationId: redeemMyLoyaltyReward
+      summary: Redeem a reward by burning loyalty points from the caller's account.
+      description: >
+        Creates an immutable `BURN` ledger entry through the loyalty points kernel and then records
+        the reward redemption. Same idempotency key and same request hash replays; same key with
+        different request conflicts. The caller cannot redeem for another profile.
+      parameters:
+        - $ref: "#/components/parameters/rewardId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RedeemRewardRequest" }
+      responses:
+        "200":
+          description: Reward redemption result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyRewardRedemption" }
+  "/internal/loyalty/programs":
+    get:
+      tags: [Programs]
+      operationId: listLoyaltyPrograms
+      summary: List loyalty programs for admin operations.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/programId"
+        - name: status
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Loyalty programs.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LoyaltyProgramAdmin" }
+    post:
+      tags: [Programs]
+      operationId: createLoyaltyProgram
+      summary: Create a loyalty program.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProgramRequest" }
+      responses:
+        "200":
+          description: Created program.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyProgram" }
+  "/internal/loyalty/program-readiness":
+    get:
+      tags: [Programs, Operations]
+      operationId: getLoyaltyProgramReadiness
+      summary: Check whether a loyalty program is ready for a service operation.
+      description: >
+        Read-only readiness probe for promotion/course admin tooling before publishing campaigns
+        that emit loyalty point intents. It checks program existence/status and optional client
+        binding operation access.
+      parameters:
+        - $ref: "#/components/parameters/tenantIdRequired"
+        - $ref: "#/components/parameters/applicationIdRequired"
+        - $ref: "#/components/parameters/programIdRequired"
+        - name: clientId
+          in: query
+          schema: { type: string }
+        - name: operation
+          in: query
+          schema: { type: string, enum: [admin, read, earn, burn, reverse, adjust, expire], default: earn }
+      responses:
+        "200":
+          description: Loyalty readiness result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyProgramReadiness" }
+  "/internal/loyalty/programs/{programUuid}":
+    parameters:
+      - $ref: "#/components/parameters/programUuid"
+    get:
+      tags: [Programs]
+      operationId: getLoyaltyProgram
+      summary: Get a loyalty program.
+      responses:
+        "200":
+          description: Program detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyProgramAdmin" }
+    patch:
+      tags: [Programs]
+      operationId: updateLoyaltyProgram
+      summary: Update mutable loyalty program fields.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProgramRequest" }
+      responses:
+        "200":
+          description: Updated program.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyProgramAdmin" }
+  "/internal/loyalty/programs/{programUuid}/status":
+    patch:
+      tags: [Programs]
+      operationId: updateLoyaltyProgramStatus
+      summary: Change loyalty program status.
+      parameters:
+        - $ref: "#/components/parameters/programUuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProgramStatusRequest" }
+      responses:
+        "200":
+          description: Updated program.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyProgramAdmin" }
+  "/internal/loyalty/programs/{programUuid}/client-bindings":
+    post:
+      tags: [Programs]
+      operationId: upsertLoyaltyProgramClientBinding
+      summary: Upsert a service client binding allowed to operate the program runtime API.
+      parameters:
+        - $ref: "#/components/parameters/programUuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertClientBindingRequest" }
+      responses:
+        "200":
+          description: Upserted client binding.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyProgramClientBinding" }
+  "/internal/loyalty/programs/{programUuid}/timeline":
+    get:
+      tags: [Audit]
+      operationId: loyaltyProgramTimeline
+      summary: Read audit timeline for a program.
+      parameters:
+        - $ref: "#/components/parameters/programUuid"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Audit timeline.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAuditQuery" }
+  "/internal/loyalty/accounts":
+    post:
+      tags: [Accounts]
+      operationId: createLoyaltyAccount
+      summary: Open a loyalty account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateAccountRequest" }
+      responses:
+        "200":
+          description: Created account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAccount" }
+    get:
+      tags: [Accounts]
+      operationId: getLoyaltyAccountByProfile
+      summary: Get a loyalty account by tenant, application, program, and profile.
+      parameters:
+        - $ref: "#/components/parameters/tenantIdRequired"
+        - $ref: "#/components/parameters/applicationIdRequired"
+        - $ref: "#/components/parameters/programIdRequired"
+        - $ref: "#/components/parameters/profileIdRequired"
+      responses:
+        "200":
+          description: Loyalty account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAccount" }
+  "/internal/loyalty/accounts:search":
+    get:
+      tags: [Accounts]
+      operationId: searchLoyaltyAccounts
+      summary: Search loyalty accounts for admin operations.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/programId"
+        - $ref: "#/components/parameters/profileId"
+        - name: status
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Matching accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LoyaltyAccount" }
+  "/internal/loyalty/accounts/{accountId}":
+    get:
+      tags: [Accounts]
+      operationId: getLoyaltyAccount
+      summary: Get a loyalty account by account id.
+      parameters:
+        - $ref: "#/components/parameters/accountId"
+      responses:
+        "200":
+          description: Loyalty account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAccount" }
+  "/internal/loyalty/accounts/{accountId}/status":
+    patch:
+      tags: [Accounts]
+      operationId: updateLoyaltyAccountStatus
+      summary: Change loyalty account status.
+      parameters:
+        - $ref: "#/components/parameters/accountId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateAccountStatusRequest" }
+      responses:
+        "200":
+          description: Updated account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAccount" }
+  "/internal/loyalty/accounts/{accountId}/timeline":
+    get:
+      tags: [Audit]
+      operationId: loyaltyAccountTimeline
+      summary: Read audit timeline for an account.
+      parameters:
+        - $ref: "#/components/parameters/accountId"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Account audit timeline.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAuditQuery" }
+  "/internal/loyalty/accounts/{accountId}/balance-buckets":
+    get:
+      tags: [Operations]
+      operationId: getLoyaltyBalanceBuckets
+      summary: Read FIFO balance bucket projection for an account.
+      description: >
+        Returns materialized remaining lots when available, otherwise falls back to a read-only FIFO
+        projection over immutable ledger entries. Debits are allocated against positive entries by
+        earliest expiry then occurrence time.
+      parameters:
+        - $ref: "#/components/parameters/accountId"
+        - name: asOf
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Balance bucket projection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyBalanceBucketResponse" }
+  "/internal/loyalty/points:earn":
+    post:
+      tags: [Points]
+      operationId: earnLoyaltyPoints
+      summary: Credit points from a trusted runtime integration.
+      description: Requires service JWT scope `internal:loyalty:earn` and an active program client binding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PointsMutationRequest" }
+      responses:
+        "200":
+          description: Earn mutation response.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PointsMutationResponse" }
+  "/internal/loyalty/points:burn":
+    post:
+      tags: [Points]
+      operationId: burnLoyaltyPoints
+      summary: Debit points from a trusted runtime integration.
+      description: Requires service JWT scope `internal:loyalty:burn` and an active program client binding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PointsMutationRequest" }
+      responses:
+        "200":
+          description: Burn mutation response.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PointsMutationResponse" }
+  "/internal/loyalty/points:adjust":
+    post:
+      tags: [Operations]
+      operationId: adjustLoyaltyPoints
+      summary: Manually adjust points for support and finance operations.
+      description: >
+        Manual adjustment is an operator/admin workflow. The current implementation writes an
+        immutable `ADJUST` ledger entry, applies idempotency and source-reference conflict checks,
+        and prevents overdraw unless the program allows negative balance.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PointsAdjustmentRequest" }
+      responses:
+        "200":
+          description: Adjustment mutation response.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PointsMutationResponse" }
+  "/internal/loyalty/points/{entryId}:reverse":
+    post:
+      tags: [Points]
+      operationId: reverseLoyaltyPoints
+      summary: Reverse an immutable ledger entry through a compensating entry.
+      parameters:
+        - $ref: "#/components/parameters/entryId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReversePointsRequest" }
+      responses:
+        "200":
+          description: Reversal mutation response.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PointsMutationResponse" }
+  "/internal/loyalty/points:expire-dry-run":
+    post:
+      tags: [Operations]
+      operationId: loyaltyPointsExpiryDryRun
+      summary: Preview expired positive point entries without mutating balances.
+      description: >
+        This dry-run previews materialized remaining lots when available so operators can inspect
+        the same settlement candidates used by expiry execute. It falls back to gross ledger
+        candidates only for old data that has not yet produced materialized lots.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PointsExpiryDryRunRequest" }
+      responses:
+        "200":
+          description: Expiry dry-run result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PointsExpiryDryRunResponse" }
+  "/internal/loyalty/points:expire":
+    post:
+      tags: [Operations]
+      operationId: executeLoyaltyPointsExpiry
+      summary: Execute safe point expiry from materialized remaining lots.
+      description: >
+        Consumes materialized remaining point lots and writes immutable `EXPIRE` ledger entries with
+        audit, idempotency and outbox events. Operators must pass a reason, correlation id,
+        idempotency key and an approved expiry approval id from the maker-checker queue.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PointsExpiryExecutionRequest" }
+      responses:
+        "200":
+          description: Expiry execution result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PointsExpiryExecutionResponse" }
+  "/internal/loyalty/expiry-approvals":
+    post:
+      tags: [Operations]
+      operationId: submitLoyaltyExpiryApproval
+      summary: Submit point expiry execution for maker-checker approval.
+      description: >
+        Locks an expiry dry-run result hash into an approval record. Execution later requires this
+        approval id to be approved and the current materialized lot candidate hash to still match.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitPointsExpiryApprovalRequest" }
+      responses:
+        "200":
+          description: Expiry approval request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAdjustmentApproval" }
+  "/internal/loyalty/point-lots:backfill":
+    post:
+      tags: [Operations]
+      operationId: backfillLoyaltyPointLots
+      summary: Dry-run or execute materialized point-lot rebuild from immutable ledger.
+      description: >
+        Rebuilds the settlement lot table from existing ledger entries for a scoped set of
+        accounts. Dry-run is the default and does not mutate lots. Execute creates missing lots,
+        resets existing lot consumption, and replays debits FIFO by expiry then occurrence time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PointLotBackfillRequest" }
+      responses:
+        "200":
+          description: Backfill result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PointLotBackfillResponse" }
+  "/internal/loyalty/adjustment-approvals":
+    get:
+      tags: [Operations]
+      operationId: listLoyaltyAdjustmentApprovals
+      summary: List loyalty operation approval requests.
+      parameters:
+        - $ref: "#/components/parameters/tenantIdRequired"
+        - $ref: "#/components/parameters/applicationIdRequired"
+        - $ref: "#/components/parameters/programId"
+        - $ref: "#/components/parameters/profileId"
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, APPROVED, REJECTED, EXECUTED] }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Operation approval queue.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAdjustmentApprovalQuery" }
+    post:
+      tags: [Operations]
+      operationId: submitLoyaltyAdjustmentApproval
+      summary: Submit a manual point adjustment for maker-checker approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PointsAdjustmentRequest" }
+      responses:
+        "200":
+          description: Created approval request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAdjustmentApproval" }
+  "/internal/loyalty/adjustment-approvals/{approvalId}:approve":
+    post:
+      tags: [Operations]
+      operationId: approveLoyaltyAdjustmentApproval
+      summary: Approve and execute a pending adjustment approval.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewApprovalRequest" }
+      responses:
+        "200":
+          description: Executed approval.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAdjustmentApproval" }
+  "/internal/loyalty/adjustment-approvals/{approvalId}:reject":
+    post:
+      tags: [Operations]
+      operationId: rejectLoyaltyAdjustmentApproval
+      summary: Reject a pending adjustment approval.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewApprovalRequest" }
+      responses:
+        "200":
+          description: Rejected approval.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAdjustmentApproval" }
+  "/internal/loyalty/approvals/{approvalId}/evidence-pack":
+    get:
+      tags: [Operations]
+      operationId: getLoyaltyApprovalEvidencePack
+      summary: Export approval evidence pack for compliance review.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Approval, audit and ledger evidence.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyApprovalEvidencePack" }
+  "/internal/loyalty/ledger":
+    get:
+      tags: [Points]
+      operationId: getLoyaltyLedger
+      summary: Read immutable ledger entries for an account.
+      parameters:
+        - name: accountId
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Account ledger.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LedgerQuery" }
+  "/internal/loyalty/reconciliation/entries":
+    get:
+      tags: [Operations]
+      operationId: searchLoyaltyReconciliationEntries
+      summary: Search loyalty ledger reconciliation entries.
+      description: >
+        Returns safe finance/support reconciliation rows scoped by tenant and application. Rows show
+        ledger direction, point delta, source reference, reversal linkage, and outbox publication
+        state without leaking request hashes or idempotency keys.
+      parameters:
+        - $ref: "#/components/parameters/tenantIdRequired"
+        - $ref: "#/components/parameters/applicationIdRequired"
+        - $ref: "#/components/parameters/programId"
+        - $ref: "#/components/parameters/profileId"
+        - name: accountId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: entryType
+          in: query
+          schema: { type: string, enum: [EARN, BURN, REVERSE, ADJUST, EXPIRE] }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Reconciliation entries.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyReconciliationQuery" }
+  "/internal/loyalty/finance/closeout":
+    get:
+      tags: [Operations]
+      operationId: exportLoyaltyFinanceCloseout
+      summary: Export finance closeout totals and rows for loyalty ledger activity.
+      parameters:
+        - $ref: "#/components/parameters/tenantIdRequired"
+        - $ref: "#/components/parameters/applicationIdRequired"
+        - $ref: "#/components/parameters/programId"
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/limit"
+        - name: cursor
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Finance closeout export.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyFinanceCloseoutExport" }
+  "/internal/loyalty/rewards":
+    get:
+      tags: [Rewards]
+      operationId: listLoyaltyRewards
+      summary: List loyalty reward catalog entries for admin operations.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/programId"
+        - name: status
+          in: query
+          schema: { type: string, enum: [DRAFT, ACTIVE, SUSPENDED, ARCHIVED] }
+        - name: activeOnly
+          in: query
+          schema: { type: boolean }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Loyalty rewards.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/LoyaltyReward" }
+    post:
+      tags: [Rewards]
+      operationId: createLoyaltyReward
+      summary: Create a loyalty reward catalog entry.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRewardRequest" }
+      responses:
+        "200":
+          description: Created reward.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyReward" }
+  "/internal/loyalty/rewards/{rewardId}":
+    parameters:
+      - $ref: "#/components/parameters/rewardId"
+    get:
+      tags: [Rewards]
+      operationId: getLoyaltyReward
+      summary: Get a loyalty reward catalog entry.
+      responses:
+        "200":
+          description: Loyalty reward.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyReward" }
+    patch:
+      tags: [Rewards]
+      operationId: updateLoyaltyReward
+      summary: Update reward catalog metadata and limits.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRewardRequest" }
+      responses:
+        "200":
+          description: Updated reward.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyReward" }
+  "/internal/loyalty/rewards/{rewardId}/status":
+    patch:
+      tags: [Rewards]
+      operationId: updateLoyaltyRewardStatus
+      summary: Change reward lifecycle status.
+      parameters:
+        - $ref: "#/components/parameters/rewardId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRewardStatusRequest" }
+      responses:
+        "200":
+          description: Updated reward status.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyReward" }
+  "/internal/loyalty/reward-redemptions":
+    get:
+      tags: [Rewards]
+      operationId: searchLoyaltyRewardRedemptions
+      summary: Search reward redemption history for operations and reconciliation.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - $ref: "#/components/parameters/programId"
+        - $ref: "#/components/parameters/profileId"
+        - name: rewardId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string, enum: [COMMITTED, REVERSED] }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Reward redemption rows.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyRewardRedemptionQuery" }
+  "/internal/loyalty/reward-redemptions/{redemptionId}":
+    get:
+      tags: [Rewards]
+      operationId: getLoyaltyRewardRedemption
+      summary: Get reward redemption detail.
+      parameters:
+        - name: redemptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Reward redemption.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyRewardRedemption" }
+  "/internal/loyalty/reward-redemptions/{redemptionId}:reverse":
+    post:
+      tags: [Rewards]
+      operationId: reverseLoyaltyRewardRedemption
+      summary: Reverse a reward redemption by reversing its burn ledger entry.
+      description: >
+        Admin support operation. It locks the redemption, creates or replays a `REVERSE` ledger entry
+        for the original burn entry, marks the reward redemption `REVERSED`, and writes audit.
+      parameters:
+        - name: redemptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReversePointsRequest" }
+      responses:
+        "200":
+          description: Reversed reward redemption.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyRewardRedemption" }
+  "/internal/loyalty/reward-redemptions/{redemptionId}/fulfillment":
+    patch:
+      tags: [Rewards]
+      operationId: updateLoyaltyRewardRedemptionFulfillment
+      summary: Update reward redemption fulfillment status.
+      description: >
+        Admin support operation for manual reward fulfillment. It changes fulfillment status/ref/note
+        only; point return must use reward-redemption reverse so the ledger remains immutable.
+      parameters:
+        - name: redemptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRewardFulfillmentStatusRequest" }
+      responses:
+        "200":
+          description: Updated fulfillment state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyRewardRedemption" }
+  "/internal/loyalty/dead-letters":
+    get:
+      tags: [Operations]
+      operationId: searchLoyaltyInboundDeadLetters
+      summary: Search inbound Kafka DLT records captured by loyalty-service.
+      description: >
+        Platform-admin operation surface for promotion-to-loyalty consumer failures. Records are
+        persisted from configured `<topic>.DLT` topics and include safe exception metadata, Kafka
+        position, payload hash, status, and replay/discard state.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [OPEN, FAILED, REPLAYED, DISCARDED] }
+        - name: sourceTopic
+          in: query
+          schema: { type: string }
+        - name: dltTopic
+          in: query
+          schema: { type: string }
+        - name: payloadHash
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Matching inbound dead letters.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterQuery" }
+  "/internal/loyalty/dead-letters/{deadLetterId}":
+    get:
+      tags: [Operations]
+      operationId: getLoyaltyInboundDeadLetter
+      summary: Get inbound Kafka DLT record detail.
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Dead-letter detail.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterDetail" }
+  "/internal/loyalty/dead-letters/{deadLetterId}:replay":
+    post:
+      tags: [Operations]
+      operationId: replayLoyaltyInboundDeadLetter
+      summary: Replay an OPEN or FAILED inbound DLT record to its source topic.
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterActionRequest" }
+      responses:
+        "200":
+          description: Replay action result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterActionResponse" }
+  "/internal/loyalty/dead-letters/{deadLetterId}:discard":
+    post:
+      tags: [Operations]
+      operationId: discardLoyaltyInboundDeadLetter
+      summary: Mark an OPEN or FAILED inbound DLT record as discarded after manual resolution.
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterActionRequest" }
+      responses:
+        "200":
+          description: Discard action result.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterActionResponse" }
+  "/internal/loyalty/audit":
+    get:
+      tags: [Audit]
+      operationId: searchLoyaltyAudit
+      summary: Search loyalty audit events.
+      parameters:
+        - $ref: "#/components/parameters/tenantId"
+        - $ref: "#/components/parameters/applicationId"
+        - name: aggregateType
+          in: query
+          schema: { type: string }
+        - name: aggregateId
+          in: query
+          schema: { type: string }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: actorId
+          in: query
+          schema: { type: string }
+        - name: correlationId
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Audit events.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAuditQuery" }
+components:
+  securitySchemes:
+    internalJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT issued by the identity-token-converter for service-to-service calls.
+  parameters:
+    tenantId:
+      name: tenantId
+      in: query
+      schema: { type: string }
+    tenantIdRequired:
+      name: tenantId
+      in: query
+      required: true
+      schema: { type: string }
+    applicationId:
+      name: applicationId
+      in: query
+      schema: { type: string }
+    applicationIdRequired:
+      name: applicationId
+      in: query
+      required: true
+      schema: { type: string }
+    programId:
+      name: programId
+      in: query
+      schema: { type: string }
+    programIdRequired:
+      name: programId
+      in: query
+      required: true
+      schema: { type: string }
+    profileId:
+      name: profileId
+      in: query
+      schema: { type: string }
+    profileIdRequired:
+      name: profileId
+      in: query
+      required: true
+      schema: { type: string }
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+    programUuid:
+      name: programUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    accountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    entryId:
+      name: entryId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    rewardId:
+      name: rewardId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  schemas:
+    ClientBindingRequest:
+      type: object
+      required: [clientId]
+      properties:
+        clientId: { type: string }
+        allowedOperations:
+          type: array
+          items: { type: string }
+    UpsertClientBindingRequest:
+      allOf:
+        - $ref: "#/components/schemas/ClientBindingRequest"
+        - type: object
+          properties:
+            status: { type: string }
+    CreateProgramRequest:
+      type: object
+      required: [tenantId, applicationId, programId, name]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        name: { type: string }
+        pointUnit: { type: string }
+        allowNegativeBalance: { type: boolean }
+        defaultPointsExpiryDays:
+          type: integer
+          minimum: 1
+        clientBindings:
+          type: array
+          items: { $ref: "#/components/schemas/ClientBindingRequest" }
+    LoyaltyProgram:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        name: { type: string }
+        pointUnit: { type: string }
+        status: { type: string }
+        allowNegativeBalance: { type: boolean }
+        defaultPointsExpiryDays: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+    LoyaltyProgramAdmin:
+      allOf:
+        - $ref: "#/components/schemas/LoyaltyProgram"
+        - type: object
+          properties:
+            updatedAt: { type: string, format: date-time, nullable: true }
+            clientBindings:
+              type: array
+              items: { $ref: "#/components/schemas/LoyaltyProgramClientBinding" }
+    LoyaltyProgramClientBinding:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        clientId: { type: string }
+        status: { type: string }
+        allowedOperations:
+          type: array
+          items: { type: string }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    LoyaltyProgramReadiness:
+      type: object
+      properties:
+        programUuid: { type: string, format: uuid, nullable: true }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        clientId: { type: string, nullable: true }
+        operation: { type: string }
+        ready: { type: boolean }
+        programStatus: { type: string }
+        clientBound: { type: boolean }
+        bindingStatus: { type: string, nullable: true }
+        allowedOperations:
+          type: array
+          items: { type: string }
+        blockers:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+    UpdateProgramRequest:
+      type: object
+      properties:
+        name: { type: string }
+        pointUnit: { type: string }
+        allowNegativeBalance: { type: boolean }
+        defaultPointsExpiryDays:
+          type: integer
+          minimum: 1
+    UpdateProgramStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        note: { type: string }
+    CreateAccountRequest:
+      type: object
+      required: [tenantId, applicationId, programId, profileId]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+    LoyaltyAccount:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        status: { type: string }
+        balance: { type: integer, format: int64 }
+        openedAt: { type: string, format: date-time }
+    LearnerLoyaltyBalanceResponse:
+      type: object
+      properties:
+        profileId: { type: string }
+        generatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LearnerLoyaltyBalance" }
+    LearnerLoyaltyBalance:
+      type: object
+      properties:
+        accountId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        pointUnit: { type: string }
+        accountStatus: { type: string }
+        programStatus: { type: string }
+        ledgerBalance: { type: integer, format: int64 }
+        activePoints: { type: integer, format: int64 }
+        expiredPoints: { type: integer, format: int64 }
+        expiringSoonPoints:
+          type: integer
+          format: int64
+          description: Remaining active points expiring within 30 days.
+        nextExpiryAt: { type: string, format: date-time, nullable: true }
+        warnings:
+          type: array
+          items: { type: string }
+    LearnerLoyaltyWalletTotals:
+      type: object
+      properties:
+        ledgerBalance: { type: integer, format: int64 }
+        activePoints: { type: integer, format: int64 }
+        expiredPoints: { type: integer, format: int64 }
+        expiringSoonPoints: { type: integer, format: int64 }
+        accountCount: { type: integer }
+        activeAccountCount: { type: integer }
+        nextExpiryAt: { type: string, format: date-time, nullable: true }
+    LearnerLoyaltyWalletAccount:
+      type: object
+      properties:
+        balance: { $ref: "#/components/schemas/LearnerLoyaltyBalance" }
+        buckets:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyBalanceBucket" }
+        recentEntries:
+          type: array
+          items: { $ref: "#/components/schemas/PointsEntry" }
+    LearnerLoyaltyWalletResponse:
+      type: object
+      properties:
+        profileId: { type: string }
+        generatedAt: { type: string, format: date-time }
+        totals: { $ref: "#/components/schemas/LearnerLoyaltyWalletTotals" }
+        accounts:
+          type: array
+          items: { $ref: "#/components/schemas/LearnerLoyaltyWalletAccount" }
+        availableRewards:
+          type: array
+          items: { $ref: "#/components/schemas/LearnerReward" }
+        recentRedemptions:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyRewardRedemption" }
+        warnings:
+          type: array
+          items: { type: string }
+    CreateRewardRequest:
+      type: object
+      required: [tenantId, applicationId, programId, rewardCode, name, pointsCost]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        rewardCode: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        pointsCost:
+          type: integer
+          format: int64
+          minimum: 1
+        status: { type: string, enum: [DRAFT, ACTIVE, SUSPENDED, ARCHIVED] }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        inventoryLimit:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+        perProfileLimit:
+          type: integer
+          minimum: 1
+          nullable: true
+        fulfillmentType: { type: string, example: MANUAL }
+        fulfillmentConfig:
+          type: object
+          additionalProperties: true
+    UpdateRewardRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        pointsCost:
+          type: integer
+          format: int64
+          minimum: 1
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        inventoryLimit:
+          type: integer
+          format: int64
+          minimum: 1
+          nullable: true
+        perProfileLimit:
+          type: integer
+          minimum: 1
+          nullable: true
+        fulfillmentType: { type: string }
+        fulfillmentConfig:
+          type: object
+          additionalProperties: true
+    UpdateRewardStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [DRAFT, ACTIVE, SUSPENDED, ARCHIVED] }
+        note: { type: string }
+    UpdateRewardFulfillmentStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [PENDING, ISSUED, MANUAL_REQUIRED, FAILED] }
+        fulfillmentRef: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+    LoyaltyReward:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        programUuid: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        rewardCode: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        pointsCost: { type: integer, format: int64 }
+        status: { type: string }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        inventoryLimit: { type: integer, format: int64, nullable: true }
+        perProfileLimit: { type: integer, nullable: true }
+        fulfillmentType: { type: string }
+        fulfillmentConfig:
+          type: object
+          additionalProperties: true
+        redeemedCount: { type: integer, format: int64 }
+        createdBy: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    LearnerReward:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        rewardCode: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        pointsCost: { type: integer, format: int64 }
+        pointUnit: { type: string }
+        ledgerBalance: { type: integer, format: int64 }
+        spendableBalance:
+          type: integer
+          format: int64
+          description: Active unexpired point-lot balance usable for reward redemption.
+        eligible: { type: boolean }
+        ineligibleReasons:
+          type: array
+          items: { type: string }
+        inventoryRemaining: { type: integer, format: int64, nullable: true }
+        perProfileRemaining: { type: integer, nullable: true }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        fulfillmentType: { type: string }
+    LearnerRewardCatalogResponse:
+      type: object
+      properties:
+        profileId: { type: string }
+        generatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LearnerReward" }
+    RedeemRewardRequest:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey: { type: string }
+        correlationId: { type: string }
+        note: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+    LoyaltyRewardRedemption:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rewardId: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        burnEntryId: { type: string, format: uuid }
+        reversalEntryId: { type: string, format: uuid, nullable: true }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        rewardCode: { type: string }
+        pointsCost: { type: integer, format: int64 }
+        sourceReference: { type: string }
+        status: { type: string, enum: [COMMITTED, REVERSED] }
+        fulfillmentStatus: { type: string, enum: [PENDING, ISSUED, MANUAL_REQUIRED, FAILED] }
+        fulfillmentRef: { type: string, nullable: true }
+        fulfillmentNote: { type: string, nullable: true }
+        rewardSnapshot:
+          type: object
+          description: Safe historical reward fields captured at redemption time; excludes raw secrets.
+          additionalProperties: true
+        correlationId: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+        redeemedAt: { type: string, format: date-time }
+        fulfilledAt: { type: string, format: date-time, nullable: true }
+        reversedAt: { type: string, format: date-time, nullable: true }
+        idempotencyReplay: { type: boolean }
+    LoyaltyRewardRedemptionQuery:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyRewardRedemption" }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+    PointLotBackfillRequest:
+      type: object
+      required: [tenantId, applicationId]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        accountId: { type: string, format: uuid }
+        dryRun:
+          type: boolean
+          description: Defaults to true when omitted.
+        limit:
+          type: integer
+          minimum: 1
+        expectedResultHash:
+          type: string
+          description: Required when dryRun is false. Must match the latest dry-run resultHash.
+        reason: { type: string }
+        correlationId: { type: string }
+    PointLotBackfillAccountResult:
+      type: object
+      properties:
+        accountId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        ledgerBalance: { type: integer, format: int64 }
+        projectedRemainingPoints: { type: integer, format: int64 }
+        projectedExpiredPoints: { type: integer, format: int64 }
+        unallocatedDebitPoints: { type: integer, format: int64 }
+        positiveEntryCount: { type: integer }
+        debitEntryCount: { type: integer }
+        existingLotCount: { type: integer }
+        missingLotCount: { type: integer }
+        resetLotCount: { type: integer }
+        warnings:
+          type: array
+          items: { type: string }
+    PointLotBackfillResponse:
+      type: object
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string, nullable: true }
+        profileId: { type: string, nullable: true }
+        accountId: { type: string, format: uuid, nullable: true }
+        dryRun: { type: boolean }
+        scannedAccountCount: { type: integer }
+        affectedAccountCount: { type: integer }
+        missingLotCount: { type: integer }
+        resetLotCount: { type: integer }
+        unallocatedDebitPoints: { type: integer, format: int64 }
+        hasMore: { type: boolean }
+        resultHash: { type: string }
+        generatedAt: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PointLotBackfillAccountResult" }
+        warnings:
+          type: array
+          items: { type: string }
+    UpdateAccountStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+        note: { type: string }
+    PointsMutationRequest:
+      type: object
+      required: [tenantId, applicationId, programId, profileId, points, sourceReference, idempotencyKey]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        points:
+          type: integer
+          format: int64
+          minimum: 1
+        sourceReference: { type: string }
+        idempotencyKey: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        occurredAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        metadata:
+          type: object
+          additionalProperties: true
+    PointsAdjustmentRequest:
+      type: object
+      required:
+        - tenantId
+        - applicationId
+        - programId
+        - profileId
+        - pointsDelta
+        - sourceReference
+        - idempotencyKey
+        - reason
+        - correlationId
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        pointsDelta:
+          type: integer
+          format: int64
+          description: Signed non-zero point delta.
+        sourceReference: { type: string }
+        idempotencyKey: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        occurredAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        metadata:
+          type: object
+          additionalProperties: true
+    ReversePointsRequest:
+      type: object
+      required: [idempotencyKey, reason]
+      properties:
+        idempotencyKey: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+    PointsMutationResponse:
+      type: object
+      properties:
+        entryId: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        entryType: { type: string, enum: [EARN, BURN, REVERSE, ADJUST, EXPIRE] }
+        pointsDelta: { type: integer, format: int64 }
+        balance: { type: integer, format: int64 }
+        idempotencyReplay: { type: boolean }
+    PointsExpiryDryRunRequest:
+      type: object
+      required: [tenantId, applicationId, programId, asOf]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        asOf: { type: string, format: date-time }
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+    PointsExpiryCandidate:
+      type: object
+      properties:
+        entryId: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        profileId: { type: string }
+        pointsDelta: { type: integer, format: int64 }
+        sourceReference: { type: string }
+        occurredAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+    PointsExpiryDryRunResponse:
+      type: object
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        asOf: { type: string, format: date-time }
+        candidateEntryCount: { type: integer }
+        affectedAccountCount: { type: integer }
+        expiringPoints: { type: integer, format: int64 }
+        resultHash: { type: string }
+        samples:
+          type: array
+          items: { $ref: "#/components/schemas/PointsExpiryCandidate" }
+        warnings:
+          type: array
+          items: { type: string }
+    PointsExpiryExecutionRequest:
+      type: object
+      required: [tenantId, applicationId, programId, asOf, idempotencyKey, reason, correlationId, approvalId]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        asOf: { type: string, format: date-time }
+        idempotencyKey: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        approvalId: { type: string, format: uuid }
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+    SubmitPointsExpiryApprovalRequest:
+      type: object
+      required: [tenantId, applicationId, programId, asOf, resultHash, idempotencyKey, reason, correlationId]
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        asOf: { type: string, format: date-time }
+        resultHash: { type: string }
+        idempotencyKey: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 500
+    PointsExpiryExecutionItem:
+      type: object
+      properties:
+        entryId: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        sourceLotId: { type: string, format: uuid }
+        sourceEntryId: { type: string, format: uuid }
+        profileId: { type: string }
+        expiredPoints: { type: integer, format: int64 }
+        sourceReference: { type: string }
+        expiresAt: { type: string, format: date-time, nullable: true }
+    PointsExpiryExecutionResponse:
+      type: object
+      properties:
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        asOf: { type: string, format: date-time }
+        expiredLotCount: { type: integer }
+        affectedAccountCount: { type: integer }
+        expiredPoints: { type: integer, format: int64 }
+        idempotencyReplay: { type: boolean }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PointsExpiryExecutionItem" }
+        warnings:
+          type: array
+          items: { type: string }
+    ReviewApprovalRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string }
+    LoyaltyAdjustmentApproval:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        pointsDelta: { type: integer, format: int64 }
+        sourceReference: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        occurredAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [PENDING, APPROVED, REJECTED, EXECUTED] }
+        requestedBy: { type: string }
+        reviewedBy: { type: string, nullable: true }
+        reviewNote: { type: string, nullable: true }
+        requestedAt: { type: string, format: date-time }
+        reviewedAt: { type: string, format: date-time, nullable: true }
+        executedAt: { type: string, format: date-time, nullable: true }
+        executedEntryId: { type: string, format: uuid, nullable: true }
+        operationType: { type: string, enum: [ADJUSTMENT, EXPIRY] }
+        metadata:
+          type: object
+          additionalProperties: true
+    LoyaltyAdjustmentApprovalQuery:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyAdjustmentApproval" }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+    LoyaltyApprovalEvidencePack:
+      type: object
+      properties:
+        approvalId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        operationType: { type: string, enum: [ADJUSTMENT, EXPIRY] }
+        generatedAt: { type: string, format: date-time }
+        approval: { $ref: "#/components/schemas/LoyaltyAdjustmentApproval" }
+        auditEvents:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyAuditEvent" }
+        ledgerEntries:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyReconciliationEntry" }
+        evidenceSummary:
+          type: object
+          additionalProperties: true
+        warnings:
+          type: array
+          items: { type: string }
+    PointsEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        entryType: { type: string, enum: [EARN, BURN, REVERSE, ADJUST, EXPIRE] }
+        pointsDelta: { type: integer, format: int64 }
+        sourceReference: { type: string }
+        reversalOfEntryId: { type: string, format: uuid, nullable: true }
+        reason: { type: string }
+        correlationId: { type: string }
+        occurredAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+    LedgerQuery:
+      type: object
+      properties:
+        accountId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        balance: { type: integer, format: int64 }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PointsEntry" }
+    LoyaltyBalanceBucket:
+      type: object
+      properties:
+        entryId: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        profileId: { type: string }
+        entryType: { type: string, enum: [EARN, BURN, REVERSE, ADJUST, EXPIRE] }
+        originalPoints: { type: integer, format: int64 }
+        consumedPoints: { type: integer, format: int64 }
+        remainingPoints: { type: integer, format: int64 }
+        sourceReference: { type: string }
+        occurredAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        status: { type: string, enum: [ACTIVE, EXPIRED] }
+    LoyaltyBalanceBucketResponse:
+      type: object
+      properties:
+        accountId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        ledgerBalance: { type: integer, format: int64 }
+        activePoints: { type: integer, format: int64 }
+        expiredPoints: { type: integer, format: int64 }
+        unallocatedDebitPoints: { type: integer, format: int64 }
+        projectionMode: { type: string }
+        asOf: { type: string, format: date-time }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyBalanceBucket" }
+        warnings:
+          type: array
+          items: { type: string }
+    LoyaltyReconciliationEntry:
+      type: object
+      properties:
+        ledgerEntryId: { type: string, format: uuid }
+        reconciliationKey: { type: string }
+        reconciliationStatus: { type: string, enum: [MATCHED, PENDING, MISSING_OUTBOX] }
+        reasonCodes:
+          type: array
+          items: { type: string }
+        direction: { type: string, enum: [CREDIT, DEBIT] }
+        entryType: { type: string, enum: [EARN, BURN, REVERSE, ADJUST, EXPIRE] }
+        accountId: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string }
+        profileId: { type: string }
+        pointsDelta: { type: integer, format: int64 }
+        sourceReference: { type: string }
+        reversalOfEntryId: { type: string, format: uuid, nullable: true }
+        outboxStatus: { type: string, enum: [PUBLISHED, PENDING_OUTBOX, MISSING_OUTBOX] }
+        correlationId: { type: string }
+        occurredAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        ledgerCreatedAt: { type: string, format: date-time }
+    LoyaltyReconciliationQuery:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyReconciliationEntry" }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+        generatedAt: { type: string, format: date-time }
+    LoyaltyFinanceCloseoutTotals:
+      type: object
+      properties:
+        earnedPoints: { type: integer, format: int64 }
+        burnedPoints: { type: integer, format: int64 }
+        reversedPoints: { type: integer, format: int64 }
+        adjustedPoints: { type: integer, format: int64 }
+        expiredPoints: { type: integer, format: int64 }
+        netPoints: { type: integer, format: int64 }
+        entryCount: { type: integer }
+        pendingOutboxCount: { type: integer }
+        missingOutboxCount: { type: integer }
+    LoyaltyFinanceCloseoutExport:
+      type: object
+      properties:
+        closeoutId: { type: string }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        programId: { type: string, nullable: true }
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        resultHash: { type: string }
+        certifiable: { type: boolean }
+        generatedAt: { type: string, format: date-time }
+        totals: { $ref: "#/components/schemas/LoyaltyFinanceCloseoutTotals" }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyReconciliationEntry" }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+        nextCursor: { type: string, nullable: true }
+        warnings:
+          type: array
+          items: { type: string }
+    LoyaltyInboundDeadLetter:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sourceTopic: { type: string }
+        dltTopic: { type: string }
+        consumerGroup: { type: string, nullable: true }
+        kafkaPartition: { type: integer }
+        kafkaOffset: { type: integer, format: int64 }
+        originalPartition: { type: integer, nullable: true }
+        originalOffset: { type: integer, format: int64, nullable: true }
+        recordKey: { type: string, nullable: true }
+        status: { type: string, enum: [OPEN, FAILED, REPLAYED, DISCARDED] }
+        replayAttempts: { type: integer }
+        payloadHash: { type: string }
+        exceptionClass: { type: string, nullable: true }
+        exceptionMessage: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastReplayAt: { type: string, format: date-time, nullable: true }
+        replayedAt: { type: string, format: date-time, nullable: true }
+        discardedAt: { type: string, format: date-time, nullable: true }
+    LoyaltyInboundDeadLetterDetail:
+      allOf:
+        - $ref: "#/components/schemas/LoyaltyInboundDeadLetter"
+        - type: object
+          properties:
+            payloadSizeBytes: { type: integer, format: int64 }
+            stacktrace: { type: string, nullable: true }
+            lastReplayError: { type: string, nullable: true }
+            resolvedBy: { type: string, nullable: true }
+            resolutionNote: { type: string, nullable: true }
+            headers:
+              type: object
+              additionalProperties: true
+    LoyaltyInboundDeadLetterQuery:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyInboundDeadLetter" }
+        limit: { type: integer }
+        hasMore: { type: boolean }
+    LoyaltyInboundDeadLetterActionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string }
+        dryRun: { type: boolean }
+    LoyaltyInboundDeadLetterActionResponse:
+      type: object
+      properties:
+        deadLetterId: { type: string, format: uuid }
+        action: { type: string, enum: [REPLAY, DISCARD] }
+        status: { type: string, enum: [DRY_RUN, REPLAYED, DISCARDED, FAILED] }
+        dryRun: { type: boolean }
+        replayed: { type: boolean }
+        discarded: { type: boolean }
+        reasonCode: { type: string }
+        payloadHash: { type: string }
+        completedAt: { type: string, format: date-time }
+    LoyaltyAuditEvent:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        tenantId: { type: string }
+        applicationId: { type: string }
+        aggregateId: { type: string }
+        aggregateType: { type: string }
+        action: { type: string }
+        actorId: { type: string }
+        note: { type: string }
+        payload:
+          type: object
+          additionalProperties: true
+        correlationId: { type: string }
+        createdAt: { type: string, format: date-time }
+    LoyaltyAuditQuery:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyAuditEvent" }
+        limit: { type: integer }
+        hasMore: { type: boolean }

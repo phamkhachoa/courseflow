@@ -1,0 +1,15 @@
+{
+  "eventId": "10000000-0000-4000-8000-000000000001",
+  "schemaVersion": 1,
+  "tenantId": "courseflow",
+  "applicationId": "learn",
+  "programId": "default",
+  "accountId": "20000000-0000-4000-8000-000000000001",
+  "entryId": "30000000-0000-4000-8000-000000000001",
+  "profileId": "learner-123",
+  "entryType": "EARN",
+  "pointsDelta": 100,
+  "sourceReference": "order:checkout-123",
+  "occurredAt": "2026-06-14T08:00:00Z",
+  "correlationId": "checkout-123"
+}

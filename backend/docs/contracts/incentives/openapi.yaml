@@ -1,0 +1,4382 @@
+openapi: 3.1.0
+info:
+  title: CourseFlow Generic Incentive API
+  version: 2.0.0-contract.2s
+  summary: Portable promotion, coupon, reservation, redemption and retention APIs.
+  description: >
+    Static OpenAPI contract for the generic incentive platform. The service is not LMS-specific:
+    source applications submit generic transaction facts and apply returned effects in their own
+    domain. The gateway alias `/api/admin/v1/incentives/**` is for operator traffic. Runtime
+    `/internal/incentives/**` endpoints are service-to-service only and are not exposed as browser
+    `/api/v1/incentives/**` routes; source services or a BFF must build trusted facts and call them
+    with internal JWT service tokens.
+servers:
+  - url: http://promotion-service:8080
+    description: Internal Docker network.
+  - url: http://localhost:28080
+    description: Local API gateway.
+tags:
+  - name: Contract
+  - name: Applications
+  - name: Campaigns
+  - name: Campaign Versions
+  - name: Coupons
+  - name: Runtime
+  - name: Reservations
+  - name: Redemptions
+  - name: Reconciliation
+  - name: Retention
+  - name: Audit
+security:
+  - internalJwt: []
+paths:
+  /internal/incentives/catalog:
+    get:
+      tags: [Contract]
+      operationId: incentiveCatalog
+      summary: Describe supported rules, actions, effects, reason codes and idempotency.
+      responses:
+        "200":
+          description: Incentive catalog.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncentiveCatalog"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/applications:
+    get:
+      tags: [Applications]
+      operationId: listIncentiveApplications
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        "200":
+          description: Application list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Application"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Applications]
+      operationId: createIncentiveApplication
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApplicationRequest"
+      responses:
+        "200":
+          description: Created application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/applications/{applicationUuid}:
+    patch:
+      tags: [Applications]
+      operationId: updateIncentiveApplication
+      parameters:
+        - $ref: "#/components/parameters/ApplicationUuid"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateApplicationRequest"
+      responses:
+        "200":
+          description: Updated application.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/applications/{applicationUuid}/status:
+    patch:
+      tags: [Applications]
+      operationId: updateIncentiveApplicationStatus
+      parameters:
+        - $ref: "#/components/parameters/ApplicationUuid"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusChangeRequest"
+      responses:
+        "200":
+          description: Updated application status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/applications/{applicationUuid}/client-bindings:
+    post:
+      tags: [Applications]
+      operationId: upsertIncentiveApplicationClientBinding
+      parameters:
+        - $ref: "#/components/parameters/ApplicationUuid"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApplicationClientBindingRequest"
+      responses:
+        "200":
+          description: Created or updated client binding.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationClientBinding"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns:
+    get:
+      tags: [Campaigns]
+      operationId: listIncentiveCampaigns
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+      responses:
+        "200":
+          description: Campaign list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Campaigns]
+      operationId: createIncentiveCampaign
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignRequest"
+      responses:
+        "200":
+          description: Created campaign shell and initial draft version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}:
+    get:
+      tags: [Campaigns]
+      operationId: getIncentiveCampaign
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+      responses:
+        "200":
+          description: Campaign detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/status:
+    patch:
+      tags: [Campaigns]
+      operationId: updateIncentiveCampaignStatus
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusChangeRequest"
+      responses:
+        "200":
+          description: Updated campaign status. Publishing must use version workflow.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions:
+    get:
+      tags: [Campaign Versions]
+      operationId: listIncentiveCampaignVersions
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+      responses:
+        "200":
+          description: Campaign versions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignVersion"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Campaign Versions]
+      operationId: createIncentiveCampaignDraftVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Created draft version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignVersion"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaign-versions/review-queue:
+    get:
+      tags: [Campaign Versions]
+      operationId: listCampaignVersionReviewQueue
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - $ref: "#/components/parameters/Status"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Versions awaiting review.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignVersionReviewQueue"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}:
+    get:
+      tags: [Campaign Versions]
+      operationId: getIncentiveCampaignVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+      responses:
+        "200":
+          description: Immutable campaign version snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignVersionDetail"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}/draft:
+    patch:
+      tags: [Campaign Versions]
+      operationId: updateIncentiveCampaignVersionDraft
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCampaignVersionDraftRequest"
+      responses:
+        "200":
+          description: Updated editable draft snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignVersionDetail"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}/validation:
+    get:
+      tags: [Campaign Versions]
+      operationId: validateIncentiveCampaignVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+      responses:
+        "200":
+          description: Publish readiness blockers and warnings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignVersionValidation"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{leftVersion}/diff:
+    get:
+      tags: [Campaign Versions]
+      operationId: diffIncentiveCampaignVersions
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - name: leftVersion
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: rightVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Canonical version diff.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignVersionDiff"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}/rollback:
+    post:
+      tags: [Campaign Versions]
+      operationId: rollbackIncentiveCampaignVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RollbackCampaignVersionRequest"
+      responses:
+        "200":
+          description: New draft generated from a published or superseded snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignVersionDetail"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}/submit:
+    post:
+      tags: [Campaign Versions]
+      operationId: submitIncentiveCampaignVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        $ref: "#/components/requestBodies/OptionalTransition"
+      responses:
+        "200":
+          $ref: "#/components/responses/CampaignVersionResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}/approve:
+    post:
+      tags: [Campaign Versions]
+      operationId: approveIncentiveCampaignVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        $ref: "#/components/requestBodies/OptionalTransition"
+      responses:
+        "200":
+          $ref: "#/components/responses/CampaignVersionResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}/reject:
+    post:
+      tags: [Campaign Versions]
+      operationId: rejectIncentiveCampaignVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        $ref: "#/components/requestBodies/OptionalTransition"
+      responses:
+        "200":
+          $ref: "#/components/responses/CampaignVersionResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/versions/{versionNumber}/publish:
+    post:
+      tags: [Campaign Versions]
+      operationId: publishIncentiveCampaignVersion
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/VersionNumber"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        $ref: "#/components/requestBodies/OptionalTransition"
+      responses:
+        "200":
+          $ref: "#/components/responses/CampaignVersionResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons:
+    get:
+      tags: [Coupons]
+      operationId: listIncentiveCoupons
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - $ref: "#/components/parameters/CampaignIdQuery"
+        - $ref: "#/components/parameters/Status"
+        - name: holderProfileId
+          in: query
+          schema:
+            type: string
+        - name: code
+          in: query
+          description: Raw coupon code lookup value. The service stores only masks and fingerprints.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Coupon list with masked codes only.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Coupon"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Coupons]
+      operationId: createIncentiveCoupon
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCouponRequest"
+      responses:
+        "200":
+          description: Created coupon. Response never contains raw code or fingerprint.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/learner/coupons:
+    get:
+      tags: [Coupons]
+      operationId: listLearnerIncentiveCoupons
+      summary: Service-to-service learner coupon wallet projection.
+      description: >
+        Read-only projection for source BFFs such as enrollment-service. The response is scoped to
+        one profile and returns masked coupon display fields only; raw coupon codes, normalized
+        fingerprints and private metadata are never exposed.
+      security:
+        - internalJwt:
+            - internal:promotion:evaluate
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: applicationId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: profileId
+          in: query
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Masked learner coupon wallet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearnerCouponWallet"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/storage-inventory:
+    get:
+      tags: [Coupons]
+      operationId: getCouponStorageInventory
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - $ref: "#/components/parameters/CampaignIdQuery"
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Coupon storage format inventory for migration readiness.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponStorageInventory"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons:import-dry-run:
+    post:
+      tags: [Coupons]
+      operationId: dryRunCouponCsvImport
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CouponImportDryRunMultipartRequest"
+      responses:
+        "200":
+          description: Non-destructive CSV import dry-run. Report contains masks only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportDryRunResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-dry-runs:
+    get:
+      tags: [Coupons]
+      operationId: listCouponCsvImportDryRuns
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: applicationId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: campaignId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [COMPLETED]
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Read-only coupon import dry-run history. Contains masked/hash/counter data only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportDryRunQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-dry-runs/{dryRunId}:
+    get:
+      tags: [Coupons]
+      operationId: getCouponCsvImportDryRun
+      parameters:
+        - name: dryRunId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Previously persisted dry-run report with masked row outcomes only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportDryRunResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-dry-runs/{dryRunId}/issue-export:
+    get:
+      tags: [Coupons]
+      operationId: exportCouponCsvImportDryRunIssues
+      parameters:
+        - name: dryRunId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: rowStatus
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [INVALID, VALID, ALL]
+            default: INVALID
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Masked CSV issue export generated from persisted dry-run rows. Content never contains raw coupon code, fingerprint, normalized code, or idempotency key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportIssueExport"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-dry-runs/{dryRunId}/approvals:
+    post:
+      tags: [Coupons]
+      operationId: requestCouponCsvImportApproval
+      parameters:
+        - name: dryRunId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CouponImportApprovalMultipartRequest"
+      responses:
+        "200":
+          description: Pending maker/checker approval for a commit-ready coupon import dry-run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-approvals:
+    get:
+      tags: [Coupons]
+      operationId: listCouponCsvImportApprovals
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: applicationId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: campaignId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDING_APPROVAL, APPROVED, REJECTED, EXECUTED]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Coupon import approval queue/history.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CouponImportApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-approvals/{approvalId}:
+    get:
+      tags: [Coupons]
+      operationId: getCouponCsvImportApproval
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Coupon import approval detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-operations:
+    get:
+      tags: [Coupons]
+      operationId: listCouponCsvImportOperations
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: applicationId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: campaignId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: approvalId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: dryRunId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [SUCCEEDED]
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Read-only coupon import commit operation history. No raw CSV, coupon code, request hash, or idempotency key hash is exposed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportOperationQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-operations/{importId}:
+    get:
+      tags: [Coupons]
+      operationId: getCouponCsvImportOperation
+      parameters:
+        - name: importId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Coupon import operation detail. Contains operational counters and audit identifiers only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportOperation"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-operations/{importId}/export:
+    get:
+      tags: [Coupons]
+      operationId: exportCouponCsvImportOperation
+      parameters:
+        - name: importId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Audit-safe coupon import operation CSV export. The CSV contains operation counters and identifiers, not raw coupon codes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportOperationExport"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-approvals/{approvalId}:approve:
+    post:
+      tags: [Coupons]
+      operationId: approveCouponCsvImportApproval
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponImportApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Approved coupon import approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-approvals/{approvalId}:reject:
+    post:
+      tags: [Coupons]
+      operationId: rejectCouponCsvImportApproval
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponImportApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Rejected coupon import approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-approvals/{approvalId}:commit:
+    post:
+      tags: [Coupons]
+      operationId: commitApprovedCouponCsvImport
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CouponImportApprovalCommitMultipartRequest"
+      responses:
+        "200":
+          description: All-or-nothing coupon import commit bound to an approved maker/checker approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportCommitResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/import-dry-runs/{dryRunId}:commit:
+    post:
+      tags: [Coupons]
+      operationId: commitCouponCsvImport
+      parameters:
+        - name: dryRunId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/CouponImportCommitMultipartRequest"
+      responses:
+        "200":
+          description: All-or-nothing coupon import commit. Response contains counts and hashes only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponImportCommitResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/{couponId}:
+    get:
+      tags: [Coupons]
+      operationId: getIncentiveCoupon
+      parameters:
+        - $ref: "#/components/parameters/CouponId"
+      responses:
+        "200":
+          description: Coupon detail with masked code only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons/{couponId}/status:
+    patch:
+      tags: [Coupons]
+      operationId: updateIncentiveCouponStatus
+      parameters:
+        - $ref: "#/components/parameters/CouponId"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCouponStatusRequest"
+      responses:
+        "200":
+          description: Updated coupon status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Coupon"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupons:generate:
+    post:
+      tags: [Coupons]
+      operationId: generateIncentiveCoupons
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateCouponsRequest"
+      responses:
+        "200":
+          description: Generated coupon batch. Response contains masks only.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateCouponsResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/admin/preview:
+    post:
+      tags: [Runtime]
+      operationId: previewIncentivesAsAdmin
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminPreviewRequest"
+      responses:
+        "200":
+          description: No-ledger preview response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPreviewResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/evaluate:
+    post:
+      tags: [Runtime]
+      operationId: evaluateIncentives
+      summary: Service-to-service eligibility decision for trusted source facts.
+      description: >
+        Trusted runtime endpoint. Browser/user clients must not send raw transaction facts directly
+        to this resource API; source services own fact resolution and call with a service internal JWT
+        carrying `internal:promotion:evaluate` plus an active incentive application client binding.
+      security:
+        - internalJwt:
+            - internal:promotion:evaluate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluateIncentivesRequest"
+      responses:
+        "200":
+          description: Eligibility decision without ledger impact.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluateIncentivesResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/reservations:
+    get:
+      tags: [Reservations]
+      operationId: listIncentiveReservations
+      summary: Read-only support view over incentive reservations before or after commit.
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - name: profileId
+          in: query
+          schema:
+            type: string
+        - name: externalReference
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CampaignIdQuery"
+        - name: couponId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Status"
+        - name: expiredOnly
+          in: query
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Reservation list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Runtime]
+      operationId: reserveIncentive
+      summary: Service-to-service reservation for a trusted source transaction.
+      description: >
+        Trusted runtime mutation. `Idempotency-Key` is the canonical retry key; the request-body
+        `idempotencyKey` field remains a compatibility fallback.
+      security:
+        - internalJwt:
+            - internal:promotion:reserve
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReserveIncentiveRequest"
+      responses:
+        "200":
+          description: Reservation result. Same idempotency key and request hash replays.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReserveIncentiveResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/reservations/{reservationId}:
+    get:
+      tags: [Reservations]
+      operationId: getIncentiveReservation
+      parameters:
+        - $ref: "#/components/parameters/ReservationId"
+      responses:
+        "200":
+          description: Reservation detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/reservations/{reservationId}/commit:
+    post:
+      tags: [Runtime]
+      operationId: commitIncentiveReservation
+      summary: Service-to-service commit of a reserved incentive.
+      description: >
+        Trusted runtime mutation. `Idempotency-Key` is the canonical retry key; the request-body
+        `idempotencyKey` field remains a compatibility fallback.
+      security:
+        - internalJwt:
+            - internal:promotion:commit
+      parameters:
+        - $ref: "#/components/parameters/ReservationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommitReservationRequest"
+      responses:
+        "200":
+          description: Commit result and redemption id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommitReservationResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/reservations/{reservationId}/cancel:
+    post:
+      tags: [Runtime]
+      operationId: cancelIncentiveReservation
+      summary: Service-to-service cancellation of an uncommitted reservation.
+      description: >
+        Trusted runtime mutation. `Idempotency-Key` is the canonical retry key; the request-body
+        `idempotencyKey` field remains a compatibility fallback.
+      security:
+        - internalJwt:
+            - internal:promotion:cancel
+      parameters:
+        - $ref: "#/components/parameters/ReservationId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelReservationRequest"
+      responses:
+        "200":
+          description: Cancellation result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CancelReservationResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions:
+    get:
+      tags: [Redemptions]
+      operationId: listIncentiveRedemptions
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - name: profileId
+          in: query
+          schema:
+            type: string
+        - name: externalReference
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CampaignIdQuery"
+        - name: couponId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Redemption list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Redemption"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/{redemptionId}:
+    get:
+      tags: [Redemptions]
+      operationId: getIncentiveRedemption
+      parameters:
+        - $ref: "#/components/parameters/RedemptionId"
+      responses:
+        "200":
+          description: Redemption detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Redemption"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/reconciliation/entries:
+    get:
+      tags: [Reconciliation]
+      operationId: queryIncentiveReconciliationEntries
+      summary: Read-only support and finance reconciliation view over promotion ledger/effects/outbox state.
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - name: profileId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: externalReference
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: "#/components/parameters/CampaignIdQuery"
+        - name: couponId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: redemptionId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: reservationId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: entryType
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [RESERVE, COMMIT, CANCEL, EXPIRE, REVERSE]
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Reconciliation effect rows. Raw coupon codes and raw request snapshots are never returned.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncentiveReconciliationQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/{redemptionId}/reverse:
+    post:
+      tags: [Redemptions]
+      operationId: reverseIncentiveRedemption
+      summary: Service-to-service/admin support reversal through a compensating ledger entry.
+      description: >
+        Trusted mutation. `Idempotency-Key` is the canonical retry key; the request-body
+        `idempotencyKey` field remains a compatibility fallback.
+      security:
+        - internalJwt:
+            - internal:promotion:reverse
+      parameters:
+        - $ref: "#/components/parameters/RedemptionId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReverseRedemptionRequest"
+      responses:
+        "200":
+          description: Reversal result. Reversal is compensating and does not delete the original redemption.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReverseRedemptionResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/policies:
+    get:
+      tags: [Retention]
+      operationId: listIncentiveRetentionPolicies
+      responses:
+        "200":
+          description: Retention policies.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionPolicyRegistry"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/dry-runs:
+    post:
+      tags: [Retention]
+      operationId: createIncentiveRetentionDryRun
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionDryRunRequest"
+      responses:
+        "200":
+          description: Retention dry-run result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionDryRunResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/restore-drills:
+    post:
+      tags: [Retention]
+      operationId: registerIncentiveRetentionRestoreDrill
+      parameters:
+        - $ref: "#/components/parameters/CorrelationIdRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionRestoreDrillRequest"
+      responses:
+        "200":
+          description: Registered restore drill.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionRestoreDrillResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/restore-drills/{restoreDrillRef}:
+    get:
+      tags: [Retention]
+      operationId: getIncentiveRetentionRestoreDrill
+      parameters:
+        - name: restoreDrillRef
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Restore drill detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionRestoreDrillResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/approvals:
+    get:
+      tags: [Retention]
+      operationId: listIncentiveRetentionApprovals
+      parameters:
+        - name: scopeType
+          in: query
+          schema:
+            type: string
+            enum: [APPLICATION, GLOBAL]
+        - name: tenantId
+          in: query
+          schema:
+            type: string
+        - name: applicationId
+          in: query
+          schema:
+            type: string
+        - name: approvalId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: dryRunId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING_APPROVAL, APPROVED, REJECTED, EXECUTED, EXECUTION_FAILED]
+        - name: policyId
+          in: query
+          schema:
+            type: string
+        - name: changeTicket
+          in: query
+          schema:
+            type: string
+        - name: requestedBy
+          in: query
+          schema:
+            type: string
+        - name: approvedBy
+          in: query
+          schema:
+            type: string
+        - name: executedBy
+          in: query
+          schema:
+            type: string
+        - name: expired
+          in: query
+          schema:
+            type: boolean
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Retention approval queue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionApprovalQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Retention]
+      operationId: requestIncentiveRetentionApproval
+      parameters:
+        - $ref: "#/components/parameters/CorrelationIdRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionApprovalRequest"
+      responses:
+        "200":
+          description: Retention approval request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/approvals/{approvalId}:
+    get:
+      tags: [Retention]
+      operationId: getIncentiveRetentionApproval
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Retention approval detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/approvals/{approvalId}/evidence-pack:
+    get:
+      tags: [Retention]
+      operationId: getIncentiveRetentionEvidencePack
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Audit-safe retention compliance evidence pack.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionEvidencePack"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/approvals/{approvalId}/evidence-pack/export:
+    get:
+      tags: [Retention]
+      operationId: exportIncentiveRetentionEvidencePack
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Audit-safe retention evidence export content.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionEvidencePackExport"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/approvals/{approvalId}:approve:
+    post:
+      tags: [Retention]
+      operationId: approveIncentiveRetentionApproval
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationIdRequired"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Approved retention approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/approvals/{approvalId}:reject:
+    post:
+      tags: [Retention]
+      operationId: rejectIncentiveRetentionApproval
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationIdRequired"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Rejected retention approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionApprovalResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/retention/executions:
+    post:
+      tags: [Retention]
+      operationId: executeIncentiveRetention
+      parameters:
+        - $ref: "#/components/parameters/CorrelationIdRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionExecutionRequest"
+      responses:
+        "200":
+          description: Retention execution result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RetentionExecutionResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/audit:
+    get:
+      tags: [Audit]
+      operationId: queryIncentiveAudit
+      parameters:
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/ApplicationId"
+        - name: aggregateType
+          in: query
+          schema:
+            type: string
+        - name: aggregateId
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: actorId
+          in: query
+          schema:
+            type: string
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+        - name: sourceClientId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Audit query response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/campaigns/{campaignId}/timeline:
+    get:
+      tags: [Audit]
+      operationId: getIncentiveCampaignTimeline
+      parameters:
+        - $ref: "#/components/parameters/CampaignId"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Campaign timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/applications/{applicationUuid}/timeline:
+    get:
+      tags: [Audit]
+      operationId: getIncentiveApplicationTimeline
+      parameters:
+        - $ref: "#/components/parameters/ApplicationUuid"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Application timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/{redemptionId}/timeline:
+    get:
+      tags: [Audit]
+      operationId: getIncentiveRedemptionTimeline
+      parameters:
+        - $ref: "#/components/parameters/RedemptionId"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Redemption timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    internalJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Internal JWT minted by the identity-token-converter flow. Service actors must carry the
+        relevant `internal:promotion:<operation>` scope and must be bound to the incentive application.
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema:
+        type: string
+    CorrelationIdRequired:
+      name: X-Correlation-Id
+      in: header
+      required: true
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 160
+      description: >
+        Canonical retry key for trusted mutations. Same key plus same normalized request hash replays
+        the stored response; same key plus different payload returns conflict. Body `idempotencyKey`
+        fields remain compatibility fallbacks during migration.
+    TenantId:
+      name: tenantId
+      in: query
+      required: false
+      schema:
+        type: string
+    ApplicationId:
+      name: applicationId
+      in: query
+      required: false
+      schema:
+        type: string
+    Status:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+    ApplicationUuid:
+      name: applicationUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CampaignId:
+      name: campaignId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CampaignIdQuery:
+      name: campaignId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    CouponId:
+      name: couponId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReservationId:
+      name: reservationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RedemptionId:
+      name: redemptionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    VersionNumber:
+      name: versionNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  requestBodies:
+    OptionalTransition:
+      required: false
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              note:
+                type: string
+  responses:
+    Error:
+      description: Error response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    CampaignVersionResponse:
+      description: Campaign version transition response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CampaignVersion"
+  schemas:
+    GenericObject:
+      type: object
+      additionalProperties: true
+    ErrorResponse:
+      type: object
+      additionalProperties: true
+      required: [statusCode, title, detail, fieldErrors]
+      properties:
+        statusCode:
+          type: string
+          example: 400 BAD_REQUEST
+        title:
+          type: string
+          example: Bad Request
+        detail:
+          type: string
+        fieldErrors:
+          type: array
+          items:
+            type: string
+    Application:
+      type: object
+      additionalProperties: true
+      required: [id, tenantId, applicationId, name, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+    ApplicationClientBinding:
+      type: object
+      additionalProperties: true
+      required: [id, clientId, status, allowedOperations]
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+        status:
+          type: string
+        allowedOperations:
+          type: array
+          items:
+            type: string
+    CreateApplicationRequest:
+      type: object
+      required: [tenantId, applicationId, name]
+      properties:
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        allowedClientIds:
+          type: array
+          items:
+            type: string
+    UpdateApplicationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        allowedClientIds:
+          type: array
+          items:
+            type: string
+    StatusChangeRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+        note:
+          type: string
+    CreateApplicationClientBindingRequest:
+      type: object
+      required: [clientId]
+      properties:
+        clientId:
+          type: string
+        status:
+          type: string
+        allowedOperations:
+          type: array
+          items:
+            type: string
+    Campaign:
+      type: object
+      additionalProperties: true
+      required: [id, tenantId, applicationId, code, name, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        draftVersion:
+          type: integer
+        publishedVersion:
+          type: integer
+    CampaignVersion:
+      type: object
+      additionalProperties: true
+      required: [campaignId, versionNumber, versionStatus]
+      properties:
+        id:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        versionNumber:
+          type: integer
+        versionStatus:
+          type: string
+        activeSnapshot:
+          type: boolean
+        createdBy:
+          type: ["string", "null"]
+        submittedBy:
+          type: ["string", "null"]
+        reviewedBy:
+          type: ["string", "null"]
+        publishedBy:
+          type: ["string", "null"]
+        reviewNote:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        submittedAt:
+          type: ["string", "null"]
+          format: date-time
+        reviewedAt:
+          type: ["string", "null"]
+          format: date-time
+        publishedAt:
+          type: ["string", "null"]
+          format: date-time
+    CampaignVersionDetail:
+      allOf:
+        - $ref: "#/components/schemas/CampaignVersion"
+        - type: object
+          additionalProperties: true
+    CampaignVersionReviewQueue:
+      type: object
+      required: [items, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [version, tenantId, applicationId, campaignCode, campaignName, blockerCount, warningCount, publishable]
+            properties:
+              version:
+                $ref: "#/components/schemas/CampaignVersion"
+              tenantId:
+                type: string
+              applicationId:
+                type: string
+              campaignCode:
+                type: string
+              campaignName:
+                type: string
+              blockerCount:
+                type: integer
+              warningCount:
+                type: integer
+              publishable:
+                type: boolean
+        limit:
+          type: integer
+        hasMore:
+          type: boolean
+    UpdateCampaignVersionDraftRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        incentiveType:
+          type: string
+        startsAt:
+          type: ["string", "null"]
+          format: date-time
+        endsAt:
+          type: ["string", "null"]
+          format: date-time
+        priority:
+          type: integer
+        exclusive:
+          type: boolean
+        stackable:
+          type: boolean
+        couponRequired:
+          type: boolean
+        matchPolicy:
+          type: string
+          enum: [ALL, ANY]
+        currency:
+          type: ["string", "null"]
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuleSpec"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionSpec"
+        maxRedemptions:
+          type: ["integer", "null"]
+        maxRedemptionsPerProfile:
+          type: ["integer", "null"]
+    ValidationMessage:
+      type: object
+      required: [severity, code, field, message]
+      properties:
+        severity:
+          type: string
+        code:
+          type: string
+        field:
+          type: ["string", "null"]
+        message:
+          type: string
+    CampaignVersionValidation:
+      type: object
+      required: [campaignId, versionNumber, publishable, blockers, warnings]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        versionNumber:
+          type: integer
+        publishable:
+          type: boolean
+        blockers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationMessage"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationMessage"
+    CampaignVersionDiff:
+      type: object
+      required: [campaignId, leftVersion, rightVersion, changes]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        leftVersion:
+          type: integer
+        rightVersion:
+          type: integer
+        changes:
+          type: array
+          items:
+            type: object
+            required: [field, leftValue, rightValue]
+            properties:
+              field:
+                type: string
+              leftValue: {}
+              rightValue: {}
+    RollbackCampaignVersionRequest:
+      type: object
+      properties:
+        note:
+          type: string
+    CreateCampaignRequest:
+      type: object
+      required: [tenantId, applicationId, code, name, actions]
+      properties:
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        incentiveType:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        priority:
+          type: integer
+        exclusive:
+          type: boolean
+        stackable:
+          type: boolean
+        couponRequired:
+          type: boolean
+        matchPolicy:
+          type: string
+          enum: [ALL, ANY]
+        currency:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuleSpec"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionSpec"
+        maxRedemptions:
+          type: integer
+        maxRedemptionsPerProfile:
+          type: integer
+    RuleSpec:
+      type: object
+      required: [type, schemaVersion]
+      properties:
+        type:
+          type: string
+        schemaVersion:
+          type: integer
+        parameters:
+          type: object
+          additionalProperties: true
+    ActionSpec:
+      type: object
+      required: [type, schemaVersion]
+      properties:
+        type:
+          type: string
+        schemaVersion:
+          type: integer
+        parameters:
+          type: object
+          additionalProperties: true
+    Coupon:
+      type: object
+      additionalProperties: false
+      required: [id, campaignId, code, normalizedCode, codeMask, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        code:
+          type: ["string", "null"]
+          description: DTO compatibility field. Runtime returns a mask, never the raw coupon credential.
+        normalizedCode:
+          type: ["string", "null"]
+          description: DTO compatibility field. Runtime returns null; stored fingerprint is not exposed.
+        codeMask:
+          type: string
+          description: Mask only. Raw code and fingerprint are never returned.
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, EXPIRED, VOID, REDEEMED]
+        holderProfileId:
+          type: ["string", "null"]
+        startsAt:
+          type: ["string", "null"]
+          format: date-time
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        maxRedemptions:
+          type: ["integer", "null"]
+        maxRedemptionsPerProfile:
+          type: ["integer", "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    LearnerCoupon:
+      type: object
+      additionalProperties: false
+      required: [couponId, campaignId, campaignCode, campaignName, codeMask, status, walletStatus, message]
+      properties:
+        couponId:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        campaignCode:
+          type: string
+        campaignName:
+          type: string
+        codeMask:
+          type: string
+          description: Mask only. Raw coupon credential and fingerprint are never returned.
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, EXPIRED, VOID, REDEEMED]
+        walletStatus:
+          type: string
+          enum: [AVAILABLE, UPCOMING, USED, EXPIRED, PAUSED, VOID, UNAVAILABLE]
+        startsAt:
+          type: ["string", "null"]
+          format: date-time
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        redemptionId:
+          type: ["string", "null"]
+          format: uuid
+        redeemedAt:
+          type: ["string", "null"]
+          format: date-time
+        message:
+          type: string
+    LearnerCouponWallet:
+      type: object
+      additionalProperties: false
+      required: [tenantId, applicationId, profileId, generatedAt, availableCount, expiringSoonCount, usedCount, expiredCount, items]
+      properties:
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        profileId:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        availableCount:
+          type: integer
+          minimum: 0
+        expiringSoonCount:
+          type: integer
+          minimum: 0
+        usedCount:
+          type: integer
+          minimum: 0
+        expiredCount:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/LearnerCoupon"
+    CreateCouponRequest:
+      type: object
+      required: [campaignId, code]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        code:
+          type: string
+          writeOnly: true
+          description: Raw coupon credential accepted only in mutation/lookup requests.
+        holderProfileId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        maxRedemptions:
+          type: integer
+        maxRedemptionsPerProfile:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+    UpdateCouponStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ACTIVE, PAUSED, EXPIRED, VOID]
+        reason:
+          type: string
+    GenerateCouponsRequest:
+      type: object
+      required: [campaignId, quantity]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        prefix:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 500
+        codeLength:
+          type: integer
+          minimum: 6
+          maximum: 32
+        holderProfileId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        maxRedemptions:
+          type: integer
+        maxRedemptionsPerProfile:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+    GenerateCouponsResponse:
+      type: object
+      required: [campaignId, requested, created, duplicateRetries, coupons]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        requested:
+          type: integer
+        created:
+          type: integer
+        duplicateRetries:
+          type: integer
+        coupons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Coupon"
+    CouponStorageInventory:
+      type: object
+      required: [legacyFallbackEnabled, fallbackDisableReady, totalCoupons, legacyCoupons, malformedCoupons, generatedAt, items]
+      properties:
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        activeOnly:
+          type: boolean
+        legacyFallbackEnabled:
+          type: boolean
+        fallbackDisableReady:
+          type: boolean
+        totalCoupons:
+          type: integer
+          format: int64
+        legacyCoupons:
+          type: integer
+          format: int64
+        malformedCoupons:
+          type: integer
+          format: int64
+        generatedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            type: object
+            required: [storageFormat, count]
+            properties:
+              storageFormat:
+                type: string
+              count:
+                type: integer
+                format: int64
+    CouponImportDryRunMultipartRequest:
+      type: object
+      required: [campaignId, file]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        maxRows:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        holderProfileId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        maxRedemptions:
+          type: integer
+          minimum: 0
+        maxRedemptionsPerProfile:
+          type: integer
+          minimum: 0
+        idempotencyKey:
+          type: string
+          maxLength: 160
+          description: Optional alternative to the Idempotency-Key header for multipart clients.
+        file:
+          type: string
+          format: binary
+          description: "CSV file. Required header: code. Optional headers become metadata unless they map to known coupon fields."
+    CouponImportDryRunIssue:
+      type: object
+      additionalProperties: false
+      required: [rowNumber, field, reasonCode, message]
+      properties:
+        rowNumber:
+          type: integer
+        codeMask:
+          type: ["string", "null"]
+          description: Mask only. Raw code and fingerprint are never returned.
+        field:
+          type: string
+        reasonCode:
+          type: string
+          enum:
+            - CODE_REQUIRED
+            - CODE_TOO_LONG
+            - DUPLICATE_IN_FILE
+            - DUPLICATE_EXISTING
+            - INVALID_DATE_TIME
+            - INVALID_INTEGER
+            - INVALID_WINDOW_OR_LIMIT
+            - HOLDER_PROFILE_TOO_LONG
+        message:
+          type: string
+    CouponImportDryRunRow:
+      type: object
+      additionalProperties: false
+      required: [rowNumber, status, issueCodes]
+      properties:
+        rowNumber:
+          type: integer
+        codeMask:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [VALID, INVALID]
+        issueCodes:
+          type: array
+          items:
+            type: string
+    CouponImportDryRunResponse:
+      type: object
+      additionalProperties: false
+      required: [dryRunId, campaignId, dryRun, requestedRows, validRows, invalidRows, duplicateInFileRows, duplicateExistingRows, storageInventoryReady, commitReady, resultHash, generatedAt, warnings, issues, sampleRows]
+      properties:
+        dryRunId:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        dryRun:
+          type: boolean
+          const: true
+        requestedRows:
+          type: integer
+        validRows:
+          type: integer
+        invalidRows:
+          type: integer
+        duplicateInFileRows:
+          type: integer
+        duplicateExistingRows:
+          type: integer
+        storageInventoryReady:
+          type: boolean
+        commitReady:
+          type: boolean
+          description: True only when all rows are valid and coupon storage inventory has no legacy/malformed rows.
+        resultHash:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponImportDryRunIssue"
+        sampleRows:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponImportDryRunRow"
+    CouponImportDryRunListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - dryRunId
+        - tenantId
+        - applicationId
+        - campaignId
+        - status
+        - requestedRows
+        - validRows
+        - invalidRows
+        - duplicateInFileRows
+        - duplicateExistingRows
+        - storageInventoryReady
+        - commitReady
+        - resultHash
+        - createdAt
+        - committedRows
+      properties:
+        dryRunId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [COMPLETED]
+        requestedRows:
+          type: integer
+        validRows:
+          type: integer
+        invalidRows:
+          type: integer
+        duplicateInFileRows:
+          type: integer
+        duplicateExistingRows:
+          type: integer
+        storageInventoryReady:
+          type: boolean
+        commitReady:
+          type: boolean
+        resultHash:
+          type: string
+        createdBy:
+          type: [string, "null"]
+        correlationId:
+          type: [string, "null"]
+        sourceClientId:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+        committedAt:
+          type: [string, "null"]
+          format: date-time
+        committedBy:
+          type: [string, "null"]
+        committedOperationId:
+          type: [string, "null"]
+          format: uuid
+        committedRows:
+          type: integer
+        failureReason:
+          type: [string, "null"]
+    CouponImportDryRunQueryResponse:
+      type: object
+      additionalProperties: false
+      required: [items, limit, hasMore, generatedAt]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponImportDryRunListItem"
+        limit:
+          type: integer
+        hasMore:
+          type: boolean
+        generatedAt:
+          type: string
+          format: date-time
+    CouponImportIssueExport:
+      type: object
+      additionalProperties: false
+      required: [dryRunId, campaignId, tenantId, applicationId, rowStatus, rowCount, filename, contentType, content, generatedAt]
+      properties:
+        dryRunId:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        rowStatus:
+          type: string
+          enum: [INVALID, VALID, ALL]
+        rowCount:
+          type: integer
+          minimum: 0
+        filename:
+          type: string
+        contentType:
+          type: string
+          const: text/csv
+        content:
+          type: string
+          description: CSV content with rowNumber, codeMask, rowStatus, and issueCodes only.
+        generatedAt:
+          type: string
+          format: date-time
+    CouponImportCommitMultipartRequest:
+      type: object
+      required: [approvalId, campaignId, approvedResultHash, reason, changeTicket, confirm, file]
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+          description: Approved maker/checker approval id. Direct coupon import commit without approval is rejected.
+        campaignId:
+          type: string
+          format: uuid
+        approvedResultHash:
+          type: string
+          description: HMAC result hash returned by the approved dry-run.
+        idempotencyKey:
+          type: string
+          maxLength: 160
+          description: Optional alternative to the Idempotency-Key header for multipart clients.
+        reason:
+          type: string
+        changeTicket:
+          type: string
+        confirm:
+          type: boolean
+          const: true
+        maxRows:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        holderProfileId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        maxRedemptions:
+          type: integer
+          minimum: 0
+        maxRedemptionsPerProfile:
+          type: integer
+          minimum: 0
+        file:
+          type: string
+          format: binary
+          description: Same CSV payload/options used for dry-run. Raw codes are never persisted in reports/audit.
+    CouponImportApprovalMultipartRequest:
+      type: object
+      required: [campaignId, approvedResultHash, reason, changeTicket, file]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        approvedResultHash:
+          type: string
+          description: HMAC result hash returned by the commit-ready dry-run.
+        reason:
+          type: string
+        changeTicket:
+          type: string
+        maxRows:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        holderProfileId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        maxRedemptions:
+          type: integer
+          minimum: 0
+        maxRedemptionsPerProfile:
+          type: integer
+          minimum: 0
+        file:
+          type: string
+          format: binary
+          description: Same CSV payload/options used for dry-run; used only for revalidation and never persisted raw.
+    CouponImportApprovalCommitMultipartRequest:
+      type: object
+      required: [confirm, file]
+      properties:
+        dryRunId:
+          type: string
+          format: uuid
+          description: Optional client cross-check; server derives the dry-run from approvalId.
+        campaignId:
+          type: string
+          format: uuid
+          description: Optional client cross-check; server derives the campaign from approvalId.
+        approvedResultHash:
+          type: string
+          description: Optional client cross-check; server derives the approved hash from approvalId.
+        idempotencyKey:
+          type: string
+          maxLength: 160
+          description: Optional alternative to the Idempotency-Key header for multipart clients.
+        reason:
+          type: string
+          description: Optional client cross-check; server derives the reason from approvalId.
+        changeTicket:
+          type: string
+          description: Optional client cross-check; server derives the ticket from approvalId.
+        confirm:
+          type: boolean
+          const: true
+        maxRows:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        holderProfileId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        maxRedemptions:
+          type: integer
+          minimum: 0
+        maxRedemptionsPerProfile:
+          type: integer
+          minimum: 0
+        file:
+          type: string
+          format: binary
+          description: Same CSV payload/options used for dry-run; raw codes are never persisted.
+    CouponImportApprovalDecisionRequest:
+      type: object
+      properties:
+        note:
+          type: string
+    CouponImportApprovalResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - approvalId
+        - status
+        - dryRunId
+        - campaignId
+        - approvedResultHash
+        - requestedRows
+        - validRows
+        - invalidRows
+        - duplicateInFileRows
+        - duplicateExistingRows
+        - storageInventoryReady
+        - commitReady
+        - reason
+        - changeTicket
+        - requestedBy
+        - expiresAt
+        - createdAt
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING_APPROVAL, APPROVED, REJECTED, EXECUTED]
+        dryRunId:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        approvedResultHash:
+          type: string
+        requestedRows:
+          type: integer
+        validRows:
+          type: integer
+        invalidRows:
+          type: integer
+        duplicateInFileRows:
+          type: integer
+        duplicateExistingRows:
+          type: integer
+        storageInventoryReady:
+          type: boolean
+        commitReady:
+          type: boolean
+        reason:
+          type: string
+        changeTicket:
+          type: string
+        requestedBy:
+          type: string
+        approvedBy:
+          type: [string, "null"]
+        rejectedBy:
+          type: [string, "null"]
+        committedBy:
+          type: [string, "null"]
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        approvedAt:
+          type: [string, "null"]
+          format: date-time
+        rejectedAt:
+          type: [string, "null"]
+          format: date-time
+        committedAt:
+          type: [string, "null"]
+          format: date-time
+    CouponImportCommitResponse:
+      type: object
+      additionalProperties: false
+      required: [importId, approvalId, dryRunId, campaignId, status, requestedRows, importedRows, resultHash, idempotencyReplay, committedAt, warnings]
+      properties:
+        importId:
+          type: string
+          format: uuid
+        approvalId:
+          type: string
+          format: uuid
+        dryRunId:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [SUCCEEDED]
+        requestedRows:
+          type: integer
+        importedRows:
+          type: integer
+        resultHash:
+          type: string
+        idempotencyReplay:
+          type: boolean
+        committedAt:
+          type: string
+          format: date-time
+        warnings:
+          type: array
+          items:
+            type: string
+    CouponImportOperation:
+      type: object
+      additionalProperties: false
+      required:
+        - importId
+        - dryRunId
+        - tenantId
+        - applicationId
+        - campaignId
+        - status
+        - requestedRows
+        - importedRows
+        - resultHash
+        - reason
+        - changeTicket
+        - createdAt
+      properties:
+        importId:
+          type: string
+          format: uuid
+        approvalId:
+          type: [string, "null"]
+          format: uuid
+        dryRunId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [SUCCEEDED]
+        requestedRows:
+          type: integer
+        importedRows:
+          type: integer
+        resultHash:
+          type: string
+        reason:
+          type: string
+        changeTicket:
+          type: string
+        createdBy:
+          type: [string, "null"]
+        correlationId:
+          type: [string, "null"]
+        sourceClientId:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+    CouponImportOperationQueryResponse:
+      type: object
+      additionalProperties: false
+      required: [items, limit, hasMore, generatedAt]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponImportOperation"
+        limit:
+          type: integer
+        hasMore:
+          type: boolean
+        generatedAt:
+          type: string
+          format: date-time
+    CouponImportOperationExport:
+      type: object
+      additionalProperties: false
+      required: [importId, dryRunId, campaignId, tenantId, applicationId, filename, contentType, content, generatedAt]
+      properties:
+        importId:
+          type: string
+          format: uuid
+        approvalId:
+          type: [string, "null"]
+          format: uuid
+        dryRunId:
+          type: string
+          format: uuid
+        campaignId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        content:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+    EvaluateIncentivesRequest:
+      type: object
+      required: [tenantId, applicationId, profileId, currency, transaction]
+      properties:
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        profileId:
+          type: string
+        externalReference:
+          type: string
+        channel:
+          type: string
+        currency:
+          type: string
+        couponCodes:
+          type: array
+          items:
+            type: string
+        couponIds:
+          type: array
+          description: >
+            Internal source-service selector for coupons already assigned to the profile. Use this
+            from BFFs when raw coupon credentials must not be exposed to browsers.
+          items:
+            type: string
+            format: uuid
+        transaction:
+          $ref: "#/components/schemas/TransactionContext"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveItem"
+        attributes:
+          type: object
+          additionalProperties: true
+    TransactionContext:
+      type: object
+      required: [subtotal]
+      properties:
+        subtotal:
+          type: number
+        shippingAmount:
+          type: number
+    IncentiveItem:
+      type: object
+      required: [id, type, quantity, unitPrice]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: number
+        attributes:
+          type: object
+          additionalProperties: true
+    IncentiveEffect:
+      type: object
+      required: [type, targetType, amount, currency, effectId, benefitType, actionType, unit, quantity, campaignVersion]
+      properties:
+        effectId:
+          type: string
+        type:
+          type: string
+        benefitType:
+          type: string
+        actionType:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: ["string", "null"]
+        amount:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        unit:
+          type: string
+        quantity:
+          type: number
+        campaignVersion:
+          type: ["integer", "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+    EvaluateIncentivesResponse:
+      type: object
+      required: [eligible, effects, reasonCodes]
+      properties:
+        eligible:
+          type: boolean
+        campaignId:
+          type: ["string", "null"]
+          format: uuid
+        campaignVersion:
+          type: ["integer", "null"]
+        campaignCode:
+          type: ["string", "null"]
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveEffect"
+        reasonCodes:
+          type: array
+          items:
+            type: string
+    AdminPreviewRequest:
+      type: object
+      required: [context]
+      properties:
+        context:
+          $ref: "#/components/schemas/EvaluateIncentivesRequest"
+        note:
+          type: string
+    AdminPreviewResponse:
+      type: object
+      required: [preview, ledgerImpact, contextHash, decision]
+      properties:
+        preview:
+          type: boolean
+        ledgerImpact:
+          type: boolean
+        contextHash:
+          type: string
+        decision:
+          $ref: "#/components/schemas/EvaluateIncentivesResponse"
+    ReserveIncentiveRequest:
+      type: object
+      required: [context]
+      properties:
+        idempotencyKey:
+          type: string
+          description: Compatibility fallback when the Idempotency-Key header cannot be sent.
+        context:
+          $ref: "#/components/schemas/EvaluateIncentivesRequest"
+    ReserveIncentiveResponse:
+      allOf:
+        - $ref: "#/components/schemas/EvaluateIncentivesResponse"
+        - type: object
+          required: [reserved, idempotencyReplay]
+          properties:
+            reserved:
+              type: boolean
+            reservationId:
+              type: ["string", "null"]
+              format: uuid
+            expiresAt:
+              type: ["string", "null"]
+              format: date-time
+            idempotencyReplay:
+              type: boolean
+    CommitReservationRequest:
+      type: object
+      properties:
+        idempotencyKey:
+          type: string
+          description: Compatibility fallback when the Idempotency-Key header cannot be sent.
+        externalReference:
+          type: string
+    CommitReservationResponse:
+      type: object
+      required: [committed, reservationId, campaignId, campaignVersion, status, effects, reasonCodes, idempotencyReplay]
+      properties:
+        committed:
+          type: boolean
+        reservationId:
+          type: ["string", "null"]
+          format: uuid
+        redemptionId:
+          type: ["string", "null"]
+          format: uuid
+        campaignId:
+          type: ["string", "null"]
+          format: uuid
+        campaignVersion:
+          type: ["integer", "null"]
+        status:
+          type: string
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveEffect"
+        reasonCodes:
+          type: array
+          items:
+            type: string
+        idempotencyReplay:
+          type: boolean
+    CancelReservationRequest:
+      type: object
+      properties:
+        idempotencyKey:
+          type: string
+          description: Compatibility fallback when the Idempotency-Key header cannot be sent.
+        reason:
+          type: string
+    CancelReservationResponse:
+      type: object
+      required: [cancelled, reservationId, status, reasonCodes, idempotencyReplay]
+      properties:
+        cancelled:
+          type: boolean
+        reservationId:
+          type: ["string", "null"]
+          format: uuid
+        status:
+          type: string
+        reasonCodes:
+          type: array
+          items:
+            type: string
+        idempotencyReplay:
+          type: boolean
+    ReservationQuotaSnapshot:
+      type: object
+      required: [scopeType, scopeId, profileId, limit]
+      properties:
+        scopeType:
+          type: string
+        scopeId:
+          type: string
+        profileId:
+          type: string
+        limit:
+          type: integer
+    Reservation:
+      type: object
+      required:
+        - id
+        - tenantId
+        - applicationId
+        - campaignId
+        - campaignVersion
+        - profileId
+        - status
+        - effects
+        - quotaSnapshot
+        - requestHash
+        - reservedAt
+        - expiresAt
+        - expired
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        campaignVersion:
+          type: integer
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        profileId:
+          type: string
+        externalReference:
+          type: ["string", "null"]
+        status:
+          type: string
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveEffect"
+        quotaSnapshot:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReservationQuotaSnapshot"
+        requestHash:
+          type: string
+        reservedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        committedAt:
+          type: ["string", "null"]
+          format: date-time
+        cancelledAt:
+          type: ["string", "null"]
+          format: date-time
+        failureReason:
+          type: ["string", "null"]
+        expired:
+          type: boolean
+    Redemption:
+      type: object
+      required: [id, reservationId, tenantId, applicationId, campaignId, campaignVersion, profileId, status, effects, redeemedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        reservationId:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        campaignVersion:
+          type: integer
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        profileId:
+          type: string
+        externalReference:
+          type: ["string", "null"]
+        status:
+          type: string
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveEffect"
+        redeemedAt:
+          type: string
+          format: date-time
+        reversedAt:
+          type: ["string", "null"]
+          format: date-time
+    IncentiveReconciliationEffect:
+      type: object
+      additionalProperties: false
+      required: [effectId, type, benefitType, actionType, targetType, amount, currency, unit, quantity, metadata]
+      properties:
+        effectId:
+          type: ["string", "null"]
+        type:
+          type: ["string", "null"]
+        benefitType:
+          type: ["string", "null"]
+        actionType:
+          type: ["string", "null"]
+        targetType:
+          type: ["string", "null"]
+        targetId:
+          type: ["string", "null"]
+        amount:
+          type: ["number", "null"]
+        currency:
+          type: ["string", "null"]
+        unit:
+          type: ["string", "null"]
+        quantity:
+          type: ["number", "null"]
+        campaignVersion:
+          type: ["integer", "null"]
+        metadata:
+          $ref: "#/components/schemas/GenericObject"
+    IncentiveReconciliationEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - ledgerEntryId
+        - reconciliationKey
+        - reconciliationStatus
+        - reasonCodes
+        - direction
+        - entryType
+        - tenantId
+        - applicationId
+        - campaignId
+        - campaignVersion
+        - profileId
+        - redemptionStatus
+        - quotaPolicy
+        - outboxStatus
+        - ledgerCreatedAt
+      properties:
+        ledgerEntryId:
+          type: string
+          format: uuid
+        reconciliationKey:
+          type: string
+        reconciliationStatus:
+          type: string
+          enum: [MATCHED, MISSING_LEDGER, MISSING_EFFECT, MISSING_OUTBOX, DUPLICATE, REVERSED, PENDING]
+        reasonCodes:
+          type: array
+          items:
+            type: string
+        direction:
+          type: string
+          enum: [APPLY, COMPENSATE, RELEASE, PENDING, UNKNOWN]
+        entryType:
+          type: string
+          enum: [RESERVE, COMMIT, CANCEL, EXPIRE, REVERSE]
+        redemptionId:
+          type: ["string", "null"]
+          format: uuid
+        reservationId:
+          type: ["string", "null"]
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        campaignVersion:
+          type: integer
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        profileId:
+          type: string
+        externalReference:
+          type: ["string", "null"]
+        redemptionStatus:
+          type: ["string", "null"]
+        quotaPolicy:
+          type: string
+          enum: [HOLD_RESERVED_QUOTA, RELEASE_RESERVED_QUOTA, NO_RELEASE_ON_COMMITTED_REVERSAL, NO_QUOTA_CHANGE]
+        quotaReleased:
+          type: ["boolean", "null"]
+        outboxStatus:
+          type: string
+          enum: [NOT_REQUIRED, MISSING, PENDING, PUBLISHED]
+        outboxEventType:
+          type: ["string", "null"]
+        outboxPublishedAt:
+          type: ["string", "null"]
+          format: date-time
+        correlationId:
+          type: ["string", "null"]
+        sourceClientId:
+          type: ["string", "null"]
+        ledgerCreatedAt:
+          type: string
+          format: date-time
+        redeemedAt:
+          type: ["string", "null"]
+          format: date-time
+        reversedAt:
+          type: ["string", "null"]
+          format: date-time
+        effect:
+          anyOf:
+            - $ref: "#/components/schemas/IncentiveReconciliationEffect"
+            - type: "null"
+    IncentiveReconciliationQueryResponse:
+      type: object
+      additionalProperties: false
+      required: [items, limit, hasMore, generatedAt]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveReconciliationEntry"
+        limit:
+          type: integer
+        hasMore:
+          type: boolean
+        generatedAt:
+          type: string
+          format: date-time
+    ReverseRedemptionRequest:
+      type: object
+      required: [reason]
+      properties:
+        idempotencyKey:
+          type: string
+          description: Compatibility fallback when the Idempotency-Key header cannot be sent.
+        reason:
+          type: string
+    ReverseRedemptionResponse:
+      type: object
+      required: [reversed, redemptionId, status, effects, reasonCodes, idempotencyReplay]
+      properties:
+        reversed:
+          type: boolean
+        redemptionId:
+          type: ["string", "null"]
+          format: uuid
+        status:
+          type: string
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveEffect"
+        reasonCodes:
+          type: array
+          items:
+            type: string
+        idempotencyReplay:
+          type: boolean
+    RetentionPolicy:
+      type: object
+      additionalProperties: false
+      required: [policyId, policyVersion, targetDataset, actionType, defaultRetentionDays, minimumRetentionDays, defaultBatchLimit, destructiveExecutionSupported, scopeTypes, eligibleWhen, blockerRules]
+      properties:
+        policyId:
+          type: string
+        policyVersion:
+          type: string
+        targetDataset:
+          type: string
+        actionType:
+          type: string
+        defaultRetentionDays:
+          type: integer
+        minimumRetentionDays:
+          type: integer
+        defaultBatchLimit:
+          type: integer
+        destructiveExecutionSupported:
+          type: boolean
+        scopeTypes:
+          type: array
+          items:
+            type: string
+        eligibleWhen:
+          type: string
+        blockerRules:
+          type: array
+          items:
+            type: string
+    RetentionPolicyRegistry:
+      type: object
+      additionalProperties: false
+      required: [policies]
+      properties:
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/RetentionPolicy"
+    RetentionDryRunRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        tenantId:
+          type: ["string", "null"]
+        applicationId:
+          type: ["string", "null"]
+        policyIds:
+          type: array
+          items:
+            type: string
+        asOf:
+          type: ["string", "null"]
+          format: date-time
+        retentionDaysOverride:
+          type: object
+          additionalProperties:
+            type: integer
+        batchLimit:
+          type: ["integer", "null"]
+        reason:
+          type: ["string", "null"]
+    RetentionDryRunResult:
+      type: object
+      additionalProperties: false
+      required: [policyId, policyVersion, targetDataset, actionType, cutoff, retentionDays, eligibleCount, blockedCount, batchLimit, destructiveExecutionSupported, resultHash]
+      properties:
+        policyId:
+          type: string
+        policyVersion:
+          type: string
+        targetDataset:
+          type: string
+        actionType:
+          type: string
+        cutoff:
+          type: string
+          format: date-time
+        retentionDays:
+          type: integer
+        eligibleCount:
+          type: integer
+          format: int64
+        blockedCount:
+          type: integer
+          format: int64
+        blockedReason:
+          type: ["string", "null"]
+        oldestCandidateAt:
+          type: ["string", "null"]
+          format: date-time
+        newestCandidateAt:
+          type: ["string", "null"]
+          format: date-time
+        batchLimit:
+          type: integer
+        destructiveExecutionSupported:
+          type: boolean
+        resultHash:
+          type: string
+    RetentionDryRunResponse:
+      type: object
+      additionalProperties: false
+      required: [dryRunId, resultHash, dryRun, nonDestructive, generatedAt, results, warnings]
+      properties:
+        dryRunId:
+          type: string
+          format: uuid
+        resultHash:
+          type: string
+        dryRun:
+          type: boolean
+        nonDestructive:
+          type: boolean
+        tenantId:
+          type: ["string", "null"]
+        applicationId:
+          type: ["string", "null"]
+        generatedAt:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/RetentionDryRunResult"
+        warnings:
+          type: array
+          items:
+            type: string
+    RetentionRestoreDrillRequest:
+      type: object
+      additionalProperties: false
+      required: [restoreDrillRef, databaseName, backupPath, artifactHash, status, checkedAt, expiresAt]
+      properties:
+        restoreDrillRef:
+          type: string
+        databaseName:
+          type: string
+        backupPath:
+          type: string
+        artifactHash:
+          type: string
+        status:
+          type: string
+        checkedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        note:
+          type: ["string", "null"]
+    RetentionRestoreDrillResponse:
+      type: object
+      additionalProperties: false
+      required: [id, restoreDrillRef, databaseName, backupPath, artifactHash, status, checkedAt, expiresAt, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        restoreDrillRef:
+          type: string
+        databaseName:
+          type: string
+        backupPath:
+          type: string
+        artifactHash:
+          type: string
+        status:
+          type: string
+        checkedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+    RetentionApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [policyId, approvedDryRunId, approvedResultHash, reason, changeTicket, restoreDrillRef]
+      properties:
+        tenantId:
+          type: ["string", "null"]
+        applicationId:
+          type: ["string", "null"]
+        policyId:
+          type: string
+        asOf:
+          type: ["string", "null"]
+          format: date-time
+        retentionDaysOverride:
+          type: object
+          additionalProperties:
+            type: integer
+        batchLimit:
+          type: ["integer", "null"]
+        approvedDryRunId:
+          type: string
+          format: uuid
+        approvedResultHash:
+          type: string
+        reason:
+          type: string
+        changeTicket:
+          type: string
+        restoreDrillRef:
+          type: string
+    RetentionApprovalDecisionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note:
+          type: ["string", "null"]
+    RetentionApprovalResponse:
+      type: object
+      additionalProperties: false
+      required: [approvalId, status, policyId, policyVersion, targetDataset, asOf, cutoff, retentionDays, dryRunId, approvedResultHash, eligibleCount, batchLimit, restoreDrillRef, changeTicket, reason, expiresAt, createdAt]
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        policyId:
+          type: string
+        policyVersion:
+          type: string
+        targetDataset:
+          type: string
+        tenantId:
+          type: ["string", "null"]
+        applicationId:
+          type: ["string", "null"]
+        asOf:
+          type: string
+          format: date-time
+        cutoff:
+          type: string
+          format: date-time
+        retentionDays:
+          type: integer
+        dryRunId:
+          type: string
+          format: uuid
+        approvedResultHash:
+          type: string
+        eligibleCount:
+          type: integer
+          format: int64
+        batchLimit:
+          type: integer
+        restoreDrillRef:
+          type: string
+        changeTicket:
+          type: string
+        reason:
+          type: string
+        note:
+          type: ["string", "null"]
+        requestedBy:
+          type: ["string", "null"]
+        approvedBy:
+          type: ["string", "null"]
+        rejectedBy:
+          type: ["string", "null"]
+        executedBy:
+          type: ["string", "null"]
+        correlationId:
+          type: ["string", "null"]
+        sourceClientId:
+          type: ["string", "null"]
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        approvedAt:
+          type: ["string", "null"]
+          format: date-time
+        rejectedAt:
+          type: ["string", "null"]
+          format: date-time
+        failedAt:
+          type: ["string", "null"]
+          format: date-time
+        executedAt:
+          type: ["string", "null"]
+          format: date-time
+    RetentionApprovalQueryResponse:
+      type: object
+      additionalProperties: false
+      required: [items, limit, hasMore, generatedAt]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RetentionApprovalResponse"
+        limit:
+          type: integer
+        hasMore:
+          type: boolean
+        generatedAt:
+          type: string
+          format: date-time
+    RetentionRestoreDrillEvidence:
+      type: object
+      additionalProperties: false
+      required: [id, restoreDrillRef, databaseName, backupPath, artifactHash, status, checkedAt, expiresAt, createdBy, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        restoreDrillRef:
+          type: string
+        databaseName:
+          type: string
+        backupPath:
+          type: string
+        artifactHash:
+          type: string
+        status:
+          type: string
+        checkedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        note:
+          type: ["string", "null"]
+        correlationId:
+          type: ["string", "null"]
+        sourceClientId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+    RetentionExecutionEvidence:
+      type: object
+      additionalProperties: false
+      required: [executionId, approvalId, status, policyId, policyVersion, targetDataset, dryRunId, approvedResultHash, cutoff, expectedEligibleCount, redactedCount, batchLimit, idempotencyKeyHash, changeTicket, restoreDrillRef, createdAt]
+      properties:
+        executionId:
+          type: string
+          format: uuid
+        approvalId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        policyId:
+          type: string
+        policyVersion:
+          type: string
+        targetDataset:
+          type: string
+        tenantId:
+          type: ["string", "null"]
+        applicationId:
+          type: ["string", "null"]
+        dryRunId:
+          type: string
+          format: uuid
+        approvedResultHash:
+          type: string
+        cutoff:
+          type: string
+          format: date-time
+        expectedEligibleCount:
+          type: integer
+          format: int64
+        redactedCount:
+          type: integer
+          format: int64
+        batchLimit:
+          type: integer
+        hasMore:
+          type: ["boolean", "null"]
+        idempotencyKeyHash:
+          type: string
+        changeTicket:
+          type: string
+        restoreDrillRef:
+          type: string
+        approvedBy:
+          type: ["string", "null"]
+        executedBy:
+          type: ["string", "null"]
+        correlationId:
+          type: ["string", "null"]
+        lastError:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: ["string", "null"]
+          format: date-time
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+    RetentionAuditEvidenceEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, action, aggregateType, aggregateId, createdAt, payloadSummary]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        aggregateType:
+          type: string
+        aggregateId:
+          type: string
+        actorId:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        correlationId:
+          type: ["string", "null"]
+        sourceClientId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        payloadSummary:
+          type: object
+          additionalProperties: true
+    RetentionEvidencePack:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, artifactType, approvalId, generatedAt, approval, auditTrail, warnings]
+      properties:
+        schemaVersion:
+          type: string
+        artifactType:
+          type: string
+        approvalId:
+          type: string
+          format: uuid
+        generatedAt:
+          type: string
+          format: date-time
+        approval:
+          $ref: "#/components/schemas/RetentionApprovalResponse"
+        restoreDrill:
+          oneOf:
+            - $ref: "#/components/schemas/RetentionRestoreDrillEvidence"
+            - type: "null"
+        execution:
+          oneOf:
+            - $ref: "#/components/schemas/RetentionExecutionEvidence"
+            - type: "null"
+        auditTrail:
+          type: array
+          items:
+            $ref: "#/components/schemas/RetentionAuditEvidenceEvent"
+        warnings:
+          type: array
+          items:
+            type: string
+    RetentionEvidencePackExport:
+      type: object
+      additionalProperties: false
+      required: [approvalId, filename, contentType, content, contentSha256, generatedAt]
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        contentType:
+          type: string
+        content:
+          type: string
+        contentSha256:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+    RetentionExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [approvalId, idempotencyKey, confirm]
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+          description: Approved retention approval id. Destructive execution derives policy, scope, dry-run hash, ticket and restore-drill evidence from this approval.
+        tenantId:
+          type: ["string", "null"]
+          description: Optional client-supplied trace/cross-check only; server derives execution scope from approvalId.
+        applicationId:
+          type: ["string", "null"]
+          description: Optional client-supplied trace/cross-check only; server derives execution scope from approvalId.
+        policyId:
+          type: ["string", "null"]
+          description: Optional client-supplied trace/cross-check only; server derives policy from approvalId.
+        asOf:
+          type: ["string", "null"]
+          format: date-time
+          description: Optional client-supplied trace/cross-check only; server derives asOf from approvalId.
+        retentionDaysOverride:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Optional client-supplied trace/cross-check only; destructive execution uses approved values.
+        batchLimit:
+          type: ["integer", "null"]
+          description: Optional client-supplied trace/cross-check only; server derives batch limit from approvalId.
+        approvedDryRunId:
+          type: ["string", "null"]
+          format: uuid
+          description: Optional client-supplied trace/cross-check only; server derives the approved dry-run id from approvalId.
+        approvedResultHash:
+          type: ["string", "null"]
+          description: Optional client-supplied trace/cross-check only; server derives the approved result hash from approvalId.
+        idempotencyKey:
+          type: string
+        reason:
+          type: ["string", "null"]
+          description: Optional client note; approved reason is retained from approvalId.
+        changeTicket:
+          type: ["string", "null"]
+          description: Optional client-supplied trace/cross-check only; server derives the change ticket from approvalId.
+        restoreDrillRef:
+          type: ["string", "null"]
+          description: Optional client-supplied trace/cross-check only; server derives restore-drill evidence from approvalId.
+        confirm:
+          type: boolean
+          const: true
+    RetentionExecutionResponse:
+      type: object
+      additionalProperties: false
+      required: [executionId, status, policyId, policyVersion, targetDataset, cutoff, dryRunId, approvedResultHash, eligibleBefore, redactedCount, batchLimit, hasMore, idempotencyReplay, executedAt]
+      properties:
+        executionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+        policyId:
+          type: string
+        policyVersion:
+          type: string
+        targetDataset:
+          type: string
+        tenantId:
+          type: ["string", "null"]
+        applicationId:
+          type: ["string", "null"]
+        cutoff:
+          type: string
+          format: date-time
+        dryRunId:
+          type: string
+          format: uuid
+        approvedResultHash:
+          type: string
+        eligibleBefore:
+          type: integer
+          format: int64
+        redactedCount:
+          type: integer
+          format: int64
+        batchLimit:
+          type: integer
+        hasMore:
+          type: boolean
+        idempotencyReplay:
+          type: boolean
+        executedAt:
+          type: string
+          format: date-time
+    CatalogParameter:
+      type: object
+      additionalProperties: false
+      required: [name, type, required]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        required:
+          type: boolean
+        description:
+          type: ["string", "null"]
+        allowedValues:
+          type: array
+          items:
+            type: string
+    RuleCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [type, schemaVersion, description, parameters, requiredFacts, missingFactReasonCode]
+      properties:
+        type:
+          type: string
+        schemaVersion:
+          type: integer
+        description:
+          type: string
+        parameters:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogParameter"
+        requiredFacts:
+          type: array
+          items:
+            type: string
+        missingFactReasonCode:
+          type: string
+    ActionCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [type, schemaVersion, benefitType, description, parameters, emittedEffectTypes]
+      properties:
+        type:
+          type: string
+        schemaVersion:
+          type: integer
+        benefitType:
+          type: string
+        description:
+          type: string
+        parameters:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogParameter"
+        emittedEffectTypes:
+          type: array
+          items:
+            type: string
+    EffectCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [benefitType, unit, actionTypes, targetTypes, description]
+      properties:
+        benefitType:
+          type: string
+        unit:
+          type: string
+        actionTypes:
+          type: array
+          items:
+            type: string
+        targetTypes:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+    ReasonCodeCatalogItem:
+      type: object
+      additionalProperties: false
+      required: [code, category, terminal, description]
+      properties:
+        code:
+          type: string
+        category:
+          type: string
+        terminal:
+          type: boolean
+        description:
+          type: string
+    IdempotencyContract:
+      type: object
+      additionalProperties: false
+      required: [preferredLocation, headerName, bodyFields, ttl, replayBehavior, conflictBehavior]
+      properties:
+        preferredLocation:
+          type: string
+        headerName:
+          type: string
+        bodyFields:
+          type: array
+          items:
+            type: string
+        ttl:
+          type: string
+        replayBehavior:
+          type: string
+        conflictBehavior:
+          type: string
+    IncentiveCatalog:
+      type: object
+      additionalProperties: true
+      required: [catalogVersion, factContractVersion, rules, actions, effects, reasonCodes, idempotency]
+      properties:
+        catalogVersion:
+          type: string
+        factContractVersion:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuleCatalogItem"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionCatalogItem"
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/EffectCatalogItem"
+        reasonCodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReasonCodeCatalogItem"
+        idempotency:
+          $ref: "#/components/schemas/IdempotencyContract"
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required: [id, tenantId, applicationId, aggregateId, aggregateType, action, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: ["string", "null"]
+        applicationId:
+          type: ["string", "null"]
+        aggregateId:
+          type: string
+        aggregateType:
+          type: string
+        action:
+          type: string
+        actorId:
+          type: ["string", "null"]
+        note:
+          type: ["string", "null"]
+        payload:
+          type: object
+          additionalProperties: true
+        correlationId:
+          type: ["string", "null"]
+        sourceClientId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+    AuditQueryResponse:
+      type: object
+      additionalProperties: true
+      required: [items, limit, hasMore]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        limit:
+          type: integer
+        hasMore:
+          type: boolean

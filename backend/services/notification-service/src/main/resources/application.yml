@@ -31,7 +31,8 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     listener:
       ack-mode: record
-courseflow:  enrollment:
+courseflow:
+  enrollment:
     base-url: ${ENROLLMENT_BASE_URL:http://enrollment-service:8080}
   notification:
     delivery:

@@ -311,6 +311,7 @@ export function CourseCard({
   next,
   duration,
   mentor,
+  priceLabel,
   tone
 }: {
   code: string;
@@ -323,6 +324,7 @@ export function CourseCard({
   next?: string;
   duration?: string;
   mentor?: string;
+  priceLabel?: string | null;
   tone: string;
 }) {
   const hasProgress = typeof progress === "number";
@@ -360,7 +362,10 @@ export function CourseCard({
           </div>
         </div>
         <div className="mt-5 flex items-center justify-between">
-          <Badge tone="neutral">{statusLabel(status)}</Badge>
+          <div className="flex min-w-0 flex-wrap gap-2">
+            <Badge tone="neutral">{statusLabel(status)}</Badge>
+            {priceLabel && <Badge tone={priceLabel === "Miễn phí" ? "brand" : "amber"}>{priceLabel}</Badge>}
+          </div>
           <Link href={href} className="inline-flex items-center gap-1 text-sm font-bold text-brand-700 hover:text-brand-900">
             <span className="inline-flex items-center gap-1">
               <span>Vào học</span>

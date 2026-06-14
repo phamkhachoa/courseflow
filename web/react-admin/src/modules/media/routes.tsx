@@ -1,4 +1,7 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { MediaPage } from "./pages";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
 
-export const mediaRoutes: RouteObject[] = [{ index: true, element: <MediaPage /> }];
+const MediaPage = lazy(() => import("./pages").then(({ MediaPage }) => ({ default: MediaPage })));
+
+export const mediaRoutes: RouteObject[] = [{ index: true, element: lazyRouteElement(MediaPage) }];

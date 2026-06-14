@@ -25,9 +25,9 @@ Clients (Next.js, React admin, Flutter) call the gateway directly. Next.js serve
 | Admin Identity | `GET/POST /api/admin/v1/users`, `GET /api/admin/v1/users/{id}`, `GET /api/admin/v1/users/{id}/privacy-export`, `POST /api/admin/v1/users/{id}/deactivate` through user-management lifecycle facade + Keycloak Admin REST |
 | Admin Access Control/RBAC | `GET /api/admin/v1/roles`, `GET /api/admin/v1/permissions`, `POST /api/admin/v1/users/{id}/assignments` |
 | Organization | `GET /api/admin/v1/organizations/departments`, `GET /api/admin/v1/terms`, `POST /api/admin/v1/sections` |
-| Course | `GET /api/v1/courses`, `GET /api/v1/courses/{slug}`, `GET /api/admin/v1/courses`, `POST /api/admin/v1/courses/{id}/publish` |
+| Course | `GET /api/v1/courses`, `GET /api/v1/courses/{slug}`, `GET /api/admin/v1/courses`, `GET /internal/courses/{id}/pricing`, `POST /api/admin/v1/courses/{id}/pricing`, `POST /api/admin/v1/courses/{id}/publish` |
 | Course Authoring | `POST /api/admin/v1/authoring/courses`, `GET /api/admin/v1/authoring/courses/{id}/draft`, `PUT /api/admin/v1/authoring/courses/{id}/curriculum` |
-| Enrollment | `GET /api/v1/enrollments?courseId=&studentId=`, `POST /api/v1/enrollments`, `POST /api/v1/waitlist`, `PUT /api/admin/v1/courses/{id}/capacity` |
+| Enrollment | `GET /api/v1/enrollments?courseId=&studentId=`, `GET /api/v1/enrollments/coupons`, `GET /api/v1/enrollments/{id}/promotion-application`, `POST /api/v1/enrollments`, `POST /api/v1/enrollments/promotion-preview`, `POST /api/v1/enrollments/checkout`, `POST /api/v1/waitlist`, `PUT /api/admin/v1/courses/{id}/capacity` |
 | Assignment | `GET /api/v1/assignments?courseId=`, `POST /api/v1/assignments/{id}/submissions`, `POST /api/admin/v1/submissions/{id}/grade` |
 | Course Modules | `GET /api/v1/courses/{courseId}/modules`, `POST /api/v1/courses/{courseId}/modules/{moduleId}/progress` |
 | Deadline | `GET /api/v1/deadlines/reminders/due`, `POST /api/admin/v1/deadlines/reminders` |
@@ -36,6 +36,9 @@ Clients (Next.js, React admin, Flutter) call the gateway directly. Next.js serve
 | Discussion | `GET /api/v1/discussions/threads`, `POST /api/v1/discussions/threads`, `POST /api/v1/discussions/threads/{id}/comments` |
 | Notification | `GET /api/v1/notifications?userId=`, `POST /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/preferences` |
 | Media/Video | `GET /api/v1/media/videos/{id}`, `GET /api/v1/media/videos/{id}/playback-url`, `POST /api/admin/v1/media/videos/{id}/transcode` |
+
+Course authoring submit-review and publish gates require purchasable pricing (`ACTIVE` or `FREE`)
+because learner checkout builds promotion facts from `GET /internal/courses/{id}/pricing`.
 | Search | `GET /api/v1/search/courses?q=`, `POST /api/admin/v1/search/courses` |
 | Analytics | `GET /api/admin/v1/analytics/courses/{id}/metrics`, `GET /api/v1/analytics/students/{id}/recommendations` |
 | Gradebook | `GET /api/v1/gradebook/courses/{courseId}/students/{studentId}`, `POST /api/admin/v1/gradebook/entries` |

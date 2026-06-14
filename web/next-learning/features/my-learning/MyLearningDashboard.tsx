@@ -10,6 +10,7 @@ import {
   CalendarClock,
   Compass,
   ClipboardCheck,
+  Coins,
   GraduationCap,
   Layers3,
   ListTodo,
@@ -24,12 +25,14 @@ import { useLearnerSession } from "@/features/auth/useLearnerSession";
 import { LearnerAssessmentPanel } from "@/features/quiz-attempts/LearnerAssessmentPanel";
 import { LearnerDeadlineHub } from "@/features/deadlines/LearnerDeadlineHub";
 import { listMyEnrollments, type Enrollment } from "@/features/enrollments/api";
+import { getLearnerLoyaltyBalances, type LearnerLoyaltyBalance } from "@/features/loyalty/api";
 import {
   courseDetailHref,
   courseModuleHref,
   listCatalogCourses
 } from "@/features/course-catalog/client-api";
 import type { CatalogCourse } from "@/features/course-catalog/api";
+import { formatCoursePrice } from "@/features/course-catalog/pricing";
 import type { CourseProgress } from "@/features/course-modules/api";
 import { clientFetch } from "@/shared/api/client";
 import {
@@ -120,6 +123,24 @@ function formatDate(value?: string): string {
     month: "2-digit",
     year: "numeric"
   }).format(date);
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("vi-VN").format(Math.max(0, Math.round(value)));
+}
+
+function loyaltySummary(items: LearnerLoyaltyBalance[]) {
+  const activeItems = items.filter((item) => item.accountStatus === "ACTIVE" && item.programStatus === "ACTIVE");
+  return {
+    totalActivePoints: activeItems.reduce((sum, item) => sum + item.activePoints, 0),
+    expiringSoonPoints: activeItems.reduce((sum, item) => sum + item.expiringSoonPoints, 0),
+    programCount: activeItems.length,
+    nextExpiryAt: activeItems
+      .map((item) => item.nextExpiryAt)
+      .filter((value): value is string => Boolean(value))
+      .sort()[0],
+    primary: activeItems[0]
+  };
 }
 
 function formatDueAt(value?: string | null): string | null {
@@ -364,6 +385,13 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
       : undefined
   );
   const isNextActionLoading = Boolean(session?.accessToken) && nextActionQuery.isLoading;
+  const loyaltyQuery = useQuery({
+    queryKey: ["learner-loyalty-balances", session?.user.id],
+    queryFn: getLearnerLoyaltyBalances,
+    enabled: Boolean(session?.accessToken),
+    retry: 0
+  });
+  const rewards = loyaltySummary(loyaltyQuery.data?.items ?? []);
 
   const heroCourse = enrolledCourses[0]?.course ?? courses[0];
   const averageProgress = dashboardCourseIds.length
@@ -514,11 +542,11 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
           icon={<Compass className="size-5" />}
         />
         <MetricCard
-          label="Kết quả"
-          value="Grade"
+          label="Điểm thưởng"
+          value={formatNumber(rewards.totalActivePoints)}
           tone="coral"
-          stateLabel="Bảng điểm"
-          icon={<Trophy className="size-5" />}
+          stateLabel={rewards.programCount ? `${rewards.programCount} ví` : "Chưa có ví"}
+          icon={<Coins className="size-5" />}
         />
       </section>
 
@@ -551,6 +579,7 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
                   status={enrollment?.status ?? course.status}
                   level={course.level}
                   progress={progress}
+                  priceLabel={formatCoursePrice(course)}
                   next={enrollment ? `Ghi danh: ${formatDate(enrollment.enrolledAt)}` : "Xem syllabus và ghi danh"}
                   duration={progress > 0 ? "Tiếp tục từ tiến độ đã lưu" : "Bắt đầu bài đầu tiên"}
                   tone={courseTones[index % courseTones.length]}
@@ -568,27 +597,35 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
                 action={<LinkButton href="/learning-paths" variant="secondary">Lập lộ trình</LinkButton>}
               />
               <div className="grid gap-4 md:grid-cols-3">
-                {recommendedCourses.map((course, index) => (
-                  <Link
-                    key={course.slug}
-                    href={courseDetailHref(course)}
-                    className={cn(
-                      "overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 transition",
-                      "hover:border-brand-200 hover:bg-brand-50/45"
-                    )}
-                  >
-                    <div className={cn("h-24 bg-gradient-to-br p-4 text-white", courseTones[index % courseTones.length])}>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-bold">{course.code}</span>
-                        <Badge tone="dark">{levelLabel(course.level)}</Badge>
+                {recommendedCourses.map((course, index) => {
+                  const priceLabel = formatCoursePrice(course);
+                  return (
+                    <Link
+                      key={course.slug}
+                      href={courseDetailHref(course)}
+                      className={cn(
+                        "overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60 transition",
+                        "hover:border-brand-200 hover:bg-brand-50/45"
+                      )}
+                    >
+                      <div className={cn("h-24 bg-gradient-to-br p-4 text-white", courseTones[index % courseTones.length])}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold">{course.code}</span>
+                          <Badge tone="dark">{levelLabel(course.level)}</Badge>
+                        </div>
                       </div>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-bold leading-6 text-ink-900">{course.title}</h3>
-                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-500">{course.summary}</p>
-                    </div>
-                  </Link>
-                ))}
+                      <div className="p-4">
+                        <h3 className="font-bold leading-6 text-ink-900">{course.title}</h3>
+                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-ink-500">{course.summary}</p>
+                        {priceLabel && (
+                          <div className="mt-3">
+                            <Badge tone={priceLabel === "Miễn phí" ? "brand" : "amber"}>{priceLabel}</Badge>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -596,6 +633,43 @@ export function MyLearningDashboard({ initialCourses }: MyLearningDashboardProps
 
         <aside className="space-y-4">
           <LearnerDeadlineHub compact maxItems={4} />
+
+          <Card>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold text-brand-600">Điểm thưởng</p>
+                <h2 className="mt-1 text-2xl font-bold text-ink-900">
+                  {formatNumber(rewards.totalActivePoints)}
+                </h2>
+              </div>
+              <span className="grid size-10 place-items-center rounded-md bg-coral-50 text-coral-600">
+                <Coins className="size-5" />
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase text-ink-500">Sắp hết hạn</p>
+                <p className="mt-1 text-lg font-bold text-ink-900">{formatNumber(rewards.expiringSoonPoints)}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase text-ink-500">Ví khả dụng</p>
+                <p className="mt-1 text-lg font-bold text-ink-900">{rewards.programCount}</p>
+              </div>
+            </div>
+            {rewards.primary ? (
+              <p className="mt-3 text-sm leading-6 text-ink-500">
+                {rewards.primary.programId}
+                {rewards.nextExpiryAt ? ` · Hạn gần nhất ${formatDate(rewards.nextExpiryAt)}` : ""}
+              </p>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-ink-500">
+                {session ? "Chưa có điểm thưởng khả dụng." : "Đăng nhập để xem điểm thưởng."}
+              </p>
+            )}
+            <Button asChild variant="secondary" className="mt-5 w-full">
+              <Link href="/loyalty">Mở ví điểm</Link>
+            </Button>
+          </Card>
 
           <Card>
             <div className="flex items-center justify-between gap-4">

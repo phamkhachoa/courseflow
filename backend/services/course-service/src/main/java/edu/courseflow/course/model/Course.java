@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -38,6 +40,15 @@ public class Course {
 
     @Column(nullable = false, length = 40)
     private String status = "DRAFT";
+
+    @Column(name = "list_price", precision = 12, scale = 2)
+    private BigDecimal listPrice;
+
+    @Column(name = "currency", length = 3)
+    private String currency;
+
+    @Column(name = "price_status", nullable = false, length = 40)
+    private String priceStatus = "NOT_CONFIGURED";
 
     @Column(name = "current_version_no", nullable = false)
     private int currentVersionNo = 1;
@@ -78,6 +89,12 @@ public class Course {
         this.updatedAt = Instant.now();
     }
 
+    public Course(UUID id, String code, String title, String slug, String summary,
+            UUID departmentId, String ownerId, String level, BigDecimal listPrice, String currency) {
+        this(id, code, title, slug, summary, departmentId, ownerId, level);
+        updatePricing(listPrice, currency);
+    }
+
     public UUID getId() {
         return id;
     }
@@ -114,8 +131,41 @@ public class Course {
         return status;
     }
 
+    public BigDecimal getListPrice() {
+        return listPrice;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public String getPriceStatus() {
+        return priceStatus;
+    }
+
     public void setStatus(String status) {
         this.status = status;
+        touch();
+    }
+
+    public void updatePricing(BigDecimal listPrice, String currency) {
+        if (listPrice == null) {
+            this.listPrice = null;
+            this.currency = null;
+            this.priceStatus = "NOT_CONFIGURED";
+            touch();
+            return;
+        }
+        if (listPrice.signum() < 0) {
+            throw new IllegalArgumentException("Course list price must not be negative");
+        }
+        String normalizedCurrency = currency == null || currency.isBlank() ? "USD" : currency.trim().toUpperCase();
+        if (normalizedCurrency.length() != 3) {
+            throw new IllegalArgumentException("Course price currency must be a 3-letter ISO code");
+        }
+        this.listPrice = listPrice.setScale(2, RoundingMode.HALF_UP);
+        this.currency = normalizedCurrency;
+        this.priceStatus = this.listPrice.signum() == 0 ? "FREE" : "ACTIVE";
         touch();
     }
 

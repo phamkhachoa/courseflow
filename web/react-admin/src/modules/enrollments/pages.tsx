@@ -2,9 +2,12 @@ import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Clock3,
+  Ban,
   GraduationCap,
   ListChecks,
+  RefreshCcw,
   Search,
+  TicketPercent,
   UserPlus,
   UsersRound
 } from "lucide-react";
@@ -32,9 +35,12 @@ import type { AdminUser } from "@/modules/identity/api";
 import { useLearnerUsers } from "@/modules/identity/useLearnerUsers";
 import {
   addToWaitlist,
+  cancelPromotionApplicationReservation,
   createEnrollment,
   getStats,
   listEnrollments,
+  listPromotionApplications,
+  retryPromotionApplicationCommit,
   listWaitlist,
   setCapacity
 } from "./api";
@@ -62,6 +68,32 @@ function waitlistStatusLabel(status?: string) {
     CANCELLED: "Đã hủy"
   };
   return labels[status ?? ""] ?? status ?? "Đang chờ";
+}
+
+function promotionStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    RESERVED: "Đã giữ ưu đãi",
+    APPLIED: "Đã áp dụng",
+    COMMIT_FAILED: "Chờ retry",
+    MANUAL_REVIEW: "Cần xử lý",
+    CANCELLED: "Đã hủy",
+    REVERSED: "Đã đảo giao dịch",
+    SKIPPED: "Không dùng ưu đãi",
+    UNAVAILABLE: "Không khả dụng"
+  };
+  return labels[status ?? ""] ?? status ?? "Chưa rõ";
+}
+
+function reasonSummary(reasonCodes?: string[]) {
+  return reasonCodes?.length ? reasonCodes.join(", ") : "Không có reason code";
+}
+
+function formatDateTime(value?: string | null) {
+  return value ? new Date(value).toLocaleString("vi-VN") : "Chưa lên lịch";
+}
+
+function canRemediatePromotion(status?: string) {
+  return status === "COMMIT_FAILED" || status === "RESERVED";
 }
 
 function courseLabel(course?: Course, fallbackId?: string) {
@@ -114,6 +146,7 @@ export function EnrollmentsPage() {
   const qc = useQueryClient();
   const [courseId, setCourseId] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [promotionStatus, setPromotionStatus] = useState("");
   const [capacity, setCapacityValue] = useState("");
   const [enrollForm, setEnrollForm] = useState({ courseId: "", studentId: "" });
   const [waitForm, setWaitForm] = useState({ courseId: "", studentId: "" });
@@ -137,6 +170,16 @@ export function EnrollmentsPage() {
     queryKey: queryKeys.enrollments.stats(courseId),
     queryFn: () => getStats(courseId),
     enabled: Boolean(courseId)
+  });
+  const promotionApplicationFilters = {
+    status: promotionStatus || undefined,
+    courseId: courseId || undefined,
+    studentId: studentId || undefined,
+    limit: 25
+  };
+  const promotionApplications = useQuery({
+    queryKey: queryKeys.enrollments.promotionApplications(promotionApplicationFilters),
+    queryFn: () => listPromotionApplications(promotionApplicationFilters)
   });
 
   const courseById = useMemo(() => {
@@ -186,6 +229,20 @@ export function EnrollmentsPage() {
       invalidateEnrollmentData(row.courseId);
     }
   });
+
+  const retryPromotionApplication = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      retryPromotionApplicationCommit(id, { reason: "Operator retry from admin enrollment ops queue" }),
+    onSuccess: (row) => invalidateEnrollmentData(row.courseId)
+  });
+
+  const cancelPromotionApplication = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      cancelPromotionApplicationReservation(id, { reason: "Operator cancelled coupon hold from admin enrollment ops queue" }),
+    onSuccess: (row) => invalidateEnrollmentData(row.courseId)
+  });
+
+  const promotionActionPending = retryPromotionApplication.isPending || cancelPromotionApplication.isPending;
 
   return (
     <div>
@@ -257,6 +314,7 @@ export function EnrollmentsPage() {
             onClick={() => {
               setCourseId("");
               setStudentId("");
+              setPromotionStatus("");
             }}
           >
             <Search size={16} />
@@ -268,6 +326,131 @@ export function EnrollmentsPage() {
             {courses.isError && <ErrorState error={courses.error} />}
             {users.isError && <ErrorState error={users.error} />}
           </div>
+        )}
+      </Card>
+
+      <Card className="mb-4">
+        <CardHeader
+          title="Coupon application ops"
+          subtitle="Các checkout ưu đãi đang chờ retry hoặc cần hỗ trợ xử lý."
+          actions={
+            <Select
+              value={promotionStatus}
+              onChange={(event) => setPromotionStatus(event.target.value)}
+              className="min-w-44"
+              aria-label="Lọc trạng thái coupon application"
+            >
+              <option value="">Open queue</option>
+              <option value="COMMIT_FAILED">Chờ retry</option>
+              <option value="MANUAL_REVIEW">Cần xử lý</option>
+              <option value="RESERVED">Đã giữ ưu đãi</option>
+              <option value="APPLIED">Đã áp dụng</option>
+              <option value="CANCELLED">Đã hủy</option>
+              <option value="REVERSED">Đã đảo giao dịch</option>
+            </Select>
+          }
+        />
+        {promotionApplications.isLoading && <Spinner />}
+        {promotionApplications.isError && <ErrorState error={promotionApplications.error} />}
+        {retryPromotionApplication.isError && <ErrorState error={retryPromotionApplication.error} />}
+        {cancelPromotionApplication.isError && <ErrorState error={cancelPromotionApplication.error} />}
+        {promotionApplications.data && promotionApplications.data.length === 0 && (
+          <EmptyState message="Không có coupon application cần xử lý theo bộ lọc hiện tại." />
+        )}
+        {promotionApplications.data && promotionApplications.data.length > 0 && (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Trạng thái</Th>
+                <Th>Khóa học</Th>
+                <Th>Học viên</Th>
+                <Th>Coupon</Th>
+                <Th>Lý do</Th>
+                <Th>Cập nhật</Th>
+                <Th>Xử lý</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {promotionApplications.data.map((row) => {
+                const course = courseById.get(row.courseId);
+                const user = userById.get(row.studentId);
+                return (
+                  <tr key={row.id} className="hover:bg-slate-50">
+                    <Td>
+                      <div className="flex flex-col gap-1">
+                        <Badge value={row.status} label={promotionStatusLabel(row.status)} />
+                        <span className="text-xs text-slate-500">Enrollment {compactId(row.enrollmentId)}</span>
+                      </div>
+                    </Td>
+                    <Td>
+                      <p className="font-semibold text-slate-900">{courseLabel(course, row.courseId)}</p>
+                      <p className="mt-1 text-xs text-slate-500">ID {compactId(row.courseId)}</p>
+                    </Td>
+                    <Td>
+                      <p className="font-semibold text-slate-900">{user?.fullName ?? `User ${compactId(row.studentId)}`}</p>
+                      <p className="mt-1 text-xs text-slate-500">{user?.email ?? `ID ${compactId(row.studentId)}`}</p>
+                    </Td>
+                    <Td>
+                      <div className="flex items-center gap-2">
+                        <TicketPercent size={16} className="text-brand-600" />
+                        <div>
+                          <p className="font-semibold text-slate-900">{row.couponCode || compactId(row.couponId ?? undefined) || "Coupon"}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Reservation {compactId(row.reservationId ?? undefined)}
+                          </p>
+                        </div>
+                      </div>
+                    </Td>
+                    <Td>
+                      <p className="max-w-xs text-sm text-slate-700">{row.message ?? reasonSummary(row.reasonCodes)}</p>
+                      {row.message && <p className="mt-1 max-w-xs text-xs text-slate-500">{reasonSummary(row.reasonCodes)}</p>}
+                      {(row.retryCount > 0 || row.nextRetryAt || row.lastRetryError) && (
+                        <div className="mt-2 rounded-md border border-amber-100 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+                          <p className="font-semibold">Retry {row.retryCount} · next {formatDateTime(row.nextRetryAt)}</p>
+                          {row.lastRetryError && <p className="mt-0.5 text-amber-700">{row.lastRetryError}</p>}
+                        </div>
+                      )}
+                    </Td>
+                    <Td>
+                      <p className="text-xs text-slate-500">
+                        {formatDateTime(row.updatedAt)}
+                      </p>
+                    </Td>
+                    <Td>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="xs"
+                          variant="secondary"
+                          disabled={!canRemediatePromotion(row.status) || promotionActionPending}
+                          onClick={() => {
+                            if (window.confirm("Retry commit coupon application này?")) {
+                              retryPromotionApplication.mutate({ id: row.id });
+                            }
+                          }}
+                        >
+                          <RefreshCcw size={14} />
+                          Retry
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="danger"
+                          disabled={!canRemediatePromotion(row.status) || promotionActionPending}
+                          onClick={() => {
+                            if (window.confirm("Cancel coupon reservation này? Enrollment đang active sẽ bị backend chặn.")) {
+                              cancelPromotionApplication.mutate({ id: row.id });
+                            }
+                          }}
+                        >
+                          <Ban size={14} />
+                          Cancel hold
+                        </Button>
+                      </div>
+                    </Td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </Table>
         )}
       </Card>
 

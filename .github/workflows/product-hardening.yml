@@ -9,12 +9,17 @@ on:
   workflow_dispatch:
     inputs:
       run_local_cluster_smoke:
-        description: "Boot the full local backend cluster and run the gateway Product Hardening smoke"
+        description: "Boot the full local backend cluster and run gateway plus promotion runtime smoke"
         required: false
         type: boolean
         default: false
       run_keycloak_security_smoke:
         description: "Run the Keycloak/OIDC security smoke against a reachable staging cluster"
+        required: false
+        type: boolean
+        default: false
+      run_promotion_runtime_smoke:
+        description: "Run the promotion runtime smoke against a reachable staging cluster"
         required: false
         type: boolean
         default: false
@@ -132,6 +137,12 @@ jobs:
       - name: Validate Keycloak security smoke script syntax
         run: node --check backend/scripts/keycloak-security-smoke.mjs
 
+      - name: Validate promotion runtime smoke script syntax
+        run: node --check backend/scripts/promotion-runtime-smoke.mjs
+
+      - name: Validate promotion observability smoke script syntax
+        run: node --check backend/scripts/promotion-observability-smoke.mjs
+
       - name: Validate Keycloak realm validator syntax
         run: node --check backend/scripts/validate-keycloak-realm.mjs
 
@@ -184,7 +195,7 @@ jobs:
             announcement-service portfolio-service discussion-service notification-service
             chat-service media-service search-service analytics-service gradebook-service
             quiz-service certificate-service peer-review-service live-session-service
-            review-service outbox-relay
+            review-service checkout-service promotion-service outbox-relay
           )
           for client in "${sts_clients[@]}"; do
             env_name="COURSEFLOW_STS_$(printf '%s' "$client" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_SECRET"
@@ -196,8 +207,9 @@ jobs:
           export COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY="$(cat "$tmpdir/internal.key")"
           export COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY="$(cat "$tmpdir/internal.pub")"
           export COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE=jwks
-          export COURSEFLOW_INTERNAL_JWT_JWKS_URI=http://identity-token-converter-service:8105/oauth/jwks
+          export COURSEFLOW_INTERNAL_JWT_JWKS_URI=http://identity-token-converter-service:8080/oauth/jwks
           export COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE=sts
+          export TOKEN_CONVERTER_URI=http://identity-token-converter-service:8080
           export CERTIFICATE_SIGNING_SECRET=prod-ci-cert-signing-secret-32-byte-minimum-value-001
           export COURSEFLOW_DB_PASSWORD=prod-ci-db-password-strong-value-001
           export COURSEFLOW_STORAGE_ACCESS_KEY=prod-ci-storage-access-key
@@ -215,6 +227,16 @@ jobs:
           export KEYCLOAK_ISSUER_URI=https://auth.example.invalid/realms/courseflow
           export KEYCLOAK_JWK_SET_URI=https://auth.example.invalid/realms/courseflow/protocol/openid-connect/certs
           export KEYCLOAK_AUDIENCE=courseflow-api
+          export PROMOTION_COUPON_FINGERPRINT_KEY_ID=prod-ci-coupon-fingerprint-v1
+          export PROMOTION_COUPON_FINGERPRINT_PEPPER=prod-ci-coupon-fingerprint-pepper-32-byte-minimum-value-001
+          export PROMOTION_COUPON_LEGACY_FALLBACK_ENABLED=true
+          export PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET=prod-ci-request-snapshot-hash-secret-32-byte-minimum-value-001
+          export PROMOTION_COUPON_ABUSE_GUARD_MODE=shadow
+          export PROMOTION_COUPON_ABUSE_GUARD_KEY_ID=prod-ci-coupon-abuse-guard-v1
+          export PROMOTION_COUPON_ABUSE_GUARD_PEPPER=prod-ci-coupon-abuse-guard-pepper-32-byte-minimum-value-001
+          export PROMOTION_ADMIN_OPERATION_RATE_GUARD_MODE=shadow
+          export PROMOTION_ADMIN_OPERATION_RATE_GUARD_KEY_ID=prod-ci-admin-operation-rate-guard-v1
+          export PROMOTION_ADMIN_OPERATION_RATE_GUARD_PEPPER=prod-ci-admin-operation-rate-guard-pepper-32-byte-minimum-value-001
           export GRAFANA_ADMIN_PASSWORD=prod-ci-grafana-password-strong-value-001
 
           backend/scripts/validate-prod-profile.sh --compose --include-observability
@@ -229,7 +251,8 @@ jobs:
         working-directory: backend
     env:
       COURSEFLOW_API_URL: http://localhost:28080/api
-      COURSEFLOW_DIRECT_SERVICE_URL: http://localhost:8083
+      COURSEFLOW_DIRECT_SERVICE_URL: http://course-service:8080
+      COURSEFLOW_DIRECT_SERVICE_TRANSPORT: docker
       SPRING_LIQUIBASE_CONTEXTS: prod,demo
     steps:
       - name: Checkout
@@ -245,6 +268,9 @@ jobs:
 
       - name: Validate Keycloak security smoke script syntax
         run: node --check scripts/keycloak-security-smoke.mjs
+
+      - name: Validate promotion runtime smoke script syntax
+        run: node --check scripts/promotion-runtime-smoke.mjs
 
       - name: Boot local backend cluster
         run: |
@@ -280,6 +306,9 @@ jobs:
 
       - name: Run Product Hardening gateway smoke
         run: node scripts/product-hardening-smoke.mjs
+
+      - name: Run promotion runtime smoke
+        run: node scripts/promotion-runtime-smoke.mjs
 
       - name: Collect local cluster logs
         if: failure()
@@ -396,3 +425,170 @@ jobs:
 
       - name: Run Keycloak/OIDC security smoke
         run: node scripts/keycloak-security-smoke.mjs
+
+  promotion-runtime-smoke:
+    name: Promotion runtime staging smoke
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.run_promotion_runtime_smoke
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      PROMOTION_SMOKE_MODE: staging
+      PROMOTION_SMOKE_GATEWAY_URL: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_GATEWAY_URL }}
+      PROMOTION_SMOKE_TOKEN_CONVERTER_URL: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_TOKEN_CONVERTER_URL }}
+      PROMOTION_SMOKE_PROMOTION_URL: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_PROMOTION_URL }}
+      PROMOTION_SMOKE_PROMETHEUS_URL: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_PROMETHEUS_URL }}
+      PROMOTION_OBSERVABILITY_REQUIRED_TARGETS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_REQUIRED_TARGETS }}
+      PROMOTION_OBSERVABILITY_REQUIRED_COUPON_ABUSE_GUARD_RESULTS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_REQUIRED_COUPON_ABUSE_GUARD_RESULTS }}
+      PROMOTION_OBSERVABILITY_REQUIRED_COUPON_LOOKUP_STORAGE_PATHS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_REQUIRED_COUPON_LOOKUP_STORAGE_PATHS }}
+      PROMOTION_OBSERVABILITY_FORBIDDEN_COUPON_LOOKUP_STORAGE_PATHS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_FORBIDDEN_COUPON_LOOKUP_STORAGE_PATHS }}
+      PROMOTION_OBSERVABILITY_MAX_FORBIDDEN_COUPON_LOOKUP_INCREASE: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_MAX_FORBIDDEN_COUPON_LOOKUP_INCREASE }}
+      PROMOTION_OBSERVABILITY_ADMIN_OPERATION_RATE_GUARD_REQUIRED: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_ADMIN_OPERATION_RATE_GUARD_REQUIRED || 'true' }}
+      PROMOTION_OBSERVABILITY_REQUIRED_ADMIN_OPERATION_RATE_GUARD_RESULTS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_REQUIRED_ADMIN_OPERATION_RATE_GUARD_RESULTS || 'allowed' }}
+      PROMOTION_OBSERVABILITY_REQUIRED_ADMIN_OPERATION_RATE_GUARD_OPERATIONS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_REQUIRED_ADMIN_OPERATION_RATE_GUARD_OPERATIONS || 'coupon_import_dry_run' }}
+      PROMOTION_OBSERVABILITY_REQUIRED_QUOTA_METRICS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_REQUIRED_QUOTA_METRICS }}
+      PROMOTION_OBSERVABILITY_REQUIRED_QUOTA_FALLBACK_RESULTS: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_REQUIRED_QUOTA_FALLBACK_RESULTS }}
+      PROMOTION_OBSERVABILITY_CUTOVER_WINDOW: ${{ vars.COURSEFLOW_PROMOTION_OBSERVABILITY_CUTOVER_WINDOW }}
+      PROMOTION_CUTOVER_ENVIRONMENT: ${{ vars.COURSEFLOW_PROMOTION_CUTOVER_ENVIRONMENT || 'staging' }}
+      PROMOTION_CUTOVER_EVIDENCE_ENABLED: ${{ vars.COURSEFLOW_PROMOTION_CUTOVER_EVIDENCE_ENABLED || 'true' }}
+      PROMOTION_CUTOVER_EVIDENCE_SCOPES: ${{ vars.COURSEFLOW_PROMOTION_CUTOVER_EVIDENCE_SCOPES }}
+      PROMOTION_CUTOVER_EVIDENCE_FILE: promotion-runtime-smoke-artifacts/promotion-cutover-evidence.json
+      PROMOTION_SMOKE_TENANT_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_TENANT_ID }}
+      PROMOTION_SMOKE_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_APPLICATION_ID }}
+      PROMOTION_SMOKE_EXPECTED_CAMPAIGN_CODE: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_EXPECTED_CAMPAIGN_CODE }}
+      PROMOTION_SMOKE_UNBOUND_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_UNBOUND_APPLICATION_ID }}
+      PROMOTION_SMOKE_SUSPENDED_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_SUSPENDED_APPLICATION_ID }}
+      PROMOTION_SMOKE_SUSPENDED_BINDING_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_SUSPENDED_BINDING_APPLICATION_ID }}
+      PROMOTION_SMOKE_EMPTY_BINDING_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_EMPTY_BINDING_APPLICATION_ID }}
+      PROMOTION_SMOKE_EVALUATE_ONLY_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_EVALUATE_ONLY_APPLICATION_ID }}
+      PROMOTION_SMOKE_COUPON_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_COUPON_APPLICATION_ID }}
+      PROMOTION_SMOKE_COUPON_CAMPAIGN_CODE: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_COUPON_CAMPAIGN_CODE }}
+      PROMOTION_SMOKE_QUOTA_APPLICATION_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_QUOTA_APPLICATION_ID }}
+      PROMOTION_SMOKE_QUOTA_CAMPAIGN_CODE: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_QUOTA_CAMPAIGN_CODE }}
+      PROMOTION_SMOKE_HOT_QUOTA_PARALLEL_ATTEMPTS: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_HOT_QUOTA_PARALLEL_ATTEMPTS }}
+      PROMOTION_SMOKE_HOT_QUOTA_SOAK_WAVES: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_HOT_QUOTA_SOAK_WAVES || '1' }}
+      PROMOTION_SMOKE_HOT_QUOTA_SOAK_ARTIFACT_FILE: promotion-runtime-smoke-artifacts/promotion-hot-quota-soak.json
+      PROMOTION_SMOKE_REQUIRE_COUPON_INVENTORY_READY: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_REQUIRE_COUPON_INVENTORY_READY }}
+      PROMOTION_SMOKE_COUPON_IMPORT_GATEWAY_ENABLED: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_COUPON_IMPORT_GATEWAY_ENABLED || 'true' }}
+      PROMOTION_SMOKE_COUPON_CAMPAIGN_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_COUPON_CAMPAIGN_ID }}
+      PROMOTION_SMOKE_COUPON_FINGERPRINT_KEY_ID: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_COUPON_FINGERPRINT_KEY_ID }}
+      PROMOTION_SMOKE_CHECKOUT_CLIENT_SECRET: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_CHECKOUT_CLIENT_SECRET }}
+      PROMOTION_SMOKE_PROMOTION_CLIENT_SECRET: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_PROMOTION_CLIENT_SECRET }}
+      PROMOTION_SMOKE_ADMIN_ACCESS_TOKEN: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_ADMIN_ACCESS_TOKEN }}
+      PROMOTION_SMOKE_COUPON_FINGERPRINT_PEPPER: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_FINGERPRINT_PEPPER }}
+      PROMOTION_SMOKE_COUPON_VALID_CODE: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_VALID_CODE }}
+      PROMOTION_SMOKE_COUPON_INACTIVE_CODE: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_INACTIVE_CODE }}
+      PROMOTION_SMOKE_COUPON_NOT_STARTED_CODE: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_NOT_STARTED_CODE }}
+      PROMOTION_SMOKE_COUPON_EXPIRED_CODE: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_EXPIRED_CODE }}
+      PROMOTION_SMOKE_COUPON_HOLDER_MISMATCH_CODE: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_HOLDER_MISMATCH_CODE }}
+      PROMOTION_SMOKE_COUPON_EXHAUSTED_CODE: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_EXHAUSTED_CODE }}
+      PROMOTION_SMOKE_COUPON_INVALID_CODE: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_COUPON_INVALID_CODE }}
+      PROMOTION_SMOKE_COUPON_ABUSE_GUARD_BURST_ATTEMPTS: ${{ vars.COURSEFLOW_PROMOTION_SMOKE_COUPON_ABUSE_GUARD_BURST_ATTEMPTS }}
+      PROMOTION_SMOKE_PROMOTION_DATABASE_URL: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_PROMOTION_DATABASE_URL }}
+      PROMOTION_SMOKE_OUTBOX_DATABASE_URL: ${{ secrets.COURSEFLOW_PROMOTION_SMOKE_OUTBOX_DATABASE_URL }}
+      PROMOTION_SMOKE_ALLOW_SKIP_DB_CHECKS: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install PostgreSQL client
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Validate promotion staging smoke script syntax
+        run: |
+          node --check scripts/promotion-runtime-smoke.mjs
+          node --check scripts/promotion-observability-smoke.mjs
+
+      - name: Validate promotion staging smoke configuration
+        run: |
+          set -euo pipefail
+
+          require_value() {
+            name="$1"
+            value="${!name:-}"
+            if [ -z "${value//[[:space:]]/}" ]; then
+              echo "::error::${name} must be configured for run_promotion_runtime_smoke"
+              exit 1
+            fi
+          }
+
+          require_value PROMOTION_SMOKE_GATEWAY_URL
+          require_value PROMOTION_SMOKE_TOKEN_CONVERTER_URL
+          require_value PROMOTION_SMOKE_PROMOTION_URL
+          require_value PROMOTION_SMOKE_PROMETHEUS_URL
+          require_value PROMOTION_SMOKE_EXPECTED_CAMPAIGN_CODE
+          require_value PROMOTION_SMOKE_UNBOUND_APPLICATION_ID
+          require_value PROMOTION_SMOKE_SUSPENDED_APPLICATION_ID
+          require_value PROMOTION_SMOKE_SUSPENDED_BINDING_APPLICATION_ID
+          require_value PROMOTION_SMOKE_EMPTY_BINDING_APPLICATION_ID
+          require_value PROMOTION_SMOKE_EVALUATE_ONLY_APPLICATION_ID
+          require_value PROMOTION_SMOKE_COUPON_APPLICATION_ID
+          require_value PROMOTION_SMOKE_COUPON_CAMPAIGN_CODE
+          require_value PROMOTION_SMOKE_QUOTA_APPLICATION_ID
+          require_value PROMOTION_SMOKE_QUOTA_CAMPAIGN_CODE
+          require_value PROMOTION_SMOKE_COUPON_FINGERPRINT_KEY_ID
+          require_value PROMOTION_SMOKE_CHECKOUT_CLIENT_SECRET
+          require_value PROMOTION_SMOKE_PROMOTION_CLIENT_SECRET
+          require_value PROMOTION_SMOKE_COUPON_FINGERPRINT_PEPPER
+          require_value PROMOTION_SMOKE_COUPON_VALID_CODE
+          require_value PROMOTION_SMOKE_COUPON_INACTIVE_CODE
+          require_value PROMOTION_SMOKE_COUPON_NOT_STARTED_CODE
+          require_value PROMOTION_SMOKE_COUPON_EXPIRED_CODE
+          require_value PROMOTION_SMOKE_COUPON_HOLDER_MISMATCH_CODE
+          require_value PROMOTION_SMOKE_COUPON_EXHAUSTED_CODE
+          require_value PROMOTION_SMOKE_COUPON_INVALID_CODE
+          require_value PROMOTION_SMOKE_PROMOTION_DATABASE_URL
+          require_value PROMOTION_SMOKE_OUTBOX_DATABASE_URL
+
+          if [ "${PROMOTION_SMOKE_COUPON_IMPORT_GATEWAY_ENABLED:-false}" = "true" ]; then
+            require_value PROMOTION_SMOKE_ADMIN_ACCESS_TOKEN
+            require_value PROMOTION_SMOKE_COUPON_CAMPAIGN_ID
+          fi
+
+          if [ "${PROMOTION_OBSERVABILITY_ADMIN_OPERATION_RATE_GUARD_REQUIRED:-false}" = "true" ] \
+            && [ "${PROMOTION_SMOKE_COUPON_IMPORT_GATEWAY_ENABLED:-false}" != "true" ]; then
+            echo "::error::Admin operation guard evidence requires PROMOTION_SMOKE_COUPON_IMPORT_GATEWAY_ENABLED=true"
+            exit 1
+          fi
+
+          if [ "${PROMOTION_CUTOVER_EVIDENCE_ENABLED:-false}" = "true" ]; then
+            require_value PROMOTION_SMOKE_ADMIN_ACCESS_TOKEN
+            require_value PROMOTION_CUTOVER_EVIDENCE_SCOPES
+          fi
+
+          if [ "${PROMOTION_SMOKE_ALLOW_SKIP_DB_CHECKS:-false}" = "true" ]; then
+            echo "::error::Promotion staging smoke must run with database checks enabled"
+            exit 1
+          fi
+
+          psql --version
+
+      - name: Run promotion runtime staging smoke
+        run: |
+          set -euo pipefail
+          mkdir -p promotion-runtime-smoke-artifacts
+          node scripts/promotion-runtime-smoke.mjs 2>&1 | tee promotion-runtime-smoke-artifacts/promotion-runtime-smoke.log
+
+      - name: Run promotion observability staging smoke
+        run: |
+          set -euo pipefail
+          mkdir -p promotion-runtime-smoke-artifacts
+          node scripts/promotion-observability-smoke.mjs 2>&1 | tee promotion-runtime-smoke-artifacts/promotion-observability-smoke.log
+
+      - name: Upload promotion runtime smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: promotion-runtime-staging-smoke-log
+          path: backend/promotion-runtime-smoke-artifacts
+          if-no-files-found: ignore

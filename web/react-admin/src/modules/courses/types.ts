@@ -20,6 +20,9 @@ export const courseSchema = z.object({
   ownerId: z.string().optional().default(""),
   level: z.string().optional().default(""),
   status: z.string().optional().default(""),
+  listPrice: z.union([z.number(), z.string()]).nullable().optional(),
+  currency: z.string().nullable().optional(),
+  priceStatus: z.string().optional().default("NOT_CONFIGURED"),
   createdAt: z.string().optional().default(""),
   materials: z.array(courseMaterialSchema).optional().default([])
 });
@@ -33,4 +36,6 @@ export type CreateCourseInput = {
   summary: string;
   departmentId: string;
   level: string;
+  listPrice?: number;
+  currency?: string;
 };

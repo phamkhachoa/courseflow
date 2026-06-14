@@ -42,6 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_outbox_unpublished
 -- merged from 002-submission-attachments.sql
 -- ============================================================
 -- changeset courseflow:assignment-002-submission-attachments
+--validCheckSum 9:1cf1fc3765ef21ace1b7f3cdf02381cc
 CREATE TABLE IF NOT EXISTS submission_attachments (
     id UUID PRIMARY KEY,
     submission_id UUID NOT NULL REFERENCES submissions(id),
@@ -56,6 +57,10 @@ CREATE TABLE IF NOT EXISTS submission_attachments (
 CREATE INDEX IF NOT EXISTS idx_submission_attachments_submission
     ON submission_attachments (submission_id);
 
+-- ============================================================
+-- merged from 004-attachment-upload-grants.sql
+-- ============================================================
+-- changeset courseflow:assignment-004-attachment-upload-grants
 -- Upload grants bind object-storage keys to the authenticated learner who requested them.
 -- Submissions may only reference an unconsumed grant for the same assignment/student.
 CREATE TABLE IF NOT EXISTS attachment_upload_grants (

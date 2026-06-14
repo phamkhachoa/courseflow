@@ -1,4 +1,7 @@
 **/target/
+!services/*/target/
+services/*/target/**
+!services/*/target/*.jar
 **/.flattened-pom.xml
 .git/
 .idea/

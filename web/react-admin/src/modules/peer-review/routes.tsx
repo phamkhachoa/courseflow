@@ -1,4 +1,7 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import { PeerReviewPage } from "./pages";
+import { lazyRouteElement } from "@/shared/routing/lazy-route";
 
-export const peerReviewRoutes: RouteObject[] = [{ index: true, element: <PeerReviewPage /> }];
+const PeerReviewPage = lazy(() => import("./pages").then(({ PeerReviewPage }) => ({ default: PeerReviewPage })));
+
+export const peerReviewRoutes: RouteObject[] = [{ index: true, element: lazyRouteElement(PeerReviewPage) }];

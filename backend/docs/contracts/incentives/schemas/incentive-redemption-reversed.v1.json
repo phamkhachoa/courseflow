@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://courseflow.local/contracts/incentives/schemas/incentive-redemption-reversed.v1.json",
+  "title": "IncentiveRedemptionReversedEventV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "schemaVersion",
+    "tenantId",
+    "applicationId",
+    "reservationId",
+    "redemptionId",
+    "campaignId",
+    "campaignVersion",
+    "profileId",
+    "correlationId",
+    "sourceClientId",
+    "reason",
+    "quotaReleased",
+    "effects",
+    "reversedAt"
+  ],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "applicationId": { "type": "string", "minLength": 1 },
+    "reservationId": { "type": "string", "format": "uuid" },
+    "redemptionId": { "type": "string", "format": "uuid" },
+    "campaignId": { "type": "string", "format": "uuid" },
+    "campaignVersion": { "type": "integer", "minimum": 1 },
+    "couponId": { "type": ["string", "null"], "format": "uuid" },
+    "profileId": { "type": "string", "minLength": 1 },
+    "externalReference": { "type": ["string", "null"] },
+    "correlationId": {
+      "type": ["string", "null"],
+      "description": "Nullable when callers omit X-Correlation-Id; gateways should provide it."
+    },
+    "sourceClientId": {
+      "type": ["string", "null"],
+      "description": "Nullable when the internal JWT does not contain a client id claim."
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "quotaReleased": {
+      "type": "boolean",
+      "description": "Current v1 behavior is false by default; quota release is explicit."
+    },
+    "effects": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "incentive-effect.v1.json" }
+    },
+    "reversedAt": { "type": "string", "format": "date-time" },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": true
+    }
+  }
+}

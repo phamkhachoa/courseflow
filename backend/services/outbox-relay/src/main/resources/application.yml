@@ -38,6 +38,11 @@ spring:
 courseflow:
   outbox:
     poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
+    metrics-refresh-ms: ${OUTBOX_METRICS_REFRESH_MS:30000}
+    replay-lease-seconds: ${OUTBOX_REPLAY_LEASE_SECONDS:300}
+    purge-enabled: ${OUTBOX_PURGE_ENABLED:false}
+    retention-days: ${OUTBOX_RETENTION_DAYS:7}
     services:
       - name: identity
         jdbc-url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/cf_identity}
@@ -91,6 +96,14 @@ courseflow:
         jdbc-url: ${REVIEW_DB_URL:jdbc:postgresql://localhost:5432/cf_review}
         username: ${REVIEW_DB_USERNAME:courseflow}
         password: ${REVIEW_DB_PASSWORD:courseflow}
+      - name: promotion
+        jdbc-url: ${PROMOTION_DB_URL:jdbc:postgresql://localhost:5432/cf_promotion}
+        username: ${PROMOTION_DB_USERNAME:courseflow}
+        password: ${PROMOTION_DB_PASSWORD:courseflow}
+      - name: loyalty
+        jdbc-url: ${LOYALTY_DB_URL:jdbc:postgresql://localhost:5432/cf_loyalty}
+        username: ${LOYALTY_DB_USERNAME:courseflow}
+        password: ${LOYALTY_DB_PASSWORD:courseflow}
 
 management:
   endpoints:

@@ -1,19 +1,22 @@
 name: courseflow-v2-backend
 
 x-prod-service-env: &prod-service-env
+  SERVER_PORT: 8080
+  SERVICE_DISCOVERY_ENABLED: "true"
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:-http://discovery-service:8080/eureka/}
   COURSEFLOW_JWT_SECRET: ""
   COURSEFLOW_INTERNAL_JWT_ALGORITHM: ${COURSEFLOW_INTERNAL_JWT_ALGORITHM:-RS256}
   COURSEFLOW_INTERNAL_JWT_SECRET: ""
   COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY: ""
   COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY: ""
   COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE: ${COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE:-jwks}
-  COURSEFLOW_INTERNAL_JWT_JWKS_URI: ${COURSEFLOW_INTERNAL_JWT_JWKS_URI:-http://identity-token-converter-service:8105/oauth/jwks}
+  COURSEFLOW_INTERNAL_JWT_JWKS_URI: ${COURSEFLOW_INTERNAL_JWT_JWKS_URI:-http://identity-token-converter-service:8080/oauth/jwks}
   COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS: ${COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS:-300}
   COURSEFLOW_INTERNAL_JWT_AUDIENCE: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:-courseflow-services}
   COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE: ${COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE:-sts}
-  COURSEFLOW_STS_ALLOWED_CLIENTS: ${COURSEFLOW_STS_ALLOWED_CLIENTS:-api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,outbox-relay}
-  COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES: ${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice}
-  TOKEN_CONVERTER_URI: ${TOKEN_CONVERTER_URI:-http://identity-token-converter-service:8105}
+  COURSEFLOW_STS_ALLOWED_CLIENTS: ${COURSEFLOW_STS_ALLOWED_CLIENTS:-api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,checkout-service,promotion-service,loyalty-service,outbox-relay}
+  COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES: ${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice,internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire}
+  TOKEN_CONVERTER_URI: ${TOKEN_CONVERTER_URI:-http://identity-token-converter-service:8080}
   EXTERNAL_TOKEN_MODE: ${EXTERNAL_TOKEN_MODE:-oidc}
   KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:?KEYCLOAK_ISSUER_URI is required for the prod profile}
   KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:?KEYCLOAK_JWK_SET_URI is required for the prod profile}
@@ -53,6 +56,8 @@ x-prod-service-env: &prod-service-env
   PEER_REVIEW_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
   LIVE_SESSION_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
   REVIEW_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  PROMOTION_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
+  LOYALTY_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
   OUTBOX_RELAY_DB_PASSWORD: ${COURSEFLOW_DB_PASSWORD:?COURSEFLOW_DB_PASSWORD is required for the prod profile}
 
 x-prod-internal-service: &prod-internal-service
@@ -136,7 +141,7 @@ services:
     environment:
       <<: *prod-service-env
       COURSEFLOW_STS_CLIENT_SECRET: ${COURSEFLOW_STS_API_GATEWAY_SECRET:?COURSEFLOW_STS_API_GATEWAY_SECRET is required for the prod profile}
-      TOKEN_CONVERTER_URI: http://identity-token-converter-service:8105
+      TOKEN_CONVERTER_URI: http://identity-token-converter-service:8080
       TOKEN_CONVERTER_MODE: ${TOKEN_CONVERTER_MODE:-required}
 
   identity-service:
@@ -169,8 +174,8 @@ services:
       COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY: ${COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY:-}
       COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE: local
       COURSEFLOW_STS_CLIENT_SECRET: !reset null
-      COURSEFLOW_STS_CLIENT_SECRETS: "api-gateway=${COURSEFLOW_STS_API_GATEWAY_SECRET:?COURSEFLOW_STS_API_GATEWAY_SECRET is required for the prod profile};access-control-service=${COURSEFLOW_STS_ACCESS_CONTROL_SERVICE_SECRET:?COURSEFLOW_STS_ACCESS_CONTROL_SERVICE_SECRET is required for the prod profile};user-management-service=${COURSEFLOW_STS_USER_MANAGEMENT_SERVICE_SECRET:?COURSEFLOW_STS_USER_MANAGEMENT_SERVICE_SECRET is required for the prod profile};organization-service=${COURSEFLOW_STS_ORGANIZATION_SERVICE_SECRET:?COURSEFLOW_STS_ORGANIZATION_SERVICE_SECRET is required for the prod profile};course-service=${COURSEFLOW_STS_COURSE_SERVICE_SECRET:?COURSEFLOW_STS_COURSE_SERVICE_SECRET is required for the prod profile};enrollment-service=${COURSEFLOW_STS_ENROLLMENT_SERVICE_SECRET:?COURSEFLOW_STS_ENROLLMENT_SERVICE_SECRET is required for the prod profile};assignment-service=${COURSEFLOW_STS_ASSIGNMENT_SERVICE_SECRET:?COURSEFLOW_STS_ASSIGNMENT_SERVICE_SECRET is required for the prod profile};deadline-service=${COURSEFLOW_STS_DEADLINE_SERVICE_SECRET:?COURSEFLOW_STS_DEADLINE_SERVICE_SECRET is required for the prod profile};announcement-service=${COURSEFLOW_STS_ANNOUNCEMENT_SERVICE_SECRET:?COURSEFLOW_STS_ANNOUNCEMENT_SERVICE_SECRET is required for the prod profile};portfolio-service=${COURSEFLOW_STS_PORTFOLIO_SERVICE_SECRET:?COURSEFLOW_STS_PORTFOLIO_SERVICE_SECRET is required for the prod profile};discussion-service=${COURSEFLOW_STS_DISCUSSION_SERVICE_SECRET:?COURSEFLOW_STS_DISCUSSION_SERVICE_SECRET is required for the prod profile};notification-service=${COURSEFLOW_STS_NOTIFICATION_SERVICE_SECRET:?COURSEFLOW_STS_NOTIFICATION_SERVICE_SECRET is required for the prod profile};chat-service=${COURSEFLOW_STS_CHAT_SERVICE_SECRET:?COURSEFLOW_STS_CHAT_SERVICE_SECRET is required for the prod profile};media-service=${COURSEFLOW_STS_MEDIA_SERVICE_SECRET:?COURSEFLOW_STS_MEDIA_SERVICE_SECRET is required for the prod profile};search-service=${COURSEFLOW_STS_SEARCH_SERVICE_SECRET:?COURSEFLOW_STS_SEARCH_SERVICE_SECRET is required for the prod profile};analytics-service=${COURSEFLOW_STS_ANALYTICS_SERVICE_SECRET:?COURSEFLOW_STS_ANALYTICS_SERVICE_SECRET is required for the prod profile};gradebook-service=${COURSEFLOW_STS_GRADEBOOK_SERVICE_SECRET:?COURSEFLOW_STS_GRADEBOOK_SERVICE_SECRET is required for the prod profile};quiz-service=${COURSEFLOW_STS_QUIZ_SERVICE_SECRET:?COURSEFLOW_STS_QUIZ_SERVICE_SECRET is required for the prod profile};certificate-service=${COURSEFLOW_STS_CERTIFICATE_SERVICE_SECRET:?COURSEFLOW_STS_CERTIFICATE_SERVICE_SECRET is required for the prod profile};peer-review-service=${COURSEFLOW_STS_PEER_REVIEW_SERVICE_SECRET:?COURSEFLOW_STS_PEER_REVIEW_SERVICE_SECRET is required for the prod profile};live-session-service=${COURSEFLOW_STS_LIVE_SESSION_SERVICE_SECRET:?COURSEFLOW_STS_LIVE_SESSION_SERVICE_SECRET is required for the prod profile};review-service=${COURSEFLOW_STS_REVIEW_SERVICE_SECRET:?COURSEFLOW_STS_REVIEW_SERVICE_SECRET is required for the prod profile};outbox-relay=${COURSEFLOW_STS_OUTBOX_RELAY_SECRET:?COURSEFLOW_STS_OUTBOX_RELAY_SECRET is required for the prod profile}"
-      COURSEFLOW_STS_CLIENT_SCOPES: ${COURSEFLOW_STS_CLIENT_SCOPES:-api-gateway=internal:service,internal:token-exchange;access-control-service=internal:service;user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;enrollment-service=internal:service;assignment-service=internal:service;deadline-service=internal:service;announcement-service=internal:service;portfolio-service=internal:service;discussion-service=internal:service;notification-service=internal:service;chat-service=internal:service,internal:token-exchange;media-service=internal:service;search-service=internal:service;analytics-service=internal:service;gradebook-service=internal:service;quiz-service=internal:service;certificate-service=internal:service;peer-review-service=internal:service;live-session-service=internal:service;review-service=internal:service;outbox-relay=internal:service}
+      COURSEFLOW_STS_CLIENT_SECRETS: "api-gateway=${COURSEFLOW_STS_API_GATEWAY_SECRET:?COURSEFLOW_STS_API_GATEWAY_SECRET is required for the prod profile};access-control-service=${COURSEFLOW_STS_ACCESS_CONTROL_SERVICE_SECRET:?COURSEFLOW_STS_ACCESS_CONTROL_SERVICE_SECRET is required for the prod profile};user-management-service=${COURSEFLOW_STS_USER_MANAGEMENT_SERVICE_SECRET:?COURSEFLOW_STS_USER_MANAGEMENT_SERVICE_SECRET is required for the prod profile};organization-service=${COURSEFLOW_STS_ORGANIZATION_SERVICE_SECRET:?COURSEFLOW_STS_ORGANIZATION_SERVICE_SECRET is required for the prod profile};course-service=${COURSEFLOW_STS_COURSE_SERVICE_SECRET:?COURSEFLOW_STS_COURSE_SERVICE_SECRET is required for the prod profile};enrollment-service=${COURSEFLOW_STS_ENROLLMENT_SERVICE_SECRET:?COURSEFLOW_STS_ENROLLMENT_SERVICE_SECRET is required for the prod profile};assignment-service=${COURSEFLOW_STS_ASSIGNMENT_SERVICE_SECRET:?COURSEFLOW_STS_ASSIGNMENT_SERVICE_SECRET is required for the prod profile};deadline-service=${COURSEFLOW_STS_DEADLINE_SERVICE_SECRET:?COURSEFLOW_STS_DEADLINE_SERVICE_SECRET is required for the prod profile};announcement-service=${COURSEFLOW_STS_ANNOUNCEMENT_SERVICE_SECRET:?COURSEFLOW_STS_ANNOUNCEMENT_SERVICE_SECRET is required for the prod profile};portfolio-service=${COURSEFLOW_STS_PORTFOLIO_SERVICE_SECRET:?COURSEFLOW_STS_PORTFOLIO_SERVICE_SECRET is required for the prod profile};discussion-service=${COURSEFLOW_STS_DISCUSSION_SERVICE_SECRET:?COURSEFLOW_STS_DISCUSSION_SERVICE_SECRET is required for the prod profile};notification-service=${COURSEFLOW_STS_NOTIFICATION_SERVICE_SECRET:?COURSEFLOW_STS_NOTIFICATION_SERVICE_SECRET is required for the prod profile};chat-service=${COURSEFLOW_STS_CHAT_SERVICE_SECRET:?COURSEFLOW_STS_CHAT_SERVICE_SECRET is required for the prod profile};media-service=${COURSEFLOW_STS_MEDIA_SERVICE_SECRET:?COURSEFLOW_STS_MEDIA_SERVICE_SECRET is required for the prod profile};search-service=${COURSEFLOW_STS_SEARCH_SERVICE_SECRET:?COURSEFLOW_STS_SEARCH_SERVICE_SECRET is required for the prod profile};analytics-service=${COURSEFLOW_STS_ANALYTICS_SERVICE_SECRET:?COURSEFLOW_STS_ANALYTICS_SERVICE_SECRET is required for the prod profile};gradebook-service=${COURSEFLOW_STS_GRADEBOOK_SERVICE_SECRET:?COURSEFLOW_STS_GRADEBOOK_SERVICE_SECRET is required for the prod profile};quiz-service=${COURSEFLOW_STS_QUIZ_SERVICE_SECRET:?COURSEFLOW_STS_QUIZ_SERVICE_SECRET is required for the prod profile};certificate-service=${COURSEFLOW_STS_CERTIFICATE_SERVICE_SECRET:?COURSEFLOW_STS_CERTIFICATE_SERVICE_SECRET is required for the prod profile};peer-review-service=${COURSEFLOW_STS_PEER_REVIEW_SERVICE_SECRET:?COURSEFLOW_STS_PEER_REVIEW_SERVICE_SECRET is required for the prod profile};live-session-service=${COURSEFLOW_STS_LIVE_SESSION_SERVICE_SECRET:?COURSEFLOW_STS_LIVE_SESSION_SERVICE_SECRET is required for the prod profile};review-service=${COURSEFLOW_STS_REVIEW_SERVICE_SECRET:?COURSEFLOW_STS_REVIEW_SERVICE_SECRET is required for the prod profile};checkout-service=${COURSEFLOW_STS_CHECKOUT_SERVICE_SECRET:?COURSEFLOW_STS_CHECKOUT_SERVICE_SECRET is required for the prod profile};promotion-service=${COURSEFLOW_STS_PROMOTION_SERVICE_SECRET:?COURSEFLOW_STS_PROMOTION_SERVICE_SECRET is required for the prod profile};loyalty-service=${COURSEFLOW_STS_LOYALTY_SERVICE_SECRET:?COURSEFLOW_STS_LOYALTY_SERVICE_SECRET is required for the prod profile};outbox-relay=${COURSEFLOW_STS_OUTBOX_RELAY_SECRET:?COURSEFLOW_STS_OUTBOX_RELAY_SECRET is required for the prod profile}"
+      COURSEFLOW_STS_CLIENT_SCOPES: ${COURSEFLOW_STS_CLIENT_SCOPES:-api-gateway=internal:service,internal:token-exchange;access-control-service=internal:service;user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;enrollment-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse;assignment-service=internal:service;deadline-service=internal:service;announcement-service=internal:service;portfolio-service=internal:service;discussion-service=internal:service;notification-service=internal:service;chat-service=internal:service,internal:token-exchange;media-service=internal:service;search-service=internal:service;analytics-service=internal:service;gradebook-service=internal:service;quiz-service=internal:service;certificate-service=internal:service;peer-review-service=internal:service;live-session-service=internal:service;review-service=internal:service;checkout-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:read;promotion-service=internal:service,internal:promotion:admin,internal:loyalty:earn,internal:loyalty:reverse;loyalty-service=internal:service,internal:loyalty:admin,internal:loyalty:read;outbox-relay=internal:service}
       ACCESS_CONTROL_RESOLUTION_MODE: ${ACCESS_CONTROL_RESOLUTION_MODE:-required}
     ports: !reset []
 
@@ -305,6 +310,45 @@ services:
     environment:
       <<: *prod-service-env
       COURSEFLOW_STS_CLIENT_SECRET: ${COURSEFLOW_STS_REVIEW_SERVICE_SECRET:?COURSEFLOW_STS_REVIEW_SERVICE_SECRET is required for the prod profile}
+    ports: !reset []
+
+  promotion-service:
+    <<: *prod-internal-service
+    environment:
+      <<: *prod-service-env
+      COURSEFLOW_STS_CLIENT_SECRET: ${COURSEFLOW_STS_PROMOTION_SERVICE_SECRET:?COURSEFLOW_STS_PROMOTION_SERVICE_SECRET is required for the prod profile}
+      PROMOTION_COUPON_FINGERPRINT_KEY_ID: ${PROMOTION_COUPON_FINGERPRINT_KEY_ID:?PROMOTION_COUPON_FINGERPRINT_KEY_ID is required for the prod profile}
+      PROMOTION_COUPON_FINGERPRINT_PEPPER: ${PROMOTION_COUPON_FINGERPRINT_PEPPER:?PROMOTION_COUPON_FINGERPRINT_PEPPER is required for the prod profile}
+      PROMOTION_COUPON_PREVIOUS_FINGERPRINT_KEYS: ${PROMOTION_COUPON_PREVIOUS_FINGERPRINT_KEYS:-}
+      PROMOTION_COUPON_LEGACY_FALLBACK_ENABLED: ${PROMOTION_COUPON_LEGACY_FALLBACK_ENABLED:?PROMOTION_COUPON_LEGACY_FALLBACK_ENABLED is required for the prod profile}
+      PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET: ${PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET:?PROMOTION_REQUEST_SNAPSHOT_HASH_SECRET is required for the prod profile}
+      PROMOTION_RETENTION_EXECUTION_ENABLED: ${PROMOTION_RETENTION_EXECUTION_ENABLED:-false}
+      PROMOTION_COUPON_ABUSE_GUARD_MODE: ${PROMOTION_COUPON_ABUSE_GUARD_MODE:-shadow}
+      PROMOTION_COUPON_ABUSE_GUARD_KEY_ID: ${PROMOTION_COUPON_ABUSE_GUARD_KEY_ID:?PROMOTION_COUPON_ABUSE_GUARD_KEY_ID is required for the prod profile}
+      PROMOTION_COUPON_ABUSE_GUARD_PEPPER: ${PROMOTION_COUPON_ABUSE_GUARD_PEPPER:?PROMOTION_COUPON_ABUSE_GUARD_PEPPER is required for the prod profile}
+      PROMOTION_COUPON_ABUSE_GUARD_PROFILE_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_PROFILE_CAPACITY:-8}
+      PROMOTION_COUPON_ABUSE_GUARD_COUPON_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_COUPON_CAPACITY:-20}
+      PROMOTION_COUPON_ABUSE_GUARD_CLIENT_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_CLIENT_CAPACITY:-100}
+      PROMOTION_COUPON_ABUSE_GUARD_APPLICATION_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_APPLICATION_CAPACITY:-1000}
+      PROMOTION_COUPON_ABUSE_GUARD_MISSING_IDENTITY_CAPACITY: ${PROMOTION_COUPON_ABUSE_GUARD_MISSING_IDENTITY_CAPACITY:-4}
+      PROMOTION_COUPON_ABUSE_GUARD_FAIL_POLICY: ${PROMOTION_COUPON_ABUSE_GUARD_FAIL_POLICY:-allow_with_alert}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_MODE: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_MODE:-shadow}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_KEY_ID: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_KEY_ID:?PROMOTION_ADMIN_OPERATION_RATE_GUARD_KEY_ID is required for the prod profile}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_PEPPER: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_PEPPER:?PROMOTION_ADMIN_OPERATION_RATE_GUARD_PEPPER is required for the prod profile}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_ACTOR_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_ACTOR_CAPACITY:-30}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_SOURCE_CLIENT_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_SOURCE_CLIENT_CAPACITY:-120}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_APPLICATION_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_APPLICATION_CAPACITY:-1000}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_CAMPAIGN_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_CAMPAIGN_CAPACITY:-120}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_CONTENT_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_CONTENT_CAPACITY:-10}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_MISSING_IDENTITY_CAPACITY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_MISSING_IDENTITY_CAPACITY:-5}
+      PROMOTION_ADMIN_OPERATION_RATE_GUARD_FAIL_POLICY: ${PROMOTION_ADMIN_OPERATION_RATE_GUARD_FAIL_POLICY:-deny}
+    ports: !reset []
+
+  loyalty-service:
+    <<: *prod-internal-service
+    environment:
+      <<: *prod-service-env
+      COURSEFLOW_STS_CLIENT_SECRET: ${COURSEFLOW_STS_LOYALTY_SERVICE_SECRET:?COURSEFLOW_STS_LOYALTY_SERVICE_SECRET is required for the prod profile}
     ports: !reset []
 
   outbox-relay:

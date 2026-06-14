@@ -6,6 +6,8 @@ import edu.courseflow.course.dto.CourseDtos.CourseDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMaterialDto;
 import edu.courseflow.course.dto.CourseDtos.CreateCourseRequestDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMetadataDto;
+import edu.courseflow.course.dto.CourseDtos.CoursePricingDto;
+import edu.courseflow.course.dto.CourseDtos.UpdateCoursePricingRequestDto;
 import edu.courseflow.course.service.CourseCatalogService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -55,6 +57,18 @@ public class CourseCatalogController {
     @GetMapping("/internal/courses/{courseId}/metadata")
     public CourseMetadataDto metadata(@PathVariable UUID courseId) {
         return courses.metadata(courseId);
+    }
+
+    @GetMapping("/internal/courses/{courseId}/pricing")
+    public CoursePricingDto pricing(@PathVariable UUID courseId) {
+        return courses.pricing(courseId);
+    }
+
+    @PostMapping("/internal/courses/{courseId}/pricing")
+    public CoursePricingDto updatePricing(@PathVariable UUID courseId,
+                                          @Valid @RequestBody UpdateCoursePricingRequestDto request,
+                                          CurrentUser user) {
+        return courses.updatePricing(courseId, request, user);
     }
 
     @PostMapping("/internal/courses/{courseId}/materials")

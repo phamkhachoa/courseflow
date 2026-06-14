@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -24,6 +25,7 @@ public class EnrollmentMembershipClient {
     private final RestClient enrollmentClient;
     private final InternalJwtService internalJwt;
 
+    @Autowired
     public EnrollmentMembershipClient(RestClient.Builder restClientBuilder,
             @Value("${courseflow.entitlement.enrollment-service-url:http://enrollment-service:8080}") String enrollmentServiceUrl,
             @Value("${courseflow.entitlement.membership-timeout-ms:1500}") long membershipTimeoutMs,

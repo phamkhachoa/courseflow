@@ -25,6 +25,7 @@ DATABASES=(
   cf_live_session
   cf_review
   cf_outbox
+  cf_promotion
 )
 
 usage() {
@@ -36,10 +37,13 @@ Usage:
 Environment:
   POSTGRES_CONTAINER   Docker container name, default courseflow-postgres
   POSTGRES_USER        PostgreSQL user, default courseflow
+  RESTORE_DRILL_REF    Optional restore drill reference written to restore-check evidence
+  RESTORE_DRILL_EVIDENCE_FILE
+                      Optional restore-check evidence JSON path
 
 Examples:
   scripts/postgres-backup-drill.sh backup
-  scripts/postgres-backup-drill.sh restore-check backups/postgres/20260612T120000Z cf_identity
+  scripts/postgres-backup-drill.sh restore-check backups/postgres/20260612T120000Z cf_promotion
 USAGE
 }
 
@@ -57,6 +61,20 @@ sha256_file() {
   else
     shasum -a 256 "$1"
   fi
+}
+
+sha256_hex() {
+  sha256_file "$1" | awk '{print $1}'
+}
+
+json_escape() {
+  local value="$1"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  printf '%s' "$value"
 }
 
 cleanup_restore_db() {
@@ -91,12 +109,12 @@ database_count=${#DATABASES[@]}
 EOF_MANIFEST
 
   echo "Backup complete: $backup_dir"
-  echo "Run restore check: scripts/postgres-backup-drill.sh restore-check $backup_dir cf_identity"
+  echo "Run restore check: scripts/postgres-backup-drill.sh restore-check $backup_dir cf_promotion"
 }
 
 restore_check() {
   local backup_dir="${1:-}"
-  local db="${2:-cf_identity}"
+  local db="${2:-cf_promotion}"
   if [[ -z "$backup_dir" ]]; then
     usage
     exit 1
@@ -123,9 +141,39 @@ restore_check() {
   docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$RESTORE_TEMP_DB" -v ON_ERROR_STOP=1 \
     -c "select current_database() as restored_database, now() as checked_at" >/dev/null
 
+  local checked_at
+  local artifact_hash
+  local restore_drill_ref
+  local evidence_file
+  local temp_db
+  checked_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  artifact_hash="sha256:$(sha256_hex "$dump_file")"
+  restore_drill_ref="${RESTORE_DRILL_REF:-restore-drill-${db}-${suffix}}"
+  evidence_file="${RESTORE_DRILL_EVIDENCE_FILE:-$backup_dir/restore-check-$db.json}"
+  temp_db="$RESTORE_TEMP_DB"
+  mkdir -p "$(dirname "$evidence_file")"
+  cat > "$evidence_file" <<EOF_EVIDENCE
+{
+  "schemaVersion": 1,
+  "artifactType": "postgres_restore_drill_evidence",
+  "restoreDrillRef": "$(json_escape "$restore_drill_ref")",
+  "databaseName": "$(json_escape "$db")",
+  "backupPath": "$(json_escape "$dump_file")",
+  "artifactHash": "$(json_escape "$artifact_hash")",
+  "status": "PASSED",
+  "checkedAt": "$(json_escape "$checked_at")",
+  "postgresContainer": "$(json_escape "$POSTGRES_CONTAINER")",
+  "postgresUser": "$(json_escape "$POSTGRES_USER")",
+  "temporaryDatabase": "$(json_escape "$temp_db")",
+  "generatedAt": "$(json_escape "$checked_at")"
+}
+EOF_EVIDENCE
+
   cleanup_restore_db
   trap - EXIT
   echo "Restore check passed for $db using $dump_file"
+  echo "Restore drill evidence: $evidence_file"
+  echo "Register restore drill payload values: restoreDrillRef=$restore_drill_ref databaseName=$db artifactHash=$artifact_hash checkedAt=$checked_at"
 }
 
 main() {
@@ -136,7 +184,7 @@ main() {
       backup "${1:-}"
       ;;
     restore-check)
-      restore_check "${1:-}" "${2:-cf_identity}"
+      restore_check "${1:-}" "${2:-cf_promotion}"
       ;;
     -h|--help|help)
       usage

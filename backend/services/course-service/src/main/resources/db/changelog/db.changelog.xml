@@ -17,4 +17,5 @@
     <include file="db/changelog/changes/005-backfill-published-course-snapshots.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/006-course-review-audit.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/007-module-item-status.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/008-course-pricing.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>
