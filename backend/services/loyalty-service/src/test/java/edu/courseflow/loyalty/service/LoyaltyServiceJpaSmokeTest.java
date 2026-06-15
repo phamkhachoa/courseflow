@@ -21,9 +21,11 @@ import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateAccountStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateProgramStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpsertClientBindingRequestDto;
 import edu.courseflow.loyalty.repository.LoyaltyPointsEntryRepository;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,6 +54,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 })
 @Testcontainers(disabledWithoutDocker = true)
 class LoyaltyServiceJpaSmokeTest {
+
+    private static final String INTERNAL_SECRET = "test-internal-jwt-secret-32-byte-value-001";
 
     private static final CurrentUser LOYALTY_ADMIN = serviceUser(
             "loyalty-service",
@@ -549,9 +553,22 @@ class LoyaltyServiceJpaSmokeTest {
 
     private static CurrentUser serviceUser(String clientId, String... scopes) {
         String scope = String.join(" ", scopes);
-        String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(
-                ("{\"actor_type\":\"service\",\"azp\":\"" + clientId + "\",\"scope\":\"" + scope + "\"}")
-                        .getBytes(StandardCharsets.UTF_8));
-        return new CurrentUser(null, null, null, Set.of(), Set.of(), "header." + payload + ".signature");
+        Instant now = Instant.now();
+        String token = Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .issuer("courseflow-token-converter")
+                .subject("service:" + clientId)
+                .claim("aud", List.of("courseflow-services"))
+                .claim("token_use", "internal")
+                .claim("actor_type", "service")
+                .claim("azp", clientId)
+                .claim("scope", scope)
+                .claim("scp", List.of(scopes))
+                .issuedAt(Date.from(now))
+                .notBefore(Date.from(now.minusSeconds(1)))
+                .expiration(Date.from(now.plusSeconds(180)))
+                .signWith(Keys.hmacShaKeyFor(INTERNAL_SECRET.getBytes(StandardCharsets.UTF_8)))
+                .compact();
+        return new CurrentUser(null, null, null, Set.of(), Set.of(), token);
     }
 }

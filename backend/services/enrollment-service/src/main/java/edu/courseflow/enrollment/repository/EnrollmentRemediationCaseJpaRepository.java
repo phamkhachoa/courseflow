@@ -49,12 +49,12 @@ public interface EnrollmentRemediationCaseJpaRepository
                     where p.id = c.promotionApplicationId
                       and p.redemptionId = :redemptionId
                   ))
-	              and (:correlationId is null or exists (
-	                    select 1 from EnrollmentRemediationCaseAction a
-	                    where a.caseId = c.id
-	                      and lower(coalesce(function('jsonb_extract_path_text', a.payloadJson, 'correlationId'), ''))
-	                          like concat('%', lower(:correlationId), '%')
-	                  ))
+              and (:correlationId is null or exists (
+                    select 1 from EnrollmentRemediationCaseAction a
+                    where a.caseId = c.id
+                      and lower(coalesce(function('jsonb_extract_path_text', a.payloadJson, 'correlationId'), ''))
+                          like concat('%', lower(:correlationId), '%')
+                  ))
               and (:assigneeId is null or c.assigneeId = :assigneeId)
             order by c.slaDueAt asc, c.createdAt asc
             """)

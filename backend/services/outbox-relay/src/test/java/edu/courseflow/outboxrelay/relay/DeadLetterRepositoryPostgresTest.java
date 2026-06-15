@@ -47,6 +47,7 @@ class DeadLetterRepositoryPostgresTest {
         repository = new DeadLetterRepository(jdbc);
         jdbc.sql("""
                         TRUNCATE relay_operator_actions,
+                                 relay_dead_letter_approvals,
                                  relay_delivery_states,
                                  relay_dead_letters,
                                  relay_checkpoints

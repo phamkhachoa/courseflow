@@ -99,30 +99,62 @@ public class DeadLetterRepository {
                                          String aggregateId,
                                          String payloadHash,
                                          int limit) {
-        return jdbc.sql("""
+        String normalizedStatus = blankToNull(status);
+        String normalizedServiceName = blankToNull(serviceName);
+        String normalizedEventType = blankToNull(eventType);
+        String normalizedAggregateId = blankToNull(aggregateId);
+        String normalizedPayloadHash = normalizePayloadHash(payloadHash);
+
+        StringBuilder sql = new StringBuilder("""
                         SELECT *
                         FROM relay_dead_letters
-                        WHERE (:status IS NULL OR status = :status)
-                          AND (:serviceName IS NULL OR service_name = :serviceName)
-                          AND (:eventType IS NULL OR event_type = :eventType)
-                          AND (:aggregateId IS NULL OR aggregate_id = :aggregateId)
-                          AND (
-                              :payloadHash IS NULL
-                              OR payload_hash = :payloadHash
-                              OR (
-                                  payload_hash IS NULL
-                                  AND ('sha256:' || encode(digest(COALESCE(payload, ''), 'sha256'), 'hex')) = :payloadHash
-                              )
-                          )
+                        WHERE 1 = 1
+                        """);
+        if (normalizedStatus != null) {
+            sql.append("  AND status = :status\n");
+        }
+        if (normalizedServiceName != null) {
+            sql.append("  AND service_name = :serviceName\n");
+        }
+        if (normalizedEventType != null) {
+            sql.append("  AND event_type = :eventType\n");
+        }
+        if (normalizedAggregateId != null) {
+            sql.append("  AND aggregate_id = :aggregateId\n");
+        }
+        if (normalizedPayloadHash != null) {
+            sql.append("""
+                            AND (
+                                payload_hash = :payloadHash
+                                OR (
+                                    payload_hash IS NULL
+                                    AND ('sha256:' || encode(digest(COALESCE(payload, ''), 'sha256'), 'hex')) = :payloadHash
+                                )
+                            )
+                    """);
+        }
+        sql.append("""
                         ORDER BY created_at ASC, id ASC
                         LIMIT :limit
-                        """)
-                .param("status", blankToNull(status))
-                .param("serviceName", blankToNull(serviceName))
-                .param("eventType", blankToNull(eventType))
-                .param("aggregateId", blankToNull(aggregateId))
-                .param("payloadHash", normalizePayloadHash(payloadHash))
-                .param("limit", Math.max(1, Math.min(limit, 501)))
+                        """);
+
+        var statement = jdbc.sql(sql.toString());
+        if (normalizedStatus != null) {
+            statement = statement.param("status", normalizedStatus);
+        }
+        if (normalizedServiceName != null) {
+            statement = statement.param("serviceName", normalizedServiceName);
+        }
+        if (normalizedEventType != null) {
+            statement = statement.param("eventType", normalizedEventType);
+        }
+        if (normalizedAggregateId != null) {
+            statement = statement.param("aggregateId", normalizedAggregateId);
+        }
+        if (normalizedPayloadHash != null) {
+            statement = statement.param("payloadHash", normalizedPayloadHash);
+        }
+        return statement.param("limit", Math.max(1, Math.min(limit, 501)))
                 .query(this::map)
                 .list();
     }
@@ -288,17 +320,27 @@ public class DeadLetterRepository {
     }
 
     public List<DeadLetterApprovalRecord> approvals(UUID deadLetterId, String status, int limit) {
-        return jdbc.sql("""
+        String normalizedStatus = blankToNull(status);
+        StringBuilder sql = new StringBuilder("""
                         SELECT *
                         FROM relay_dead_letter_approvals
                         WHERE dead_letter_id = :deadLetterId
-                          AND (:status IS NULL OR status = :status)
+                        """);
+        if (normalizedStatus != null) {
+            sql.append("  AND status = :status\n");
+        }
+        sql.append("""
                         ORDER BY requested_at DESC, id DESC
                         LIMIT :limit
-                        """)
+                        """);
+
+        var statement = jdbc.sql(sql.toString())
                 .param("deadLetterId", deadLetterId)
-                .param("status", blankToNull(status))
-                .param("limit", Math.max(1, Math.min(limit, 501)))
+                .param("limit", Math.max(1, Math.min(limit, 501)));
+        if (normalizedStatus != null) {
+            statement = statement.param("status", normalizedStatus);
+        }
+        return statement
                 .query(this::mapApproval)
                 .list();
     }

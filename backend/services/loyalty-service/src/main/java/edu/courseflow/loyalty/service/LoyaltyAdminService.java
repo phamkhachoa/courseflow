@@ -952,7 +952,9 @@ public class LoyaltyAdminService {
     private List<LoyaltyPointsEntry> evidenceLedgerEntries(
             LoyaltyAdjustmentApproval approval,
             String operationType) {
-        if ("ADJUSTMENT".equalsIgnoreCase(operationType) && approval.getExecutedEntryId() != null) {
+        if (("ADJUSTMENT".equalsIgnoreCase(operationType)
+                || REWARD_REVERSAL_APPROVAL_OPERATION.equalsIgnoreCase(operationType))
+                && approval.getExecutedEntryId() != null) {
             return pointsEntries.findById(approval.getExecutedEntryId())
                     .map(entry -> List.of(entry))
                     .orElseGet(() -> List.of());
