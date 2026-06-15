@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.GradingQueueItemDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RequestUploadUrlDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RubricCriterionDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RubricDto;
@@ -116,6 +117,43 @@ class AssignmentServiceLifecycleTest {
         assertThat(result.getFirst().latestProgressStatus()).isEqualTo("SUBMITTED");
         assertThat(result.getFirst().attemptsUsed()).isEqualTo(1);
         assertThat(result.getFirst().overdue()).isFalse();
+    }
+
+    @Test
+    void gradingQueueDefaultsToSubmittedAndResubmittedStatuses() {
+        AssignmentDto assignment = assignment(ASSIGNMENT_ID, "Queue item", "PUBLISHED",
+                null, Instant.now().plus(Duration.ofDays(7)), null, "FILE");
+        GradingQueueItemDto queueItem = new GradingQueueItemDto(
+                SUBMISSION_ID.toString(),
+                ASSIGNMENT_ID.toString(),
+                "Queue item",
+                COURSE_ID.toString(),
+                STUDENT_ID,
+                1,
+                Instant.now(),
+                "SUBMITTED",
+                false,
+                0,
+                new BigDecimal("100"),
+                null,
+                1);
+        when(assignments.listByCourse(COURSE_ID)).thenReturn(List.of(assignment));
+        when(assignments.listGradingQueue(List.of(assignment), List.of("SUBMITTED", "RESUBMITTED"), 50))
+                .thenReturn(List.of(queueItem));
+
+        List<GradingQueueItemDto> result = service.gradingQueue(COURSE_ID, null, null, 50);
+
+        assertThat(result).containsExactly(queueItem);
+    }
+
+    @Test
+    void gradingQueueRejectsAssignmentOutsideCourse() {
+        when(assignments.listByCourse(COURSE_ID)).thenReturn(List.of());
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> service.gradingQueue(COURSE_ID, ASSIGNMENT_ID, null, 50));
+
+        assertThat(ex.getMessage()).contains("ASSIGNMENT_NOT_IN_COURSE");
     }
 
     @Test

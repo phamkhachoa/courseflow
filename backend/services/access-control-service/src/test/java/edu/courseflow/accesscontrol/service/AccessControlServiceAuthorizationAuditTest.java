@@ -569,7 +569,6 @@ class AccessControlServiceAuthorizationAuditTest {
                 auditLogs,
                 metrics,
                 internalJwtService,
-                false,
                 auditAllowed);
     }
 

@@ -1,6 +1,6 @@
 /// Sanitized student view of a quiz, from `GET /v1/quizzes/{quizId}`.
 ///
-/// Mirrors identity-service `StudentQuizDto`: students never receive the answer
+/// Mirrors the student quiz API DTO: students never receive the answer
 /// key (no `correctAnswer`, no option `correct` flag, no `feedback`). The full
 /// `QuizDto` is only returned to staff or to a student with a GRADED attempt
 /// when `showCorrectAnswers` is set — the learner app always treats it as the

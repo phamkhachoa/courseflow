@@ -94,9 +94,6 @@ class ExternalTokenVerifierOidcTest {
 
     private TokenConverterProperties properties(String audiences) {
         return new TokenConverterProperties(
-                "oidc",
-                "",
-                "courseflow-identity",
                 issuer,
                 jwksUri,
                 audiences,

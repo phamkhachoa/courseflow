@@ -46,7 +46,9 @@ import {
 } from "@/shared/ui";
 import { cn } from "@/shared/ui/cn";
 import {
+  approveCouponDistribution,
   approveCampaignVersion,
+  approveRedemptionReversalApproval,
   approveRetentionApproval,
   campaignTimeline,
   couponStorageInventory,
@@ -54,6 +56,7 @@ import {
   createCampaign,
   createCampaignVersion,
   createCoupon,
+  createCouponDistribution,
   executeRetention,
   exportRetentionEvidencePack,
   generateCoupons,
@@ -70,22 +73,30 @@ import {
   listApplications,
   listCampaigns,
   listCampaignVersions,
+  listCouponDistributions,
   listCoupons,
   listLoyaltyPrograms,
+  listRedemptionReversalApprovals,
   listRedemptions,
   listReservations,
   listSubmittedCampaignVersions,
   publishCampaignVersion,
+  previewIncentives,
+  previewCouponDistribution,
   queryAudit,
   redemptionTimeline,
   rejectCampaignVersion,
+  rejectRedemptionReversalApproval,
   rejectRetentionApproval,
   registerRetentionRestoreDrill,
   requestRetentionApproval,
+  issueCouponDistribution,
+  revokeCouponDistribution,
   reverseRedemption,
   retentionOperationId,
   rollbackCampaignVersion,
   runRetentionDryRun,
+  submitRedemptionReversalApproval,
   submitCampaignVersion,
   updateCampaignVersionDraft,
   updateCouponStatus,
@@ -123,6 +134,9 @@ import {
 } from "./retention-gates";
 import type {
   ActionSpec,
+  AdminPreviewIncentivesRequest,
+  AdminPreviewIncentivesResponse,
+  AdminSimulationCandidate,
   ApplicationFilters,
   AuditEvent,
   AuditFilters,
@@ -131,10 +145,16 @@ import type {
   CampaignVersion,
   CampaignVersionDetail,
   Coupon,
+  CouponDistribution,
+  CouponDistributionFilters,
+  CouponDistributionPreviewResponse,
+  CouponDistributionRecipientInput,
   CouponFilters,
+  IncentiveItem,
   LoyaltyProgram,
   Redemption,
   RedemptionFilters,
+  RedemptionReversalApproval,
   Reservation,
   ReservationFilters,
   RetentionApproval,
@@ -154,6 +174,7 @@ const navItems = [
   { to: "/incentives/review", label: "Review queue" },
   { to: "/incentives/coupon-imports", label: "Coupon imports" },
   { to: "/incentives/redemptions", label: "Support" },
+  { to: "/incentives/ops-console", label: "Ops console" },
   { to: "/incentives/reconciliation", label: "Reconciliation" },
   { to: "/incentives/loyalty", label: "Loyalty" },
   { to: "/incentives/retention", label: "Retention" },
@@ -2518,6 +2539,128 @@ function CouponTable({
   );
 }
 
+type CouponDistributionAction = {
+  distribution: CouponDistribution;
+  action: "approve" | "issue" | "revoke";
+};
+
+function parseDistributionRecipients(raw: string): CouponDistributionRecipientInput[] {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [profileId, metadataJson] = line.split("|", 2).map((part) => part.trim());
+      if (!profileId) throw new Error("Recipient profileId is required");
+      if (!metadataJson) return { profileId };
+      const parsed = JSON.parse(metadataJson) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error(`Recipient metadata phải là JSON object: ${profileId}`);
+      }
+      return { profileId, metadata: parsed as Record<string, unknown> };
+    });
+}
+
+function distributionActionLabel(action: CouponDistributionAction["action"]) {
+  if (action === "approve") return "Approve";
+  if (action === "issue") return "Issue";
+  return "Revoke";
+}
+
+function distributionActionReason(action: CouponDistributionAction["action"]) {
+  if (action === "approve") return "Coupon distribution approved by operations";
+  if (action === "issue") return "Coupon distribution issued by operations";
+  return "Coupon distribution revoked by operations";
+}
+
+function CouponDistributionTable({
+  rows,
+  campaignById,
+  onAction
+}: {
+  rows?: CouponDistribution[];
+  campaignById: Map<string, Campaign>;
+  onAction: (distribution: CouponDistribution, action: CouponDistributionAction["action"]) => void;
+}) {
+  if (!rows?.length) return <EmptyState message="Chưa có distribution phù hợp." />;
+  return (
+    <Table>
+      <thead>
+        <tr>
+          <Th>Distribution</Th>
+          <Th>Campaign</Th>
+          <Th>Source</Th>
+          <Th>Status</Th>
+          <Th>Recipients</Th>
+          <Th>Updated</Th>
+          <Th>Action</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((distribution) => {
+          const campaign = campaignById.get(distribution.campaignId);
+          return (
+            <tr key={distribution.id} className="hover:bg-slate-50">
+              <Td>
+                <p className="text-sm font-semibold text-slate-900">{distribution.name}</p>
+                <p className="mt-1 font-mono text-xs text-slate-400">{compactId(distribution.id)}</p>
+              </Td>
+              <Td>
+                <p className="text-sm font-semibold text-slate-800">{campaign?.code ?? compactId(distribution.campaignId)}</p>
+                <p className="mt-1 text-xs text-slate-400">{campaign?.name ?? compactId(distribution.campaignId)}</p>
+              </Td>
+              <Td>
+                <StatusPill value={distribution.sourceType} />
+                <p className="mt-1 font-mono text-xs text-slate-400">{distribution.sourceReference || "manual"}</p>
+              </Td>
+              <Td>
+                <StatusPill value={distribution.status} />
+                <p className="mt-1 text-xs text-slate-400">{distribution.notifyLearners ? "notify queued" : "silent"}</p>
+              </Td>
+              <Td>
+                <p className="text-xs text-slate-500">total {distribution.recipientCount}</p>
+                <p className="mt-1 text-xs text-slate-500">issued {distribution.issuedCount} · revoked {distribution.revokedCount}</p>
+              </Td>
+              <Td>{formatDateTime(distribution.updatedAt ?? distribution.createdAt)}</Td>
+              <Td>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="xs"
+                    variant="secondary"
+                    disabled={distribution.status !== "PENDING_APPROVAL"}
+                    onClick={() => onAction(distribution, "approve")}
+                  >
+                    <CheckCircle2 size={14} />
+                    Approve
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="secondary"
+                    disabled={distribution.status !== "APPROVED"}
+                    onClick={() => onAction(distribution, "issue")}
+                  >
+                    <Send size={14} />
+                    Issue
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="danger"
+                    disabled={distribution.status === "REVOKED"}
+                    onClick={() => onAction(distribution, "revoke")}
+                  >
+                    <XCircle size={14} />
+                    Revoke
+                  </Button>
+                </div>
+              </Td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </Table>
+  );
+}
+
 export function CouponCatalogPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<CouponFilters>({ limit: 50 });
@@ -2536,6 +2679,23 @@ export function CouponCatalogPage() {
   });
   const [statusTarget, setStatusTarget] = useState<{ coupon: Coupon; status: string } | null>(null);
   const [statusReason, setStatusReason] = useState("Updated by coupon operations");
+  const [distributionFilters, setDistributionFilters] = useState<CouponDistributionFilters>({ limit: 20 });
+  const [distributionForm, setDistributionForm] = useState({
+    campaignId: "",
+    name: "",
+    sourceType: "COHORT",
+    sourceReference: "",
+    notifyLearners: true,
+    startsAt: "",
+    expiresAt: "",
+    maxRedemptions: "1",
+    maxRedemptionsPerProfile: "1",
+    metadataJson: "{}",
+    recipients: ""
+  });
+  const [distributionPreview, setDistributionPreview] = useState<CouponDistributionPreviewResponse | null>(null);
+  const [distributionAction, setDistributionAction] = useState<CouponDistributionAction | null>(null);
+  const [distributionActionReasonText, setDistributionActionReasonText] = useState("");
 
   const campaigns = useQuery({
     queryKey: queryKeys.incentives.campaigns({}),
@@ -2556,6 +2716,11 @@ export function CouponCatalogPage() {
   const inventory = useQuery({
     queryKey: queryKeys.incentives.couponStorageInventory(inventoryFilters),
     queryFn: () => couponStorageInventory(inventoryFilters),
+    retry: 1
+  });
+  const distributions = useQuery({
+    queryKey: queryKeys.incentives.couponDistributions(distributionFilters),
+    queryFn: () => listCouponDistributions(distributionFilters),
     retry: 1
   });
 
@@ -2593,6 +2758,74 @@ export function CouponCatalogPage() {
       invalidateIncentives(queryClient);
       setFilters((current) => ({ ...current, campaignId: response.campaignId }));
       setDraftFilters((current) => ({ ...current, campaignId: response.campaignId }));
+    }
+  });
+
+  const distributionPayload = () => {
+    if (!distributionForm.campaignId) throw new Error("Chọn campaign trước khi tạo distribution");
+    const recipients = parseDistributionRecipients(distributionForm.recipients);
+    if (recipients.length === 0) throw new Error("Distribution cần ít nhất một recipient");
+    let metadata: Record<string, unknown> | undefined;
+    if (distributionForm.metadataJson.trim()) {
+      const parsed = JSON.parse(distributionForm.metadataJson) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Distribution metadata phải là JSON object");
+      }
+      metadata = parsed as Record<string, unknown>;
+    }
+    return {
+      campaignId: distributionForm.campaignId,
+      sourceType: distributionForm.sourceType,
+      sourceReference: distributionForm.sourceReference.trim() || undefined,
+      notifyLearners: distributionForm.notifyLearners,
+      startsAt: toIsoDateTime(distributionForm.startsAt),
+      expiresAt: toIsoDateTime(distributionForm.expiresAt),
+      maxRedemptions: toNumberOrUndefined(distributionForm.maxRedemptions),
+      maxRedemptionsPerProfile: toNumberOrUndefined(distributionForm.maxRedemptionsPerProfile),
+      metadata,
+      recipients
+    };
+  };
+
+  const previewDistribution = useMutation({
+    mutationFn: () => previewCouponDistribution(distributionPayload()),
+    onSuccess: (response) => setDistributionPreview(response)
+  });
+
+  const createDistribution = useMutation({
+    mutationFn: () => {
+      if (!distributionPreview) throw new Error("Preview distribution trước khi tạo");
+      if (!distributionForm.name.trim()) throw new Error("Distribution name is required");
+      return createCouponDistribution({
+        ...distributionPayload(),
+        name: distributionForm.name.trim(),
+        previewHash: distributionPreview.previewHash,
+        reason: "Created from coupon distribution console"
+      });
+    },
+    onSuccess: (distribution) => {
+      setDistributionPreview(null);
+      setDistributionFilters((current) => ({ ...current, campaignId: distribution.campaignId }));
+      invalidateIncentives(queryClient);
+    }
+  });
+
+  const distributionActionMutation = useMutation({
+    mutationFn: () => {
+      if (!distributionAction) throw new Error("Chưa chọn distribution");
+      const input = { reason: distributionActionReasonText.trim() || distributionActionReason(distributionAction.action) };
+      if (distributionAction.action === "approve") {
+        return approveCouponDistribution(distributionAction.distribution.id, input);
+      }
+      if (distributionAction.action === "issue") {
+        return issueCouponDistribution(distributionAction.distribution.id, input);
+      }
+      return revokeCouponDistribution(distributionAction.distribution.id, input);
+    },
+    onSuccess: () => {
+      setDistributionAction(null);
+      setDistributionActionReasonText("");
+      invalidateIncentives(queryClient);
     }
   });
 
@@ -2765,8 +2998,199 @@ export function CouponCatalogPage() {
               </Button>
             </div>
           </Card>
+
+          <Card>
+            <CardHeader title="Distribution issue" subtitle="Preview recipient set, tạo approval item và issue coupon holder-specific." compact />
+            <div className="grid gap-3 p-4">
+              <FormField label="Campaign" required>
+                <Select
+                  value={distributionForm.campaignId}
+                  onChange={(event) => {
+                    setDistributionForm({ ...distributionForm, campaignId: event.target.value });
+                    setDistributionPreview(null);
+                  }}
+                >
+                  <option value="">Chọn campaign</option>
+                  {(campaigns.data ?? []).map((campaign) => (
+                    <option key={campaign.id} value={campaign.id}>
+                      {campaign.code} · {campaign.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Name" required>
+                <Input
+                  value={distributionForm.name}
+                  onChange={(event) => setDistributionForm({ ...distributionForm, name: event.target.value })}
+                />
+              </FormField>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+                <FormField label="Source">
+                  <Select
+                    value={distributionForm.sourceType}
+                    onChange={(event) => {
+                      setDistributionForm({ ...distributionForm, sourceType: event.target.value });
+                      setDistributionPreview(null);
+                    }}
+                  >
+                    <option value="COHORT">COHORT</option>
+                    <option value="SECTION">SECTION</option>
+                    <option value="COURSE">COURSE</option>
+                    <option value="SEGMENT">SEGMENT</option>
+                    <option value="MANUAL">MANUAL</option>
+                  </Select>
+                </FormField>
+                <FormField label="Reference">
+                  <Input
+                    value={distributionForm.sourceReference}
+                    onChange={(event) => {
+                      setDistributionForm({ ...distributionForm, sourceReference: event.target.value });
+                      setDistributionPreview(null);
+                    }}
+                  />
+                </FormField>
+              </div>
+              {checkboxLabel("Notify learners", distributionForm.notifyLearners, (checked) => {
+                setDistributionForm({ ...distributionForm, notifyLearners: checked });
+                setDistributionPreview(null);
+              })}
+              <FormField label="Recipients" required>
+                <Textarea
+                  className="font-mono text-xs"
+                  rows={6}
+                  value={distributionForm.recipients}
+                  onChange={(event) => {
+                    setDistributionForm({ ...distributionForm, recipients: event.target.value });
+                    setDistributionPreview(null);
+                  }}
+                  placeholder={'learner-1\nlearner-2 | {"section":"A"}'}
+                />
+              </FormField>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+                <FormField label="Starts">
+                  <Input
+                    type="datetime-local"
+                    value={distributionForm.startsAt}
+                    onChange={(event) => {
+                      setDistributionForm({ ...distributionForm, startsAt: event.target.value });
+                      setDistributionPreview(null);
+                    }}
+                  />
+                </FormField>
+                <FormField label="Expires">
+                  <Input
+                    type="datetime-local"
+                    value={distributionForm.expiresAt}
+                    onChange={(event) => {
+                      setDistributionForm({ ...distributionForm, expiresAt: event.target.value });
+                      setDistributionPreview(null);
+                    }}
+                  />
+                </FormField>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+                <FormField label="Max redemptions">
+                  <Input
+                    value={distributionForm.maxRedemptions}
+                    onChange={(event) => {
+                      setDistributionForm({ ...distributionForm, maxRedemptions: event.target.value });
+                      setDistributionPreview(null);
+                    }}
+                    inputMode="numeric"
+                  />
+                </FormField>
+                <FormField label="Max/profile">
+                  <Input
+                    value={distributionForm.maxRedemptionsPerProfile}
+                    onChange={(event) => {
+                      setDistributionForm({ ...distributionForm, maxRedemptionsPerProfile: event.target.value });
+                      setDistributionPreview(null);
+                    }}
+                    inputMode="numeric"
+                  />
+                </FormField>
+              </div>
+              <FormField label="Metadata JSON">
+                <Textarea
+                  className="font-mono text-xs"
+                  value={distributionForm.metadataJson}
+                  onChange={(event) => {
+                    setDistributionForm({ ...distributionForm, metadataJson: event.target.value });
+                    setDistributionPreview(null);
+                  }}
+                />
+              </FormField>
+              {distributionPreview && (
+                <Notice tone="success" title="Preview ready">
+                  {distributionPreview.uniqueRecipients}/{distributionPreview.requestedRecipients} unique recipients · {distributionPreview.duplicateRecipients} duplicate · {compactId(distributionPreview.previewHash)}
+                </Notice>
+              )}
+              {(previewDistribution.isError || createDistribution.isError) && (
+                <Notice tone="danger" title="Không thể tạo distribution">
+                  {previewDistribution.error?.message ?? createDistribution.error?.message}
+                </Notice>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => previewDistribution.mutate()} disabled={previewDistribution.isPending}>
+                  <ShieldCheck size={16} />
+                  {previewDistribution.isPending ? "Previewing" : "Preview"}
+                </Button>
+                <Button onClick={() => createDistribution.mutate()} disabled={createDistribution.isPending || !distributionPreview}>
+                  <Plus size={16} />
+                  {createDistribution.isPending ? "Creating" : "Create"}
+                </Button>
+              </div>
+            </div>
+          </Card>
         </div>
       </div>
+
+      <Card>
+        <CardHeader
+          title="Coupon distributions"
+          subtitle="Lifecycle phát coupon theo cohort/section/course/segment: preview, approve, issue, revoke và notification outbox."
+          actions={<Badge value="ROWS" label={`${distributions.data?.items.length ?? 0} rows`} tone="info" />}
+        />
+        <Toolbar>
+          <FormField label="Tenant">
+            <Input value={distributionFilters.tenantId ?? ""} onChange={(event) => setDistributionFilters({ ...distributionFilters, tenantId: event.target.value || undefined })} />
+          </FormField>
+          <FormField label="Application">
+            <Input value={distributionFilters.applicationId ?? ""} onChange={(event) => setDistributionFilters({ ...distributionFilters, applicationId: event.target.value || undefined })} />
+          </FormField>
+          <FormField label="Campaign">
+            <Select value={distributionFilters.campaignId ?? ""} onChange={(event) => setDistributionFilters({ ...distributionFilters, campaignId: event.target.value || undefined })}>
+              <option value="">Tất cả campaign</option>
+              {(campaigns.data ?? []).map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.code} · {campaign.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Status">
+            <Select value={distributionFilters.status ?? ""} onChange={(event) => setDistributionFilters({ ...distributionFilters, status: event.target.value || undefined })}>
+              <option value="">Tất cả</option>
+              <option value="PENDING_APPROVAL">PENDING_APPROVAL</option>
+              <option value="APPROVED">APPROVED</option>
+              <option value="ISSUED">ISSUED</option>
+              <option value="REVOKED">REVOKED</option>
+            </Select>
+          </FormField>
+        </Toolbar>
+        {distributions.isLoading && <Spinner />}
+        {distributions.isError && <ErrorState error={distributions.error} />}
+        {!distributions.isLoading && !distributions.isError && (
+          <CouponDistributionTable
+            rows={distributions.data?.items}
+            campaignById={campaignById}
+            onAction={(distribution, action) => {
+              setDistributionAction({ distribution, action });
+              setDistributionActionReasonText(distributionActionReason(action));
+            }}
+          />
+        )}
+      </Card>
 
       <ConfirmDialog
         open={Boolean(statusTarget)}
@@ -2784,6 +3208,26 @@ export function CouponCatalogPage() {
           <Textarea value={statusReason} onChange={(event) => setStatusReason(event.target.value)} />
         </FormField>
         {statusMutation.isError && <Notice tone="danger" title="Không thể đổi trạng thái">{statusMutation.error.message}</Notice>}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(distributionAction)}
+        onOpenChange={(open) => {
+          if (!open) setDistributionAction(null);
+        }}
+        title={`${distributionActionLabel(distributionAction?.action ?? "approve")} distribution`}
+        description={distributionAction ? `${distributionAction.distribution.name} · ${compactId(distributionAction.distribution.id)}` : undefined}
+        confirmLabel={distributionActionLabel(distributionAction?.action ?? "approve")}
+        tone={distributionAction?.action === "revoke" ? "danger" : "primary"}
+        onConfirm={() => distributionActionMutation.mutate()}
+        isPending={distributionActionMutation.isPending}
+      >
+        <FormField label="Reason">
+          <Textarea value={distributionActionReasonText} onChange={(event) => setDistributionActionReasonText(event.target.value)} />
+        </FormField>
+        {distributionActionMutation.isError && (
+          <Notice tone="danger" title="Không thể cập nhật distribution">{distributionActionMutation.error.message}</Notice>
+        )}
       </ConfirmDialog>
     </div>
   );
@@ -2883,6 +3327,243 @@ function DiffPanel({
         </div>
       ))}
     </div>
+  );
+}
+
+type SimulationForm = {
+  profileId: string;
+  externalReference: string;
+  channel: string;
+  currency: string;
+  subtotal: string;
+  shippingAmount: string;
+  couponCodes: string;
+  attributesJson: string;
+  itemsJson: string;
+  note: string;
+};
+
+const defaultSimulationForm: SimulationForm = {
+  profileId: "learner-1",
+  externalReference: "simulation-checkout",
+  channel: "WEB",
+  currency: "USD",
+  subtotal: "120",
+  shippingAmount: "0",
+  couponCodes: "",
+  attributesJson: '{\n  "segment": "NEW"\n}',
+  itemsJson: '[\n  {\n    "id": "sample-course",\n    "type": "COURSE",\n    "quantity": 1,\n    "unitPrice": 120,\n    "attributes": {\n      "category": "spring"\n    }\n  }\n]',
+  note: "pre-publish campaign simulation"
+};
+
+function parseJsonRecord(value: string, label: string): Record<string, unknown> {
+  if (!value.trim()) return {};
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${label} phải là JSON object`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function parseJsonArray<T>(value: string, label: string): T[] {
+  if (!value.trim()) return [];
+  const parsed = JSON.parse(value) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${label} phải là JSON array`);
+  }
+  return parsed as T[];
+}
+
+function decimalInput(value: string, label: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "0";
+  if (!Number.isFinite(Number(trimmed))) {
+    throw new Error(`${label} phải là số`);
+  }
+  return trimmed;
+}
+
+function formatAmount(value?: number | string | null, currency?: string | null) {
+  const number = Number(value ?? 0);
+  const formatted = new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits: 2
+  }).format(Number.isFinite(number) ? number : 0);
+  return currency ? `${formatted} ${currency}` : formatted;
+}
+
+function totalEffectAmount(
+  effects: AdminPreviewIncentivesResponse["decision"]["effects"],
+  predicate: (effect: AdminPreviewIncentivesResponse["decision"]["effects"][number]) => boolean
+) {
+  return effects.filter(predicate).reduce((sum, effect) => sum + Number(effect.quantity ?? effect.amount ?? 0), 0);
+}
+
+function SimulationCandidateList({ candidates }: { candidates?: AdminSimulationCandidate[] }) {
+  if (!candidates?.length) return <EmptyState message="Không có candidate campaign khớp sample context." />;
+  return (
+    <div className="divide-y divide-slate-100">
+      {candidates.map((candidate) => {
+        const stackingStatus = candidate.stackingStatus ?? (candidate.selected ? "SELECTED_PRIMARY" : candidate.matched ? "MATCHED" : "SKIPPED");
+        const stackingReasons = candidate.stackingReasonCodes?.length ? candidate.stackingReasonCodes : candidate.reasonCodes;
+        return (
+          <div key={`${candidate.campaignId}-${candidate.campaignVersion ?? "draft"}`} className="grid gap-3 p-3 md:grid-cols-[1fr_auto]">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill value={stackingStatus} />
+                <StatusPill value={candidate.exclusive ? "EXCLUSIVE" : "NON_EXCLUSIVE"} />
+                <StatusPill value={candidate.stackable === false ? "NO_STACK" : "STACKABLE"} />
+                <span className="font-mono text-xs text-slate-500">{compactId(candidate.campaignId)}</span>
+                <span className="text-xs font-semibold text-slate-500">v{candidate.campaignVersion ?? "-"}</span>
+              </div>
+              <p className="mt-2 text-sm font-bold text-slate-900">{candidate.campaignCode ?? "-"}</p>
+              <p className="mt-1 text-xs text-slate-500">{stackingReasons.join(", ") || "-"}</p>
+            </div>
+            <div className="text-left md:text-right">
+              <p className="text-sm font-semibold text-slate-800">
+                Discount {formatAmount(totalEffectAmount(candidate.effects, (effect) => effect.benefitType === "DISCOUNT" || effect.unit === "MONEY"))}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Points {formatAmount(totalEffectAmount(candidate.effects, (effect) => effect.benefitType === "POINTS_EARN_INTENT" || effect.unit === "POINT"))}
+              </p>
+            </div>
+            {candidate.quotaExposure.length > 0 && (
+              <div className="md:col-span-2 grid gap-2 sm:grid-cols-2">
+                {candidate.quotaExposure.map((quota) => (
+                  <div key={`${candidate.campaignId}-${quota.scopeType}-${quota.profileId}`} className="rounded-md border border-slate-200 bg-slate-50 p-2 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-700">{quota.scopeType}</span>
+                      <div className="flex flex-wrap justify-end gap-1">
+                        <StatusPill value={quota.available ? "AVAILABLE" : "EXHAUSTED"} />
+                        <StatusPill value={quota.wouldConsume ? "WOULD_CONSUME" : "VIEW_ONLY"} />
+                      </div>
+                    </div>
+                    <p className="mt-1 font-mono text-slate-500">{compactId(quota.scopeId)} · {quota.profileId}</p>
+                    <p className="mt-1 text-slate-500">used {quota.used}/{quota.limit} · remaining {quota.remaining}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PromotionSimulationPanel({ campaign }: { campaign?: Campaign }) {
+  const [form, setForm] = useState<SimulationForm>({
+    ...defaultSimulationForm,
+    currency: campaign?.currency || defaultSimulationForm.currency
+  });
+  const [result, setResult] = useState<AdminPreviewIncentivesResponse | null>(null);
+  const simulation = useMutation({
+    mutationFn: () => {
+      if (!campaign) throw new Error("Chưa tải campaign");
+      const context: AdminPreviewIncentivesRequest["context"] = {
+        tenantId: campaign.tenantId,
+        applicationId: campaign.applicationId,
+        profileId: form.profileId.trim(),
+        externalReference: form.externalReference.trim() || undefined,
+        channel: form.channel.trim() || undefined,
+        currency: form.currency.trim() || campaign.currency || "USD",
+        couponCodes: splitCommaList(form.couponCodes),
+        transaction: {
+          subtotal: decimalInput(form.subtotal, "Subtotal"),
+          shippingAmount: decimalInput(form.shippingAmount, "Shipping")
+        },
+        items: parseJsonArray<IncentiveItem>(form.itemsJson, "Items"),
+        attributes: parseJsonRecord(form.attributesJson, "Attributes")
+      };
+      return previewIncentives(
+        {
+          context,
+          note: form.note.trim() || undefined
+        },
+        retentionOperationId("admin-incentive-simulation")
+      );
+    },
+    onSuccess: setResult
+  });
+  const decision = result?.decision;
+  const totals = result?.totals;
+  return (
+    <Card>
+      <CardHeader
+        title="Promotion simulation"
+        subtitle="Nhập sample checkout context để xem campaign thắng, discount/points, reason code và quota exposure trước publish."
+        actions={<Search size={18} className="text-brand-700" />}
+      />
+      <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.9fr)]">
+        <div className="grid gap-3">
+          <div className="grid gap-3 md:grid-cols-3">
+            <FormField label="Profile" required>
+              <Input value={form.profileId} onChange={(event) => setForm({ ...form, profileId: event.target.value })} />
+            </FormField>
+            <FormField label="Channel">
+              <Input value={form.channel} onChange={(event) => setForm({ ...form, channel: event.target.value })} />
+            </FormField>
+            <FormField label="Currency" required>
+              <Input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value })} />
+            </FormField>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <FormField label="Subtotal" required>
+              <Input value={form.subtotal} onChange={(event) => setForm({ ...form, subtotal: event.target.value })} inputMode="decimal" />
+            </FormField>
+            <FormField label="Shipping">
+              <Input value={form.shippingAmount} onChange={(event) => setForm({ ...form, shippingAmount: event.target.value })} inputMode="decimal" />
+            </FormField>
+            <FormField label="Coupon codes">
+              <Input value={form.couponCodes} onChange={(event) => setForm({ ...form, couponCodes: event.target.value })} placeholder="SAVE10, VIP20" />
+            </FormField>
+          </div>
+          <FormField label="External reference">
+            <Input value={form.externalReference} onChange={(event) => setForm({ ...form, externalReference: event.target.value })} />
+          </FormField>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <FormField label="Attributes JSON">
+              <Textarea className="font-mono text-xs" rows={8} value={form.attributesJson} onChange={(event) => setForm({ ...form, attributesJson: event.target.value })} />
+            </FormField>
+            <FormField label="Items JSON">
+              <Textarea className="font-mono text-xs" rows={8} value={form.itemsJson} onChange={(event) => setForm({ ...form, itemsJson: event.target.value })} />
+            </FormField>
+          </div>
+          <FormField label="Audit note">
+            <Input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} />
+          </FormField>
+          {simulation.isError && <ErrorState error={simulation.error} />}
+          <div className="flex justify-end">
+            <Button onClick={() => simulation.mutate()} disabled={simulation.isPending || !campaign || !form.profileId.trim()}>
+              <Search size={16} />
+              {simulation.isPending ? "Simulating" : "Run simulation"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {!result && <EmptyState message="Chưa có simulation result." />}
+          {result && (
+            <>
+              <Notice tone={decision?.eligible ? "success" : "warning"} title={decision?.eligible ? "Eligible" : "Not eligible"}>
+                {decision?.reasonCodes.join(", ") || "-"} · context {compactId(result.contextHash, 14, 6)}
+              </Notice>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StatCard label="Discount" value={formatAmount(totals?.totalDiscount, totals?.currency)} detail="Tổng discount/free shipping." tone="success" />
+                <StatCard label="Final amount" value={formatAmount(totals?.finalAmount, totals?.currency)} detail="Sau discount mô phỏng." tone="info" />
+                <StatCard label="Points" value={formatAmount(totals?.totalPoints)} detail="POINTS_EARN_INTENT." tone="warning" />
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <KeyValue label="Winner" value={result.winningCampaignCode || compactId(result.winningCampaignId)} />
+                <KeyValue label="Version" value={result.winningCampaignVersion ? `v${result.winningCampaignVersion}` : "-"} />
+                <KeyValue label="Coupon" value={result.couponId ? compactId(result.couponId) : "-"} />
+                <KeyValue label="Ledger impact" value={String(result.ledgerImpact)} />
+              </div>
+              <SimulationCandidateList candidates={result.candidates} />
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -3233,6 +3914,8 @@ export function CampaignWorkspacePage() {
             </Card>
           </div>
 
+          <PromotionSimulationPanel campaign={campaign.data} />
+
           <Card>
             <CardHeader title="Campaign audit timeline" subtitle="Actor, action, note và correlation để support/reviewer truy vết." actions={<History size={18} className="text-brand-700" />} />
             {timeline.isLoading && <Spinner />}
@@ -3533,12 +4216,97 @@ function RedemptionTable({
   );
 }
 
+function RedemptionReversalApprovalTable({
+  rows,
+  onApprove,
+  onReject,
+  onExecute,
+  pendingApprovalId
+}: {
+  rows?: RedemptionReversalApproval[];
+  onApprove: (approval: RedemptionReversalApproval) => void;
+  onReject: (approval: RedemptionReversalApproval) => void;
+  onExecute: (approval: RedemptionReversalApproval) => void;
+  pendingApprovalId?: string | null;
+}) {
+  if (!rows?.length) return <EmptyState message="Không có reversal approval phù hợp." />;
+  return (
+    <Table>
+      <thead>
+        <tr>
+          <Th>Approval</Th>
+          <Th>Redemption</Th>
+          <Th>Status</Th>
+          <Th>Evidence</Th>
+          <Th>Operators</Th>
+          <Th>Action</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((approval) => (
+          <tr key={approval.approvalId} className="hover:bg-slate-50">
+            <Td>
+              <p className="font-mono text-xs font-semibold text-slate-700">{compactId(approval.approvalId)}</p>
+              <p className="mt-1 text-xs text-slate-400">expires {formatDateTime(approval.expiresAt)}</p>
+            </Td>
+            <Td>
+              <Link to={`/incentives/redemptions/${approval.redemptionId}`} className="font-mono text-xs font-semibold text-brand-700 hover:underline">
+                {compactId(approval.redemptionId)}
+              </Link>
+              <p className="mt-1 text-xs text-slate-400">{approval.externalReference ?? approval.profileId ?? "no reference"}</p>
+            </Td>
+            <Td>
+              <StatusPill value={approval.status} />
+            </Td>
+            <Td>
+              <p className="text-sm font-semibold text-slate-700">{approval.changeTicket}</p>
+              <p className="mt-1 line-clamp-2 text-xs text-slate-500">{approval.reason}</p>
+              <p className="mt-1 font-mono text-xs text-slate-400">{compactId(approval.subjectHash)}</p>
+            </Td>
+            <Td>
+              <p className="text-xs text-slate-500">requested {approval.requestedBy ?? "-"}</p>
+              <p className="mt-1 text-xs text-slate-500">approved {approval.approvedBy ?? "-"}</p>
+              {approval.executedBy && <p className="mt-1 text-xs text-emerald-600">executed {approval.executedBy}</p>}
+            </Td>
+            <Td>
+              <div className="flex flex-wrap gap-2">
+                {approval.status === "PENDING_APPROVAL" && (
+                  <>
+                    <Button size="sm" variant="secondary" disabled={pendingApprovalId === approval.approvalId} onClick={() => onApprove(approval)}>
+                      <CheckCircle2 size={14} />
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="danger" disabled={pendingApprovalId === approval.approvalId} onClick={() => onReject(approval)}>
+                      <XCircle size={14} />
+                      Reject
+                    </Button>
+                  </>
+                )}
+                {approval.status === "APPROVED" && (
+                  <Button size="sm" variant="danger" disabled={pendingApprovalId === approval.approvalId} onClick={() => onExecute(approval)}>
+                    <RotateCcw size={14} />
+                    Execute
+                  </Button>
+                )}
+              </div>
+            </Td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
 export function RedemptionSupportPage() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<ReservationFilters>({ limit: 50 });
   const [draftFilters, setDraftFilters] = useState<ReservationFilters>({ limit: 50 });
   const [target, setTarget] = useState<Redemption | null>(null);
   const [reason, setReason] = useState("");
+  const [changeTicket, setChangeTicket] = useState("");
+  const [approvalStatus, setApprovalStatus] = useState("PENDING_APPROVAL");
+  const [decision, setDecision] = useState<{ approval: RedemptionReversalApproval; action: "approve" | "reject" } | null>(null);
+  const [decisionNote, setDecisionNote] = useState("");
   const redemptionFilters = useMemo<RedemptionFilters>(
     () => ({
       tenantId: filters.tenantId,
@@ -3551,6 +4319,19 @@ export function RedemptionSupportPage() {
     }),
     [filters]
   );
+  const reversalApprovalFilters = useMemo(
+    () => ({
+      tenantId: filters.tenantId,
+      applicationId: filters.applicationId,
+      campaignId: filters.campaignId,
+      status: approvalStatus || undefined,
+      limit: 50
+    }),
+    [approvalStatus, filters.applicationId, filters.campaignId, filters.tenantId]
+  );
+  const reversalApprovalQueueEnabled = Boolean(
+    reversalApprovalFilters.tenantId?.trim() && reversalApprovalFilters.applicationId?.trim()
+  );
   const reservations = useQuery({
     queryKey: queryKeys.incentives.reservations(filters),
     queryFn: () => listReservations(filters),
@@ -3561,17 +4342,58 @@ export function RedemptionSupportPage() {
     queryFn: () => listRedemptions(redemptionFilters),
     retry: 1
   });
-  const reverse = useMutation({
+  const reversalApprovals = useQuery({
+    queryKey: queryKeys.incentives.redemptionReversalApprovals(reversalApprovalFilters),
+    queryFn: () => listRedemptionReversalApprovals(reversalApprovalFilters),
+    enabled: reversalApprovalQueueEnabled,
+    retry: 1
+  });
+  const requestReversalApproval = useMutation({
     mutationFn: () => {
       if (!target) throw new Error("Chưa chọn redemption");
-      return reverseRedemption(target.id, {
+      return submitRedemptionReversalApproval(target.id, {
         idempotencyKey: `admin-reversal-${crypto.randomUUID()}`,
-        reason: reason.trim()
+        reason: reason.trim(),
+        changeTicket: changeTicket.trim(),
+        metadata: {
+          source: "promotion-support",
+          externalReference: target.externalReference ?? undefined,
+          profileId: target.profileId
+        }
       });
     },
     onSuccess: () => {
       setTarget(null);
       setReason("");
+      setChangeTicket("");
+      invalidateIncentives(queryClient);
+    }
+  });
+  const decideReversalApproval = useMutation({
+    mutationFn: () => {
+      if (!decision) throw new Error("Chưa chọn approval");
+      const input = { note: decisionNote.trim() || undefined };
+      return decision.action === "approve"
+        ? approveRedemptionReversalApproval(decision.approval.approvalId, input)
+        : rejectRedemptionReversalApproval(decision.approval.approvalId, input);
+    },
+    onSuccess: () => {
+      setDecision(null);
+      setDecisionNote("");
+      invalidateIncentives(queryClient);
+    }
+  });
+  const executeReversalApproval = useMutation({
+    mutationFn: (approval: RedemptionReversalApproval) => {
+      if (!approval.idempotencyKey) throw new Error("Approval thiếu idempotency key");
+      return reverseRedemption(approval.redemptionId, {
+        idempotencyKey: approval.idempotencyKey,
+        reason: approval.reason,
+        approvalId: approval.approvalId,
+        changeTicket: approval.changeTicket
+      });
+    },
+    onSuccess: () => {
       invalidateIncentives(queryClient);
     }
   });
@@ -3644,10 +4466,54 @@ export function RedemptionSupportPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Redemptions" subtitle="Reverse không release lại quota đã commit; backend ghi ledger REVERSE và audit event." />
+        <CardHeader title="Redemptions" subtitle="Reverse support cần request approval trước khi execute; runtime service compensation vẫn đi qua binding riêng." />
         {redemptions.isLoading && <Spinner />}
         {redemptions.isError && <ErrorState error={redemptions.error} />}
         {!redemptions.isLoading && !redemptions.isError && <RedemptionTable rows={redemptions.data} onReverse={setTarget} />}
+      </Card>
+
+      <Card>
+        <CardHeader title="Reversal approvals" subtitle="Maker-checker cho promotion redemption reverse theo tenant/application đang lọc." />
+        <div className="mb-3 flex flex-wrap items-end gap-3">
+          <FormField label="Status">
+            <Select value={approvalStatus} onChange={(event) => setApprovalStatus(event.target.value)}>
+              <option value="PENDING_APPROVAL">PENDING_APPROVAL</option>
+              <option value="APPROVED">APPROVED</option>
+              <option value="REJECTED">REJECTED</option>
+              <option value="EXECUTED">EXECUTED</option>
+              <option value="">Tất cả</option>
+            </Select>
+          </FormField>
+        </div>
+        {!reversalApprovalQueueEnabled && (
+          <Notice tone="warning" title="Tenant/application required">
+            Nhập tenant và application ở bộ lọc phía trên để tải approval queue.
+          </Notice>
+        )}
+        {reversalApprovals.isLoading && <Spinner />}
+        {reversalApprovals.isError && <ErrorState error={reversalApprovals.error} />}
+        {reversalApprovalQueueEnabled && !reversalApprovals.isLoading && !reversalApprovals.isError && (
+          <RedemptionReversalApprovalTable
+            rows={reversalApprovals.data}
+            pendingApprovalId={
+              decideReversalApproval.isPending
+                ? decision?.approval.approvalId
+                : executeReversalApproval.isPending
+                  ? executeReversalApproval.variables?.approvalId
+                  : null
+            }
+            onApprove={(approval) => {
+              setDecision({ approval, action: "approve" });
+              setDecisionNote("");
+            }}
+            onReject={(approval) => {
+              setDecision({ approval, action: "reject" });
+              setDecisionNote("");
+            }}
+            onExecute={(approval) => executeReversalApproval.mutate(approval)}
+          />
+        )}
+        {executeReversalApproval.isError && <ErrorState error={executeReversalApproval.error} />}
       </Card>
 
       <ConfirmDialog
@@ -3656,19 +4522,44 @@ export function RedemptionSupportPage() {
           if (!open) {
             setTarget(null);
             setReason("");
+            setChangeTicket("");
           }
         }}
-        title="Reverse redemption"
-        description="Thao tác này ghi audit và ledger reversal. Cần nhập lý do rõ ràng."
-        confirmLabel="Reverse"
+        title="Request reversal approval"
+        description="Reviewer phải approve trước khi operator execute reverse."
+        confirmLabel="Request approval"
         tone="danger"
-        isPending={reverse.isPending}
-        onConfirm={() => reverse.mutate()}
+        isPending={requestReversalApproval.isPending}
+        onConfirm={() => requestReversalApproval.mutate()}
       >
         <FormField label="Reason" required>
           <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="VD: Order refunded / duplicate payment" />
         </FormField>
-        {reverse.isError && <ErrorState error={reverse.error} />}
+        <FormField label="Change ticket" required>
+          <Input value={changeTicket} onChange={(event) => setChangeTicket(event.target.value)} placeholder="INC-1234 / refund case" />
+        </FormField>
+        {requestReversalApproval.isError && <ErrorState error={requestReversalApproval.error} />}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(decision)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDecision(null);
+            setDecisionNote("");
+          }
+        }}
+        title={decision?.action === "approve" ? "Approve reversal" : "Reject reversal"}
+        description={decision ? `${compactId(decision.approval.redemptionId)} · ${decision.approval.changeTicket}` : undefined}
+        confirmLabel={decision?.action === "approve" ? "Approve" : "Reject"}
+        tone={decision?.action === "reject" ? "danger" : "primary"}
+        isPending={decideReversalApproval.isPending}
+        onConfirm={() => decideReversalApproval.mutate()}
+      >
+        <FormField label={decision?.action === "reject" ? "Note" : "Note"}>
+          <Textarea value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} placeholder="Reviewer note" />
+        </FormField>
+        {decideReversalApproval.isError && <ErrorState error={decideReversalApproval.error} />}
       </ConfirmDialog>
     </div>
   );
@@ -3678,6 +4569,9 @@ export function RedemptionDetailPage() {
   const { redemptionId = "" } = useParams();
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
+  const [approvalId, setApprovalId] = useState("");
+  const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [changeTicket, setChangeTicket] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const redemption = useQuery({
     queryKey: queryKeys.incentives.redemption(redemptionId),
@@ -3694,12 +4588,17 @@ export function RedemptionDetailPage() {
   const reverse = useMutation({
     mutationFn: () =>
       reverseRedemption(redemptionId, {
-        idempotencyKey: `admin-reversal-${crypto.randomUUID()}`,
-        reason: reason.trim()
+        idempotencyKey: idempotencyKey.trim(),
+        reason: reason.trim(),
+        approvalId: approvalId.trim(),
+        changeTicket: changeTicket.trim()
       }),
     onSuccess: () => {
       setConfirmOpen(false);
       setReason("");
+      setApprovalId("");
+      setIdempotencyKey("");
+      setChangeTicket("");
       invalidateIncentives(queryClient);
     }
   });
@@ -3720,7 +4619,7 @@ export function RedemptionDetailPage() {
             onClick={() => setConfirmOpen(true)}
           >
             <RotateCcw size={16} />
-            Reverse
+            Execute reversal
           </Button>
         }
       />
@@ -3761,16 +4660,33 @@ export function RedemptionDetailPage() {
 
       <ConfirmDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="Reverse redemption"
-        description="Cần lý do để audit/support trace sau này."
-        confirmLabel="Reverse"
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) {
+            setReason("");
+            setApprovalId("");
+            setIdempotencyKey("");
+            setChangeTicket("");
+          }
+        }}
+        title="Execute approved reversal"
+        description="Dùng approval id và idempotency key từ reversal approval queue."
+        confirmLabel="Execute"
         tone="danger"
         isPending={reverse.isPending}
         onConfirm={() => reverse.mutate()}
       >
+        <FormField label="Approval ID" required>
+          <Input value={approvalId} onChange={(event) => setApprovalId(event.target.value)} />
+        </FormField>
+        <FormField label="Idempotency key" required>
+          <Input value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} />
+        </FormField>
         <FormField label="Reason" required>
           <Textarea value={reason} onChange={(event) => setReason(event.target.value)} />
+        </FormField>
+        <FormField label="Change ticket" required>
+          <Input value={changeTicket} onChange={(event) => setChangeTicket(event.target.value)} />
         </FormField>
         {reverse.isError && <ErrorState error={reverse.error} />}
       </ConfirmDialog>

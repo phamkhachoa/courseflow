@@ -64,6 +64,22 @@ export type Submission = {
   attachments?: SubmissionAttachment[];
 };
 
+export type GradingQueueItem = {
+  submissionId: string;
+  assignmentId: string;
+  assignmentTitle: string;
+  courseId: string;
+  studentId: string;
+  attemptNo: number;
+  submittedAt?: string;
+  status: string;
+  isLate: boolean;
+  minutesLate: number;
+  maxScore?: number;
+  rubricId?: string;
+  attachmentCount: number;
+};
+
 export type RubricCriterion = {
   id: string;
   name: string;
@@ -130,6 +146,13 @@ export async function listSubmissions(assignmentId: string, studentId: string): 
     params: { studentId }
   });
   return unwrapList<Submission>(data);
+}
+
+export async function listGradingQueue(courseId: string, limit = 50): Promise<GradingQueueItem[]> {
+  const { data } = await apiClient.get("/admin/v1/assignments/grading-queue", {
+    params: { courseId, limit }
+  });
+  return unwrapList<GradingQueueItem>(data);
 }
 
 export type RubricScore = {

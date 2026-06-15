@@ -284,6 +284,9 @@ class LearnerNextActionServiceTest {
                 "9",
                 "BEGINNER",
                 "PUBLISHED",
+                BigDecimal.ZERO,
+                "USD",
+                "FREE",
                 Instant.parse("2026-06-01T00:00:00Z"),
                 List.of());
     }

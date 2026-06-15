@@ -1,7 +1,6 @@
 /// Authenticated user used by the mobile shell.
 ///
-/// In legacy mode this is returned by identity-service. In Keycloak mode the
-/// initial identity fields come from OIDC token claims; profile and product
+/// Initial identity fields come from OIDC token claims; profile and product
 /// role fields are hydrated from user-management-service.
 class AuthUser {
   const AuthUser({
@@ -51,10 +50,7 @@ class AuthUser {
       );
 }
 
-/// Token pair + metadata for the active auth mode.
-///
-/// Legacy mode mirrors identity-service `TokenResponseDto`; Keycloak mode is
-/// built from AppAuth's token response.
+/// Token pair + metadata built from AppAuth's Keycloak token response.
 class AuthSession {
   const AuthSession({
     required this.accessToken,

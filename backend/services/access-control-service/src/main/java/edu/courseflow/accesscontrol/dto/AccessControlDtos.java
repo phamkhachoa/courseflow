@@ -23,7 +23,6 @@ public final class AccessControlDtos {
             @NotBlank String subject,
             @Email String email,
             Boolean emailVerified,
-            String legacyUserId,
             List<RoleAssignmentHint> roleAssignments) {
     }
 

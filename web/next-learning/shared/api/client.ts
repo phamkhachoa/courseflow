@@ -1,7 +1,7 @@
 "use client";
 
 import { API_BASE_URL, unwrap } from "./envelope";
-import { keycloakAuthEnabled, refreshKeycloakToken } from "@/features/auth/keycloak-auth";
+import { refreshKeycloakToken } from "@/features/auth/keycloak-auth";
 
 export type LearnerUser = {
   id: number;
@@ -137,47 +137,23 @@ export async function clientFetch<T>(
   let response = await run(session?.accessToken);
 
   if (response.status === 401 && session?.refreshToken) {
-    if (keycloakAuthEnabled) {
-      try {
-        const refreshed = await refreshKeycloakToken(session.refreshToken);
-        const next: StoredSession = {
-          ...refreshed,
-          user: {
-            ...refreshed.user,
-            fullName: refreshed.user.fullName || session.user.fullName,
-            avatarUrl: session.user.avatarUrl ?? refreshed.user.avatarUrl,
-            role: session.user.role || refreshed.user.role,
-            status: session.user.status || refreshed.user.status
-          }
-        };
-        learnerSession.write(next);
-        session = next;
-        response = await run(next.accessToken);
-      } catch {
-        learnerSession.clear();
-      }
-    } else {
-      const refreshed = await fetch(`${API_BASE_URL}/v1/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: session.refreshToken })
-      });
-      if (refreshed.ok) {
-        const refreshedSession = unwrap<StoredSession & { accessToken: string }>(await refreshed.json());
-        const next: StoredSession = {
-          ...refreshedSession,
-          user: {
-            ...refreshedSession.user,
-            fullName: refreshedSession.user.fullName || session.user.fullName,
-            avatarUrl: session.user.avatarUrl ?? refreshedSession.user.avatarUrl
-          }
-        };
-        learnerSession.write(next);
-        session = next;
-        response = await run(next.accessToken);
-      } else {
-        learnerSession.clear();
-      }
+    try {
+      const refreshed = await refreshKeycloakToken(session.refreshToken);
+      const next: StoredSession = {
+        ...refreshed,
+        user: {
+          ...refreshed.user,
+          fullName: refreshed.user.fullName || session.user.fullName,
+          avatarUrl: session.user.avatarUrl ?? refreshed.user.avatarUrl,
+          role: session.user.role || refreshed.user.role,
+          status: session.user.status || refreshed.user.status
+        }
+      };
+      learnerSession.write(next);
+      session = next;
+      response = await run(next.accessToken);
+    } catch {
+      learnerSession.clear();
     }
   }
 

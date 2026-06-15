@@ -12,10 +12,41 @@ export type Certificate = {
   issuedAt?: string;
 };
 
+export type CertificateEligibility = {
+  generatedAt?: string;
+  courseId: string;
+  studentId: string;
+  eligible: boolean;
+  status: string;
+  completionEligible: boolean;
+  gradeEligible: boolean;
+  requiredItemsEligible: boolean;
+  issued: boolean;
+  finalGrade?: number;
+  gradeThreshold?: number;
+  finalGradeStatus?: string;
+  certificateId?: string;
+  verificationCode?: string;
+  issuedAt?: string;
+  missingRequirements: Array<{
+    code: string;
+    label: string;
+    detail?: string;
+  }>;
+};
+
 export async function verifyCertificate(code: string): Promise<Certificate> {
   const { data } = await apiClient.get(`/admin/v1/certificates/verify/${code}`);
   return unwrap<Certificate>(data);
 }
+
+export async function getCertificateEligibility(courseId: string, studentId: string): Promise<CertificateEligibility> {
+  const { data } = await apiClient.get("/admin/v1/certificates/eligibility", {
+    params: { courseId, studentId }
+  });
+  return unwrap<CertificateEligibility>(data);
+}
+
 export async function issueCertificate(input: {
   studentId: string;
   courseId: string;

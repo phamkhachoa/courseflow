@@ -11,4 +11,5 @@
                             http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
 
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/002-marketing-funnel-metrics.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

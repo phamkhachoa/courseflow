@@ -5,11 +5,13 @@ import edu.courseflow.notification.dto.NotificationDtos.CreateNotificationReques
 import edu.courseflow.notification.dto.NotificationDtos.NotificationDto;
 import edu.courseflow.notification.dto.NotificationDtos.NotificationPreferenceDto;
 import edu.courseflow.notification.dto.NotificationDtos.UpsertPreferenceRequestDto;
+import edu.courseflow.notification.push.NotificationStreamRegistry;
 import edu.courseflow.notification.service.NotificationService;
 import edu.courseflow.notification.web.Authz;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,14 +19,17 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 public class NotificationController {
 
     private final NotificationService notifications;
+    private final NotificationStreamRegistry streams;
 
-    public NotificationController(NotificationService notifications) {
+    public NotificationController(NotificationService notifications, NotificationStreamRegistry streams) {
         this.notifications = notifications;
+        this.streams = streams;
     }
 
     @GetMapping("/internal/notifications")
@@ -33,6 +38,12 @@ public class NotificationController {
                                       CurrentUser user) {
         Authz.requireSelfOrAdmin(user, userId);
         return notifications.listForUser(userId, unreadOnly);
+    }
+
+    @GetMapping(value = "/internal/notifications/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@RequestParam String userId, CurrentUser user) {
+        Authz.requireSelf(user, userId);
+        return streams.subscribe(userId);
     }
 
     @PostMapping("/internal/notifications")

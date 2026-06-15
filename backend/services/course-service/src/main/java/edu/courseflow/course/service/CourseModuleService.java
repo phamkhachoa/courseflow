@@ -26,7 +26,10 @@ import edu.courseflow.course.dto.LearningDtos.CoursePlayerModuleStateDto;
 import edu.courseflow.course.dto.LearningDtos.CoursePlayerNextActionDto;
 import edu.courseflow.course.dto.LearningDtos.CoursePlayerPrerequisiteDto;
 import edu.courseflow.course.dto.LearningDtos.LearnerCoursePlayerDto;
+import edu.courseflow.course.dto.LearningDtos.LearnerLearningPathDto;
 import edu.courseflow.course.dto.LearningDtos.LearningSourceStatusDto;
+import edu.courseflow.course.dto.LearningDtos.LearningPathItemDto;
+import edu.courseflow.course.dto.LearningDtos.LearningPathModuleDto;
 import edu.courseflow.course.dto.LearningDtos.LearningAccessCheckDto;
 import edu.courseflow.course.dto.LearningDtos.LearningAccessCheckRequestDto;
 import edu.courseflow.course.service.LearningSourceStatusClient.SourceKey;
@@ -37,12 +40,14 @@ import edu.courseflow.course.dto.RecordItemCompletionRequestDto;
 import edu.courseflow.course.exception.ForbiddenException;
 import edu.courseflow.course.mapper.CourseMapper;
 import edu.courseflow.course.model.CourseModule;
+import edu.courseflow.course.model.Course;
 import edu.courseflow.course.model.CourseVersion;
 import edu.courseflow.course.model.LearnerItemProgress;
 import edu.courseflow.course.model.LearnerModuleProgress;
 import edu.courseflow.course.model.ModuleItem;
 import edu.courseflow.course.model.OutboxEvent;
 import edu.courseflow.course.repository.CourseModuleJpaRepository;
+import edu.courseflow.course.repository.CourseJpaRepository;
 import edu.courseflow.course.repository.CourseVersionJpaRepository;
 import edu.courseflow.course.repository.LearnerItemProgressJpaRepository;
 import edu.courseflow.course.repository.LearnerModuleProgressJpaRepository;
@@ -69,6 +74,7 @@ public class CourseModuleService {
 
     private final CourseModuleJpaRepository modules;
     private final ModuleItemJpaRepository items;
+    private final CourseJpaRepository courses;
     private final CourseVersionJpaRepository versions;
     private final ModulePrerequisiteJpaRepository prerequisites;
     private final LearnerModuleProgressJpaRepository progressRepository;
@@ -84,6 +90,7 @@ public class CourseModuleService {
 
     public CourseModuleService(CourseModuleJpaRepository modules,
             ModuleItemJpaRepository items,
+            CourseJpaRepository courses,
             CourseVersionJpaRepository versions,
             ModulePrerequisiteJpaRepository prerequisites,
             LearnerModuleProgressJpaRepository progressRepository,
@@ -99,6 +106,7 @@ public class CourseModuleService {
             InternalJwtService internalJwt) {
         this.modules = modules;
         this.items = items;
+        this.courses = courses;
         this.versions = versions;
         this.prerequisites = prerequisites;
         this.progressRepository = progressRepository;
@@ -132,6 +140,33 @@ public class CourseModuleService {
         return player(courseId, user, false);
     }
 
+    public LearnerLearningPathDto learningPath(UUID courseId, CurrentUser user, String cohortId, String sectionId) {
+        LearnerCoursePlayerDto player = player(courseId, user, false);
+        Map<String, CoursePlayerModuleStateDto> moduleStateById = player.moduleStates().stream()
+                .collect(Collectors.toMap(CoursePlayerModuleStateDto::moduleId, Function.identity(), (a, b) -> a));
+        Map<String, ModuleProgressSummaryDto> moduleProgressById = player.progress().modules().stream()
+                .collect(Collectors.toMap(ModuleProgressSummaryDto::moduleId, Function.identity(), (a, b) -> a));
+        Map<String, CoursePlayerItemStateDto> itemStateById = player.itemStates().stream()
+                .collect(Collectors.toMap(CoursePlayerItemStateDto::itemId, Function.identity(), (a, b) -> a));
+        List<LearningPathModuleDto> pathModules = player.modules().stream()
+                .map(module -> learningPathModule(
+                        module,
+                        moduleStateById.get(module.id()),
+                        moduleProgressById.get(module.id()),
+                        itemStateById))
+                .toList();
+        return new LearnerLearningPathDto(
+                Instant.now(),
+                player.courseId(),
+                player.publishedVersionNo(),
+                player.progress().studentId(),
+                trimToNull(cohortId),
+                trimToNull(sectionId),
+                player.progress(),
+                player.nextAction(),
+                pathModules);
+    }
+
     private LearnerCoursePlayerDto player(UUID courseId, CurrentUser user, boolean includeCertificateEligibility) {
         if (user == null || user.id() == null) {
             throw new ForbiddenException("Authentication required");
@@ -156,12 +191,59 @@ public class CourseModuleService {
         return new LearnerCoursePlayerDto(
                 Instant.now(),
                 courseId.toString(),
+                curriculum.versionNo(),
                 curriculum.modules().stream().map(this::toCourseModuleDto).toList(),
                 progress,
                 certificateEligibility,
                 nextAction(curriculum, progress, itemStates),
                 moduleStates,
                 itemStates);
+    }
+
+    private LearningPathModuleDto learningPathModule(CourseModuleDto module,
+                                                     CoursePlayerModuleStateDto state,
+                                                     ModuleProgressSummaryDto progress,
+                                                     Map<String, CoursePlayerItemStateDto> itemStateById) {
+        List<LearningPathItemDto> pathItems = module.items().stream()
+                .map(item -> learningPathItem(item, itemStateById.get(item.id())))
+                .toList();
+        return new LearningPathModuleDto(
+                module.id(),
+                module.title(),
+                module.description(),
+                module.position(),
+                state != null && state.locked(),
+                state == null ? null : state.lockedReasonCode(),
+                state == null ? null : state.lockedReasonText(),
+                progress == null ? 0 : progress.percentComplete(),
+                progress == null ? pathItems.size() : progress.totalItems(),
+                progress == null ? 0 : progress.completedItems(),
+                progress == null ? (int) pathItems.stream().filter(LearningPathItemDto::required).count()
+                        : progress.totalRequiredItems(),
+                progress == null ? 0 : progress.completedRequiredItems(),
+                progress != null && progress.completed(),
+                state == null || state.unmetPrerequisites() == null ? List.of() : state.unmetPrerequisites(),
+                pathItems);
+    }
+
+    private LearningPathItemDto learningPathItem(ModuleItemDto item, CoursePlayerItemStateDto state) {
+        return new LearningPathItemDto(
+                item.id(),
+                item.itemType(),
+                item.itemId(),
+                item.title(),
+                item.estimatedMinutes(),
+                item.position(),
+                item.required(),
+                state == null ? "NOT_STARTED" : state.progressStatus(),
+                state == null ? null : state.progressType(),
+                state == null ? null : state.completedAt(),
+                state == null ? null : state.completionMode(),
+                state != null && state.locked(),
+                state == null ? null : state.lockedReasonCode(),
+                state == null ? "READY" : state.sourceStatus(),
+                state == null ? null : state.sourceDueAt(),
+                state == null ? null : state.sourceLockAt());
     }
 
     public PresignedDownloadDto downloadPublishedMedia(UUID courseId, UUID mediaId, CurrentUser user) {
@@ -477,6 +559,7 @@ public class CourseModuleService {
 
         return new CourseProgressDto(
                 courseId.toString(),
+                curriculum.versionNo(),
                 studentId,
                 totalModules,
                 completedModules,
@@ -930,17 +1013,37 @@ public class CourseModuleService {
     }
 
     private PublishedCurriculum publishedCurriculum(UUID courseId) {
+        CourseVersion publishedVersion = resolvePublishedVersion(courseId);
+        String snapshot = publishedVersion.getSnapshot();
+        if (snapshot == null || snapshot.isBlank()) {
+            throw new BadRequestException("Published course has an empty curriculum snapshot");
+        }
+        PublishedCurriculum curriculum = PublishedCurriculum.fromSnapshot(
+                publishedVersion.getVersionNo(),
+                readSnapshot(snapshot));
+        validatePublishedCurriculum(curriculum);
+        return curriculum;
+    }
+
+    private CourseVersion resolvePublishedVersion(UUID courseId) {
+        Course course = courses.findById(courseId)
+                .orElseThrow(() -> new NotFoundException("Course not found: " + courseId));
+        Integer publishedVersionNo = course.getPublishedVersionNo();
+        if (publishedVersionNo != null) {
+            CourseVersion version = versions.findByCourseIdAndVersionNo(courseId, publishedVersionNo)
+                    .orElseThrow(() -> new BadRequestException(
+                            "Published course pointer references missing version: " + publishedVersionNo));
+            if (!"PUBLISHED".equals(version.getState())) {
+                throw new BadRequestException(
+                        "Published course pointer references non-published version: " + publishedVersionNo);
+            }
+            return version;
+        }
         List<CourseVersion> publishedVersions = versions.findByCourseIdAndStateOrderByVersionNoDesc(courseId, "PUBLISHED");
         if (publishedVersions.isEmpty()) {
             throw new BadRequestException("Published course has no frozen curriculum snapshot");
         }
-        String snapshot = publishedVersions.get(0).getSnapshot();
-        if (snapshot == null || snapshot.isBlank()) {
-            throw new BadRequestException("Published course has an empty curriculum snapshot");
-        }
-        PublishedCurriculum curriculum = PublishedCurriculum.fromSnapshot(readSnapshot(snapshot));
-        validatePublishedCurriculum(curriculum);
-        return curriculum;
+        return publishedVersions.getFirst();
     }
 
     private void validatePublishedCurriculum(PublishedCurriculum curriculum) {
@@ -1213,23 +1316,23 @@ public class CourseModuleService {
         return isBlank(value) ? null : value.trim();
     }
 
-    private record PublishedCurriculum(List<PublishedModule> modules) {
+    private record PublishedCurriculum(int versionNo, List<PublishedModule> modules) {
         private PublishedCurriculum {
             modules = modules == null ? List.of() : List.copyOf(modules);
         }
 
-        private static PublishedCurriculum fromSnapshot(List<ModuleOutlineDto> modules) {
+        private static PublishedCurriculum fromSnapshot(int versionNo, List<ModuleOutlineDto> modules) {
             List<PublishedModule> publishedModules = modules == null ? List.of() : modules.stream()
                     .map(PublishedModule::fromSnapshot)
                     .toList();
-            return new PublishedCurriculum(publishedModules);
+            return new PublishedCurriculum(versionNo, publishedModules);
         }
 
         private static PublishedCurriculum fromLive(List<CourseModule> modules, ModuleItemJpaRepository items) {
             List<PublishedModule> publishedModules = modules == null ? List.of() : modules.stream()
                     .map(module -> PublishedModule.fromLive(module, items.findByModuleIdOrderByPositionAsc(module.getId())))
                     .toList();
-            return new PublishedCurriculum(publishedModules);
+            return new PublishedCurriculum(0, publishedModules);
         }
 
         private List<PublishedItem> items() {

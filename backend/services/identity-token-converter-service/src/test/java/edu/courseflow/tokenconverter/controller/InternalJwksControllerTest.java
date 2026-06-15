@@ -21,11 +21,8 @@ class InternalJwksControllerTest {
         generator.initialize(2048);
         var pair = generator.generateKeyPair();
         TokenConverterProperties properties = new TokenConverterProperties(
-                "legacy",
-                "external-jwt-secret-that-is-at-least-32-bytes",
-                "courseflow-identity",
-                "",
-                "",
+                "https://sso.courseflow.example.com/realms/courseflow",
+                "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs",
                 "courseflow-api",
                 "RS256",
                 "",
@@ -34,9 +31,11 @@ class InternalJwksControllerTest {
                 "courseflow-token-converter",
                 "courseflow-services",
                 "courseflow-services",
-                "sts-client-secret-that-is-at-least-32-bytes",
-                "*",
+                "",
+                "api-gateway=sts-client-secret-that-is-at-least-32-bytes",
+                "api-gateway",
                 "internal:service,internal:user",
+                "api-gateway=internal:service,internal:user",
                 180,
                 30);
 

@@ -10,9 +10,13 @@ import edu.courseflow.commonlibrary.security.InternalScopes;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.ClientBindingRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.CreateProgramRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.CreateRewardRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsAdjustmentRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsMutationRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RedeemRewardRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.ReviewLoyaltyAdjustmentApprovalRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.ReversePointsRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.SubmitRewardRedemptionReversalApprovalRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateAccountStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateProgramStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpsertClientBindingRequestDto;
@@ -53,6 +57,10 @@ class LoyaltyServiceJpaSmokeTest {
             "loyalty-service",
             InternalScopes.LOYALTY_ADMIN,
             InternalScopes.LOYALTY_READ);
+    private static final CurrentUser LOYALTY_REVIEWER = serviceUser(
+            "loyalty-risk-reviewer",
+            InternalScopes.LOYALTY_ADMIN,
+            InternalScopes.LOYALTY_READ);
     private static final CurrentUser CHECKOUT = serviceUser(
             "checkout-service",
             InternalScopes.LOYALTY_EARN,
@@ -79,6 +87,9 @@ class LoyaltyServiceJpaSmokeTest {
 
     @Autowired
     private LoyaltyAdminService admin;
+
+    @Autowired
+    private LoyaltyRewardService rewards;
 
     @Autowired
     private LoyaltyPointsEntryRepository pointsEntries;
@@ -290,6 +301,101 @@ class LoyaltyServiceJpaSmokeTest {
                 .extracting("action")
                 .contains("loyalty.points.adjusted");
         assertThat(outboxEventCount("loyalty.points.adjusted")).isGreaterThanOrEqualTo(2);
+    }
+
+    @Test
+    void rewardRedemptionReverseRequiresApprovedMakerCheckerApproval() {
+        String programId = "reward-reverse-" + UUID.randomUUID();
+        loyalty.createProgram(program(programId), LOYALTY_ADMIN);
+        CurrentUser learner = new CurrentUser(42L, "learner42@example.com", "STUDENT", Set.of("STUDENT"));
+        var earn = loyalty.earn(points(programId, "42", 100, "reward-reverse-earn", "reward-reverse-earn-idem"),
+                CHECKOUT);
+        var reward = rewards.createReward(new CreateRewardRequestDto(
+                "courseflow",
+                "lms",
+                programId,
+                "voucher-" + UUID.randomUUID(),
+                "Voucher",
+                "Manual voucher",
+                60L,
+                "ACTIVE",
+                Instant.now().minusSeconds(60),
+                null,
+                null,
+                null,
+                "MANUAL",
+                Map.of("provider", "manual")), LOYALTY_ADMIN);
+        var redemption = rewards.redeemReward(
+                reward.id(),
+                new RedeemRewardRequestDto(
+                        "reward-redemption-idem-" + UUID.randomUUID(),
+                        "corr-reward-redemption",
+                        "learner redemption",
+                        Map.of("cartId", "cart-42")),
+                learner);
+        assertThat(pointsEntries.balance(earn.accountId())).isEqualTo(40);
+
+        var reverseWithoutApproval = new ReversePointsRequestDto(
+                "reward-reverse-idem-" + UUID.randomUUID(),
+                "customer support refund",
+                "corr-reward-reverse",
+                Map.of("ticketId", "T-42"));
+        assertThatThrownBy(() -> rewards.reverseRedemption(redemption.id(), reverseWithoutApproval, LOYALTY_ADMIN))
+                .isInstanceOf(ConflictException.class)
+                .satisfies(error -> assertThat(((ErrorCodeCarrier) error).errorCode())
+                        .isEqualTo(LoyaltyErrorCodes.LOYALTY_REWARD_REVERSAL_APPROVAL_REQUIRED));
+
+        var approvalRequest = new SubmitRewardRedemptionReversalApprovalRequestDto(
+                "reward-reverse-idem-approved-" + UUID.randomUUID(),
+                "customer support refund",
+                "corr-reward-reverse-approved",
+                Map.of("ticketId", "T-42", "evidence", "support-case"));
+        var approval = rewards.submitReversalApproval(redemption.id(), approvalRequest, LOYALTY_ADMIN);
+        assertThat(approval.status()).isEqualTo("PENDING");
+        assertThat(approval.operationType()).isEqualTo("REWARD_REDEMPTION_REVERSE");
+        assertThat(approval.metadata())
+                .containsEntry("thresholdPolicy", "ALL_REWARD_REDEMPTION_REVERSALS_REQUIRE_MAKER_CHECKER_APPROVAL");
+
+        assertThatThrownBy(() -> loyalty.approveAdjustmentApproval(
+                        approval.id(),
+                        new ReviewLoyaltyAdjustmentApprovalRequestDto("maker cannot approve own request"),
+                        LOYALTY_ADMIN))
+                .isInstanceOf(ForbiddenException.class)
+                .satisfies(error -> assertThat(((ErrorCodeCarrier) error).errorCode())
+                        .isEqualTo(LoyaltyErrorCodes.LOYALTY_ADJUSTMENT_SELF_APPROVAL_DENIED));
+
+        var approved = loyalty.approveAdjustmentApproval(
+                approval.id(),
+                new ReviewLoyaltyAdjustmentApprovalRequestDto("approved by risk checker"),
+                LOYALTY_REVIEWER);
+        assertThat(approved.status()).isEqualTo("APPROVED");
+        assertThat(pointsEntries.balance(earn.accountId())).isEqualTo(40);
+
+        var reversed = rewards.reverseRedemption(
+                redemption.id(),
+                new ReversePointsRequestDto(
+                        approvalRequest.idempotencyKey(),
+                        approvalRequest.reason(),
+                        approvalRequest.correlationId(),
+                        approvalRequest.metadata(),
+                        approval.id()),
+                LOYALTY_ADMIN);
+        assertThat(reversed.status()).isEqualTo("REVERSED");
+        assertThat(reversed.reversalEntryId()).isNotNull();
+        assertThat(pointsEntries.balance(earn.accountId())).isEqualTo(100);
+
+        var evidence = admin.approvalEvidencePack(approval.id(), LOYALTY_ADMIN);
+        assertThat(evidence.operationType()).isEqualTo("REWARD_REDEMPTION_REVERSE");
+        assertThat(evidence.approval().status()).isEqualTo("EXECUTED");
+        assertThat(evidence.ledgerEntries())
+                .extracting("entryType")
+                .contains("REVERSE");
+        assertThat(evidence.auditEvents())
+                .extracting("action")
+                .contains(
+                        "loyalty.reward_reversal_approval.requested",
+                        "loyalty.reward_reversal_approval.approved",
+                        "loyalty.reward_reversal_approval.executed");
     }
 
     @Test

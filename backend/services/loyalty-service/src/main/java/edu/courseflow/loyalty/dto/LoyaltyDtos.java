@@ -1,6 +1,7 @@
 package edu.courseflow.loyalty.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.time.Instant;
@@ -150,6 +151,120 @@ public final class LoyaltyDtos {
     ) {
     }
 
+    public record CreateLoyaltyTierPolicyRequestDto(
+            @NotBlank String tenantId,
+            @NotBlank String applicationId,
+            @NotBlank String programId,
+            @NotBlank String tierCode,
+            @NotBlank String name,
+            @NotNull @Positive Integer rank,
+            @NotNull @Min(0) Long qualificationPoints,
+            @NotNull @Positive Integer qualificationWindowDays,
+            @NotNull @Min(0) Integer downgradeGraceDays,
+            Map<String, Object> benefits
+    ) {
+    }
+
+    public record UpdateLoyaltyTierPolicyRequestDto(
+            String name,
+            @Positive Integer rank,
+            @Min(0) Long qualificationPoints,
+            @Positive Integer qualificationWindowDays,
+            @Min(0) Integer downgradeGraceDays,
+            Map<String, Object> benefits
+    ) {
+    }
+
+    public record UpdateLoyaltyTierPolicyStatusRequestDto(
+            @NotBlank String status,
+            String note
+    ) {
+    }
+
+    public record LoyaltyTierPolicyDto(
+            UUID id,
+            UUID programUuid,
+            String tenantId,
+            String applicationId,
+            String programId,
+            String tierCode,
+            String name,
+            int rank,
+            String status,
+            long qualificationPoints,
+            int qualificationWindowDays,
+            int downgradeGraceDays,
+            Map<String, Object> benefits,
+            String createdBy,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+    }
+
+    public record LoyaltyTierProgressDto(
+            UUID stateId,
+            UUID accountId,
+            UUID currentTierPolicyId,
+            String currentTierCode,
+            String currentTierName,
+            int currentTierRank,
+            long qualificationPoints,
+            Integer qualificationWindowDays,
+            Instant qualificationWindowStartedAt,
+            Instant qualificationWindowEndsAt,
+            Instant currentPeriodStartedAt,
+            Instant qualifiedAt,
+            Instant graceUntil,
+            UUID nextTierPolicyId,
+            String nextTierCode,
+            String nextTierName,
+            Integer nextTierRank,
+            Long nextTierPointsRequired,
+            Long pointsToNext,
+            Instant evaluatedAt
+    ) {
+    }
+
+    public record LoyaltyTierStateDto(
+            UUID id,
+            UUID accountId,
+            UUID programUuid,
+            String tenantId,
+            String applicationId,
+            String programId,
+            String profileId,
+            LoyaltyTierProgressDto progress,
+            Instant updatedAt
+    ) {
+    }
+
+    public record LoyaltyTierStateQueryResponseDto(
+            List<LoyaltyTierStateDto> items,
+            int limit,
+            boolean hasMore
+    ) {
+    }
+
+    public record RecalculateLoyaltyTiersRequestDto(
+            String tenantId,
+            String applicationId,
+            String programId,
+            String profileId,
+            UUID accountId,
+            @Positive Integer limit,
+            String reason,
+            String correlationId
+    ) {
+    }
+
+    public record LoyaltyTierRecalculateResponseDto(
+            Instant runAt,
+            int scanned,
+            int changed,
+            List<LoyaltyTierStateDto> items
+    ) {
+    }
+
     public record PointsMutationRequestDto(
             @NotBlank String tenantId,
             @NotBlank String applicationId,
@@ -170,8 +285,16 @@ public final class LoyaltyDtos {
             @NotBlank String idempotencyKey,
             @NotBlank String reason,
             String correlationId,
-            Map<String, Object> metadata
+            Map<String, Object> metadata,
+            UUID approvalId
     ) {
+        public ReversePointsRequestDto(
+                String idempotencyKey,
+                String reason,
+                String correlationId,
+                Map<String, Object> metadata) {
+            this(idempotencyKey, reason, correlationId, metadata, null);
+        }
     }
 
     public record PointsAdjustmentRequestDto(
@@ -367,6 +490,7 @@ public final class LoyaltyDtos {
             long expiredPoints,
             long expiringSoonPoints,
             Instant nextExpiryAt,
+            LoyaltyTierProgressDto tierProgress,
             List<String> warnings
     ) {
     }
@@ -491,6 +615,48 @@ public final class LoyaltyDtos {
     ) {
     }
 
+    public record LoyaltyBenefitReconciliationEntryDto(
+            String reconciliationKey,
+            String reconciliationStatus,
+            List<String> reasonCodes,
+            String itemType,
+            String severity,
+            String tenantId,
+            String applicationId,
+            String programId,
+            String profileId,
+            String redemptionId,
+            String effectId,
+            String expectedEntryType,
+            long expectedPointsDelta,
+            String expectedSourceReference,
+            String expectedIdempotencyKey,
+            UUID ledgerEntryId,
+            UUID reversalOfEntryId,
+            UUID rewardRedemptionId,
+            UUID rewardBurnEntryId,
+            UUID rewardReversalEntryId,
+            String rewardCode,
+            String rewardStatus,
+            long rewardPointsCost,
+            String sourceEventType,
+            String sourceEventId,
+            String payloadHash,
+            String correlationId,
+            Instant observedAt,
+            Instant ledgerCreatedAt,
+            Instant rewardReversedAt
+    ) {
+    }
+
+    public record LoyaltyBenefitReconciliationQueryResponseDto(
+            List<LoyaltyBenefitReconciliationEntryDto> items,
+            int limit,
+            boolean hasMore,
+            Instant generatedAt
+    ) {
+    }
+
     public record LoyaltyFinanceCloseoutTotalsDto(
             long earnedPoints,
             long burnedPoints,
@@ -585,7 +751,50 @@ public final class LoyaltyDtos {
     public record UpdateRewardFulfillmentStatusRequestDto(
             @NotBlank String status,
             String fulfillmentRef,
-            String note
+            String note,
+            @NotBlank String idempotencyKey,
+            @NotBlank String reason,
+            @NotBlank String correlationId,
+            Map<String, Object> metadata,
+            UUID approvalId
+    ) {
+    }
+
+    public record SubmitRewardFulfillmentApprovalRequestDto(
+            @NotBlank String status,
+            String fulfillmentRef,
+            String note,
+            @NotBlank String idempotencyKey,
+            @NotBlank String reason,
+            @NotBlank String correlationId,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record RetryRewardFulfillmentRequestDto(
+            String reason,
+            String correlationId
+    ) {
+    }
+
+    public record RewardFulfillmentCallbackRequestDto(
+            UUID redemptionId,
+            String externalRef,
+            @NotBlank String status,
+            String fulfillmentRef,
+            String note,
+            String errorClass,
+            String errorMessage,
+            Instant occurredAt,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record SubmitRewardRedemptionReversalApprovalRequestDto(
+            @NotBlank String idempotencyKey,
+            @NotBlank String reason,
+            @NotBlank String correlationId,
+            Map<String, Object> metadata
     ) {
     }
 
@@ -667,6 +876,15 @@ public final class LoyaltyDtos {
             String fulfillmentStatus,
             String fulfillmentRef,
             String fulfillmentNote,
+            String fulfillmentProvider,
+            int fulfillmentAttemptCount,
+            Instant fulfillmentLastAttemptAt,
+            Instant fulfillmentNextAttemptAt,
+            Instant fulfillmentSlaDueAt,
+            String fulfillmentErrorClass,
+            String fulfillmentErrorMessage,
+            Instant fulfillmentCallbackReceivedAt,
+            String fulfillmentCallbackPayloadHash,
             Map<String, Object> rewardSnapshot,
             String correlationId,
             String note,
@@ -675,6 +893,31 @@ public final class LoyaltyDtos {
             Instant fulfilledAt,
             Instant reversedAt,
             boolean idempotencyReplay
+    ) {
+    }
+
+    public record RewardFulfillmentRunItemDto(
+            UUID redemptionId,
+            String rewardCode,
+            String fulfillmentProvider,
+            String fulfillmentStatus,
+            String fulfillmentRef,
+            int fulfillmentAttemptCount,
+            Instant nextAttemptAt,
+            String errorClass,
+            String errorMessage
+    ) {
+    }
+
+    public record RewardFulfillmentRunResponseDto(
+            Instant runAt,
+            int scanned,
+            int dispatched,
+            int issued,
+            int pending,
+            int failed,
+            int manualRequired,
+            List<RewardFulfillmentRunItemDto> items
     ) {
     }
 
@@ -746,7 +989,8 @@ public final class LoyaltyDtos {
 
     public record LoyaltyInboundDeadLetterActionRequestDto(
             @NotBlank String reason,
-            Boolean dryRun
+            Boolean dryRun,
+            UUID approvalId
     ) {
     }
 
@@ -760,6 +1004,45 @@ public final class LoyaltyDtos {
             String reasonCode,
             String payloadHash,
             Instant completedAt
+    ) {
+    }
+
+    public record LoyaltyInboundDeadLetterApprovalRequestDto(
+            @NotBlank String action,
+            @NotBlank String reason,
+            @NotBlank String evidenceReference
+    ) {
+    }
+
+    public record LoyaltyInboundDeadLetterApprovalReviewRequestDto(
+            @NotBlank String note
+    ) {
+    }
+
+    public record LoyaltyInboundDeadLetterApprovalDto(
+            UUID id,
+            UUID deadLetterId,
+            String action,
+            String status,
+            String reason,
+            String evidenceReference,
+            String thresholdPolicy,
+            String payloadHash,
+            String requestHash,
+            String requestedBy,
+            String reviewedBy,
+            String reviewNote,
+            String executedBy,
+            Instant requestedAt,
+            Instant reviewedAt,
+            Instant executedAt
+    ) {
+    }
+
+    public record LoyaltyInboundDeadLetterApprovalQueryResponseDto(
+            List<LoyaltyInboundDeadLetterApprovalDto> items,
+            int limit,
+            boolean hasMore
     ) {
     }
 

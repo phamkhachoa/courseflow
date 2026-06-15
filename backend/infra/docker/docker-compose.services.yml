@@ -8,7 +8,6 @@ x-service-env: &service-env
   SERVER_PORT: 8080
   SERVICE_DISCOVERY_ENABLED: "true"
   EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8080/eureka/
-  COURSEFLOW_JWT_SECRET: ${COURSEFLOW_JWT_SECRET:-courseflow-local-cluster-jwt-secret-change-me-32}
   COURSEFLOW_INTERNAL_JWT_ALGORITHM: ${COURSEFLOW_INTERNAL_JWT_ALGORITHM:-HS256}
   COURSEFLOW_INTERNAL_JWT_SECRET: ${COURSEFLOW_INTERNAL_JWT_SECRET:-courseflow-local-internal-jwt-secret-change-me-32}
   COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY: ${COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY:-}
@@ -29,7 +28,6 @@ x-service-env: &service-env
   COURSEFLOW_ENTITLEMENT_COURSE_SERVICE_URL: http://course-service:8080
   ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8080
   USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8080
-  EXTERNAL_TOKEN_MODE: ${EXTERNAL_TOKEN_MODE:-oidc}
   KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:18080/realms/courseflow}
   KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-courseflow-api}
   KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/courseflow/protocol/openid-connect/certs}
@@ -39,7 +37,6 @@ x-service-env: &service-env
   KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-local-keycloak-user-lifecycle-secret-change-me}
   KEYCLOAK_SETUP_EMAIL_CLIENT_ID: ${KEYCLOAK_SETUP_EMAIL_CLIENT_ID:-courseflow-admin-web}
   ACCESS_CONTROL_RESOLUTION_MODE: ${ACCESS_CONTROL_RESOLUTION_MODE:-required}
-  ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP: ${ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP:-true}
   ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED: ${ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED:-false}
   CERTIFICATE_COURSE_SERVICE_URL: http://course-service:8080
   CERTIFICATE_ENROLLMENT_SERVICE_URL: http://enrollment-service:8080
@@ -65,7 +62,6 @@ x-service-env: &service-env
   STORAGE_ACCESS_KEY: courseflow
   STORAGE_SECRET_KEY: courseflow
   STORAGE_ALLOW_DEMO_CREDENTIALS: "true"
-  IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/cf_identity
   ACCESS_CONTROL_DB_URL: jdbc:postgresql://postgres:5432/cf_access_control
   USER_MANAGEMENT_DB_URL: jdbc:postgresql://postgres:5432/cf_user_management
   ORGANIZATION_DB_URL: jdbc:postgresql://postgres:5432/cf_organization
@@ -87,8 +83,6 @@ x-service-env: &service-env
   PROMOTION_DB_URL: jdbc:postgresql://postgres:5432/cf_promotion
   LOYALTY_DB_URL: jdbc:postgresql://postgres:5432/cf_loyalty
   OUTBOX_RELAY_DB_URL: jdbc:postgresql://postgres:5432/cf_outbox
-  IDENTITY_DB_USERNAME: courseflow
-  IDENTITY_DB_PASSWORD: courseflow
   ACCESS_CONTROL_DB_USERNAME: courseflow
   ACCESS_CONTROL_DB_PASSWORD: courseflow
   USER_MANAGEMENT_DB_USERNAME: courseflow
@@ -179,13 +173,6 @@ services:
       TOKEN_CONVERTER_MODE: ${TOKEN_CONVERTER_MODE:-required}
     ports:
       - "${API_GATEWAY_PORT:-28080}:8080"
-
-  identity-service:
-    <<: *service-common
-    build:
-      <<: *build-common
-      args:
-        MODULE: services/identity-service
 
   access-control-service:
     <<: *service-common

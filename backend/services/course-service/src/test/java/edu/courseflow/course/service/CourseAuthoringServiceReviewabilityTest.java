@@ -2,12 +2,15 @@ package edu.courseflow.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.course.dto.AuthoringDtos.CourseDraftDto;
+import edu.courseflow.course.dto.AuthoringDtos.CourseDraftPreviewDto;
 import edu.courseflow.course.dto.AuthoringDtos.ItemOutlineDto;
 import edu.courseflow.course.dto.AuthoringDtos.ModuleOutlineDto;
 import edu.courseflow.course.mapper.CourseMapper;
@@ -21,6 +24,7 @@ import edu.courseflow.course.repository.CourseReviewAuditLogJpaRepository;
 import edu.courseflow.course.repository.CourseVersionJpaRepository;
 import edu.courseflow.course.repository.ModuleItemJpaRepository;
 import edu.courseflow.course.repository.ModulePrerequisiteJpaRepository;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -81,6 +85,51 @@ class CourseAuthoringServiceReviewabilityTest {
                 () -> service.submitForReview(COURSE_ID, OWNER));
 
         assertThat(ex.getMessage()).contains("video item without video media");
+    }
+
+    @Test
+    void previewDraftReturnsReadinessIssuesWithoutSubmitting() {
+        Course course = course();
+        course.updatePricing(BigDecimal.ZERO, "USD");
+        CourseModule module = module();
+        ModuleItem video = item("VIDEO", ITEM_ID.toString(), null, null, null, null);
+        ItemOutlineDto videoDto = new ItemOutlineDto(
+                ITEM_ID.toString(),
+                "VIDEO",
+                ITEM_ID.toString(),
+                "Item",
+                null,
+                null,
+                List.of(),
+                null,
+                10,
+                1,
+                true);
+        ModuleOutlineDto moduleDto = new ModuleOutlineDto(
+                MODULE_ID.toString(),
+                "Module 1",
+                null,
+                1,
+                "DRAFT",
+                List.of(videoDto));
+        when(courses.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(modules.findByCourseIdOrderByPositionAsc(COURSE_ID)).thenReturn(List.of(module));
+        when(items.findByModuleIdOrderByPositionAsc(MODULE_ID)).thenReturn(List.of(video));
+        when(prerequisites.findByModuleId(MODULE_ID)).thenReturn(List.of());
+        when(mapper.toOutlineDto(video)).thenReturn(videoDto);
+        when(mapper.toOutlineDto(module, List.of(videoDto))).thenReturn(moduleDto);
+
+        CourseDraftPreviewDto preview = service.previewDraft(COURSE_ID, OWNER);
+
+        assertThat(preview.readinessStatus()).isEqualTo("BLOCKED");
+        assertThat(preview.moduleCount()).isEqualTo(1);
+        assertThat(preview.itemCount()).isEqualTo(1);
+        assertThat(preview.requiredItemCount()).isEqualTo(1);
+        assertThat(preview.totalEstimatedMinutes()).isEqualTo(10);
+        assertThat(preview.firstRequiredItem().itemId()).isEqualTo(ITEM_ID.toString());
+        assertThat(preview.nextAction().title()).isEqualTo("Item");
+        assertThat(preview.modules()).containsExactly(moduleDto);
+        assertThat(preview.issues()).contains("Module 'Module 1', item 'Item' is a video item without video media");
     }
 
     @Test
@@ -150,6 +199,7 @@ class CourseAuthoringServiceReviewabilityTest {
     @Test
     void submitForReviewAcceptsReadyTextLesson() {
         Course course = course();
+        course.updatePricing(BigDecimal.ZERO, "USD");
         CourseModule module = module();
         ModuleItem lesson = item("LESSON", ITEM_ID.toString(), "Read the notes", null, null, null);
         CourseVersion version = new CourseVersion(UUID.randomUUID(), COURSE_ID, 1, "DRAFT", "2", "Initial draft");
@@ -178,6 +228,59 @@ class CourseAuthoringServiceReviewabilityTest {
 
         assertThat(result).isSameAs(draft);
         assertThat(course.getReviewState()).isEqualTo("IN_REVIEW");
+    }
+
+    @Test
+    void publishSnapshotPinsPublishedVersionAndSerializesPublishedModuleStatus() {
+        Course course = course();
+        course.updatePricing(BigDecimal.ZERO, "USD");
+        course.setReviewState("APPROVED");
+        CourseModule module = module();
+        ModuleItem lesson = item("LESSON", ITEM_ID.toString(), "Read the notes", null, null, null);
+        ItemOutlineDto lessonDto = new ItemOutlineDto(
+                ITEM_ID.toString(),
+                "LESSON",
+                ITEM_ID.toString(),
+                "Item",
+                "Read the notes",
+                null,
+                List.of(),
+                null,
+                10,
+                1,
+                true);
+        CourseVersion version = new CourseVersion(UUID.randomUUID(), COURSE_ID, 1, "APPROVED", "2", "approved");
+        when(courses.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(modules.findByCourseIdOrderByPositionAsc(COURSE_ID)).thenReturn(List.of(module));
+        when(items.findByModuleIdOrderByPositionAsc(MODULE_ID)).thenReturn(List.of(lesson));
+        when(prerequisites.findByModuleId(MODULE_ID)).thenReturn(List.of());
+        when(versions.findByCourseIdAndVersionNo(COURSE_ID, 1)).thenReturn(Optional.of(version));
+        when(mapper.toOutlineDto(lesson)).thenReturn(lessonDto);
+        when(mapper.toOutlineDto(eq(module), anyList())).thenAnswer(invocation -> new ModuleOutlineDto(
+                MODULE_ID.toString(),
+                module.getTitle(),
+                module.getDescription(),
+                module.getPosition(),
+                module.getStatus(),
+                invocation.getArgument(1)));
+        when(mapper.toDraftDto(eq(course), anyList())).thenAnswer(invocation -> new CourseDraftDto(
+                COURSE_ID.toString(),
+                course.getTitle(),
+                course.getSlug(),
+                course.getSummary(),
+                course.getStatus(),
+                course.getReviewState(),
+                course.getCurrentVersionNo(),
+                course.getLastAuthoredBy(),
+                invocation.getArgument(1)));
+
+        service.publishSnapshot(COURSE_ID, OWNER);
+
+        assertThat(course.getReviewState()).isEqualTo("PUBLISHED");
+        assertThat(course.getPublishedVersionNo()).isEqualTo(1);
+        assertThat(module.getStatus()).isEqualTo("PUBLISHED");
+        assertThat(version.getState()).isEqualTo("PUBLISHED");
+        assertThat(version.getSnapshot()).contains("\"status\":\"PUBLISHED\"");
     }
 
     private static Course course() {

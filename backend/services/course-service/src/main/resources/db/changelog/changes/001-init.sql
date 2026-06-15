@@ -124,6 +124,7 @@ CREATE INDEX IF NOT EXISTS idx_course_versions_course ON course_versions(course_
 
 -- Track which version is the working draft and which is live on the course row.
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS current_version_no INT NOT NULL DEFAULT 1;
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS published_version_no INT;
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS review_state VARCHAR(40) NOT NULL DEFAULT 'DRAFT'; -- DRAFT, IN_REVIEW, APPROVED, REJECTED
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS last_authored_by VARCHAR(64);
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
@@ -160,7 +161,7 @@ ON CONFLICT (course_id, position) DO NOTHING;
 INSERT INTO module_items (id, module_id, item_type, item_id, title, description, estimated_minutes, position, required)
 VALUES
   ('30000000-0000-0000-0000-000000002001', '30000000-0000-0000-0000-000000001001', 'LESSON', '30000000-0000-0000-0000-000000000101', 'Read architecture overview', 'Review the architecture guide and identify service ownership boundaries.', 25, 1, TRUE),
-  ('30000000-0000-0000-0000-000000002002', '30000000-0000-0000-0000-000000001001', 'ASSIGNMENT', '50000000-0000-0000-0000-000000000001', 'Build identity-service skeleton', 'Implement the first service skeleton and submit the API contract.', 60, 2, TRUE),
+  ('30000000-0000-0000-0000-000000002002', '30000000-0000-0000-0000-000000001001', 'ASSIGNMENT', '50000000-0000-0000-0000-000000000001', 'Build service skeleton', 'Implement the first service skeleton and submit the API contract.', 60, 2, TRUE),
   ('30000000-0000-0000-0000-000000002003', '30000000-0000-0000-0000-000000001002', 'LESSON', '30000000-0000-0000-0000-000000000102', 'Run outbox and CDC lab', 'Practice outbox publishing, replay safety and analytics event consumption.', 40, 1, TRUE)
 ON CONFLICT (module_id, position) DO NOTHING;
 

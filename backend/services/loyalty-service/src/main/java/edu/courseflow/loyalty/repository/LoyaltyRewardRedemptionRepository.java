@@ -19,6 +19,10 @@ public interface LoyaltyRewardRedemptionRepository extends JpaRepository<Loyalty
             String applicationId,
             String idempotencyKey);
 
+    Optional<LoyaltyRewardRedemption> findByFulfillmentProviderAndFulfillmentRef(
+            String fulfillmentProvider,
+            String fulfillmentRef);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select redemption from LoyaltyRewardRedemption redemption where redemption.id = :id")
     Optional<LoyaltyRewardRedemption> findByIdForUpdate(@Param("id") UUID id);
@@ -52,4 +56,37 @@ public interface LoyaltyRewardRedemptionRepository extends JpaRepository<Loyalty
             @Param("fromRedeemedAt") Instant from,
             @Param("toRedeemedAt") Instant to,
             Pageable pageable);
+
+    @Query("""
+            select redemption
+            from LoyaltyRewardRedemption redemption
+            where redemption.status = 'REVERSED'
+              and redemption.tenantId = :tenantId
+              and redemption.applicationId = :applicationId
+              and (:programId is null or redemption.programId = :programId)
+              and (:profileId is null or redemption.profileId = :profileId)
+              and (:fromReversedAt is null or redemption.reversedAt >= :fromReversedAt)
+              and (:toReversedAt is null or redemption.reversedAt < :toReversedAt)
+            order by redemption.reversedAt desc
+            """)
+    List<LoyaltyRewardRedemption> searchReversedForReconciliation(
+            @Param("tenantId") String tenantId,
+            @Param("applicationId") String applicationId,
+            @Param("programId") String programId,
+            @Param("profileId") String profileId,
+            @Param("fromReversedAt") Instant from,
+            @Param("toReversedAt") Instant to,
+            Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select redemption
+            from LoyaltyRewardRedemption redemption
+            where redemption.status = 'COMMITTED'
+              and redemption.fulfillmentStatus in ('PENDING', 'FAILED')
+              and redemption.fulfillmentNextAttemptAt is not null
+              and redemption.fulfillmentNextAttemptAt <= :now
+            order by redemption.fulfillmentNextAttemptAt asc, redemption.redeemedAt asc
+            """)
+    List<LoyaltyRewardRedemption> findDueFulfillmentsForUpdate(@Param("now") Instant now, Pageable pageable);
 }

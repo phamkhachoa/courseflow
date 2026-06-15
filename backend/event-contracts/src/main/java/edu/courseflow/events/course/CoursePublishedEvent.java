@@ -16,9 +16,28 @@ public record CoursePublishedEvent(
         String ownerId,
         String level,
         String status,
+        Integer publishedVersionNo,
         Instant publishedAt,
         EventMetadata metadata
 ) implements CourseFlowEvent {
+    public CoursePublishedEvent(
+            String eventId,
+            String courseId,
+            String code,
+            String title,
+            String slug,
+            String summary,
+            String departmentId,
+            String ownerId,
+            String level,
+            String status,
+            Instant publishedAt,
+            EventMetadata metadata
+    ) {
+        this(eventId, courseId, code, title, slug, summary, departmentId, ownerId, level, status, null,
+                publishedAt, metadata);
+    }
+
     @Override
     public String eventType() {
         return "course.published";

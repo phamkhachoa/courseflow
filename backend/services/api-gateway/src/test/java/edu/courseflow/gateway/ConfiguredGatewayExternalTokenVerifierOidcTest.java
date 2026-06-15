@@ -86,9 +86,6 @@ class ConfiguredGatewayExternalTokenVerifierOidcTest {
 
     private ConfiguredGatewayExternalTokenVerifier verifier(String audiences) {
         ExternalTokenProperties properties = new ExternalTokenProperties(
-                "oidc",
-                "",
-                "",
                 issuer,
                 jwksUri,
                 audiences);

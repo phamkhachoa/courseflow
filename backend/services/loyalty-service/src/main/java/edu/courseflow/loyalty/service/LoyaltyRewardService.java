@@ -5,10 +5,14 @@ import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_PROGRAM_N
 import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_ALREADY_EXISTS;
 import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_IDEMPOTENCY_KEY_REUSED;
 import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_INACTIVE;
+import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_FULFILLMENT_APPROVAL_MISMATCH;
+import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_FULFILLMENT_APPROVAL_REQUIRED;
 import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_INVALID_REQUEST;
 import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_NOT_FOUND;
 import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_OUT_OF_STOCK;
 import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_PROFILE_LIMIT_REACHED;
+import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_REVERSAL_APPROVAL_MISMATCH;
+import static edu.courseflow.loyalty.service.LoyaltyErrorCodes.LOYALTY_REWARD_REVERSAL_APPROVAL_REQUIRED;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -21,27 +25,38 @@ import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.CreateRewardRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LearnerRewardCatalogResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LearnerRewardDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyAdjustmentApprovalDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyRewardDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyRewardRedemptionDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyRewardRedemptionQueryResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsMutationRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsMutationResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.RedeemRewardRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RetryRewardFulfillmentRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.ReversePointsRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RewardFulfillmentCallbackRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RewardFulfillmentRunItemDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RewardFulfillmentRunResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.SubmitRewardFulfillmentApprovalRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.SubmitRewardRedemptionReversalApprovalRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateRewardFulfillmentStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateRewardRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateRewardStatusRequestDto;
 import edu.courseflow.loyalty.model.LoyaltyAccount;
+import edu.courseflow.loyalty.model.LoyaltyAdjustmentApproval;
 import edu.courseflow.loyalty.model.LoyaltyAuditEvent;
 import edu.courseflow.loyalty.model.LoyaltyProgram;
 import edu.courseflow.loyalty.model.LoyaltyReward;
+import edu.courseflow.loyalty.model.LoyaltyRewardFulfillmentAttempt;
 import edu.courseflow.loyalty.model.LoyaltyRewardRedemption;
 import edu.courseflow.loyalty.model.OutboxEvent;
 import edu.courseflow.loyalty.repository.LoyaltyAccountRepository;
+import edu.courseflow.loyalty.repository.LoyaltyAdjustmentApprovalRepository;
 import edu.courseflow.loyalty.repository.LoyaltyAuditEventRepository;
 import edu.courseflow.loyalty.repository.LoyaltyPointLotRepository;
 import edu.courseflow.loyalty.repository.LoyaltyPointsEntryRepository;
 import edu.courseflow.loyalty.repository.LoyaltyProgramRepository;
+import edu.courseflow.loyalty.repository.LoyaltyRewardFulfillmentAttemptRepository;
 import edu.courseflow.loyalty.repository.LoyaltyRewardRedemptionRepository;
 import edu.courseflow.loyalty.repository.LoyaltyRewardRepository;
 import edu.courseflow.loyalty.repository.OutboxEventRepository;
@@ -55,17 +70,34 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Service
 public class LoyaltyRewardService {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
     };
+    private static final String REWARD_REVERSAL_APPROVAL_OPERATION = "REWARD_REDEMPTION_REVERSE";
+    private static final String REWARD_REVERSAL_THRESHOLD_POLICY =
+            "ALL_REWARD_REDEMPTION_REVERSALS_REQUIRE_MAKER_CHECKER_APPROVAL";
+    private static final String REWARD_FULFILLMENT_APPROVAL_OPERATION = "REWARD_FULFILLMENT_OVERRIDE";
+    private static final String REWARD_FULFILLMENT_THRESHOLD_POLICY =
+            "ALL_MANUAL_REWARD_FULFILLMENT_OVERRIDES_REQUIRE_MAKER_CHECKER_APPROVAL";
+    private static final Set<String> FULFILLMENT_STATUSES = Set.of(
+            "PENDING", "ISSUED", "MANUAL_REQUIRED", "FAILED");
+    private static final int DEFAULT_MAX_FULFILLMENT_ATTEMPTS = 5;
+    private static final long DEFAULT_FULFILLMENT_BASE_BACKOFF_SECONDS = 60;
+    private static final long DEFAULT_FULFILLMENT_MAX_BACKOFF_SECONDS = 3600;
+    private static final long DEFAULT_FULFILLMENT_SLA_HOURS = 48;
 
     private final LoyaltyRewardRepository rewards;
     private final LoyaltyRewardRedemptionRepository redemptions;
@@ -73,11 +105,18 @@ public class LoyaltyRewardService {
     private final LoyaltyAccountRepository accounts;
     private final LoyaltyPointsEntryRepository pointsEntries;
     private final LoyaltyPointLotRepository pointLots;
+    private final LoyaltyAdjustmentApprovalRepository adjustmentApprovals;
     private final LoyaltyAuditEventRepository auditEvents;
+    private final LoyaltyRewardFulfillmentAttemptRepository fulfillmentAttempts;
     private final OutboxEventRepository outboxEvents;
     private final LoyaltyAccessService access;
     private final LoyaltyService loyaltyService;
+    private final RestClient.Builder restClientBuilder;
     private final ObjectMapper objectMapper;
+    private final int maxFulfillmentAttempts;
+    private final long fulfillmentBaseBackoffSeconds;
+    private final long fulfillmentMaxBackoffSeconds;
+    private final long defaultFulfillmentSlaHours;
 
     public LoyaltyRewardService(
             LoyaltyRewardRepository rewards,
@@ -86,22 +125,44 @@ public class LoyaltyRewardService {
             LoyaltyAccountRepository accounts,
             LoyaltyPointsEntryRepository pointsEntries,
             LoyaltyPointLotRepository pointLots,
+            LoyaltyAdjustmentApprovalRepository adjustmentApprovals,
             LoyaltyAuditEventRepository auditEvents,
+            LoyaltyRewardFulfillmentAttemptRepository fulfillmentAttempts,
             OutboxEventRepository outboxEvents,
             LoyaltyAccessService access,
             LoyaltyService loyaltyService,
-            ObjectMapper objectMapper) {
+            RestClient.Builder restClientBuilder,
+            ObjectMapper objectMapper,
+            @Value("${courseflow.loyalty.reward-fulfillment.max-attempts:5}") int maxFulfillmentAttempts,
+            @Value("${courseflow.loyalty.reward-fulfillment.base-backoff-seconds:60}") long fulfillmentBaseBackoffSeconds,
+            @Value("${courseflow.loyalty.reward-fulfillment.max-backoff-seconds:3600}") long fulfillmentMaxBackoffSeconds,
+            @Value("${courseflow.loyalty.reward-fulfillment.default-sla-hours:48}") long defaultFulfillmentSlaHours) {
         this.rewards = rewards;
         this.redemptions = redemptions;
         this.programs = programs;
         this.accounts = accounts;
         this.pointsEntries = pointsEntries;
         this.pointLots = pointLots;
+        this.adjustmentApprovals = adjustmentApprovals;
         this.auditEvents = auditEvents;
+        this.fulfillmentAttempts = fulfillmentAttempts;
         this.outboxEvents = outboxEvents;
         this.access = access;
         this.loyaltyService = loyaltyService;
+        this.restClientBuilder = restClientBuilder;
         this.objectMapper = objectMapper;
+        this.maxFulfillmentAttempts = maxFulfillmentAttempts <= 0
+                ? DEFAULT_MAX_FULFILLMENT_ATTEMPTS
+                : maxFulfillmentAttempts;
+        this.fulfillmentBaseBackoffSeconds = fulfillmentBaseBackoffSeconds <= 0
+                ? DEFAULT_FULFILLMENT_BASE_BACKOFF_SECONDS
+                : fulfillmentBaseBackoffSeconds;
+        this.fulfillmentMaxBackoffSeconds = fulfillmentMaxBackoffSeconds <= 0
+                ? DEFAULT_FULFILLMENT_MAX_BACKOFF_SECONDS
+                : fulfillmentMaxBackoffSeconds;
+        this.defaultFulfillmentSlaHours = defaultFulfillmentSlaHours <= 0
+                ? DEFAULT_FULFILLMENT_SLA_HOURS
+                : defaultFulfillmentSlaHours;
     }
 
     @Transactional(readOnly = true)
@@ -326,6 +387,7 @@ public class LoyaltyRewardService {
                             "pointsCost", saved.getPointsCost()));
             emitRewardEvent(saved, "loyalty.reward.redeemed", actor(user), request.note(), request.correlationId(),
                     Map.of("idempotencyReplay", false));
+            dispatchFulfillment(saved, reward, actor(user), request.note(), request.correlationId(), false);
             return redemptionDto(saved, false);
         } catch (DataIntegrityViolationException ex) {
             LoyaltyRewardRedemption replay = redemptions
@@ -385,6 +447,48 @@ public class LoyaltyRewardService {
     }
 
     @Transactional
+    public LoyaltyAdjustmentApprovalDto submitReversalApproval(
+            UUID redemptionId,
+            SubmitRewardRedemptionReversalApprovalRequestDto request,
+            CurrentUser user) {
+        LoyaltyRewardRedemption redemption = redemptions.findById(redemptionId)
+                .orElseThrow(() -> NotFoundException.coded(
+                        LOYALTY_REWARD_NOT_FOUND,
+                        "Loyalty reward redemption not found"));
+        access.requireAdminAccess(redemption.getTenantId(), redemption.getApplicationId(), user);
+        if ("REVERSED".equals(redemption.getStatus())) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_INVALID_REQUEST,
+                    "Reward redemption is already reversed");
+        }
+        Map<String, Object> metadata = rewardReversalApprovalMetadata(redemption, request);
+        LoyaltyAdjustmentApproval approval = adjustmentApprovals.save(new LoyaltyAdjustmentApproval(
+                redemption.getTenantId(),
+                redemption.getApplicationId(),
+                redemption.getProgramId(),
+                redemption.getProfileId(),
+                redemption.getPointsCost(),
+                rewardReversalSourceReference(redemption),
+                normalize(request.idempotencyKey()),
+                request.reason(),
+                request.correlationId(),
+                Instant.now(),
+                null,
+                json(metadata),
+                rewardReversalApprovalHash(redemption, request),
+                actor(user)));
+        audit(redemption.getTenantId(), redemption.getApplicationId(), approval.getId().toString(),
+                "loyalty-reward-reversal-approval", "loyalty.reward_reversal_approval.requested",
+                actor(user), request.reason(), request.correlationId(), Map.of(
+                        "redemptionId", redemption.getId().toString(),
+                        "rewardId", redemption.getRewardId().toString(),
+                        "rewardCode", redemption.getRewardCode(),
+                        "pointsToRestore", redemption.getPointsCost(),
+                        "thresholdPolicy", REWARD_REVERSAL_THRESHOLD_POLICY));
+        return approvalDto(approval);
+    }
+
+    @Transactional
     public LoyaltyRewardRedemptionDto reverseRedemption(
             UUID redemptionId,
             ReversePointsRequestDto request,
@@ -394,25 +498,88 @@ public class LoyaltyRewardService {
                         LOYALTY_REWARD_NOT_FOUND,
                         "Loyalty reward redemption not found"));
         access.requireAdminAccess(redemption.getTenantId(), redemption.getApplicationId(), user);
+        LoyaltyAdjustmentApproval approval = requireApprovedReversalApproval(redemption, request);
         if ("REVERSED".equals(redemption.getStatus())) {
             return redemptionDto(redemption, true);
         }
+        if ("EXECUTED".equals(approval.getStatus())) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_REVERSAL_APPROVAL_MISMATCH,
+                    "Reward reversal approval has already been executed");
+        }
         PointsMutationResponseDto reversal = loyaltyService.reverseRewardBurn(redemption.getBurnEntryId(), request, user);
         redemption.markReversed(reversal.entryId());
+        try {
+            approval.markExecuted(reversal.entryId());
+        } catch (IllegalStateException ex) {
+            throw ConflictException.coded(LOYALTY_REWARD_REVERSAL_APPROVAL_MISMATCH, ex.getMessage());
+        }
         LoyaltyRewardRedemption saved = redemptions.save(redemption);
+        audit(saved.getTenantId(), saved.getApplicationId(), approval.getId().toString(),
+                "loyalty-reward-reversal-approval", "loyalty.reward_reversal_approval.executed",
+                actor(user), request.reason(), request.correlationId(), Map.of(
+                        "redemptionId", saved.getId().toString(),
+                        "rewardId", saved.getRewardId().toString(),
+                        "rewardCode", saved.getRewardCode(),
+                        "burnEntryId", saved.getBurnEntryId().toString(),
+                        "reversalEntryId", reversal.entryId().toString(),
+                        "pointsRestored", saved.getPointsCost(),
+                        "thresholdPolicy", REWARD_REVERSAL_THRESHOLD_POLICY));
         audit(saved.getTenantId(), saved.getApplicationId(), saved.getId().toString(),
                 "loyalty-reward-redemption", "loyalty.reward.reversed", actor(user),
                 request.reason(), request.correlationId(), Map.of(
                         "rewardId", saved.getRewardId().toString(),
                         "rewardCode", saved.getRewardCode(),
+                        "approvalId", approval.getId().toString(),
+                        "approvalReviewedBy", approval.getReviewedBy(),
                         "burnEntryId", saved.getBurnEntryId().toString(),
                         "reversalEntryId", reversal.entryId().toString(),
                         "pointsCost", saved.getPointsCost()));
         emitRewardEvent(saved, "loyalty.reward.reversed", actor(user), request.reason(), request.correlationId(),
                 Map.of(
+                        "approvalId", approval.getId().toString(),
                         "reversalEntryId", reversal.entryId().toString(),
                         "idempotencyReplay", reversal.idempotencyReplay()));
         return redemptionDto(saved, reversal.idempotencyReplay());
+    }
+
+    @Transactional
+    public LoyaltyAdjustmentApprovalDto submitFulfillmentApproval(
+            UUID redemptionId,
+            SubmitRewardFulfillmentApprovalRequestDto request,
+            CurrentUser user) {
+        LoyaltyRewardRedemption redemption = redemptions.findById(redemptionId)
+                .orElseThrow(() -> NotFoundException.coded(
+                        LOYALTY_REWARD_NOT_FOUND,
+                        "Loyalty reward redemption not found"));
+        access.requireAdminAccess(redemption.getTenantId(), redemption.getApplicationId(), user);
+        validateFulfillmentStatus(request.status());
+        Map<String, Object> metadata = rewardFulfillmentApprovalMetadata(redemption, request);
+        LoyaltyAdjustmentApproval approval = adjustmentApprovals.save(new LoyaltyAdjustmentApproval(
+                redemption.getTenantId(),
+                redemption.getApplicationId(),
+                redemption.getProgramId(),
+                redemption.getProfileId(),
+                0L,
+                rewardFulfillmentSourceReference(redemption),
+                normalize(request.idempotencyKey()),
+                request.reason(),
+                request.correlationId(),
+                Instant.now(),
+                null,
+                json(metadata),
+                rewardFulfillmentApprovalHash(redemption, request),
+                actor(user)));
+        audit(redemption.getTenantId(), redemption.getApplicationId(), approval.getId().toString(),
+                "loyalty-reward-fulfillment-approval", "loyalty.reward_fulfillment_approval.requested",
+                actor(user), request.reason(), request.correlationId(), Map.of(
+                        "redemptionId", redemption.getId().toString(),
+                        "rewardId", redemption.getRewardId().toString(),
+                        "rewardCode", redemption.getRewardCode(),
+                        "currentFulfillmentStatus", redemption.getFulfillmentStatus(),
+                        "targetFulfillmentStatus", normalizeFulfillmentStatus(request.status()),
+                        "thresholdPolicy", REWARD_FULFILLMENT_THRESHOLD_POLICY));
+        return approvalDto(approval);
     }
 
     @Transactional
@@ -425,24 +592,418 @@ public class LoyaltyRewardService {
                         LOYALTY_REWARD_NOT_FOUND,
                         "Loyalty reward redemption not found"));
         access.requireAdminAccess(redemption.getTenantId(), redemption.getApplicationId(), user);
+        LoyaltyAdjustmentApproval approval = requireApprovedFulfillmentApproval(redemption, request, user);
+        if ("EXECUTED".equals(approval.getStatus())) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_FULFILLMENT_APPROVAL_MISMATCH,
+                    "Reward fulfillment approval has already been executed");
+        }
         try {
             redemption.updateFulfillment(request.status(), request.fulfillmentRef(), request.note());
         } catch (IllegalArgumentException ex) {
             throw BadRequestException.coded(LOYALTY_REWARD_INVALID_REQUEST, ex.getMessage());
         }
+        try {
+            approval.markExecuted(null);
+        } catch (IllegalStateException ex) {
+            throw ConflictException.coded(LOYALTY_REWARD_FULFILLMENT_APPROVAL_MISMATCH, ex.getMessage());
+        }
         LoyaltyRewardRedemption saved = redemptions.save(redemption);
-        audit(saved.getTenantId(), saved.getApplicationId(), saved.getId().toString(),
-                "loyalty-reward-redemption", "loyalty.reward.fulfillment_status_changed", actor(user),
-                request.note(), saved.getCorrelationId(), Map.of(
+        audit(saved.getTenantId(), saved.getApplicationId(), approval.getId().toString(),
+                "loyalty-reward-fulfillment-approval", "loyalty.reward_fulfillment_approval.executed",
+                actor(user), request.reason(), request.correlationId(), Map.of(
+                        "redemptionId", saved.getId().toString(),
                         "rewardId", saved.getRewardId().toString(),
                         "rewardCode", saved.getRewardCode(),
                         "fulfillmentStatus", saved.getFulfillmentStatus(),
+                        "fulfillmentRef", saved.getFulfillmentRef() == null ? "" : saved.getFulfillmentRef(),
+                        "approvalReviewedBy", approval.getReviewedBy(),
+                        "thresholdPolicy", REWARD_FULFILLMENT_THRESHOLD_POLICY));
+        audit(saved.getTenantId(), saved.getApplicationId(), saved.getId().toString(),
+                "loyalty-reward-redemption", "loyalty.reward.fulfillment_status_changed", actor(user),
+                request.reason(), request.correlationId(), Map.of(
+                        "rewardId", saved.getRewardId().toString(),
+                        "rewardCode", saved.getRewardCode(),
+                        "approvalId", approval.getId().toString(),
+                        "fulfillmentStatus", saved.getFulfillmentStatus(),
                         "fulfillmentRef", saved.getFulfillmentRef() == null ? "" : saved.getFulfillmentRef()));
-        emitRewardEvent(saved, "loyalty.reward.fulfillment_status_changed", actor(user), request.note(),
-                saved.getCorrelationId(), Map.of(
+        emitRewardEvent(saved, "loyalty.reward.fulfillment_status_changed", actor(user), request.reason(),
+                request.correlationId(), Map.of(
+                        "approvalId", approval.getId().toString(),
                         "fulfillmentStatus", saved.getFulfillmentStatus(),
                         "fulfillmentRef", saved.getFulfillmentRef() == null ? "" : saved.getFulfillmentRef()));
         return redemptionDto(saved, false);
+    }
+
+    @Transactional
+    public LoyaltyRewardRedemptionDto retryFulfillment(
+            UUID redemptionId,
+            RetryRewardFulfillmentRequestDto request,
+            CurrentUser user) {
+        LoyaltyRewardRedemption redemption = redemptions.findByIdForUpdate(redemptionId)
+                .orElseThrow(() -> NotFoundException.coded(
+                        LOYALTY_REWARD_NOT_FOUND,
+                        "Loyalty reward redemption not found"));
+        access.requireAdminAccess(redemption.getTenantId(), redemption.getApplicationId(), user);
+        LoyaltyReward reward = rewardById(redemption.getRewardId());
+        dispatchFulfillment(
+                redemption,
+                reward,
+                actor(user),
+                request == null ? null : request.reason(),
+                request == null ? redemption.getCorrelationId() : request.correlationId(),
+                true);
+        return redemptionDto(redemption, false);
+    }
+
+    @Transactional
+    public LoyaltyRewardRedemptionDto applyFulfillmentCallback(
+            String provider,
+            RewardFulfillmentCallbackRequestDto request,
+            CurrentUser user) {
+        LoyaltyRewardRedemption redemption = callbackRedemption(provider, request);
+        access.requireAdminAccess(redemption.getTenantId(), redemption.getApplicationId(), user);
+        String callbackHash = hash(Map.of(
+                "provider", normalizedProvider(provider),
+                "redemptionId", redemption.getId().toString(),
+                "externalRef", blankToNull(request.externalRef()) == null ? "" : request.externalRef().trim(),
+                "status", normalized(request.status()),
+                "fulfillmentRef", blankToNull(request.fulfillmentRef()) == null ? "" : request.fulfillmentRef().trim(),
+                "metadata", request.metadata() == null ? Map.of() : request.metadata()));
+        try {
+            redemption.updateFulfillment(
+                    request.status(),
+                    blankToNull(request.fulfillmentRef()) == null ? request.externalRef() : request.fulfillmentRef(),
+                    request.note(),
+                    request.errorClass(),
+                    request.errorMessage(),
+                    callbackHash,
+                    request.occurredAt() == null ? Instant.now() : request.occurredAt());
+        } catch (IllegalArgumentException ex) {
+            throw BadRequestException.coded(LOYALTY_REWARD_INVALID_REQUEST, ex.getMessage());
+        }
+        LoyaltyRewardRedemption saved = redemptions.save(redemption);
+        audit(saved.getTenantId(), saved.getApplicationId(), saved.getId().toString(),
+                "loyalty-reward-redemption", "loyalty.reward.fulfillment_callback_received", actor(user),
+                request.note(), saved.getCorrelationId(), Map.of(
+                        "provider", normalizedProvider(provider),
+                        "fulfillmentStatus", saved.getFulfillmentStatus(),
+                        "fulfillmentRef", saved.getFulfillmentRef() == null ? "" : saved.getFulfillmentRef(),
+                        "callbackPayloadHash", callbackHash));
+        emitRewardEvent(saved, "loyalty.reward.fulfillment_callback_received", actor(user), request.note(),
+                saved.getCorrelationId(), Map.of(
+                        "provider", normalizedProvider(provider),
+                        "fulfillmentStatus", saved.getFulfillmentStatus(),
+                        "callbackPayloadHash", callbackHash));
+        return redemptionDto(saved, false);
+    }
+
+    @Transactional
+    public RewardFulfillmentRunResponseDto runDueFulfillments(Optional<Integer> limit, CurrentUser user) {
+        access.requirePlatformAdmin(user);
+        return runDueFulfillmentsInternal(boundedLimit(limit.orElse(50)), actor(user));
+    }
+
+    @Transactional
+    public RewardFulfillmentRunResponseDto runDueFulfillmentsForScheduler() {
+        return runDueFulfillmentsInternal(50, "loyalty-fulfillment-job");
+    }
+
+    private RewardFulfillmentRunResponseDto runDueFulfillmentsInternal(int limit, String actorId) {
+        Instant runAt = Instant.now();
+        List<LoyaltyRewardRedemption> due = redemptions.findDueFulfillmentsForUpdate(
+                runAt,
+                PageRequest.of(0, boundedLimit(limit)));
+        List<RewardFulfillmentRunItemDto> items = new ArrayList<>();
+        int issued = 0;
+        int pending = 0;
+        int failed = 0;
+        int manualRequired = 0;
+        for (LoyaltyRewardRedemption redemption : due) {
+            LoyaltyReward reward = rewardById(redemption.getRewardId());
+            dispatchFulfillment(redemption, reward, actorId, "Scheduled reward fulfillment retry",
+                    redemption.getCorrelationId(), false);
+            items.add(runItem(redemption));
+            switch (redemption.getFulfillmentStatus()) {
+                case "ISSUED" -> issued++;
+                case "PENDING" -> pending++;
+                case "FAILED" -> failed++;
+                case "MANUAL_REQUIRED" -> manualRequired++;
+                default -> {
+                }
+            }
+        }
+        return new RewardFulfillmentRunResponseDto(
+                runAt,
+                due.size(),
+                items.size(),
+                issued,
+                pending,
+                failed,
+                manualRequired,
+                items);
+    }
+
+    private void dispatchFulfillment(
+            LoyaltyRewardRedemption redemption,
+            LoyaltyReward reward,
+            String actorId,
+            String note,
+            String correlationId,
+            boolean force) {
+        if ("REVERSED".equals(redemption.getStatus())) {
+            return;
+        }
+        if (!force && ("ISSUED".equals(redemption.getFulfillmentStatus())
+                || "MANUAL_REQUIRED".equals(redemption.getFulfillmentStatus()))) {
+            return;
+        }
+        Map<String, Object> config = readMap(reward.getFulfillmentConfigJson());
+        String provider = normalizedProvider(blankToNull(redemption.getFulfillmentProvider()) == null
+                ? reward.getFulfillmentType()
+                : redemption.getFulfillmentProvider());
+        Instant now = Instant.now();
+        redemption.initializeFulfillment(provider, fulfillmentSlaDueAt(redemption, config), now);
+        if (!force && redemption.getFulfillmentNextAttemptAt() != null
+                && redemption.getFulfillmentNextAttemptAt().isAfter(now)) {
+            return;
+        }
+        redemption.markFulfillmentAttemptStarted(now);
+        FulfillmentOutcome outcome;
+        try {
+            outcome = dispatchProvider(provider, redemption, reward, config);
+        } catch (RestClientResponseException ex) {
+            outcome = FulfillmentOutcome.failed(
+                    ex.getClass().getSimpleName(),
+                    "HTTP " + ex.getStatusCode().value() + " from reward fulfillment provider",
+                    true,
+                    Map.of("statusCode", ex.getStatusCode().value(), "responseBody", ex.getResponseBodyAsString()));
+        } catch (RestClientException ex) {
+            outcome = FulfillmentOutcome.failed(ex.getClass().getSimpleName(), ex.getMessage(), true, Map.of());
+        } catch (RuntimeException ex) {
+            outcome = FulfillmentOutcome.failed(ex.getClass().getSimpleName(), ex.getMessage(), false, Map.of());
+        }
+        applyFulfillmentOutcome(redemption, outcome);
+        LoyaltyRewardRedemption saved = redemptions.save(redemption);
+        fulfillmentAttempts.save(new LoyaltyRewardFulfillmentAttempt(
+                saved,
+                provider,
+                saved.getFulfillmentAttemptCount(),
+                saved.getFulfillmentStatus(),
+                saved.getFulfillmentRef(),
+                saved.getFulfillmentErrorClass(),
+                saved.getFulfillmentErrorMessage(),
+                now,
+                Instant.now(),
+                saved.getFulfillmentNextAttemptAt(),
+                correlationId,
+                json(outcome.payload())));
+        audit(saved.getTenantId(), saved.getApplicationId(), saved.getId().toString(),
+                "loyalty-reward-redemption", "loyalty.reward.fulfillment_dispatched", actorId,
+                note, correlationId, Map.of(
+                        "provider", provider,
+                        "attempt", saved.getFulfillmentAttemptCount(),
+                        "fulfillmentStatus", saved.getFulfillmentStatus(),
+                        "fulfillmentRef", saved.getFulfillmentRef() == null ? "" : saved.getFulfillmentRef(),
+                        "nextAttemptAt", saved.getFulfillmentNextAttemptAt() == null
+                                ? ""
+                                : saved.getFulfillmentNextAttemptAt().toString(),
+                        "errorClass", saved.getFulfillmentErrorClass() == null
+                                ? ""
+                                : saved.getFulfillmentErrorClass()));
+        emitRewardEvent(saved, "loyalty.reward.fulfillment_dispatched", actorId, note, correlationId, Map.of(
+                "provider", provider,
+                "attempt", saved.getFulfillmentAttemptCount(),
+                "fulfillmentStatus", saved.getFulfillmentStatus(),
+                "nextAttemptAt", saved.getFulfillmentNextAttemptAt() == null
+                        ? ""
+                        : saved.getFulfillmentNextAttemptAt().toString()));
+    }
+
+    private FulfillmentOutcome dispatchProvider(
+            String provider,
+            LoyaltyRewardRedemption redemption,
+            LoyaltyReward reward,
+            Map<String, Object> config) {
+        return switch (provider) {
+            case "AUTO_ISSUE" -> FulfillmentOutcome.success(
+                    "ISSUED",
+                    "auto-issue:" + redemption.getId(),
+                    "Reward auto-issued",
+                    Map.of("adapter", "AUTO_ISSUE"));
+            case "WEBHOOK", "PROVIDER_CALLBACK" -> FulfillmentOutcome.success(
+                    "PENDING",
+                    externalReference(provider, redemption, config),
+                    "Waiting for reward fulfillment provider callback",
+                    Map.of("adapter", provider));
+            case "HTTP_POST" -> dispatchHttpProvider(redemption, reward, config);
+            case "MANUAL" -> FulfillmentOutcome.success(
+                    "MANUAL_REQUIRED",
+                    redemption.getFulfillmentRef(),
+                    "Manual reward fulfillment required",
+                    Map.of("adapter", "MANUAL"));
+            default -> FulfillmentOutcome.success(
+                    "MANUAL_REQUIRED",
+                    redemption.getFulfillmentRef(),
+                    "Unsupported provider " + provider + "; manual fulfillment required",
+                    Map.of("adapter", provider, "unsupported", true));
+        };
+    }
+
+    private FulfillmentOutcome dispatchHttpProvider(
+            LoyaltyRewardRedemption redemption,
+            LoyaltyReward reward,
+            Map<String, Object> config) {
+        String endpointUrl = stringValue(config.get("endpointUrl"));
+        if (endpointUrl == null || endpointUrl.isBlank()) {
+            return FulfillmentOutcome.success(
+                    "MANUAL_REQUIRED",
+                    redemption.getFulfillmentRef(),
+                    "HTTP_POST fulfillment is missing endpointUrl",
+                    Map.of("adapter", "HTTP_POST", "missingEndpointUrl", true));
+        }
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("redemptionId", redemption.getId().toString());
+        request.put("rewardId", redemption.getRewardId().toString());
+        request.put("rewardCode", redemption.getRewardCode());
+        request.put("tenantId", redemption.getTenantId());
+        request.put("applicationId", redemption.getApplicationId());
+        request.put("programId", redemption.getProgramId());
+        request.put("profileId", redemption.getProfileId());
+        request.put("pointsCost", redemption.getPointsCost());
+        request.put("sourceReference", redemption.getSourceReference());
+        request.put("externalRef", externalReference("HTTP_POST", redemption, config));
+        request.put("rewardSnapshot", readMap(redemption.getRewardSnapshotJson()));
+        request.put("metadata", readMap(redemption.getMetadataJson()));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> response = restClientBuilder.build()
+                .post()
+                .uri(endpointUrl)
+                .body(request)
+                .retrieve()
+                .body(Map.class);
+        Map<String, Object> responsePayload = response == null ? Map.of() : response;
+        String status = normalized(stringValue(responsePayload.get("status")));
+        if (status == null || status.isBlank()) {
+            status = "PENDING";
+        }
+        String fulfillmentRef = firstPresent(
+                stringValue(responsePayload.get("fulfillmentRef")),
+                stringValue(responsePayload.get("externalRef")),
+                stringValue(request.get("externalRef")));
+        String note = firstPresent(stringValue(responsePayload.get("note")), "HTTP fulfillment dispatched");
+        return FulfillmentOutcome.success(status, fulfillmentRef, note, Map.of(
+                "adapter", "HTTP_POST",
+                "endpointUrl", endpointUrl,
+                "response", responsePayload));
+    }
+
+    private void applyFulfillmentOutcome(LoyaltyRewardRedemption redemption, FulfillmentOutcome outcome) {
+        String status = normalized(outcome.status());
+        if ("FAILED".equals(status)) {
+            Instant nextAttemptAt = outcome.retryable()
+                    && redemption.getFulfillmentAttemptCount() < maxFulfillmentAttempts
+                            ? nextFulfillmentAttemptAt(redemption.getFulfillmentAttemptCount())
+                            : null;
+            redemption.markFulfillmentFailure(
+                    outcome.errorClass(),
+                    outcome.errorMessage(),
+                    nextAttemptAt,
+                    nextAttemptAt == null
+                            ? "Reward fulfillment failed; manual intervention required"
+                            : "Reward fulfillment failed; retry scheduled");
+            return;
+        }
+        try {
+            redemption.updateFulfillment(status, outcome.fulfillmentRef(), outcome.note());
+            if ("PENDING".equals(status)) {
+                redemption.scheduleNextFulfillmentAttempt(null);
+            }
+        } catch (IllegalArgumentException ex) {
+            redemption.updateFulfillment(
+                    "MANUAL_REQUIRED",
+                    outcome.fulfillmentRef(),
+                    "Provider returned unsupported status " + outcome.status());
+        }
+    }
+
+    private Instant fulfillmentSlaDueAt(LoyaltyRewardRedemption redemption, Map<String, Object> config) {
+        long slaHours = longConfig(config, "slaHours", defaultFulfillmentSlaHours);
+        long slaMinutes = longConfig(config, "slaMinutes", 0);
+        Instant base = redemption.getRedeemedAt() == null ? Instant.now() : redemption.getRedeemedAt();
+        return base.plusSeconds((slaHours * 3600) + (slaMinutes * 60));
+    }
+
+    private Instant nextFulfillmentAttemptAt(int attemptNumber) {
+        int exponent = Math.max(0, Math.min(10, attemptNumber - 1));
+        long delay = Math.min(
+                fulfillmentMaxBackoffSeconds,
+                fulfillmentBaseBackoffSeconds * (1L << exponent));
+        return Instant.now().plusSeconds(delay);
+    }
+
+    private LoyaltyRewardRedemption callbackRedemption(String provider, RewardFulfillmentCallbackRequestDto request) {
+        if (request.redemptionId() != null) {
+            return redemptions.findByIdForUpdate(request.redemptionId())
+                    .orElseThrow(() -> NotFoundException.coded(
+                            LOYALTY_REWARD_NOT_FOUND,
+                            "Loyalty reward redemption not found"));
+        }
+        String externalRef = blankToNull(request.externalRef());
+        if (externalRef == null) {
+            throw BadRequestException.coded(
+                    LOYALTY_REWARD_INVALID_REQUEST,
+                    "redemptionId or externalRef is required for fulfillment callback");
+        }
+        LoyaltyRewardRedemption matched = redemptions
+                .findByFulfillmentProviderAndFulfillmentRef(normalizedProvider(provider), externalRef)
+                .orElseThrow(() -> NotFoundException.coded(
+                        LOYALTY_REWARD_NOT_FOUND,
+                        "Reward fulfillment callback did not match a redemption"));
+        return redemptions.findByIdForUpdate(matched.getId()).orElse(matched);
+    }
+
+    private RewardFulfillmentRunItemDto runItem(LoyaltyRewardRedemption redemption) {
+        return new RewardFulfillmentRunItemDto(
+                redemption.getId(),
+                redemption.getRewardCode(),
+                redemption.getFulfillmentProvider(),
+                redemption.getFulfillmentStatus(),
+                redemption.getFulfillmentRef(),
+                redemption.getFulfillmentAttemptCount(),
+                redemption.getFulfillmentNextAttemptAt(),
+                redemption.getFulfillmentErrorClass(),
+                redemption.getFulfillmentErrorMessage());
+    }
+
+    private String externalReference(String provider, LoyaltyRewardRedemption redemption, Map<String, Object> config) {
+        String configured = firstPresent(
+                stringValue(config.get("externalReference")),
+                stringValue(config.get("externalRef")));
+        if (configured != null) {
+            return configured + ":" + redemption.getId();
+        }
+        String prefix = firstPresent(stringValue(config.get("externalReferencePrefix")), provider.toLowerCase());
+        return prefix + ":" + redemption.getRewardCode() + ":" + redemption.getId();
+    }
+
+    private String normalizedProvider(String provider) {
+        return provider == null || provider.isBlank() ? "MANUAL" : provider.trim().toUpperCase();
+    }
+
+    private long longConfig(Map<String, Object> config, String key, long fallback) {
+        Object value = config == null ? null : config.get(key);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Long.parseLong(text.trim());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     private void requireRewardRedeemable(LoyaltyReward reward, String profileId, Instant now) {
@@ -460,6 +1021,264 @@ public class LoyaltyRewardService {
                     LOYALTY_REWARD_PROFILE_LIMIT_REACHED,
                     "Learner has reached the per-profile redemption limit");
         }
+    }
+
+    private LoyaltyAdjustmentApproval requireApprovedReversalApproval(
+            LoyaltyRewardRedemption redemption,
+            ReversePointsRequestDto request) {
+        if (request.approvalId() == null) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_REVERSAL_APPROVAL_REQUIRED,
+                    "Reward redemption reversal requires an approved approvalId");
+        }
+        LoyaltyAdjustmentApproval approval = adjustmentApprovals.findByIdForUpdate(request.approvalId())
+                .orElseThrow(() -> NotFoundException.coded(
+                        LOYALTY_REWARD_REVERSAL_APPROVAL_REQUIRED,
+                        "Reward redemption reversal approval not found"));
+        Map<String, Object> metadata = readMap(approval.getMetadataJson());
+        if (!REWARD_REVERSAL_APPROVAL_OPERATION.equalsIgnoreCase(approvalOperationType(metadata))) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_REVERSAL_APPROVAL_MISMATCH,
+                    "Approval is not for reward redemption reversal");
+        }
+        if (!redemption.getTenantId().equals(approval.getTenantId())
+                || !redemption.getApplicationId().equals(approval.getApplicationId())
+                || !redemption.getProgramId().equals(approval.getProgramId())
+                || !redemption.getProfileId().equals(approval.getProfileId())
+                || redemption.getPointsCost() != approval.getPointsDelta()
+                || !rewardReversalSourceReference(redemption).equals(approval.getSourceReference())
+                || !redemption.getId().toString().equals(stringValue(metadata.get("redemptionId")))
+                || !redemption.getBurnEntryId().toString().equals(stringValue(metadata.get("burnEntryId")))) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_REVERSAL_APPROVAL_MISMATCH,
+                    "Reward reversal approval scope does not match the redemption");
+        }
+        if (!normalize(request.idempotencyKey()).equals(approval.getIdempotencyKey())
+                || !rewardReversalApprovalHash(redemption, request).equals(approval.getRequestHash())) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_REVERSAL_APPROVAL_MISMATCH,
+                    "Reward reversal approval evidence no longer matches execution request");
+        }
+        if (!"APPROVED".equals(approval.getStatus()) && !"EXECUTED".equals(approval.getStatus())) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_REVERSAL_APPROVAL_REQUIRED,
+                    "Reward redemption reversal requires an approved approval");
+        }
+        return approval;
+    }
+
+    private Map<String, Object> rewardReversalApprovalMetadata(
+            LoyaltyRewardRedemption redemption,
+            SubmitRewardRedemptionReversalApprovalRequestDto request) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("operationType", REWARD_REVERSAL_APPROVAL_OPERATION);
+        metadata.put("thresholdPolicy", REWARD_REVERSAL_THRESHOLD_POLICY);
+        metadata.put("redemptionId", redemption.getId().toString());
+        metadata.put("rewardId", redemption.getRewardId().toString());
+        metadata.put("rewardCode", redemption.getRewardCode());
+        metadata.put("burnEntryId", redemption.getBurnEntryId().toString());
+        metadata.put("pointsToRestore", redemption.getPointsCost());
+        metadata.put("redemptionStatus", redemption.getStatus());
+        metadata.put("fulfillmentStatus", redemption.getFulfillmentStatus());
+        metadata.put("idempotencyKey", normalize(request.idempotencyKey()));
+        metadata.put("requestMetadata", request.metadata() == null ? Map.of() : request.metadata());
+        return metadata;
+    }
+
+    private String rewardReversalApprovalHash(
+            LoyaltyRewardRedemption redemption,
+            SubmitRewardRedemptionReversalApprovalRequestDto request) {
+        return rewardReversalApprovalHash(
+                redemption,
+                request.idempotencyKey(),
+                request.reason(),
+                request.correlationId(),
+                request.metadata());
+    }
+
+    private String rewardReversalApprovalHash(
+            LoyaltyRewardRedemption redemption,
+            ReversePointsRequestDto request) {
+        return rewardReversalApprovalHash(
+                redemption,
+                request.idempotencyKey(),
+                request.reason(),
+                request.correlationId(),
+                request.metadata());
+    }
+
+    private String rewardReversalApprovalHash(
+            LoyaltyRewardRedemption redemption,
+            String idempotencyKey,
+            String reason,
+            String correlationId,
+            Map<String, Object> metadata) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("operation", REWARD_REVERSAL_APPROVAL_OPERATION);
+        payload.put("tenantId", redemption.getTenantId());
+        payload.put("applicationId", redemption.getApplicationId());
+        payload.put("programId", redemption.getProgramId());
+        payload.put("profileId", redemption.getProfileId());
+        payload.put("redemptionId", redemption.getId().toString());
+        payload.put("rewardId", redemption.getRewardId().toString());
+        payload.put("burnEntryId", redemption.getBurnEntryId().toString());
+        payload.put("pointsToRestore", redemption.getPointsCost());
+        payload.put("idempotencyKey", normalize(idempotencyKey));
+        payload.put("reason", reason);
+        payload.put("correlationId", correlationId);
+        payload.put("metadata", metadata == null ? Map.of() : metadata);
+        return hash(payload);
+    }
+
+    private String rewardReversalSourceReference(LoyaltyRewardRedemption redemption) {
+        return "reward-reversal:" + redemption.getId();
+    }
+
+    private LoyaltyAdjustmentApproval requireApprovedFulfillmentApproval(
+            LoyaltyRewardRedemption redemption,
+            UpdateRewardFulfillmentStatusRequestDto request,
+            CurrentUser user) {
+        if (request.approvalId() == null) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_FULFILLMENT_APPROVAL_REQUIRED,
+                    "Reward fulfillment override requires an approved approvalId");
+        }
+        validateFulfillmentStatus(request.status());
+        LoyaltyAdjustmentApproval approval = adjustmentApprovals.findByIdForUpdate(request.approvalId())
+                .orElseThrow(() -> NotFoundException.coded(
+                        LOYALTY_REWARD_FULFILLMENT_APPROVAL_REQUIRED,
+                        "Reward fulfillment approval not found"));
+        Map<String, Object> metadata = readMap(approval.getMetadataJson());
+        if (!REWARD_FULFILLMENT_APPROVAL_OPERATION.equalsIgnoreCase(approvalOperationType(metadata))) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_FULFILLMENT_APPROVAL_MISMATCH,
+                    "Approval is not for reward fulfillment override");
+        }
+        if (!redemption.getTenantId().equals(approval.getTenantId())
+                || !redemption.getApplicationId().equals(approval.getApplicationId())
+                || !redemption.getProgramId().equals(approval.getProgramId())
+                || !redemption.getProfileId().equals(approval.getProfileId())
+                || !rewardFulfillmentSourceReference(redemption).equals(approval.getSourceReference())
+                || !redemption.getId().toString().equals(stringValue(metadata.get("redemptionId")))
+                || !redemption.getRewardId().toString().equals(stringValue(metadata.get("rewardId")))) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_FULFILLMENT_APPROVAL_MISMATCH,
+                    "Reward fulfillment approval scope does not match the redemption");
+        }
+        if (!normalize(request.idempotencyKey()).equals(approval.getIdempotencyKey())
+                || !rewardFulfillmentApprovalHash(redemption, request).equals(approval.getRequestHash())) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_FULFILLMENT_APPROVAL_MISMATCH,
+                    "Reward fulfillment approval evidence no longer matches execution request");
+        }
+        if (!"APPROVED".equals(approval.getStatus()) && !"EXECUTED".equals(approval.getStatus())) {
+            throw ConflictException.coded(
+                    LOYALTY_REWARD_FULFILLMENT_APPROVAL_REQUIRED,
+                    "Reward fulfillment override requires an approved approval");
+        }
+        String executor = actor(user);
+        if (executor != null
+                && approval.getReviewedBy() != null
+                && executor.equalsIgnoreCase(approval.getReviewedBy())) {
+            throw ForbiddenException.coded(
+                    LOYALTY_REWARD_FULFILLMENT_APPROVAL_MISMATCH,
+                    "Reviewer cannot execute their own reward fulfillment approval");
+        }
+        return approval;
+    }
+
+    private Map<String, Object> rewardFulfillmentApprovalMetadata(
+            LoyaltyRewardRedemption redemption,
+            SubmitRewardFulfillmentApprovalRequestDto request) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("operationType", REWARD_FULFILLMENT_APPROVAL_OPERATION);
+        metadata.put("thresholdPolicy", REWARD_FULFILLMENT_THRESHOLD_POLICY);
+        metadata.put("redemptionId", redemption.getId().toString());
+        metadata.put("rewardId", redemption.getRewardId().toString());
+        metadata.put("rewardCode", redemption.getRewardCode());
+        metadata.put("currentFulfillmentStatus", redemption.getFulfillmentStatus());
+        metadata.put("currentFulfillmentRef", blankToNull(redemption.getFulfillmentRef()));
+        metadata.put("targetFulfillmentStatus", normalizeFulfillmentStatus(request.status()));
+        metadata.put("targetFulfillmentRef", blankToNull(request.fulfillmentRef()));
+        metadata.put("targetFulfillmentNote", blankToNull(request.note()));
+        metadata.put("idempotencyKey", normalize(request.idempotencyKey()));
+        metadata.put("requestMetadata", request.metadata() == null ? Map.of() : request.metadata());
+        return metadata;
+    }
+
+    private String rewardFulfillmentApprovalHash(
+            LoyaltyRewardRedemption redemption,
+            SubmitRewardFulfillmentApprovalRequestDto request) {
+        return rewardFulfillmentApprovalHash(
+                redemption,
+                request.status(),
+                request.fulfillmentRef(),
+                request.note(),
+                request.idempotencyKey(),
+                request.reason(),
+                request.correlationId(),
+                request.metadata());
+    }
+
+    private String rewardFulfillmentApprovalHash(
+            LoyaltyRewardRedemption redemption,
+            UpdateRewardFulfillmentStatusRequestDto request) {
+        return rewardFulfillmentApprovalHash(
+                redemption,
+                request.status(),
+                request.fulfillmentRef(),
+                request.note(),
+                request.idempotencyKey(),
+                request.reason(),
+                request.correlationId(),
+                request.metadata());
+    }
+
+    private String rewardFulfillmentApprovalHash(
+            LoyaltyRewardRedemption redemption,
+            String status,
+            String fulfillmentRef,
+            String note,
+            String idempotencyKey,
+            String reason,
+            String correlationId,
+            Map<String, Object> metadata) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("operation", REWARD_FULFILLMENT_APPROVAL_OPERATION);
+        payload.put("tenantId", redemption.getTenantId());
+        payload.put("applicationId", redemption.getApplicationId());
+        payload.put("programId", redemption.getProgramId());
+        payload.put("profileId", redemption.getProfileId());
+        payload.put("redemptionId", redemption.getId().toString());
+        payload.put("rewardId", redemption.getRewardId().toString());
+        payload.put("currentFulfillmentStatus", redemption.getFulfillmentStatus());
+        payload.put("currentFulfillmentRef", blankToNull(redemption.getFulfillmentRef()));
+        payload.put("targetFulfillmentStatus", normalizeFulfillmentStatus(status));
+        payload.put("targetFulfillmentRef", blankToNull(fulfillmentRef));
+        payload.put("targetFulfillmentNote", blankToNull(note));
+        payload.put("idempotencyKey", normalize(idempotencyKey));
+        payload.put("reason", reason);
+        payload.put("correlationId", correlationId);
+        payload.put("metadata", metadata == null ? Map.of() : metadata);
+        return hash(payload);
+    }
+
+    private String rewardFulfillmentSourceReference(LoyaltyRewardRedemption redemption) {
+        return "reward-fulfillment:" + redemption.getId();
+    }
+
+    private String validateFulfillmentStatus(String status) {
+        String normalized = normalizeFulfillmentStatus(status);
+        if (!FULFILLMENT_STATUSES.contains(normalized)) {
+            throw BadRequestException.coded(
+                    LOYALTY_REWARD_INVALID_REQUEST,
+                    "Unsupported reward fulfillment status: " + status);
+        }
+        return normalized;
+    }
+
+    private String normalizeFulfillmentStatus(String status) {
+        return status == null || status.isBlank() ? "" : status.trim().toUpperCase();
     }
 
     private LearnerRewardDto learnerRewardDto(LoyaltyReward reward, String profileId, Instant now) {
@@ -544,6 +1363,32 @@ public class LoyaltyRewardService {
                 reward.getUpdatedAt());
     }
 
+    private LoyaltyAdjustmentApprovalDto approvalDto(LoyaltyAdjustmentApproval approval) {
+        Map<String, Object> metadata = readMap(approval.getMetadataJson());
+        return new LoyaltyAdjustmentApprovalDto(
+                approval.getId(),
+                approval.getTenantId(),
+                approval.getApplicationId(),
+                approval.getProgramId(),
+                approval.getProfileId(),
+                approval.getPointsDelta(),
+                approval.getSourceReference(),
+                approval.getReason(),
+                approval.getCorrelationId(),
+                approval.getOccurredAt(),
+                approval.getExpiresAt(),
+                approval.getStatus(),
+                approval.getRequestedBy(),
+                approval.getReviewedBy(),
+                approval.getReviewNote(),
+                approval.getRequestedAt(),
+                approval.getReviewedAt(),
+                approval.getExecutedAt(),
+                approval.getExecutedEntryId(),
+                approvalOperationType(metadata),
+                metadata);
+    }
+
     private LoyaltyRewardRedemptionDto redemptionDto(LoyaltyRewardRedemption redemption, boolean idempotencyReplay) {
         return new LoyaltyRewardRedemptionDto(
                 redemption.getId(),
@@ -562,6 +1407,15 @@ public class LoyaltyRewardService {
                 redemption.getFulfillmentStatus(),
                 redemption.getFulfillmentRef(),
                 redemption.getFulfillmentNote(),
+                redemption.getFulfillmentProvider(),
+                redemption.getFulfillmentAttemptCount(),
+                redemption.getFulfillmentLastAttemptAt(),
+                redemption.getFulfillmentNextAttemptAt(),
+                redemption.getFulfillmentSlaDueAt(),
+                redemption.getFulfillmentErrorClass(),
+                redemption.getFulfillmentErrorMessage(),
+                redemption.getFulfillmentCallbackReceivedAt(),
+                redemption.getFulfillmentCallbackPayloadHash(),
                 readMap(redemption.getRewardSnapshotJson()),
                 redemption.getCorrelationId(),
                 redemption.getNote(),
@@ -599,6 +1453,11 @@ public class LoyaltyRewardService {
         payload.put("status", redemption.getStatus());
         payload.put("fulfillmentStatus", redemption.getFulfillmentStatus());
         payload.put("fulfillmentRef", redemption.getFulfillmentRef());
+        payload.put("fulfillmentProvider", redemption.getFulfillmentProvider());
+        payload.put("fulfillmentAttemptCount", redemption.getFulfillmentAttemptCount());
+        payload.put("fulfillmentNextAttemptAt", redemption.getFulfillmentNextAttemptAt());
+        payload.put("fulfillmentSlaDueAt", redemption.getFulfillmentSlaDueAt());
+        payload.put("fulfillmentErrorClass", redemption.getFulfillmentErrorClass());
         payload.put("sourceReference", redemption.getSourceReference());
         payload.put("correlationId", correlationId);
         payload.put("actorId", actorId);
@@ -715,6 +1574,28 @@ public class LoyaltyRewardService {
         }
     }
 
+    private String approvalOperationType(Map<String, Object> metadata) {
+        String operationType = stringValue(metadata.get("operationType"));
+        return operationType == null ? "ADJUSTMENT" : operationType;
+    }
+
+    private String stringValue(Object value) {
+        return value == null || value.toString().isBlank() ? null : value.toString().trim();
+    }
+
+    private String firstPresent(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            String normalized = blankToNull(value);
+            if (normalized != null) {
+                return normalized;
+            }
+        }
+        return null;
+    }
+
     private String json(Object value) {
         try {
             return objectMapper.writeValueAsString(value == null ? Map.of() : value);
@@ -768,5 +1649,33 @@ public class LoyaltyRewardService {
     private String blankToNull(String value) {
         String normalized = normalize(value);
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private record FulfillmentOutcome(
+            String status,
+            String fulfillmentRef,
+            String note,
+            String errorClass,
+            String errorMessage,
+            boolean retryable,
+            Map<String, Object> payload) {
+
+        static FulfillmentOutcome success(
+                String status,
+                String fulfillmentRef,
+                String note,
+                Map<String, Object> payload) {
+            return new FulfillmentOutcome(status, fulfillmentRef, note, null, null, false,
+                    payload == null ? Map.of() : payload);
+        }
+
+        static FulfillmentOutcome failed(
+                String errorClass,
+                String errorMessage,
+                boolean retryable,
+                Map<String, Object> payload) {
+            return new FulfillmentOutcome("FAILED", null, null, errorClass, errorMessage, retryable,
+                    payload == null ? Map.of() : payload);
+        }
     }
 }

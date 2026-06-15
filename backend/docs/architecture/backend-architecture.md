@@ -12,7 +12,6 @@ This follows the same architectural lesson from YAS: independent business servic
 |---|---|---|
 | keycloak | external IAM/IdP: login, SSO, MFA, password policy, sessions, OAuth2/OIDC access tokens, federation, JWKS/key rotation | LMS course/section permissions, profile directory |
 | discovery-service | internal service registry for backend application services; lets gateway and services locate each other without static host ports | authentication, authorization, public routing policy |
-| identity-service | retired legacy/local compatibility surfaces only; excluded from the production Keycloak profile unless an operator explicitly enables a legacy profile | long-term password/session ownership, profile directory, LMS authorization |
 | access-control-service | CourseFlow product authorization, Keycloak `issuer + subject` mapping, scoped roles, permissions, role grants, authorization audit | login, password, MFA, SSO sessions, user profile content |
 | user-management-service | display name, avatar, bio, locale/timezone, public profile, profile summaries and user directory | login, password, token issuance, role/permission decisions |
 | organization-service | departments, programs, academic terms, course sections | course content, user credentials |
@@ -23,16 +22,35 @@ This follows the same architectural lesson from YAS: independent business servic
 | announcement-service | draft/scheduled/published course announcements | WebSocket/email delivery |
 | portfolio-service | evidence documents, journal entries, feedback snapshots, published grade records | assignment definitions |
 | discussion-service | threads, comments, reactions, moderation state, accepted answer | notification inbox |
-| notification-service | inbox, delivery preference, WebSocket push, event dedup | source business event decisions |
+| notification-service | inbox, delivery preference, WebSocket/SSE push, event dedup | source business event decisions |
 | media-service | file metadata, upload policy, signed URLs, video assets, transcode jobs, HLS/DASH renditions, captions/transcripts, per-user video progress | course/assignment business rules |
 | search-service | Elasticsearch course/content search documents | source-of-truth course data |
-| analytics-service | reporting read models, progress metrics, risk signals, completion/time-spent reports, course recommendation read model | source-of-truth submissions/grades |
+| analytics-service | reporting read models, progress metrics, risk signals, completion/time-spent reports, course recommendation and marketing funnel read models | source-of-truth submissions/grades, marketing attribution source events |
 | gradebook-service | grade categories, grade items, weighted final grades, overrides, rubric audit | quiz attempts, assignment submissions, certificates |
 | quiz-service | question banks, quiz definition, attempts, answer snapshots, auto-grading | final course grade |
 | certificate-service | certificate issue/revoke/reissue, verification code, public verification audit | grade calculation |
 | peer-review-service | peer review settings, reviewer assignment, review submissions, disputes, finalized peer scores | assignment definition, final gradebook calculation |
 | live-session-service | live/webinar session schedule, host/co-host, attendee registration, join links, recording references, session lifecycle state | video-on-demand assets, meeting transport (Zoom/WebRTC provider) |
 | review-service | course star ratings, written reviews, helpful votes, moderation state, aggregated rating read model | course catalog source-of-truth, enrollment state |
+
+Analytics marketing funnel support is a read-model boundary. Admins read aggregates through
+`GET /api/admin/v1/analytics/marketing/funnel`; trusted services feed shadow funnel events through
+`POST /internal/analytics/marketing/funnel/events` with an idempotent event id. The ingestion API
+accepts only the fixed stage taxonomy and bounded non-PII dimension codes; client-facing tracking and
+full attribution remain outside analytics-service.
+
+Analytics warehouse export is a bounded artifact boundary, not ad hoc table dumping. Platform admins
+or trusted export services with `internal:analytics:export-read` call
+`POST /internal/analytics/warehouse/exports` to receive CSV content with manifest metadata:
+dataset name, schema version, ordered columns, row count, truncation flag and content SHA-256. The
+first datasets are `MARKETING_FUNNEL_DAILY`, `COURSE_COMPLETION_SNAPSHOT`, and
+`ORG_DASHBOARD_SNAPSHOT`; larger streaming/object-store exports remain a later warehouse sink.
+
+Learner learning path is a course-service read projection over the immutable published curriculum
+snapshot plus learner progress/source status. `GET /api/v1/courses/{courseId}/learning-path`
+returns module order, prerequisite lock state, item progress/source status and next action. Optional
+`cohortId` and `sectionId` are request context for client navigation only; section/cohort roster
+truth remains in organization/enrollment boundaries.
 
 ## Standard Service Layers
 
@@ -126,12 +144,11 @@ Keycloak `issuer + subject` to a CourseFlow user through `POST /internal/identit
 `POST /internal/users/provision-profile` on `user-management-service`. The token converter only
 resolves existing links; it does not silently create privileged users from arbitrary external claims.
 Admin role, permission and user-role-assignment routes terminate at `access-control-service`;
-`identity-service` remains only for legacy account/security compatibility during the Keycloak
-migration and is not mounted in the default gateway route table.
+the former custom password/JWT service has been decommissioned.
 The compatibility `GET /api/v1/users/me` route now terminates at `user-management-service`; it
 combines the CourseFlow user id/email/status/primary role resolved by `access-control-service` with
 display name/avatar stored in the profile repository. This keeps client hydration off the legacy
-identity database while preserving the old response shape during the migration.
+identity database while preserving the response shape expected by clients.
 Admin user list/detail reads are composed by `user-management-service` so admin screens keep one
 read endpoint while display profile data stays in user-management and email/status/primary role stay
 in access-control. Backoffice user-management endpoints require a valid internal JWT and ask
@@ -164,6 +181,11 @@ Service controllers may still use `/public/**`, `/internal/**`, or `/backoffice/
 Those prefixes are implementation details behind the gateway and should not appear in client code.
 True service-to-service APIs stay off the public gateway and are protected by network policy or a
 short-lived internal JWT.
+Notification realtime SSE is exposed through the learner API route
+`GET /api/v1/notifications/stream?userId=<caller-id>`, backed by
+`/internal/notifications/stream`. It is self-only, best-effort, and complements the durable inbox;
+`GET /api/v1/notifications` remains the source of truth after reconnect or multi-replica fan-out
+misses.
 
 `identity-token-converter-service` is the internal OAuth2 token-exchange bridge. In converter mode,
 the gateway validates the external identity token, calls `/oauth/token`, and forwards a short-lived
@@ -207,7 +229,7 @@ consistent inside a service and documented in code:
 
 | Adapter | Used For |
 |---|---|
-| JPA | identity-service account compatibility, access-control-service authorization aggregate, user-management-service profile aggregate, rich LMS aggregates |
+| JPA | access-control-service authorization aggregate, user-management-service profile aggregate, rich LMS aggregates |
 | JdbcClient | small Postgres domain services and reporting-style reads/writes |
 | MongoRepository | portfolio-service learning evidence documents |
 | ElasticsearchRepository | search-service course/content search documents |
@@ -249,7 +271,7 @@ review-service       --review.posted-----------> course-service, analytics-servi
 
 ## Outbox and Dedup
 
-Event-producing services use a local `outbox_events` table in the same transaction as domain changes. Events are published by Debezium CDC or the `outbox-relay` service under `services/outbox-relay`. The relay owns its own checkpoint, delivery-state, and dead-letter tables, exposes admin-only DLQ inspect/replay/discard endpoints, and does not migrate producer service schemas.
+Event-producing services use a local `outbox_events` table in the same transaction as domain changes. Events are published by Debezium CDC or the `outbox-relay` service under `services/outbox-relay`. The relay owns its own checkpoint, delivery-state, and dead-letter tables, exposes admin DLQ inspect endpoints plus maker-checker gated live replay/discard, and does not migrate producer service schemas.
 
 Event-consuming services keep `processed_events` keyed by event id and consumer name. This makes Kafka at-least-once delivery safe.
 
@@ -258,7 +280,6 @@ Event-consuming services keep `processed_events` keyed by event id and consumer 
 Each service owns its database:
 
 ```text
-cf_identity
 cf_organization
 cf_course
 cf_enrollment

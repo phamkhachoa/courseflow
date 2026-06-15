@@ -49,4 +49,15 @@ public interface EnrollmentPromotionApplicationJpaRepository
             @Param("status") String status,
             @Param("now") Instant now,
             Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select a from EnrollmentPromotionApplication a
+            where a.status = 'RESERVED'
+              and a.updatedAt <= :cutoff
+            order by a.updatedAt asc
+            """)
+    List<EnrollmentPromotionApplication> lockReservedOlderThan(
+            @Param("cutoff") Instant cutoff,
+            Pageable pageable);
 }

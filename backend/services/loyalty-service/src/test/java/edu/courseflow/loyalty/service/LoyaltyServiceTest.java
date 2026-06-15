@@ -66,6 +66,8 @@ class LoyaltyServiceTest {
     private LoyaltyMetrics metrics;
     @Mock
     private LoyaltyAccessService access;
+    @Mock
+    private LoyaltyTierService tierService;
 
     private ObjectMapper objectMapper;
     private LoyaltyService service;
@@ -86,7 +88,8 @@ class LoyaltyServiceTest {
                 outboxEventRepository,
                 objectMapper,
                 metrics,
-                access);
+                access,
+                tierService);
         program = new LoyaltyProgram("courseflow", "lms", "default", "Default points", "POINT", false, 365, "test");
         account = new LoyaltyAccount(program, "profile-1");
     }

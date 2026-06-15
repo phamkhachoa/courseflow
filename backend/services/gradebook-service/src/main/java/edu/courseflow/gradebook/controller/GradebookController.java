@@ -5,6 +5,8 @@ import edu.courseflow.gradebook.dto.GradebookDtos.FinalGradeDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeCategoryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeItemDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeOverrideDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradePublishAuditDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradingQueueItemDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradingSchemeDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.StudentGradebookDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.UpsertCategoryRequestDto;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -86,6 +89,26 @@ public class GradebookController {
     public List<GradeOverrideDto> listOverrides(@PathVariable UUID entryId, CurrentUser user) {
         courseAccess.requireCourseStaffAccess(user, gradebook.courseIdForEntry(entryId));
         return gradebook.listOverrides(entryId);
+    }
+
+    @GetMapping("/courses/{courseId}/grade-publish-audit")
+    public List<GradePublishAuditDto> gradePublishAudit(@PathVariable UUID courseId,
+            @RequestParam(required = false) String studentId,
+            @RequestParam(required = false) UUID gradeItemId,
+            @RequestParam(defaultValue = "50") int limit,
+            CurrentUser user) {
+        courseAccess.requireCourseStaffAccess(user, courseId);
+        return gradebook.listGradePublishAudit(courseId, studentId, gradeItemId, limit);
+    }
+
+    @GetMapping("/courses/{courseId}/grading-queue")
+    public List<GradingQueueItemDto> gradingQueue(@PathVariable UUID courseId,
+            @RequestParam(required = false) String studentId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "50") int limit,
+            CurrentUser user) {
+        courseAccess.requireCourseStaffAccess(user, courseId);
+        return gradebook.gradingQueue(courseId, studentId, status, limit);
     }
 
     // ---- Grade categories (weights) ----

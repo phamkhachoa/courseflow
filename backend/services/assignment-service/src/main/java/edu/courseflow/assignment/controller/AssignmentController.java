@@ -5,6 +5,7 @@ import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentReadinessDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.AttachmentRef;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.GradingQueueItemDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.LearnerSourceStatusDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedDownloadDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedUploadDto;
@@ -71,6 +72,17 @@ public class AssignmentController {
     @GetMapping("/internal/assignments/{assignmentId}/readiness")
     public AssignmentReadinessDto readiness(@PathVariable UUID assignmentId) {
         return assignments.readiness(assignmentId);
+    }
+
+    @GetMapping("/internal/assignments/grading-queue")
+    public List<GradingQueueItemDto> gradingQueue(@RequestParam UUID courseId,
+            @RequestParam(required = false) UUID assignmentId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "50") int limit,
+            CurrentUser user) {
+        Authz.requireStaff(user);
+        courseAccess.requireCourseStaffAccess(user, courseId);
+        return assignments.gradingQueue(courseId, assignmentId, status, limit);
     }
 
     @GetMapping("/internal/assignments/status")

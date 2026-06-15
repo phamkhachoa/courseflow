@@ -8,7 +8,10 @@ The backend is a Spring Boot microservice system. It intentionally has no `core-
 common-library                  Cross-cutting API/error/web helpers only
 event-contracts                 Shared event schemas
 services/
-  identity-service              Users, auth, roles, token lifecycle
+  access-control-service        Product authorization, scoped roles, permissions
+  user-management-service       User profiles, directory, Keycloak lifecycle facade
+  identity-token-converter-service
+                                STS: Keycloak token validation and internal JWT issuance
   organization-service          Departments, terms, programs, course sections
   course-service                Course catalog, syllabus, materials metadata
   enrollment-service            Enrollment, rosters, waitlists, capacity

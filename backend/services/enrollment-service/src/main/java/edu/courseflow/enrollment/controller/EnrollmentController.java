@@ -7,14 +7,21 @@ import edu.courseflow.enrollment.dto.EnrollmentDtos.BatchEnrollResultDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.ChangeStatusRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.CourseAccessDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentBenefitReconciliationQueryResponseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentCheckoutResponseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentPromotionApplicationStateDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentRemediationCaseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentStatsDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.LearnerCouponWalletDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.PaymentStatusUpdateRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionApplicationActionRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionPreviewDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionPreviewRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RemediationCaseActionRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RemediationCaseAssignRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RefundDropPolicyEvaluateRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RefundDropPolicyEvaluationResponseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.SetCapacityRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistEntryDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistRequestDto;
@@ -69,6 +76,14 @@ public class EnrollmentController {
         return enrollments.checkout(request, user);
     }
 
+    @PostMapping("/internal/enrollments/orders/{id}:record-payment")
+    public EnrollmentCheckoutResponseDto recordOrderPayment(
+            @PathVariable UUID id,
+            @Valid @RequestBody PaymentStatusUpdateRequestDto request,
+            CurrentUser user) {
+        return enrollments.recordOrderPayment(id, request, user);
+    }
+
     @GetMapping("/internal/enrollments/access")
     public CourseAccessDto access(@RequestParam UUID courseId,
                                   @RequestParam String studentId) {
@@ -84,6 +99,17 @@ public class EnrollmentController {
     @GetMapping("/internal/learner-memberships")
     public List<EnrollmentDto> learnerMemberships(@RequestParam String studentId) {
         return enrollments.learnerMemberships(studentId);
+    }
+
+    @GetMapping("/internal/enrollments/audit")
+    public List<AuditLogEntryDto> auditLogQuery(
+            @RequestParam Optional<UUID> enrollmentId,
+            @RequestParam Optional<UUID> courseId,
+            @RequestParam Optional<String> studentId,
+            @RequestParam Optional<String> correlationId,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return enrollments.auditLog(enrollmentId, courseId, studentId, correlationId, limit, user);
     }
 
     @GetMapping("/internal/waitlist")
@@ -116,6 +142,32 @@ public class EnrollmentController {
         return enrollments.promotionApplicationQueue(status, courseId, studentId, limit, user);
     }
 
+    @GetMapping("/internal/enrollments/benefit-reconciliation")
+    public EnrollmentBenefitReconciliationQueryResponseDto benefitReconciliation(
+            @RequestParam Optional<UUID> enrollmentId,
+            @RequestParam Optional<UUID> courseId,
+            @RequestParam Optional<String> studentId,
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<Boolean> includeMatched,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return enrollments.benefitReconciliation(
+                enrollmentId,
+                courseId,
+                studentId,
+                status,
+                includeMatched,
+                limit,
+                user);
+    }
+
+    @PostMapping("/internal/enrollments/refund-drop-policy:evaluate")
+    public RefundDropPolicyEvaluationResponseDto evaluateRefundDropPolicy(
+            @Valid @RequestBody RefundDropPolicyEvaluateRequestDto request,
+            CurrentUser user) {
+        return enrollments.evaluateRefundDropPolicy(request, user);
+    }
+
     @PostMapping("/internal/enrollments/promotion-applications/{id}:retry-commit")
     public EnrollmentPromotionApplicationStateDto retryPromotionApplicationCommit(
             @PathVariable UUID id,
@@ -130,6 +182,64 @@ public class EnrollmentController {
             @RequestBody(required = false) PromotionApplicationActionRequestDto request,
             CurrentUser user) {
         return enrollments.cancelPromotionApplicationReservation(id, request, user);
+    }
+
+    @GetMapping("/internal/enrollments/remediation-cases")
+    public List<EnrollmentRemediationCaseDto> remediationCaseQueue(
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<UUID> courseId,
+            @RequestParam Optional<UUID> enrollmentId,
+            @RequestParam Optional<UUID> promotionApplicationId,
+            @RequestParam Optional<UUID> orderId,
+            @RequestParam Optional<String> studentId,
+            @RequestParam Optional<UUID> couponId,
+            @RequestParam Optional<UUID> redemptionId,
+            @RequestParam Optional<String> correlationId,
+            @RequestParam Optional<String> assigneeId,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return enrollments.remediationCaseQueue(
+                status,
+                courseId,
+                enrollmentId,
+                promotionApplicationId,
+                orderId,
+                studentId,
+                couponId,
+                redemptionId,
+                correlationId,
+                assigneeId,
+                limit,
+                user);
+    }
+
+    @GetMapping("/internal/enrollments/remediation-cases/{id}")
+    public EnrollmentRemediationCaseDto remediationCase(@PathVariable UUID id, CurrentUser user) {
+        return enrollments.remediationCase(id, user);
+    }
+
+    @PostMapping("/internal/enrollments/remediation-cases/{id}:assign")
+    public EnrollmentRemediationCaseDto assignRemediationCase(
+            @PathVariable UUID id,
+            @Valid @RequestBody RemediationCaseAssignRequestDto request,
+            CurrentUser user) {
+        return enrollments.assignRemediationCase(id, request, user);
+    }
+
+    @PostMapping("/internal/enrollments/remediation-cases/{id}:note")
+    public EnrollmentRemediationCaseDto addRemediationCaseNote(
+            @PathVariable UUID id,
+            @RequestBody(required = false) RemediationCaseActionRequestDto request,
+            CurrentUser user) {
+        return enrollments.addRemediationCaseNote(id, request, user);
+    }
+
+    @PostMapping("/internal/enrollments/remediation-cases/{id}:resolve")
+    public EnrollmentRemediationCaseDto resolveRemediationCase(
+            @PathVariable UUID id,
+            @RequestBody(required = false) RemediationCaseActionRequestDto request,
+            CurrentUser user) {
+        return enrollments.resolveRemediationCase(id, request, user);
     }
 
     @PatchMapping("/internal/enrollments/{id}/status")

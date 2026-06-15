@@ -224,6 +224,70 @@ class TrustedGatewayHeaderFilterTest {
     }
 
     @Test
+    void rejectsAnalyticsFunnelIngestWhenServiceOnlyHasGenericScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/marketing/funnel/events");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsAnalyticsFunnelIngestWithFunnelWriteScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/marketing/funnel/events");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.ANALYTICS_FUNNEL_WRITE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsAnalyticsWarehouseExportWhenServiceOnlyHasGenericScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/warehouse/exports");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsAnalyticsWarehouseExportWithExportReadScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/warehouse/exports");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.ANALYTICS_EXPORT_READ));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
     void rejectsPromotionReservationCommitWithReserveScopeOnly() throws ServletException, IOException {
         TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
         MockHttpServletRequest request = new MockHttpServletRequest(
@@ -397,6 +461,97 @@ class TrustedGatewayHeaderFilterTest {
     }
 
     @Test
+    void rejectsUserInternalJwtOnCourseVerifiedProgressEndpointEvenWhenIdentityHeadersMatch()
+            throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = requestWithIdentityHeaders(
+                "POST",
+                "/internal/courses/30000000-0000-0000-0000-000000000001/modules/30000000-0000-0000-0000-000000001001/items/30000000-0000-0000-0000-000000002001/progress/verified");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + userInternalToken("42"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void rejectsUserInternalJwtOnCourseInternalProgressEndpointEvenWhenIdentityHeadersMatch()
+            throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = requestWithIdentityHeaders(
+                "GET",
+                "/internal/courses/30000000-0000-0000-0000-000000000001/modules/progress/internal");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + userInternalToken("42"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsCourseVerifiedProgressEndpointWithServiceInternalJwt() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/courses/30000000-0000-0000-0000-000000000001/modules/items/progress/verified");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsUserInternalJwtOnEnrollmentServiceOnlyEndpointEvenWhenIdentityHeadersMatch()
+            throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = requestWithIdentityHeaders("GET", "/internal/enrollments/access");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + userInternalToken("42"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void rejectsUserInternalJwtOnEnrollmentPaymentServiceOnlyEndpointEvenWhenIdentityHeadersMatch()
+            throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = requestWithIdentityHeaders(
+                "POST",
+                "/internal/enrollments/orders/30000000-0000-0000-0000-000000000001:record-payment");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + userInternalToken("42"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsEnrollmentServiceOnlyEndpointWithServiceInternalJwt() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/learner-memberships");
+        request.addParameter("studentId", "42");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
     void rejectsRolePolicyReadWhenServiceOnlyHasGenericScope() throws ServletException, IOException {
         TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/roles");
@@ -477,6 +632,26 @@ class TrustedGatewayHeaderFilterTest {
     }
 
     @Test
+    void rejectsIdentityHeadersWhenInternalJwtActorTypeIsMissing() throws ServletException, IOException {
+        SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET, meterRegistry);
+        MockHttpServletRequest request = requestWithIdentityHeaders();
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + userInternalTokenWithoutActorType("42"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(meterRegistry
+                        .get("courseflow.internal_jwt.rejections")
+                        .tag("reason", "wrong_actor_type")
+                        .tag("request_type", "internal_endpoint")
+                        .counter()
+                        .count())
+                .isEqualTo(1.0);
+    }
+
+    @Test
     void rejectsIdentityHeadersWhenRoleSetDoesNotMatchInternalJwt() throws ServletException, IOException {
         TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
         MockHttpServletRequest request = requestWithIdentityHeaders();
@@ -553,8 +728,16 @@ class TrustedGatewayHeaderFilterTest {
     }
 
     private String userInternalToken(String userId, List<Map<String, Object>> roleAssignments) {
+        return userInternalToken(userId, roleAssignments, true);
+    }
+
+    private String userInternalTokenWithoutActorType(String userId) {
+        return userInternalToken(userId, List.of(Map.of("code", "STUDENT", "scopeType", "PLATFORM")), false);
+    }
+
+    private String userInternalToken(String userId, List<Map<String, Object>> roleAssignments, boolean includeActorType) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .issuer("courseflow-token-converter")
                 .subject(userId)
                 .claim("aud", List.of("courseflow-services"))
@@ -564,9 +747,11 @@ class TrustedGatewayHeaderFilterTest {
                 .claim("roles", List.of("STUDENT"))
                 .claim("role_assignments", roleAssignments)
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(180)))
-                .signWith(Keys.hmacShaKeyFor(INTERNAL_SECRET.getBytes(StandardCharsets.UTF_8)))
-                .compact();
+                .expiration(Date.from(now.plusSeconds(180)));
+        if (includeActorType) {
+            builder.claim("actor_type", "user");
+        }
+        return builder.signWith(Keys.hmacShaKeyFor(INTERNAL_SECRET.getBytes(StandardCharsets.UTF_8))).compact();
     }
 
     private String roleScope(String code, String scopeType, String scopeId) {

@@ -2,15 +2,18 @@ package edu.courseflow.course.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.web.CurrentUser;
+import edu.courseflow.course.dto.AuthoringDtos.CourseVersionDto;
 import edu.courseflow.course.dto.CourseDtos.CourseDto;
 import edu.courseflow.course.exception.ForbiddenException;
 import edu.courseflow.course.repository.CourseCatalogRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +22,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -80,6 +84,29 @@ class CourseCatalogServiceAuthzTest {
         verifyNoInteractions(authoring);
     }
 
+    @Test
+    void publishEventIncludesPublishedVersionNumber() throws Exception {
+        CurrentUser owner = new CurrentUser(2L, "owner@courseflow.local", "INSTRUCTOR", Set.of("INSTRUCTOR"));
+        CourseDto course = courseDto(DEPARTMENT_ID, "2");
+        CourseVersionDto version = new CourseVersionDto(
+                UUID.randomUUID().toString(),
+                COURSE_ID.toString(),
+                5,
+                "PUBLISHED",
+                "2",
+                "approved",
+                Instant.now(),
+                Instant.now());
+        when(courses.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(authoring.publishSnapshot(COURSE_ID, owner)).thenReturn(version);
+        ArgumentCaptor<String> payload = ArgumentCaptor.forClass(String.class);
+
+        service.publish(COURSE_ID, owner);
+
+        verify(courses).outbox(eq(COURSE_ID), eq("course.published"), payload.capture());
+        assertThat(new ObjectMapper().readTree(payload.getValue()).path("publishedVersionNo").asInt()).isEqualTo(5);
+    }
+
     private static CourseDto courseDto(UUID departmentId, String ownerId) {
         return new CourseDto(
                 COURSE_ID.toString(),
@@ -91,6 +118,9 @@ class CourseCatalogServiceAuthzTest {
                 ownerId,
                 "BEGINNER",
                 "DRAFT",
+                BigDecimal.ZERO,
+                "USD",
+                "FREE",
                 Instant.now(),
                 List.of());
     }

@@ -13,6 +13,7 @@ import edu.courseflow.course.dto.CourseDtos.CreateCourseRequestDto;
 import edu.courseflow.course.dto.CourseDtos.CourseMetadataDto;
 import edu.courseflow.course.dto.CourseDtos.CoursePricingDto;
 import edu.courseflow.course.dto.CourseDtos.UpdateCoursePricingRequestDto;
+import edu.courseflow.course.dto.AuthoringDtos.CourseVersionDto;
 import edu.courseflow.course.exception.ForbiddenException;
 import edu.courseflow.course.repository.CourseCatalogRepository;
 import edu.courseflow.events.common.EventMetadata;
@@ -142,7 +143,7 @@ public class CourseCatalogService {
         requireOwnerOrAdmin(current, user);
         // Enforce the review workflow (must be APPROVED), freeze the curriculum snapshot into the
         // current course_version and stamp published_at before the course goes live.
-        authoring.publishSnapshot(courseId, user);
+        CourseVersionDto publishedVersion = authoring.publishSnapshot(courseId, user);
         courses.updateStatus(courseId, "PUBLISHED");
         courses.outbox(courseId, "course.published", toJson(new CoursePublishedEvent(
                 UUID.randomUUID().toString(),
@@ -155,6 +156,7 @@ public class CourseCatalogService {
                 current.ownerId(),
                 current.level(),
                 "PUBLISHED",
+                publishedVersion.versionNo(),
                 Instant.now(),
                 metadata(user))));
         return get(courseId);

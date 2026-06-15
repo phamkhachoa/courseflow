@@ -126,9 +126,9 @@ pending/missing outbox evidence. When `hasMore` is true the client should pass t
 `GET /internal/loyalty/dead-letters` and related action endpoints expose the promotion-to-loyalty
 Kafka DLT operations queue. Only platform admins or service callers with loyalty admin scope may
 view or resolve records. Detail responses intentionally expose payload hash, payload size, headers,
-Kafka position and exception metadata, but not raw payload. Replay republishes the stored original
-payload to the captured source topic; discard marks the record as manually resolved without
-publishing it.
+Kafka position and exception metadata, but not raw payload. Live replay/discard requires an approved
+maker-checker `approvalId`; dry-run remains read-only. Replay republishes the stored original payload
+to the captured source topic; discard marks the record as manually resolved without publishing it.
 The live promotion-to-loyalty consumer records processed upstream `eventId`s after successful
 handling. Replayed records with the same payload are skipped before ledger mutation; same event id
 with a different payload is treated as an inbound payload conflict and is retry/DLT eligible.
@@ -139,9 +139,15 @@ hashes.
 `POST /internal/loyalty/reward-redemptions/{redemptionId}:reverse` is an admin support action that
 reverses the original burn ledger entry and marks the redemption `REVERSED`; it must not use manual
 adjustment as a shortcut.
+`POST /internal/loyalty/reward-redemptions/{redemptionId}/fulfillment-approvals` submits manual
+reward fulfillment overrides for maker-checker review. The approval metadata captures current
+fulfillment status/reference, target status/reference/note, threshold policy, idempotency key and
+request hash.
 `PATCH /internal/loyalty/reward-redemptions/{redemptionId}/fulfillment` only changes fulfillment
-status/reference/note. It must not mutate points, and failed fulfillment that should return points
-must use reward redemption reversal.
+status/reference/note after receiving an approved `approvalId` whose scope/hash still matches the
+current redemption. It must not mutate points, and failed fulfillment that should return points must
+use reward redemption reversal. Provider callbacks and retry runs remain separate service/admin
+operations and do not use the manual override approval contract.
 
 ## Producer Events
 

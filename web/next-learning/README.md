@@ -30,14 +30,12 @@ source already adds `/v1/...` paths.
 
 ## Keycloak Login
 
-The learner app can use the enterprise Keycloak flow without changing code:
+The learner app uses Authorization Code + PKCE against the CourseFlow Keycloak realm:
 
 ```bash
-NEXT_PUBLIC_AUTH_MODE=keycloak
 NEXT_PUBLIC_KEYCLOAK_ISSUER_URI=http://localhost:18080/realms/courseflow
 NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=courseflow-learner-web
 ```
 
-This enables Authorization Code + PKCE and stores the Keycloak access token for gateway calls. Keep
-`NEXT_PUBLIC_AUTH_MODE=legacy` only for explicit local compatibility testing of the retired
-identity-service password login/register flow.
+The Keycloak access token is stored for gateway calls and refreshed through the Keycloak token
+endpoint.

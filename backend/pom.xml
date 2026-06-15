@@ -32,7 +32,6 @@
     <modules>
         <module>common-library</module>
         <module>event-contracts</module>
-        <module>services/identity-service</module>
         <module>services/discovery-service</module>
         <module>services/access-control-service</module>
         <module>services/user-management-service</module>

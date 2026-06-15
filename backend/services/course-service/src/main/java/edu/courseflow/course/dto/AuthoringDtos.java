@@ -26,6 +26,38 @@ public final class AuthoringDtos {
     ) {
     }
 
+    public record CourseDraftPreviewDto(
+            String courseId,
+            String title,
+            String slug,
+            String summary,
+            String status,
+            String reviewState,
+            int currentVersionNo,
+            Instant generatedAt,
+            String readinessStatus,
+            int moduleCount,
+            int itemCount,
+            int requiredItemCount,
+            int totalEstimatedMinutes,
+            CourseDraftPreviewItemDto firstRequiredItem,
+            CourseDraftPreviewItemDto nextAction,
+            List<ModuleOutlineDto> modules,
+            List<String> issues
+    ) {
+    }
+
+    public record CourseDraftPreviewItemDto(
+            String moduleId,
+            String moduleTitle,
+            String itemId,
+            String itemType,
+            String title,
+            Integer estimatedMinutes,
+            boolean required
+    ) {
+    }
+
     public record ModuleOutlineDto(
             String moduleId,
             String title,
@@ -92,6 +124,13 @@ public final class AuthoringDtos {
             String note,
             List<String> checklist,
             Instant createdAt
+    ) {
+    }
+
+    public record CourseReviewChecklistItemDto(
+            String id,
+            String label,
+            boolean required
     ) {
     }
 

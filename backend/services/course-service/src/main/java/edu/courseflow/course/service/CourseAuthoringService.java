@@ -7,7 +7,10 @@ import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.course.dto.AuthoringDtos.CourseDraftDto;
+import edu.courseflow.course.dto.AuthoringDtos.CourseDraftPreviewDto;
+import edu.courseflow.course.dto.AuthoringDtos.CourseDraftPreviewItemDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseReviewAuditDto;
+import edu.courseflow.course.dto.AuthoringDtos.CourseReviewChecklistItemDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseReviewQueueItemDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseVersionDiffChangeDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseVersionDiffDto;
@@ -56,6 +59,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CourseAuthoringService {
+
+    private static final List<CourseReviewChecklistItemDto> REVIEW_CHECKLIST = List.of(
+            new CourseReviewChecklistItemDto("content-ready", "Content has no learner-facing blockers", true),
+            new CourseReviewChecklistItemDto("dependency-ready", "Media, quiz, and assignment dependencies are ready", true),
+            new CourseReviewChecklistItemDto("learner-preview-checked", "Learner preview was checked", true),
+            new CourseReviewChecklistItemDto("publish-risk-reviewed", "Publish risk and rollback plan were reviewed", true));
 
     private final CourseJpaRepository courses;
     private final CourseModuleJpaRepository modules;
@@ -126,6 +135,51 @@ public class CourseAuthoringService {
         return mapper.toDraftDto(course, listModules(courseId));
     }
 
+    public CourseDraftPreviewDto previewDraft(UUID courseId, CurrentUser user) {
+        Course course = findCourse(courseId);
+        requireReviewVisibility(course, user);
+        List<ModuleOutlineDto> previewModules = listModules(courseId);
+        List<String> issues = reviewabilityIssues(course);
+        CourseDraftPreviewItemDto firstRequiredItem = firstRequiredPreviewItem(previewModules);
+        int itemCount = 0;
+        int requiredItemCount = 0;
+        int totalEstimatedMinutes = 0;
+        for (ModuleOutlineDto module : previewModules) {
+            for (ItemOutlineDto item : module.items() == null ? List.<ItemOutlineDto>of() : module.items()) {
+                itemCount++;
+                if (item.required()) {
+                    requiredItemCount++;
+                }
+                if (item.estimatedMinutes() != null && item.estimatedMinutes() > 0) {
+                    totalEstimatedMinutes += item.estimatedMinutes();
+                }
+            }
+        }
+        return new CourseDraftPreviewDto(
+                course.getId().toString(),
+                course.getTitle(),
+                course.getSlug(),
+                course.getSummary(),
+                course.getStatus(),
+                course.getReviewState(),
+                course.getCurrentVersionNo(),
+                Instant.now(),
+                issues.isEmpty() ? "READY_FOR_REVIEW" : "BLOCKED",
+                previewModules.size(),
+                itemCount,
+                requiredItemCount,
+                totalEstimatedMinutes,
+                firstRequiredItem,
+                firstRequiredItem,
+                previewModules,
+                issues);
+    }
+
+    public List<CourseReviewChecklistItemDto> reviewChecklist(CurrentUser user) {
+        requireAuthenticated(user);
+        return REVIEW_CHECKLIST;
+    }
+
     private List<ModuleOutlineDto> listModules(UUID courseId) {
         return modules.findByCourseIdOrderByPositionAsc(courseId).stream()
                 .filter(module -> !"ARCHIVED".equals(module.getStatus()))
@@ -170,6 +224,25 @@ public class CourseAuthoringService {
                 .filter(item -> !"ARCHIVED".equals(item.getStatus()))
                 .map(mapper::toOutlineDto)
                 .toList();
+    }
+
+    private CourseDraftPreviewItemDto firstRequiredPreviewItem(List<ModuleOutlineDto> previewModules) {
+        for (ModuleOutlineDto module : previewModules) {
+            List<ItemOutlineDto> moduleItems = module.items() == null ? List.of() : module.items();
+            for (ItemOutlineDto item : moduleItems) {
+                if (item.required()) {
+                    return new CourseDraftPreviewItemDto(
+                            module.moduleId(),
+                            module.title(),
+                            item.itemId(),
+                            item.itemType(),
+                            item.title(),
+                            item.estimatedMinutes(),
+                            true);
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -313,11 +386,12 @@ public class CourseAuthoringService {
         if (!"IN_REVIEW".equals(reviewState)) {
             throw new BadRequestException("Only a course IN_REVIEW can be approved (current: " + reviewState + ")");
         }
+        List<String> checklist = requireCompleteReviewChecklist(request);
         course.setReviewState("APPROVED");
         course.setLastAuthoredBy(String.valueOf(user.id()));
         versions.findByCourseIdAndVersionNo(courseId, course.getCurrentVersionNo())
                 .ifPresent(version -> version.setState("APPROVED"));
-        recordReviewAudit(course, user, "APPROVE", reviewState, "APPROVED", decisionNote(request), decisionChecklist(request));
+        recordReviewAudit(course, user, "APPROVE", reviewState, "APPROVED", decisionNote(request), checklist);
         return getDraft(courseId);
     }
 
@@ -358,11 +432,12 @@ public class CourseAuthoringService {
         ensureReviewable(courseId);
         CourseVersion version = versions.findByCourseIdAndVersionNo(courseId, course.getCurrentVersionNo())
                 .orElseThrow(() -> new NotFoundException("Course version not found: " + courseId));
+        publishModules(courseId);
         List<ModuleOutlineDto> snapshotModules = getDraft(courseId).modules();
         validatePublishSnapshot(snapshotModules);
         version.publish(toJson(snapshotModules), Instant.now());
         course.setReviewState("PUBLISHED");
-        publishModules(courseId);
+        course.publishVersion(version.getVersionNo());
         recordReviewAudit(course, user, "PUBLISH", reviewState, "PUBLISHED",
                 "Published v" + version.getVersionNo() + " learner snapshot", List.of());
         return toVersionDto(version);
@@ -669,12 +744,16 @@ public class CourseAuthoringService {
     }
 
     private void ensureReviewable(UUID courseId) {
-        Course course = findCourse(courseId);
-        List<CourseModule> courseModules = modules.findByCourseIdOrderByPositionAsc(courseId).stream()
-                .filter(module -> !"ARCHIVED".equals(module.getStatus()))
-                .toList();
+        List<String> issues = reviewabilityIssues(findCourse(courseId));
+        if (!issues.isEmpty()) {
+            throw new BadRequestException("Course is not ready for review: " + String.join("; ", issues));
+        }
+    }
+
+    private List<String> reviewabilityIssues(Course course) {
+        List<CourseModule> courseModules = activeModules(course.getId());
         if (courseModules.isEmpty()) {
-            throw new BadRequestException("Course must have at least one chapter before review");
+            return List.of("Course must have at least one chapter before review");
         }
         List<String> issues = new ArrayList<>();
         if (!hasPurchasablePricing(course)) {
@@ -682,9 +761,7 @@ public class CourseAuthoringService {
         }
         int requiredItems = 0;
         for (CourseModule module : courseModules) {
-            List<ModuleItem> moduleItems = items.findByModuleIdOrderByPositionAsc(module.getId()).stream()
-                    .filter(item -> !"ARCHIVED".equals(item.getStatus()))
-                    .toList();
+            List<ModuleItem> moduleItems = activeItems(module.getId());
             if (moduleItems.isEmpty()) {
                 issues.add("Module '" + module.getTitle() + "' has no learning items");
                 continue;
@@ -704,9 +781,7 @@ public class CourseAuthoringService {
         if (requiredItems == 0) {
             issues.add("Course must contain at least one required learning item");
         }
-        if (!issues.isEmpty()) {
-            throw new BadRequestException("Course is not ready for review: " + String.join("; ", issues));
-        }
+        return List.copyOf(issues);
     }
 
     private boolean hasPurchasablePricing(Course course) {
@@ -1398,7 +1473,38 @@ public class CourseAuthoringService {
     }
 
     private List<String> decisionChecklist(ReviewDecisionRequestDto request) {
-        return request == null ? List.of() : normalizeChecklist(request.checklist());
+        return validateKnownReviewChecklist(request == null ? List.of() : normalizeChecklist(request.checklist()));
+    }
+
+    private List<String> requireCompleteReviewChecklist(ReviewDecisionRequestDto request) {
+        List<String> checklist = decisionChecklist(request);
+        List<String> missing = requiredReviewChecklistIds().stream()
+                .filter(id -> !checklist.contains(id))
+                .toList();
+        if (!missing.isEmpty()) {
+            throw new BadRequestException("Review checklist is incomplete: " + String.join(", ", missing));
+        }
+        return checklist;
+    }
+
+    private List<String> validateKnownReviewChecklist(List<String> checklist) {
+        Set<String> allowed = REVIEW_CHECKLIST.stream()
+                .map(CourseReviewChecklistItemDto::id)
+                .collect(Collectors.toSet());
+        List<String> unknown = checklist.stream()
+                .filter(item -> !allowed.contains(item))
+                .toList();
+        if (!unknown.isEmpty()) {
+            throw new BadRequestException("Unknown review checklist item(s): " + String.join(", ", unknown));
+        }
+        return checklist;
+    }
+
+    private List<String> requiredReviewChecklistIds() {
+        return REVIEW_CHECKLIST.stream()
+                .filter(CourseReviewChecklistItemDto::required)
+                .map(CourseReviewChecklistItemDto::id)
+                .toList();
     }
 
     private String normalizeNote(String value) {

@@ -157,5 +157,5 @@ CREATE TABLE IF NOT EXISTS processed_events (
 -- changeset courseflow:assignment-900-demo-data context=demo
 INSERT INTO assignments (id, course_id, title, assignment_type, due_at, max_score, status)
 VALUES
-  ('50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'Build identity-service skeleton', 'CODE_PROJECT', '2026-02-10T23:59:00+07:00', 100, 'PUBLISHED')
+  ('50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'Build service skeleton', 'CODE_PROJECT', '2026-02-10T23:59:00+07:00', 100, 'PUBLISHED')
 ON CONFLICT (id) DO NOTHING;

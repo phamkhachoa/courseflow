@@ -7,6 +7,12 @@ area; it is to prove that the core LMS workflow can be operated, audited and rec
 
 - Golden flow: create course, submit review, approve, publish, enroll learner, learn content, submit
   assessment, grade, finalize, issue certificate, report.
+- Course authoring preview: reviewers must inspect the server-side draft learner preview before
+  approving the `learner-preview-checked` gate; learner runtime remains backed only by the published
+  immutable curriculum snapshot.
+- Published course runtime: publish must pin `courses.published_version_no`, freeze module status as
+  `PUBLISHED` inside the snapshot, expose the pinned version to learner player/progress responses,
+  and emit it on `course.published` events.
 - Admin UX: operators must use pickers/search for common workflows, not raw UUID lookup as the
   primary path.
 - Compliance baseline: admin can export identity-owned user data and deactivate an account with a
@@ -32,9 +38,10 @@ Use demo data or a disposable test tenant. Do not run this checklist against pro
 | Enroll learner | Student or scoped staff | Enrollment is `ACTIVE`; unpublished courses are rejected |
 | Learn content | Student | Module/item progress updates under enrolled course |
 | Take quiz | Student | Attempt uses question snapshot and deadline guard |
-| Grade/finalize | Staff | Gradebook entry/final grade is scoped and auditable |
+| Grade/finalize | Staff | Grading queue shows missing/finalize-ready work; gradebook entry/final grade is scoped and auditable |
 | Issue certificate | Staff | Verification code resolves publicly |
 | Report | Staff/admin | Course reports require course staff scope; org dashboards require platform admin or matching org scope |
+| Learner success | Staff | At-risk learners can be filtered by severity and opened directly in gradebook/certificate eligibility workflows |
 | Notify learner | Staff/admin | Notification row has delivery status and appears in learner inbox |
 | Privacy action | Admin | User privacy export downloads; deactivate revokes tokens/role grants |
 
@@ -60,7 +67,7 @@ Targeted hardening gate:
 
 ```bash
 cd backend
-mvn -pl services/identity-service,services/notification-service -am test
+mvn -pl services/access-control-service,services/user-management-service,services/notification-service -am test
 mvn -pl services/analytics-service -am test
 mvn -pl services/outbox-relay -am test
 ```
@@ -382,17 +389,18 @@ Then check:
 - Production token converter runs with `ACCESS_CONTROL_RESOLUTION_MODE=required`; it must not fall
   back to roles embedded in external token claims when `access-control-service` is unavailable.
 - Production STS client credentials use an explicit `COURSEFLOW_STS_ALLOWED_CLIENTS` allowlist; `*`
-  is reserved for local/demo only, and the legacy `identity-service` is rejected in the Keycloak
-  production profile.
+  is reserved for local/demo only.
 - Production STS service scopes are explicit; wildcard `COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES=*`
   is rejected, and the list must include the endpoint-level scopes enforced by
   `TrustedGatewayHeaderFilter`, including the concrete `internal:promotion:<operation>` scopes.
 - Promotion service-to-service calls are fail-closed twice: the common internal JWT filter rejects
   generic `internal:service` tokens for `/internal/incentives/**`, and promotion access checks
   require the matching `internal:promotion:<operation>` scope before honoring the client binding.
-  Runtime operation scopes are granted to trusted source clients such as `checkout-service` and
-  `enrollment-service`; the
-  `promotion-service` STS client keeps only `internal:promotion:admin` by default.
+  Runtime operation scopes are granted only to deployed source clients. In the current production
+  topology, enrollment-service owns checkout/order/payment boundary calls; do not require a
+  `checkout-service` STS client until a real service is deployed. The `promotion-service` STS client
+  keeps `internal:promotion:admin` plus only the loyalty scopes needed for readiness and reversal
+  compensation.
 - Downstream services expose internal JWT rejection counters through
   `courseflow.internal_jwt.rejections` for `/internal/**`, `/backoffice/**` and identity-header
   requests.
@@ -477,8 +485,42 @@ Then check:
   latency summary.
 - Outbox relay DLQ is operator-visible: `GET /api/admin/v1/outbox/dead-letters?status=OPEN`
   returns metadata only and must not expose raw payload.
-- Outbox relay DLQ replay/discard requires platform `ADMIN`, an idempotency key, and a reason. Replay
-  uses the stored topic/key/payload and cannot be redirected by the request body.
+- Outbox relay DLQ live replay/discard requires platform `ADMIN`, an idempotency key, a reason, and
+  an approved maker-checker `approvalId`. Approval requests carry action, reason, evidence reference,
+  payload hash, request hash, and `OUTBOX_DLT_DUAL_CONTROL_V1`; the requester cannot approve their
+  own action. Replay uses the stored topic/key/payload and cannot be redirected by the request body.
+- Promotion operator redemption reverse requires maker-checker before production. Operators request
+  approval with the target redemption, execution idempotency key, reason, change ticket, subject hash,
+  and `NO_RELEASE_ON_COMMITTED_REVERSAL` evidence; a different reviewer approves; execution requires
+  the approved `approvalId` and a different executor, then marks the approval executed after the
+  compensating `REVERSE` ledger and `incentive.redemption.reversed` outbox event are written.
+- Enrollment paid checkout is release-gated by the order boundary: any positive `finalAmount`
+  creates a `PAYMENT_PENDING` order and `PENDING_PAYMENT` enrollment, promotion commit is deferred
+  until the order is `PAID`, and only checkout/payment service actors can record payment events.
+  `PAID` events must include amount, currency, provider, and provider reference; provider/reference
+  pairs are unique and idempotent across orders; mismatches, duplicate references, or replay
+  conflicts must open assigned remediation cases. Failed commits, manual reviews, and stale
+  reservations must also open assigned remediation cases, and successful retries/corrections must
+  auto-resolve the open case. Active remediation cases are database-deduped per source order or
+  promotion application, while resolved cases remain as history. Each remediation action is mirrored
+  into `enrollment_audit_log` with the case id, action, reason code, note, case-status transition,
+  and correlation payload without overloading the enrollment status columns.
+- Unified incentive ops console must keep the case view anchored: enrollment reconciliation and
+  audit can be filtered by enrollment/course/learner/correlation, promotion reservation/redemption
+  and coupon evidence by redemption/coupon/enrollment external reference, loyalty evidence by
+  account/reward/correlation, remediation cases by learner/course/enrollment/coupon/redemption/
+  correlation with assign/note/resolve actions, and outbox/DLT evidence by service/event/aggregate/
+  payload hash.
+- Loyalty benefit reconciliation must distinguish missing ledger evidence from mismatched ledger
+  evidence: promotion earn/reverse and reward reverse rows are not `MATCHED` unless entry type,
+  restored points, source reference/reversal link and account evidence align with the expected
+  benefit.
+- Loyalty reward fulfillment override requires maker-checker before production. Operators request
+  approval with target status/reference, reason, idempotency key and correlation id; a different
+  reviewer approves in the shared loyalty approval queue; live PATCH requires the approved
+  `approvalId` and rechecks redemption scope plus current fulfillment state before execution.
+  Fulfillment-only approvals intentionally carry zero point delta, and the database constraint must
+  allow that only when the approval metadata operation is `REWARD_FULFILLMENT_OVERRIDE`.
 - Outbox relay Prometheus metrics include `outbox_relay_dead_letters_open`,
   `outbox_relay_dead_letter_oldest_age_seconds`, `outbox_relay_replay_total`, and
   `outbox_relay_publish_failures_total`.
@@ -500,20 +542,29 @@ Do not call a build production-ready if any item below is true:
 
 - A normal operator must paste UUIDs for the golden flow.
 - A learner can access unpublished or unenrolled course assessment content.
+- A reviewer can approve `learner-preview-checked` without a server-side draft preview of the
+  current authoring curriculum.
+- Learner runtime selects the latest `course_versions.state=PUBLISHED` row instead of the pinned
+  `courses.published_version_no`, or published snapshots still contain draft module status.
+- Browser-facing course module routes expose service-only verified completion or cross-student
+  progress lookup endpoints.
+- Browser-facing enrollment routes expose service-only checkout/payment membership endpoints or
+  admin-only promotion remediation, benefit reconciliation, batch, stats, and audit endpoints.
 - Quiz attempts can be graded from mutable live question data instead of saved attempt snapshots.
-- Grade changes lack override reason/audit.
+- Grade changes, grading queue state, or final-grade finalize actions lack reason/audit evidence.
+- Learner success dashboards list at-risk learners without severity triage or direct remediation
+  links to gradebook and certificate eligibility workflows.
 - Notification send creates an inbox row with no delivery status.
 - Identity privacy export/deactivation lacks audit or token revocation.
 - Token converter can issue a user internal JWT from external claims without resolving
   `access-control-service`.
-- STS client credentials allow `COURSEFLOW_STS_ALLOWED_CLIENTS=*` or include `identity-service` in
-  production.
+- STS client credentials allow `COURSEFLOW_STS_ALLOWED_CLIENTS=*` in production.
 - Downstream services trust `X-User-*` headers without internal JWT attestation.
 - `/backoffice/**` service endpoints are reachable without a valid internal JWT.
 - Staff roles can read org dashboards or student analytics without matching org/course scope.
 - Department/org-scoped roles false-deny child course/section actions because callers omitted
   `ancestorScopes`.
-- Chat/WebSocket accepts legacy CourseFlow JWTs directly instead of exchanging the bearer token
+- Chat/WebSocket accepts external bearer tokens directly instead of exchanging the bearer token
   through `identity-token-converter-service`.
 - Fresh Liquibase migration fails from an empty database.
 - Promotion legacy coupon fallback is disabled while active inventory still has `legacy_sha`,

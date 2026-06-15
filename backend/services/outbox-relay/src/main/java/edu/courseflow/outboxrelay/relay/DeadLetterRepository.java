@@ -24,16 +24,19 @@ public class DeadLetterRepository {
                                  String aggregateId,
                                  String payload,
                                  int attempts,
+                                 String errorClass,
                                  String lastError,
                                  String payloadHash) {
         jdbc.sql("""
                         INSERT INTO relay_dead_letters
-                            (service_name, source_event_id, event_type, aggregate_id, payload, attempts,
-                             last_error, status, payload_hash, updated_at)
-                        VALUES (:service, :eventId, :eventType, :aggregateId, :payload, :attempts,
-                                :lastError, 'OPEN', :payloadHash, NOW())
+                            (service_name, source_event_id, event_type, topic, aggregate_id, payload, attempts,
+                             error_class, last_error, status, payload_hash, updated_at)
+                        VALUES (:service, :eventId, :eventType, :topic, :aggregateId, :payload, :attempts,
+                                :errorClass, :lastError, 'OPEN', :payloadHash, NOW())
                         ON CONFLICT (service_name, source_event_id) DO UPDATE
                           SET attempts = EXCLUDED.attempts,
+                              topic = COALESCE(EXCLUDED.topic, relay_dead_letters.topic),
+                              error_class = EXCLUDED.error_class,
                               last_error = EXCLUDED.last_error,
                               payload_hash = EXCLUDED.payload_hash,
                               status = CASE
@@ -46,9 +49,11 @@ public class DeadLetterRepository {
                 .param("service", serviceName)
                 .param("eventId", sourceEventId)
                 .param("eventType", eventType)
+                .param("topic", eventType)
                 .param("aggregateId", aggregateId)
                 .param("payload", payload)
                 .param("attempts", attempts)
+                .param("errorClass", truncate(errorClass, 255))
                 .param("lastError", truncate(lastError, 4000))
                 .param("payloadHash", payloadHash)
                 .update();
@@ -92,6 +97,7 @@ public class DeadLetterRepository {
                                          String serviceName,
                                          String eventType,
                                          String aggregateId,
+                                         String payloadHash,
                                          int limit) {
         return jdbc.sql("""
                         SELECT *
@@ -100,6 +106,14 @@ public class DeadLetterRepository {
                           AND (:serviceName IS NULL OR service_name = :serviceName)
                           AND (:eventType IS NULL OR event_type = :eventType)
                           AND (:aggregateId IS NULL OR aggregate_id = :aggregateId)
+                          AND (
+                              :payloadHash IS NULL
+                              OR payload_hash = :payloadHash
+                              OR (
+                                  payload_hash IS NULL
+                                  AND ('sha256:' || encode(digest(COALESCE(payload, ''), 'sha256'), 'hex')) = :payloadHash
+                              )
+                          )
                         ORDER BY created_at ASC, id ASC
                         LIMIT :limit
                         """)
@@ -107,6 +121,7 @@ public class DeadLetterRepository {
                 .param("serviceName", blankToNull(serviceName))
                 .param("eventType", blankToNull(eventType))
                 .param("aggregateId", blankToNull(aggregateId))
+                .param("payloadHash", normalizePayloadHash(payloadHash))
                 .param("limit", Math.max(1, Math.min(limit, 501)))
                 .query(this::map)
                 .list();
@@ -272,6 +287,152 @@ public class DeadLetterRepository {
                 .update();
     }
 
+    public List<DeadLetterApprovalRecord> approvals(UUID deadLetterId, String status, int limit) {
+        return jdbc.sql("""
+                        SELECT *
+                        FROM relay_dead_letter_approvals
+                        WHERE dead_letter_id = :deadLetterId
+                          AND (:status IS NULL OR status = :status)
+                        ORDER BY requested_at DESC, id DESC
+                        LIMIT :limit
+                        """)
+                .param("deadLetterId", deadLetterId)
+                .param("status", blankToNull(status))
+                .param("limit", Math.max(1, Math.min(limit, 501)))
+                .query(this::mapApproval)
+                .list();
+    }
+
+    public Optional<DeadLetterApprovalRecord> findApprovalById(UUID id) {
+        return jdbc.sql("""
+                        SELECT *
+                        FROM relay_dead_letter_approvals
+                        WHERE id = :id
+                        """)
+                .param("id", id)
+                .query(this::mapApproval)
+                .list()
+                .stream()
+                .findFirst();
+    }
+
+    public Optional<DeadLetterApprovalRecord> findEquivalentActiveApproval(
+            UUID deadLetterId,
+            String action,
+            String requestHash) {
+        return jdbc.sql("""
+                        SELECT *
+                        FROM relay_dead_letter_approvals
+                        WHERE dead_letter_id = :deadLetterId
+                          AND action = :action
+                          AND request_hash = :requestHash
+                          AND status IN ('PENDING', 'APPROVED', 'EXECUTED')
+                        ORDER BY requested_at DESC, id DESC
+                        LIMIT 1
+                        """)
+                .param("deadLetterId", deadLetterId)
+                .param("action", action)
+                .param("requestHash", requestHash)
+                .query(this::mapApproval)
+                .list()
+                .stream()
+                .findFirst();
+    }
+
+    public DeadLetterApprovalRecord insertApproval(UUID deadLetterId,
+                                                   String action,
+                                                   String reason,
+                                                   String evidenceReference,
+                                                   String thresholdPolicy,
+                                                   String payloadHash,
+                                                   String requestHash,
+                                                   String requestedBy,
+                                                   String correlationId) {
+        return jdbc.sql("""
+                        INSERT INTO relay_dead_letter_approvals
+                            (dead_letter_id, action, reason, evidence_reference, threshold_policy, payload_hash,
+                             request_hash, requested_by, correlation_id)
+                        VALUES (:deadLetterId, :action, :reason, :evidenceReference, :thresholdPolicy, :payloadHash,
+                                :requestHash, :requestedBy, :correlationId)
+                        RETURNING *
+                        """)
+                .param("deadLetterId", deadLetterId)
+                .param("action", action)
+                .param("reason", truncate(reason, 4000))
+                .param("evidenceReference", truncate(evidenceReference, 4000))
+                .param("thresholdPolicy", truncate(thresholdPolicy, 120))
+                .param("payloadHash", truncate(payloadHash, 80))
+                .param("requestHash", truncate(requestHash, 80))
+                .param("requestedBy", truncate(requestedBy, 255))
+                .param("correlationId", truncate(correlationId, 160))
+                .query(this::mapApproval)
+                .list()
+                .getFirst();
+    }
+
+    public Optional<DeadLetterApprovalRecord> approveApproval(UUID id, String reviewer, String note) {
+        return jdbc.sql("""
+                        UPDATE relay_dead_letter_approvals
+                        SET status = 'APPROVED',
+                            reviewed_by = :reviewer,
+                            review_note = :note,
+                            reviewed_at = NOW()
+                        WHERE id = :id
+                          AND status = 'PENDING'
+                        RETURNING *
+                        """)
+                .param("id", id)
+                .param("reviewer", truncate(reviewer, 255))
+                .param("note", truncate(note, 4000))
+                .query(this::mapApproval)
+                .list()
+                .stream()
+                .findFirst();
+    }
+
+    public Optional<DeadLetterApprovalRecord> rejectApproval(UUID id, String reviewer, String note) {
+        return jdbc.sql("""
+                        UPDATE relay_dead_letter_approvals
+                        SET status = 'REJECTED',
+                            reviewed_by = :reviewer,
+                            review_note = :note,
+                            reviewed_at = NOW()
+                        WHERE id = :id
+                          AND status = 'PENDING'
+                        RETURNING *
+                        """)
+                .param("id", id)
+                .param("reviewer", truncate(reviewer, 255))
+                .param("note", truncate(note, 4000))
+                .query(this::mapApproval)
+                .list()
+                .stream()
+                .findFirst();
+    }
+
+    public Optional<DeadLetterApprovalRecord> markApprovalExecuted(
+            UUID id,
+            String executedBy,
+            String idempotencyKey) {
+        return jdbc.sql("""
+                        UPDATE relay_dead_letter_approvals
+                        SET status = 'EXECUTED',
+                            executed_by = :executedBy,
+                            execution_idempotency_key = :idempotencyKey,
+                            executed_at = NOW()
+                        WHERE id = :id
+                          AND status = 'APPROVED'
+                        RETURNING *
+                        """)
+                .param("id", id)
+                .param("executedBy", truncate(executedBy, 255))
+                .param("idempotencyKey", truncate(idempotencyKey, 160))
+                .query(this::mapApproval)
+                .list()
+                .stream()
+                .findFirst();
+    }
+
     public List<DeadLetterCount> openCounts() {
         return jdbc.sql("""
                         SELECT service_name,
@@ -296,9 +457,13 @@ public class DeadLetterRepository {
                 rs.getString("service_name"),
                 rs.getObject("source_event_id", UUID.class),
                 rs.getString("event_type"),
+                rs.getString("topic"),
+                boxedInt(rs, "kafka_partition"),
+                boxedLong(rs, "kafka_offset"),
                 rs.getString("aggregate_id"),
                 rs.getString("payload"),
                 rs.getInt("attempts"),
+                rs.getString("error_class"),
                 rs.getString("last_error"),
                 instant(rs, "created_at"),
                 rs.getString("status"),
@@ -315,13 +480,53 @@ public class DeadLetterRepository {
                 rs.getString("payload_hash"));
     }
 
+    private DeadLetterApprovalRecord mapApproval(ResultSet rs, int rowNum) throws SQLException {
+        return new DeadLetterApprovalRecord(
+                rs.getObject("id", UUID.class),
+                rs.getObject("dead_letter_id", UUID.class),
+                rs.getString("action"),
+                rs.getString("status"),
+                rs.getString("reason"),
+                rs.getString("evidence_reference"),
+                rs.getString("threshold_policy"),
+                rs.getString("payload_hash"),
+                rs.getString("request_hash"),
+                rs.getString("requested_by"),
+                rs.getString("reviewed_by"),
+                rs.getString("review_note"),
+                rs.getString("executed_by"),
+                rs.getString("execution_idempotency_key"),
+                rs.getString("correlation_id"),
+                instant(rs, "requested_at"),
+                instant(rs, "reviewed_at"),
+                instant(rs, "executed_at"));
+    }
+
     private Instant instant(ResultSet rs, String column) throws SQLException {
         var timestamp = rs.getTimestamp(column);
         return timestamp == null ? null : timestamp.toInstant();
     }
 
+    private Integer boxedInt(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
+        return rs.wasNull() ? null : value;
+    }
+
+    private Long boxedLong(ResultSet rs, String column) throws SQLException {
+        long value = rs.getLong(column);
+        return rs.wasNull() ? null : value;
+    }
+
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String normalizePayloadHash(String value) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        return normalized.startsWith("sha256:") ? normalized : "sha256:" + normalized;
     }
 
     private String truncate(String value, int maxLength) {

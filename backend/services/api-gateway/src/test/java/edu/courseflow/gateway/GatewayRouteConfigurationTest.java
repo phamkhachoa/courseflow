@@ -53,6 +53,25 @@ class GatewayRouteConfigurationTest {
     }
 
     @Test
+    void identityRoutesUseKeycloakBackedServicesAndNeverLegacyIdentityService() {
+        Map<String, Object> root = loadGatewayApplicationYaml();
+        List<Map<String, Object>> routes = routes(root);
+
+        assertThat(routes).noneSatisfy(route -> assertThat(String.valueOf(route.get("uri")))
+                .as("route %s must not point to removed legacy identity-service", route.get("id"))
+                .contains("identity-service"));
+        assertThat(allPredicates(routes)).noneSatisfy(predicate -> assertThat(predicate)
+                .as("legacy password auth is blocked in the global filter, not routed")
+                .contains("/api/v1/auth"));
+
+        assertRouteUriHasPath(routes, "user-management-current-user", "lb://user-management-service", "/api/v1/users/me");
+        assertRouteUriHasPath(routes, "user-management-admin-users-root-create", "lb://user-management-service",
+                "/api/admin/v1/users,/api/admin/v1/users/");
+        assertRouteUriHasPath(routes, "access-control-admin-user-assignments", "lb://access-control-service",
+                "/api/admin/v1/users/*/assignments,/api/admin/v1/users/*/assignments/**,/api/admin/v1/users/*/assignments:export");
+    }
+
+    @Test
     void promotionRoutesUseGenericIncentivePaths() {
         Map<String, Object> root = loadGatewayApplicationYaml();
         List<Map<String, Object>> routes = routes(root);
@@ -60,15 +79,8 @@ class GatewayRouteConfigurationTest {
         assertRoute(routes, "promotion-admin", "lb://promotion-service",
                 "/api/admin/v1/incentives,/api/admin/v1/incentives/**");
         assertThat(routes).noneSatisfy(route -> assertThat(route.get("id")).isEqualTo("promotion-user"));
-        List<String> allPredicates = routes.stream()
-                .flatMap(route -> {
-                    @SuppressWarnings("unchecked")
-                    List<String> predicates = (List<String>) route.get("predicates");
-                    return predicates.stream();
-                })
-                .toList();
-        assertThat(allPredicates).noneMatch(predicate -> predicate.contains("/api/v1/incentives/evaluate"));
-        assertThat(allPredicates).noneMatch(predicate -> predicate.contains("/api/v1/incentives/reservations"));
+        assertThat(allPredicates(routes)).noneMatch(predicate -> predicate.contains("/api/v1/incentives/evaluate"));
+        assertThat(allPredicates(routes)).noneMatch(predicate -> predicate.contains("/api/v1/incentives/reservations"));
     }
 
     @Test
@@ -78,6 +90,56 @@ class GatewayRouteConfigurationTest {
 
         assertRoute(routes, "outbox-admin", "lb://outbox-relay",
                 "/api/admin/v1/outbox,/api/admin/v1/outbox/**");
+    }
+
+    @Test
+    void courseLearnerModulesRouteDoesNotExposeServiceOnlyProgressEndpoints() {
+        Map<String, Object> root = loadGatewayApplicationYaml();
+        List<Map<String, Object>> routes = routes(root);
+        Map<String, Object> route = routes.stream()
+                .filter(candidate -> "course-user-modules".equals(candidate.get("id")))
+                .findFirst()
+                .orElseThrow();
+
+        @SuppressWarnings("unchecked")
+        List<String> predicates = (List<String>) route.get("predicates");
+        assertThat(predicates).anySatisfy(predicate -> assertThat(predicate)
+                .contains("/api/v1/courses/*/modules")
+                .contains("/api/v1/courses/*/modules/player")
+                .contains("/api/v1/courses/*/modules/progress")
+                .contains("/api/v1/courses/*/modules/*/progress")
+                .contains("/api/v1/courses/*/modules/*/items/*/progress")
+                .doesNotContain("/api/v1/courses/*/modules/**")
+                .doesNotContain("progress/verified")
+                .doesNotContain("progress/internal"));
+    }
+
+    @Test
+    void enrollmentLearnerRouteDoesNotExposeAdminOrServiceOnlyEndpoints() {
+        Map<String, Object> root = loadGatewayApplicationYaml();
+        List<Map<String, Object>> routes = routes(root);
+        Map<String, Object> route = routes.stream()
+                .filter(candidate -> "enrollment-user".equals(candidate.get("id")))
+                .findFirst()
+                .orElseThrow();
+
+        @SuppressWarnings("unchecked")
+        List<String> predicates = (List<String>) route.get("predicates");
+        assertThat(predicates).anySatisfy(predicate -> assertThat(predicate)
+                .contains("/api/v1/enrollments")
+                .contains("/api/v1/enrollments/promotion-preview")
+                .contains("/api/v1/enrollments/coupons")
+                .contains("/api/v1/enrollments/checkout")
+                .contains("/api/v1/waitlist")
+                .doesNotContain("/api/v1/enrollments/**")
+                .doesNotContain("/api/v1/enrollments/orders")
+                .doesNotContain("/api/v1/enrollments/access")
+                .doesNotContain("/api/v1/enrollments/roster")
+                .doesNotContain("/api/v1/enrollments/promotion-applications")
+                .doesNotContain("/api/v1/enrollments/benefit-reconciliation")
+                .doesNotContain("/api/v1/enrollments/remediation-cases")
+                .doesNotContain("/api/v1/enrollments/batch")
+                .doesNotContain("/api/v1/enrollments/stats"));
     }
 
     @Test
@@ -124,6 +186,28 @@ class GatewayRouteConfigurationTest {
         assertThat(filters).anySatisfy(filter -> assertThat(filter)
                 .contains("RewritePath=/api")
                 .contains("/internal/$\\{segment}"));
+    }
+
+    private static void assertRouteUriHasPath(List<Map<String, Object>> routes, String id, String uri, String path) {
+        Map<String, Object> route = routes.stream()
+                .filter(candidate -> id.equals(candidate.get("id")))
+                .findFirst()
+                .orElseThrow();
+        assertThat(String.valueOf(route.get("uri"))).contains(uri);
+
+        @SuppressWarnings("unchecked")
+        List<String> predicates = (List<String>) route.get("predicates");
+        assertThat(predicates).anySatisfy(predicate -> assertThat(predicate).contains("Path=").contains(path));
+    }
+
+    private static List<String> allPredicates(List<Map<String, Object>> routes) {
+        return routes.stream()
+                .flatMap(route -> {
+                    @SuppressWarnings("unchecked")
+                    List<String> predicates = (List<String>) route.get("predicates");
+                    return predicates.stream();
+                })
+                .toList();
     }
 
     @SuppressWarnings("unchecked")

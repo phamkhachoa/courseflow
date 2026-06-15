@@ -18,6 +18,8 @@ public final class InternalScopes {
     public static final String PROFILE_READ = "internal:profile:read";
     public static final String PROFILE_WRITE = "internal:profile:write";
     public static final String BACKOFFICE = "internal:backoffice";
+    public static final String ANALYTICS_FUNNEL_WRITE = "internal:analytics:funnel-write";
+    public static final String ANALYTICS_EXPORT_READ = "internal:analytics:export-read";
     public static final String PROMOTION_ADMIN = "internal:promotion:admin";
     public static final String PROMOTION_EVALUATE = "internal:promotion:evaluate";
     public static final String PROMOTION_RESERVE = "internal:promotion:reserve";

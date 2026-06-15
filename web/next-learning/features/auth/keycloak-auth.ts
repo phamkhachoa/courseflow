@@ -27,9 +27,6 @@ type JwtClaims = {
   family_name?: string;
 };
 
-const authMode = (process.env.NEXT_PUBLIC_AUTH_MODE ?? "keycloak").toLowerCase();
-export const keycloakAuthEnabled = authMode !== "legacy";
-
 const authority = (process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER_URI ?? "http://localhost:18080/realms/courseflow")
   .replace(/\/$/, "");
 const clientId = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "courseflow-learner-web";

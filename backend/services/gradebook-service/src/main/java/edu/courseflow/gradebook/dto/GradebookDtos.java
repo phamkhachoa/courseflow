@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 public final class GradebookDtos {
 
@@ -135,6 +136,45 @@ public final class GradebookDtos {
     }
 
     public record FinalizeRequestDto(String finalizedBy) {
+    }
+
+    // ---- Grade publish/finalize audit ----
+
+    public record GradePublishAuditDto(
+            String id,
+            String action,
+            String courseId,
+            String studentId,
+            String gradeItemId,
+            String gradeEntryId,
+            String finalGradeId,
+            String actorId,
+            List<String> reasonCodes,
+            Map<String, Object> payload,
+            Instant createdAt
+    ) {
+    }
+
+    public record GradingQueueItemDto(
+            String queueKey,
+            String courseId,
+            String studentId,
+            String status,
+            List<String> reasonCodes,
+            String gradeItemId,
+            String gradeEntryId,
+            String finalGradeId,
+            String title,
+            String categoryName,
+            String sourceType,
+            String sourceId,
+            BigDecimal rawScore,
+            BigDecimal adjustedScore,
+            BigDecimal maxScore,
+            String finalGradeStatus,
+            Instant gradedAt,
+            Instant finalizedAt
+    ) {
     }
 
     // ---- Categories + weights (P0-4: weights must be set so final scores aren't always 0) ----

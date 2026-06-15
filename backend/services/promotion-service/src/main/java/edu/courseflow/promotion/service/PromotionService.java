@@ -15,6 +15,9 @@ import edu.courseflow.events.incentive.IncentiveRedemptionCommittedEvent;
 import edu.courseflow.events.incentive.IncentiveRedemptionReversedEvent;
 import edu.courseflow.promotion.dto.PromotionDtos.AdminPreviewIncentivesRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.AdminPreviewIncentivesResponseDto;
+import edu.courseflow.promotion.dto.PromotionDtos.AdminSimulationCandidateDto;
+import edu.courseflow.promotion.dto.PromotionDtos.AdminSimulationQuotaExposureDto;
+import edu.courseflow.promotion.dto.PromotionDtos.AdminSimulationTotalsDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CampaignDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CancelReservationRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CancelReservationResponseDto;
@@ -47,6 +50,7 @@ import edu.courseflow.promotion.model.IncentiveCampaign;
 import edu.courseflow.promotion.model.IncentiveCoupon;
 import edu.courseflow.promotion.model.IncentiveIdempotencyKey;
 import edu.courseflow.promotion.model.IncentiveLedgerEntry;
+import edu.courseflow.promotion.model.IncentiveOperationApproval;
 import edu.courseflow.promotion.model.IncentiveQuotaCounter;
 import edu.courseflow.promotion.model.IncentiveRedemption;
 import edu.courseflow.promotion.model.IncentiveReservation;
@@ -112,6 +116,7 @@ public class PromotionService {
     private final IncentiveDecisionEngine decisions;
     private final IncentiveAccessService access;
     private final CampaignVersionService campaignVersionService;
+    private final RedemptionReversalApprovalService reversalApprovals;
     private final ObjectMapper objectMapper;
     private final IncentiveMetrics metrics;
     private final CouponCodeFingerprintService couponFingerprints;
@@ -134,6 +139,7 @@ public class PromotionService {
                             IncentiveDecisionEngine decisions,
                             IncentiveAccessService access,
                             CampaignVersionService campaignVersionService,
+                            RedemptionReversalApprovalService reversalApprovals,
                             ObjectMapper objectMapper,
                             IncentiveMetrics metrics,
                             CouponCodeFingerprintService couponFingerprints,
@@ -154,6 +160,7 @@ public class PromotionService {
         this.decisions = decisions;
         this.access = access;
         this.campaignVersionService = campaignVersionService;
+        this.reversalApprovals = reversalApprovals;
         this.objectMapper = objectMapper;
         this.metrics = metrics;
         this.couponFingerprints = couponFingerprints;
@@ -606,7 +613,8 @@ public class PromotionService {
                     user,
                     sourceClientId,
                     contextHash);
-            EvaluateIncentivesResponseDto decision = evaluateDecision(context, "preview");
+            PreviewSimulation simulation = previewSimulation(context, "preview");
+            EvaluateIncentivesResponseDto decision = simulation.decision();
             audit(
                     context.tenantId(),
                     context.applicationId(),
@@ -615,16 +623,82 @@ public class PromotionService {
                     "incentive.previewed",
                     actorId(user),
                     request.note(),
-                    previewAuditPayload(auditFacts, decision, contextHash),
+                    previewAuditPayload(auditFacts, simulation, contextHash),
                     correlationId,
                     sourceClientId);
             metric = runtimeMetric(decision.eligible(), decision.reasonCodes(), hasCouponSelectors(context), "previewed");
-            return new AdminPreviewIncentivesResponseDto(true, false, contextHash, decision);
+            return new AdminPreviewIncentivesResponseDto(
+                    true,
+                    false,
+                    contextHash,
+                    decision,
+                    decision.campaignId(),
+                    decision.campaignVersion(),
+                    decision.campaignCode(),
+                    decision.couponId(),
+                    simulation.totals(),
+                    simulation.quotaExposure(),
+                    simulation.candidates(),
+                    Instant.now());
         } catch (RuntimeException ex) {
             metric = runtimeExceptionMetric(ex);
             throw ex;
         } finally {
             metrics.runtimeOperation("preview", metric.result(), metric.reason(), elapsed(started));
+        }
+    }
+
+    private PreviewSimulation previewSimulation(EvaluateIncentivesRequestDto request, String operation) {
+        CouponMatchDiagnostics couponDiagnostics = CouponMatchDiagnostics.forRequest(request);
+        try {
+            List<Selection> candidates = selectCandidates(request, couponDiagnostics);
+            Selection selected = candidates.stream()
+                    .filter(candidate -> quotasAvailable(candidate, request.profileId()))
+                    .findFirst()
+                    .orElse(null);
+            EvaluateIncentivesResponseDto decision;
+            if (selected == null) {
+                if (!candidates.isEmpty()) {
+                    Selection first = candidates.getFirst();
+                    decision = new EvaluateIncentivesResponseDto(
+                            false,
+                            first.campaign().getCampaignId(),
+                            first.campaign().getCampaignVersion(),
+                            first.campaign().getCode(),
+                            first.coupon() == null ? null : first.coupon().getId(),
+                            List.of(),
+                            List.of("QUOTA_EXHAUSTED"));
+                } else {
+                    decision = new EvaluateIncentivesResponseDto(
+                            false, null, null, null, null, List.of(), List.of("NO_ELIGIBLE_INCENTIVE"));
+                }
+            } else {
+                decision = new EvaluateIncentivesResponseDto(
+                        true,
+                        selected.campaign().getCampaignId(),
+                        selected.campaign().getCampaignVersion(),
+                        selected.campaign().getCode(),
+                        selected.coupon() == null ? null : selected.coupon().getId(),
+                        selected.decision().effects(),
+                        selected.decision().reasonCodes());
+            }
+            StackingAnalysis stackingAnalysis = stackingAnalysis(candidates, selected, request.profileId());
+            List<AdminSimulationCandidateDto> candidateDtos = candidates.stream()
+                    .map(candidate -> simulationCandidateDto(
+                            candidate,
+                            request.profileId(),
+                            stackingAnalysis.result(candidate)))
+                    .toList();
+            List<AdminSimulationQuotaExposureDto> quotaExposure = selected == null
+                    ? List.of()
+                    : quotaExposure(selected, request.profileId());
+            return new PreviewSimulation(
+                    decision,
+                    simulationTotals(request, decision.effects()),
+                    quotaExposure,
+                    candidateDtos);
+        } finally {
+            recordCouponMatch(operation, couponDiagnostics);
         }
     }
 
@@ -1089,6 +1163,11 @@ public class PromotionService {
             requireReverseAccess(redemption, user);
             access.requireKnownApplication(redemption.getTenantId(), redemption.getApplicationId(), user, "reverse");
             AuditMetadata auditMetadata = AuditMetadata.from(user, access, correlationId);
+            boolean serviceActor = "service".equalsIgnoreCase(access.actorType(user));
+            IncentiveOperationApproval approval = null;
+            if (!serviceActor) {
+                approval = reversalApprovals.requireApprovedForReverse(redemption, request, user);
+            }
             String requestHash = hash(Map.of("redemptionId", redemptionId.toString(), "request", request));
             IdempotencySlot<ReverseRedemptionResponseDto> slot = acquireIdempotency(
                     redemption.getTenantId(),
@@ -1126,13 +1205,21 @@ public class PromotionService {
             }
             IncentiveRedemption saved = redemptions.save(redemption);
             ledgerEntries.save(new IncentiveLedgerEntry("REVERSE", reservation, saved.getId(), saved.getEffectsJson()));
+            Map<String, Object> auditPayload = new LinkedHashMap<>();
+            auditPayload.put("reservationId", reservation.getId().toString());
+            auditPayload.put("campaignId", saved.getCampaignId().toString());
+            auditPayload.put("campaignVersion", saved.getCampaignVersion());
+            auditPayload.put("quotaPolicy", COMMITTED_REVERSAL_QUOTA_POLICY);
+            auditPayload.put("quotaReleased", COMMITTED_REVERSAL_RELEASES_QUOTA);
+            if (approval != null) {
+                auditPayload.put("approvalId", approval.getId().toString());
+                auditPayload.put("approvalStatus", approval.getStatus());
+                auditPayload.put("approvalSubjectHash", approval.getSubjectHash());
+                auditPayload.put("approvedBy", approval.getApprovedBy());
+                auditPayload.put("changeTicket", approval.getChangeTicket());
+            }
             audit(saved.getTenantId(), saved.getApplicationId(), saved.getId().toString(), "redemption",
-                    "redemption.reversed", actorId(user), request.reason(), Map.of(
-                            "reservationId", reservation.getId().toString(),
-                            "campaignId", saved.getCampaignId().toString(),
-                            "campaignVersion", saved.getCampaignVersion(),
-                            "quotaPolicy", COMMITTED_REVERSAL_QUOTA_POLICY,
-                            "quotaReleased", COMMITTED_REVERSAL_RELEASES_QUOTA), auditMetadata);
+                    "redemption.reversed", actorId(user), request.reason(), auditPayload, auditMetadata);
             outboxEvents.save(new OutboxEvent(saved.getId(), "incentive-redemption",
                     "incentive.redemption.reversed", toJson(new IncentiveRedemptionReversedEvent(
                     UUID.randomUUID().toString(),
@@ -1153,6 +1240,8 @@ public class PromotionService {
                     eventEffects(saved.getEffectsJson()),
                     saved.getReversedAt(),
                     eventMetadata(auditMetadata, user)))));
+            reversalApprovals.markExecuted(approval, actorId(user), saved.getReversedAt(),
+                    auditMetadata.correlationId(), auditMetadata.sourceClientId());
             ReverseRedemptionResponseDto response = reverseResponse(saved, false, "REVERSED");
             completeIdempotency(slot.key(), response);
             metrics.reversal("success", "REVERSED");
@@ -1340,6 +1429,170 @@ public class PromotionService {
                     profileId, selection.coupon().getMaxRedemptionsPerProfile()));
         }
         return List.copyOf(snapshot);
+    }
+
+    private StackingAnalysis stackingAnalysis(List<Selection> candidates, Selection selected, String profileId) {
+        if (candidates.isEmpty()) {
+            return new StackingAnalysis(Map.of());
+        }
+        Map<Selection, StackingPolicyResult> results = new LinkedHashMap<>();
+        for (Selection candidate : candidates) {
+            boolean quotaAvailable = quotasAvailable(candidate, profileId);
+            StackingPolicyResult result;
+            if (!quotaAvailable) {
+                result = new StackingPolicyResult(
+                        "QUOTA_EXHAUSTED",
+                        List.of("QUOTA_EXHAUSTED"),
+                        false);
+            } else if (candidate == selected) {
+                result = new StackingPolicyResult(
+                        "SELECTED_PRIMARY",
+                        List.of("RUNTIME_SINGLE_WINNER", "STACKING_PRIMARY"),
+                        true);
+            } else if (selected == null) {
+                result = new StackingPolicyResult(
+                        "NOT_SELECTED",
+                        List.of("NO_PRIMARY_SELECTION"),
+                        false);
+            } else if (selected.campaign().isExclusive()) {
+                result = new StackingPolicyResult(
+                        "BLOCKED_BY_EXCLUSIVE_WINNER",
+                        List.of("WINNER_EXCLUSIVE"),
+                        false);
+            } else if (!selected.campaign().isStackable()) {
+                result = new StackingPolicyResult(
+                        "BLOCKED_BY_PRIMARY_NON_STACKABLE",
+                        List.of("WINNER_NOT_STACKABLE"),
+                        false);
+            } else if (candidate.campaign().isExclusive()) {
+                result = new StackingPolicyResult(
+                        "BLOCKED_BY_CANDIDATE_EXCLUSIVE",
+                        List.of("CANDIDATE_EXCLUSIVE"),
+                        false);
+            } else if (!candidate.campaign().isStackable()) {
+                result = new StackingPolicyResult(
+                        "BLOCKED_BY_CANDIDATE_NON_STACKABLE",
+                        List.of("CANDIDATE_NOT_STACKABLE"),
+                        false);
+            } else {
+                result = new StackingPolicyResult(
+                        "WOULD_STACK",
+                        List.of("STACKING_COMPATIBLE", "SIMULATION_ONLY"),
+                        true);
+            }
+            results.put(candidate, result);
+        }
+        return new StackingAnalysis(results);
+    }
+
+    private AdminSimulationCandidateDto simulationCandidateDto(Selection selection,
+                                                               String profileId,
+                                                               StackingPolicyResult stacking) {
+        return new AdminSimulationCandidateDto(
+                selection.campaign().getCampaignId(),
+                selection.campaign().getCampaignVersion(),
+                selection.campaign().getCode(),
+                selection.coupon() == null ? null : selection.coupon().getId(),
+                true,
+                "SELECTED_PRIMARY".equals(stacking.status()),
+                selection.campaign().isExclusive(),
+                selection.campaign().isStackable(),
+                stacking.status(),
+                stacking.reasonCodes(),
+                selection.decision().effects(),
+                selection.decision().reasonCodes(),
+                quotaExposure(selection, profileId, stacking.wouldConsumeQuota()));
+    }
+
+    private List<AdminSimulationQuotaExposureDto> quotaExposure(Selection selection, String profileId) {
+        return quotaExposure(selection, profileId, true);
+    }
+
+    private List<AdminSimulationQuotaExposureDto> quotaExposure(Selection selection,
+                                                                String profileId,
+                                                                boolean wouldConsume) {
+        CampaignDefinitionSnapshot campaign = selection.campaign();
+        return quotaSnapshot(selection, profileId).stream()
+                .map(entry -> quotaExposure(
+                        campaign.getTenantId(),
+                        campaign.getApplicationId(),
+                        entry,
+                        wouldConsume))
+                .toList();
+    }
+
+    private AdminSimulationQuotaExposureDto quotaExposure(String tenantId,
+                                                          String applicationId,
+                                                          QuotaSnapshotEntry entry,
+                                                          boolean wouldConsume) {
+        String profileId = entry.profileId() == null || entry.profileId().isBlank()
+                ? IncentiveQuotaCounter.WILDCARD_PROFILE
+                : entry.profileId();
+        int used = quotaCounters.findByTenantIdAndApplicationIdAndScopeTypeAndScopeIdAndProfileId(
+                        tenantId,
+                        applicationId,
+                        entry.scopeType(),
+                        entry.scopeId(),
+                        profileId)
+                .map(IncentiveQuotaCounter::getUsedCount)
+                .orElse(0);
+        int remaining = Math.max(0, entry.limit() - used);
+        boolean available = entry.limit() > 0 && remaining > 0;
+        return new AdminSimulationQuotaExposureDto(
+                entry.scopeType(),
+                entry.scopeId(),
+                profileId,
+                entry.limit(),
+                used,
+                remaining,
+                available,
+                wouldConsume && available);
+    }
+
+    private AdminSimulationTotalsDto simulationTotals(EvaluateIncentivesRequestDto request,
+                                                      List<IncentiveEffectDto> effects) {
+        BigDecimal subtotal = request.transaction() == null || request.transaction().subtotal() == null
+                ? BigDecimal.ZERO
+                : request.transaction().subtotal();
+        BigDecimal shipping = request.transaction() == null || request.transaction().shippingAmount() == null
+                ? BigDecimal.ZERO
+                : request.transaction().shippingAmount();
+        BigDecimal totalDiscount = safeEffects(effects).stream()
+                .filter(this::discountEffect)
+                .map(effect -> effect.amount() == null ? BigDecimal.ZERO : effect.amount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalPoints = safeEffects(effects).stream()
+                .filter(this::pointsEffect)
+                .map(effect -> effect.quantity() == null
+                        ? effect.amount() == null ? BigDecimal.ZERO : effect.amount()
+                        : effect.quantity())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal finalAmount = subtotal.add(shipping).subtract(totalDiscount).max(BigDecimal.ZERO);
+        return new AdminSimulationTotalsDto(
+                money(subtotal),
+                money(totalDiscount),
+                money(finalAmount),
+                request.currency(),
+                totalPoints);
+    }
+
+    private List<IncentiveEffectDto> safeEffects(List<IncentiveEffectDto> effects) {
+        return effects == null ? List.of() : effects;
+    }
+
+    private boolean discountEffect(IncentiveEffectDto effect) {
+        return "DISCOUNT".equalsIgnoreCase(effect.benefitType())
+                || "MONEY".equalsIgnoreCase(effect.unit())
+                || effect.currency() != null;
+    }
+
+    private boolean pointsEffect(IncentiveEffectDto effect) {
+        return "POINTS_EARN_INTENT".equalsIgnoreCase(effect.benefitType())
+                || "POINT".equalsIgnoreCase(effect.unit());
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private ReserveCandidate reserveFirstAvailableCandidate(List<Selection> candidates, String profileId) {
@@ -1680,8 +1933,9 @@ public class PromotionService {
     }
 
     private Map<String, Object> previewAuditPayload(Map<String, Object> auditFacts,
-                                                    EvaluateIncentivesResponseDto decision,
+                                                    PreviewSimulation simulation,
                                                     String contextHash) {
+        EvaluateIncentivesResponseDto decision = simulation.decision();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("preview", true);
         payload.put("ledgerImpact", false);
@@ -1700,6 +1954,9 @@ public class PromotionService {
         payload.put("campaignCode", Objects.toString(decision.campaignCode(), ""));
         payload.put("couponId", decision.couponId() == null ? "" : decision.couponId().toString());
         payload.put("reasonCodes", decision.reasonCodes());
+        payload.put("totals", simulation.totals());
+        payload.put("quotaExposure", simulation.quotaExposure());
+        payload.put("candidateCount", simulation.candidates().size());
         return payload;
     }
 
@@ -2198,6 +2455,23 @@ public class PromotionService {
         static RuntimeMetric error() {
             return new RuntimeMetric("error", "error");
         }
+    }
+
+    private record StackingPolicyResult(String status, List<String> reasonCodes, boolean wouldConsumeQuota) {
+    }
+
+    private record StackingAnalysis(Map<Selection, StackingPolicyResult> results) {
+        StackingPolicyResult result(Selection selection) {
+            return results.getOrDefault(
+                    selection,
+                    new StackingPolicyResult("NOT_SELECTED", List.of("NO_STACKING_ANALYSIS"), false));
+        }
+    }
+
+    private record PreviewSimulation(EvaluateIncentivesResponseDto decision,
+                                     AdminSimulationTotalsDto totals,
+                                     List<AdminSimulationQuotaExposureDto> quotaExposure,
+                                     List<AdminSimulationCandidateDto> candidates) {
     }
 
     private record QuotaSnapshotEntry(String scopeType, String scopeId, String profileId, int limit) {

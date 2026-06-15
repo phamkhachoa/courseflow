@@ -19,7 +19,6 @@ spring:
     contexts: ${SPRING_LIQUIBASE_CONTEXTS:prod}
 courseflow:
   access-control:
-    allow-legacy-bootstrap: ${ACCESS_CONTROL_ALLOW_LEGACY_BOOTSTRAP:false}
     audit-authz-allowed: ${ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED:false}
 management:
   endpoints:

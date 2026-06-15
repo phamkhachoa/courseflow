@@ -2,18 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Bell, Compass, LogIn, LogOut, Search, UserPlus } from "lucide-react";
-import { API_BASE_URL } from "@/shared/api/envelope";
+import { usePathname } from "next/navigation";
+import { Bell, Compass, LogIn, LogOut, Search } from "lucide-react";
 import { learnerSession, type StoredSession } from "@/shared/api/client";
 import { Badge, Button, cn } from "@/shared/ui";
-import { keycloakAuthEnabled, redirectToKeycloakLogout } from "./keycloak-auth";
+import { redirectToKeycloakLogout } from "./keycloak-auth";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
   { href: "/search", label: "Tìm kiếm" },
   { href: "/learning-paths", label: "Lộ trình" },
   { href: "/deadlines", label: "Deadline" },
+  { href: "/loyalty", label: "Ưu đãi" },
   { href: "/gradebook", label: "Bảng điểm" },
   { href: "/notifications", label: "Thông báo" },
   { href: "/certificates", label: "Chứng chỉ" }
@@ -30,7 +30,6 @@ function initials(name?: string, email?: string) {
 }
 
 export function LearnerHeader() {
-  const router = useRouter();
   const pathname = usePathname();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -87,24 +86,8 @@ export function LearnerHeader() {
   async function handleLogout() {
     const current = learnerSession.read();
     setLoggingOut(true);
-    try {
-      if (keycloakAuthEnabled) {
-        learnerSession.clear();
-        redirectToKeycloakLogout(current);
-        return;
-      }
-      if (current?.accessToken) {
-        await fetch(`${API_BASE_URL}/v1/auth/logout`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${current.accessToken}` }
-        });
-      }
-    } finally {
-      learnerSession.clear();
-      setLoggingOut(false);
-      router.push("/");
-      router.refresh();
-    }
+    learnerSession.clear();
+    redirectToKeycloakLogout(current);
   }
 
   return (
@@ -183,21 +166,12 @@ export function LearnerHeader() {
                   </Link>
                 </Button>
                 <Button asChild size="sm">
-                  {keycloakAuthEnabled ? (
-                    <Link href={`/login?next=${encodeURIComponent(nextHref)}`}>
-                      <span className="inline-flex items-center gap-2">
-                        <LogIn className="size-4" />
-                        <span>IAM</span>
-                      </span>
-                    </Link>
-                  ) : (
-                    <Link href={`/register?next=${encodeURIComponent(nextHref)}`}>
-                      <span className="inline-flex items-center gap-2">
-                        <UserPlus className="size-4" />
-                        <span>Đăng ký</span>
-                      </span>
-                    </Link>
-                  )}
+                  <Link href={`/login?next=${encodeURIComponent(nextHref)}`}>
+                    <span className="inline-flex items-center gap-2">
+                      <LogIn className="size-4" />
+                      <span>IAM</span>
+                    </span>
+                  </Link>
                 </Button>
               </>
             )}

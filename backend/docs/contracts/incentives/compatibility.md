@@ -88,6 +88,11 @@ Java source to integrate with promotion, coupon, redemption, or reconciliation f
 - Coupon CSV import dry-run is non-destructive. The persisted batch and row reports store content
   hash, result hash, row masks, counts, warnings, and issue codes only. Raw codes and lookup
   fingerprints must never be written to audit, report JSON, examples, or API responses.
+- Experiment preview is an operator-only simulation surface. `POST
+  /internal/incentives/admin/experiments:preview` returns deterministic assignment buckets and
+  variant allocation bands with `ledgerImpact=false`; it must not be used by checkout/enrollment as
+  the runtime assignment source of truth until experiment id/variant attribution is persisted on
+  reservation, redemption, ledger and reconciliation records.
 
 ## Idempotency
 
@@ -103,6 +108,13 @@ request-body `idempotencyKey` fields remain compatibility fallbacks during migra
 Same key plus same request hash returns a stored response. Same key plus different request hash is a
 conflict. Idempotency responses keep the original business result and set `idempotencyReplay=true`
 where the DTO supports it.
+
+Operator/admin redemption reversals now use maker-checker. Support users first call
+`POST /internal/incentives/redemptions/{redemptionId}/reversal-approvals` with the execution
+`idempotencyKey`, reason, and change ticket. A different reviewer approves the request, then an
+operator executes `POST /internal/incentives/redemptions/{redemptionId}/reverse` with the approved
+`approvalId`, same `idempotencyKey`, reason, and change ticket. Runtime service actors that hold the
+bound `reverse` operation keep the direct reverse path for automated enrollment/order compensation.
 
 ## Reservation Ops Contract
 
@@ -154,8 +166,8 @@ response JSON.
 ## Loyalty Boundary
 
 Loyalty is accepted as a separate bounded context. Promotion may emit intent effects such as
-`benefitType=POINTS_EARN_INTENT` via action `LOYALTY_POINTS_EARN`, but it must not own loyalty
-balances, expiry buckets, reward inventory, or tier state.
+`benefitType=POINTS_EARN_INTENT` via action `LOYALTY_POINTS_EARN`, but it must not own loyalty balances,
+expiry buckets, reward inventory, or tier state.
 
 Promotion-to-loyalty application is asynchronous and idempotent:
 

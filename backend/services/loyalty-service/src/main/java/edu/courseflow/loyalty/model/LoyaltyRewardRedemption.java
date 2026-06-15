@@ -85,6 +85,33 @@ public class LoyaltyRewardRedemption {
     @Column(name = "fulfillment_note", columnDefinition = "TEXT")
     private String fulfillmentNote;
 
+    @Column(name = "fulfillment_provider", nullable = false, length = 80)
+    private String fulfillmentProvider = "MANUAL";
+
+    @Column(name = "fulfillment_attempt_count", nullable = false)
+    private int fulfillmentAttemptCount;
+
+    @Column(name = "fulfillment_last_attempt_at")
+    private Instant fulfillmentLastAttemptAt;
+
+    @Column(name = "fulfillment_next_attempt_at")
+    private Instant fulfillmentNextAttemptAt;
+
+    @Column(name = "fulfillment_sla_due_at")
+    private Instant fulfillmentSlaDueAt;
+
+    @Column(name = "fulfillment_error_class", length = 160)
+    private String fulfillmentErrorClass;
+
+    @Column(name = "fulfillment_error_message", columnDefinition = "TEXT")
+    private String fulfillmentErrorMessage;
+
+    @Column(name = "fulfillment_callback_received_at")
+    private Instant fulfillmentCallbackReceivedAt;
+
+    @Column(name = "fulfillment_callback_payload_hash", length = 128)
+    private String fulfillmentCallbackPayloadHash;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "reward_snapshot_json", nullable = false, columnDefinition = "jsonb")
     private String rewardSnapshotJson = "{}";
@@ -149,14 +176,21 @@ public class LoyaltyRewardRedemption {
         this.correlationId = correlationId;
         this.note = note;
         this.metadataJson = metadataJson == null || metadataJson.isBlank() ? "{}" : metadataJson;
-        if ("AUTO_ISSUE".equalsIgnoreCase(reward.getFulfillmentType())) {
-            this.fulfillmentStatus = "ISSUED";
-            this.fulfillmentRef = sourceReference;
-            this.fulfilledAt = Instant.now();
-        }
+        initializeFulfillment(reward.getFulfillmentType(), null, Instant.now());
     }
 
     public void updateFulfillment(String status, String fulfillmentRef, String note) {
+        updateFulfillment(status, fulfillmentRef, note, null, null, null, null);
+    }
+
+    public void updateFulfillment(
+            String status,
+            String fulfillmentRef,
+            String note,
+            String errorClass,
+            String errorMessage,
+            String callbackPayloadHash,
+            Instant callbackReceivedAt) {
         String nextStatus = status == null || status.isBlank() ? "" : status.trim().toUpperCase();
         if (!FULFILLMENT_STATUSES.contains(nextStatus)) {
             throw new IllegalArgumentException("Unsupported reward fulfillment status: " + status);
@@ -170,8 +204,67 @@ public class LoyaltyRewardRedemption {
         }
         if ("ISSUED".equals(nextStatus)) {
             this.fulfilledAt = Instant.now();
+            this.fulfillmentNextAttemptAt = null;
+            this.fulfillmentErrorClass = null;
+            this.fulfillmentErrorMessage = null;
+        } else if ("MANUAL_REQUIRED".equals(nextStatus)) {
+            this.fulfillmentNextAttemptAt = null;
+            this.fulfillmentErrorClass = null;
+            this.fulfillmentErrorMessage = null;
+        } else if ("FAILED".equals(nextStatus)) {
+            this.fulfillmentErrorClass = errorClass == null || errorClass.isBlank() ? null : errorClass.trim();
+            this.fulfillmentErrorMessage = errorMessage == null || errorMessage.isBlank() ? null : errorMessage.trim();
+        }
+        if (callbackPayloadHash != null && !callbackPayloadHash.isBlank()) {
+            this.fulfillmentCallbackPayloadHash = callbackPayloadHash.trim();
+        }
+        if (callbackReceivedAt != null) {
+            this.fulfillmentCallbackReceivedAt = callbackReceivedAt;
         }
         this.updatedAt = Instant.now();
+    }
+
+    public void initializeFulfillment(String provider, Instant slaDueAt, Instant firstAttemptAt) {
+        this.fulfillmentProvider = normalizeProvider(provider);
+        this.fulfillmentSlaDueAt = slaDueAt;
+        if (firstAttemptAt != null && "PENDING".equals(fulfillmentStatus)) {
+            this.fulfillmentNextAttemptAt = firstAttemptAt;
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    public void markFulfillmentAttemptStarted(Instant attemptedAt) {
+        this.fulfillmentAttemptCount += 1;
+        this.fulfillmentLastAttemptAt = attemptedAt == null ? Instant.now() : attemptedAt;
+        this.fulfillmentNextAttemptAt = null;
+        if (!"ISSUED".equals(fulfillmentStatus) && !"MANUAL_REQUIRED".equals(fulfillmentStatus)) {
+            this.fulfillmentStatus = "PENDING";
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    public void scheduleNextFulfillmentAttempt(Instant nextAttemptAt) {
+        this.fulfillmentNextAttemptAt = nextAttemptAt;
+        this.updatedAt = Instant.now();
+    }
+
+    public void markFulfillmentFailure(
+            String errorClass,
+            String errorMessage,
+            Instant nextAttemptAt,
+            String note) {
+        this.fulfillmentStatus = "FAILED";
+        this.fulfillmentErrorClass = errorClass == null || errorClass.isBlank() ? null : errorClass.trim();
+        this.fulfillmentErrorMessage = errorMessage == null || errorMessage.isBlank() ? null : errorMessage.trim();
+        this.fulfillmentNextAttemptAt = nextAttemptAt;
+        if (note != null) {
+            this.fulfillmentNote = note.isBlank() ? null : note.trim();
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    private String normalizeProvider(String provider) {
+        return provider == null || provider.isBlank() ? "MANUAL" : provider.trim().toUpperCase();
     }
 
     public void markReversed(UUID reversalEntryId) {
@@ -205,6 +298,15 @@ public class LoyaltyRewardRedemption {
     public String getFulfillmentStatus() { return fulfillmentStatus; }
     public String getFulfillmentRef() { return fulfillmentRef; }
     public String getFulfillmentNote() { return fulfillmentNote; }
+    public String getFulfillmentProvider() { return fulfillmentProvider; }
+    public int getFulfillmentAttemptCount() { return fulfillmentAttemptCount; }
+    public Instant getFulfillmentLastAttemptAt() { return fulfillmentLastAttemptAt; }
+    public Instant getFulfillmentNextAttemptAt() { return fulfillmentNextAttemptAt; }
+    public Instant getFulfillmentSlaDueAt() { return fulfillmentSlaDueAt; }
+    public String getFulfillmentErrorClass() { return fulfillmentErrorClass; }
+    public String getFulfillmentErrorMessage() { return fulfillmentErrorMessage; }
+    public Instant getFulfillmentCallbackReceivedAt() { return fulfillmentCallbackReceivedAt; }
+    public String getFulfillmentCallbackPayloadHash() { return fulfillmentCallbackPayloadHash; }
     public String getRewardSnapshotJson() { return rewardSnapshotJson; }
     public String getCorrelationId() { return correlationId; }
     public String getNote() { return note; }

@@ -104,7 +104,14 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
             if (!"internal".equals(claims.get("token_use", String.class))) {
                 return RejectionReason.WRONG_TOKEN_USE;
             }
-            if (requiresServiceActor(request) && !"service".equals(claims.get("actor_type", String.class))) {
+            String actorType = claims.get("actor_type", String.class);
+            if (!"user".equals(actorType) && !"service".equals(actorType)) {
+                return RejectionReason.WRONG_ACTOR_TYPE;
+            }
+            if (hasIdentityHeaders(request) && !"user".equals(actorType)) {
+                return RejectionReason.WRONG_ACTOR_TYPE;
+            }
+            if (requiresServiceActor(request) && !"service".equals(actorType)) {
                 return RejectionReason.WRONG_ACTOR_TYPE;
             }
             if (hasIdentityHeaders(request) && !identityClaimsMatchHeaders(claims, request)) {
@@ -145,7 +152,22 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
         return path.startsWith("/internal/identities/")
                 || path.startsWith("/internal/authz/check")
-                || path.startsWith("/internal/users/provision-profile");
+                || path.startsWith("/internal/users/provision-profile")
+                || isCourseModuleServiceOnlyEndpoint(path)
+                || isEnrollmentServiceOnlyEndpoint(path);
+    }
+
+    private boolean isCourseModuleServiceOnlyEndpoint(String path) {
+        return path.matches("^/internal/courses/[^/]+/modules/[^/]+/items/[^/]+/progress/verified$")
+                || path.matches("^/internal/courses/[^/]+/modules/items/progress/verified$")
+                || path.matches("^/internal/courses/[^/]+/modules/progress/internal$");
+    }
+
+    private boolean isEnrollmentServiceOnlyEndpoint(String path) {
+        return path.equals("/internal/enrollments/access")
+                || path.equals("/internal/enrollments/roster")
+                || path.equals("/internal/learner-memberships")
+                || path.matches("^/internal/enrollments/orders/[^/]+:record-payment$");
     }
 
     private Set<String> requiredServiceScopes(HttpServletRequest request) {
@@ -184,6 +206,12 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
         }
         if (path.equals("/internal/loyalty") || path.startsWith("/internal/loyalty/")) {
             return loyaltyScopes(path, method);
+        }
+        if (path.equals("/internal/analytics/marketing/funnel/events")) {
+            return Set.of(InternalScopes.ANALYTICS_FUNNEL_WRITE);
+        }
+        if (path.equals("/internal/analytics/warehouse/exports")) {
+            return Set.of(InternalScopes.ANALYTICS_EXPORT_READ);
         }
         if (path.startsWith("/internal/")) {
             return Set.of(InternalScopes.SERVICE);

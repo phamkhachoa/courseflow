@@ -38,13 +38,13 @@ class TokenExchangeServiceTest {
     private static final String PROMOTION_STS_SECRET = "promotion-sts-secret-32-byte-value";
     private static final String LOYALTY_STS_SECRET = "loyalty-sts-secret-32-byte-value";
     private static final String API_GATEWAY_CLIENT_ID = "api-gateway";
+    private static final String KEYCLOAK_ISSUER = "https://sso.courseflow.example.com/realms/courseflow";
+    private static final String KEYCLOAK_JWKS =
+            "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs";
 
     private final TokenConverterProperties properties = new TokenConverterProperties(
-            "legacy",
-            EXTERNAL_SECRET,
-            "courseflow-identity",
-            "",
-            "",
+            KEYCLOAK_ISSUER,
+            KEYCLOAK_JWKS,
             "courseflow-api",
             "HS256",
             INTERNAL_SECRET,
@@ -53,14 +53,16 @@ class TokenExchangeServiceTest {
             "courseflow-token-converter",
             "courseflow-services",
             "courseflow-services,course-service",
-            STS_SECRET,
+            "",
+            API_GATEWAY_CLIENT_ID + "=" + STS_SECRET,
             API_GATEWAY_CLIENT_ID,
             "internal:service,internal:token-exchange",
+            API_GATEWAY_CLIENT_ID + "=internal:service,internal:token-exchange",
             180,
             30);
     private final TokenExchangeService service = new TokenExchangeService(
-            new ExternalTokenVerifier(properties),
-            AccessControlIdentityResolver.legacyClaims(),
+            externalVerifier(properties),
+            testIdentityResolver(),
             new InternalTokenIssuer(properties, new ScopeMapper()),
             properties);
 
@@ -133,11 +135,17 @@ class TokenExchangeServiceTest {
     }
 
     @Test
-    void rejectsExternalTokenFromUnexpectedIssuer() {
-        assertThatThrownBy(() -> service.exchange(
+    void rejectsInvalidExternalToken() {
+        TokenExchangeService rejecting = new TokenExchangeService(
+                rejectingExternalVerifier(properties),
+                testIdentityResolver(),
+                new InternalTokenIssuer(properties, new ScopeMapper()),
+                properties);
+
+        assertThatThrownBy(() -> rejecting.exchange(
                 TokenExchangeService.TOKEN_EXCHANGE_GRANT,
                 TokenExchangeService.ACCESS_TOKEN_TYPE,
-                externalTokenWithIssuer("courseflow-other-issuer", "student@courseflow.local", "4", "STUDENT"),
+                "bad-token",
                 "courseflow-services",
                 null,
                 API_GATEWAY_CLIENT_ID,
@@ -157,11 +165,8 @@ class TokenExchangeServiceTest {
         generator.initialize(2048);
         var pair = generator.generateKeyPair();
         TokenConverterProperties rsProperties = new TokenConverterProperties(
-                "legacy",
-                EXTERNAL_SECRET,
-                "courseflow-identity",
-                "",
-                "",
+                KEYCLOAK_ISSUER,
+                KEYCLOAK_JWKS,
                 "courseflow-api",
                 "RS256",
                 "",
@@ -170,14 +175,16 @@ class TokenExchangeServiceTest {
                 "courseflow-token-converter",
                 "courseflow-services",
                 "courseflow-services",
-                STS_SECRET,
+                "",
+                API_GATEWAY_CLIENT_ID + "=" + STS_SECRET,
                 API_GATEWAY_CLIENT_ID,
                 "internal:service,internal:token-exchange",
+                API_GATEWAY_CLIENT_ID + "=internal:service,internal:token-exchange",
                 180,
                 30);
         TokenExchangeService rsService = new TokenExchangeService(
-                new ExternalTokenVerifier(rsProperties),
-                AccessControlIdentityResolver.legacyClaims(),
+                externalVerifier(rsProperties),
+                testIdentityResolver(),
                 new InternalTokenIssuer(rsProperties, new ScopeMapper()),
                 rsProperties);
 
@@ -452,9 +459,6 @@ class TokenExchangeServiceTest {
     @Test
     void oidcModeRequiresPerClientStsSecretsAndScopes() {
         assertThatThrownBy(() -> new TokenConverterProperties(
-                "oidc",
-                "",
-                "courseflow-identity",
                 "https://sso.courseflow.example.com/realms/courseflow",
                 "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs",
                 "courseflow-api",
@@ -466,8 +470,10 @@ class TokenExchangeServiceTest {
                 "courseflow-services",
                 "courseflow-services",
                 STS_SECRET,
+                "",
                 "api-gateway",
                 "internal:service,internal:token-exchange",
+                "",
                 180,
                 30))
                 .isInstanceOf(IllegalStateException.class)
@@ -477,9 +483,6 @@ class TokenExchangeServiceTest {
     @Test
     void oidcModeRejectsPerClientSecretWithoutScopePolicy() {
         assertThatThrownBy(() -> new TokenConverterProperties(
-                "oidc",
-                "",
-                "courseflow-identity",
                 "https://sso.courseflow.example.com/realms/courseflow",
                 "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs",
                 "courseflow-api",
@@ -504,9 +507,6 @@ class TokenExchangeServiceTest {
     @Test
     void oidcModeAcceptsPerClientStsPolicy() {
         TokenConverterProperties oidcProperties = new TokenConverterProperties(
-                "oidc",
-                "",
-                "courseflow-identity",
                 "https://sso.courseflow.example.com/realms/courseflow",
                 "https://sso.courseflow.example.com/realms/courseflow/protocol/openid-connect/certs",
                 "courseflow-api",
@@ -609,6 +609,30 @@ class TokenExchangeServiceTest {
     }
 
     @Test
+    void rejectsTrustedUserTokenWhenActorTypeIsMissing() {
+        TokenConverterProperties stsProperties = stsProperties();
+        TokenExchangeService stsService = service(stsProperties);
+        String actorToken = internalUserTokenWithoutActorType("42", "student@courseflow.local", "STUDENT");
+
+        assertThatThrownBy(() -> stsService.exchange(
+                TokenExchangeService.TRUSTED_USER_GRANT,
+                null,
+                null,
+                "courseflow-services",
+                "internal:user",
+                "course-service",
+                STS_SECRET,
+                null,
+                null,
+                null,
+                null,
+                actorToken))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void recordsTokenExchangeMetricsForSuccessAndFailure() {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         TokenExchangeService metered = service(properties, registry);
@@ -691,7 +715,7 @@ class TokenExchangeServiceTest {
                 && "4".equals(event.actorId())
                 && "courseflow-services".equals(event.audience())
                 && event.scopes().contains("course:read")
-                && "courseflow-identity".equals(event.externalIssuer())
+                && KEYCLOAK_ISSUER.equals(event.externalIssuer())
                 && "student@courseflow.local".equals(event.externalSubject())
                 && "200".equals(event.status())));
 
@@ -718,7 +742,7 @@ class TokenExchangeServiceTest {
     }
 
     private String externalToken(String subject, String userId, String... roleCodes) {
-        return externalTokenWithIssuer("courseflow-identity", subject, userId, roleCodes);
+        return externalTokenWithIssuer(KEYCLOAK_ISSUER, subject, userId, roleCodes);
     }
 
     private String externalTokenWithIssuer(String issuer, String subject, String userId, String... roleCodes) {
@@ -747,14 +771,25 @@ class TokenExchangeServiceTest {
         return Keys.hmacShaKeyFor(INTERNAL_SECRET.getBytes(StandardCharsets.UTF_8));
     }
 
+    private SecretKey externalKey() {
+        return Keys.hmacShaKeyFor(EXTERNAL_SECRET.getBytes(StandardCharsets.UTF_8));
+    }
+
     private String internalUserToken(String userId, String email, String role) {
+        return internalUserToken(userId, email, role, true);
+    }
+
+    private String internalUserTokenWithoutActorType(String userId, String email, String role) {
+        return internalUserToken(userId, email, role, false);
+    }
+
+    private String internalUserToken(String userId, String email, String role, boolean includeActorType) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .issuer("courseflow-token-converter")
                 .subject(userId)
                 .claim("aud", List.of("courseflow-services"))
                 .claim("token_use", "internal")
-                .claim("actor_type", "user")
                 .claim("azp", "api-gateway")
                 .claim("uid", userId)
                 .claim("email", email)
@@ -764,18 +799,17 @@ class TokenExchangeServiceTest {
                         "scopeType", "COURSE",
                         "scopeId", "100")))
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(180)))
-                .signWith(internalKey())
-                .compact();
+                .expiration(Date.from(now.plusSeconds(180)));
+        if (includeActorType) {
+            builder.claim("actor_type", "user");
+        }
+        return builder.signWith(internalKey()).compact();
     }
 
     private TokenConverterProperties stsProperties() {
         return new TokenConverterProperties(
-                "legacy",
-                EXTERNAL_SECRET,
-                "courseflow-identity",
-                "",
-                "",
+                KEYCLOAK_ISSUER,
+                KEYCLOAK_JWKS,
                 "courseflow-api",
                 "HS256",
                 INTERNAL_SECRET,
@@ -784,20 +818,19 @@ class TokenExchangeServiceTest {
                 "courseflow-token-converter",
                 "courseflow-services",
                 "courseflow-services",
-                STS_SECRET,
+                "",
+                "course-service=" + STS_SECRET,
                 "course-service",
                 "internal:service,internal:user",
+                "course-service=internal:service,internal:user",
                 180,
                 30);
     }
 
     private TokenConverterProperties stsPropertiesWithClientPolicy() {
         return new TokenConverterProperties(
-                "legacy",
-                EXTERNAL_SECRET,
-                "courseflow-identity",
-                "",
-                "",
+                KEYCLOAK_ISSUER,
+                KEYCLOAK_JWKS,
                 "courseflow-api",
                 "HS256",
                 INTERNAL_SECRET,
@@ -833,16 +866,16 @@ class TokenExchangeServiceTest {
 
     private TokenExchangeService service(TokenConverterProperties customProperties) {
         return new TokenExchangeService(
-                new ExternalTokenVerifier(customProperties),
-                AccessControlIdentityResolver.legacyClaims(),
+                externalVerifier(customProperties),
+                testIdentityResolver(),
                 new InternalTokenIssuer(customProperties, new ScopeMapper()),
                 customProperties);
     }
 
     private TokenExchangeService service(TokenConverterProperties customProperties, SimpleMeterRegistry registry) {
         return new TokenExchangeService(
-                new ExternalTokenVerifier(customProperties),
-                AccessControlIdentityResolver.legacyClaims(),
+                externalVerifier(customProperties),
+                testIdentityResolver(),
                 new InternalTokenIssuer(customProperties, new ScopeMapper()),
                 customProperties,
                 new TokenConverterMetrics(registry));
@@ -850,12 +883,75 @@ class TokenExchangeServiceTest {
 
     private TokenExchangeService service(TokenConverterProperties customProperties, TokenConverterAudit audit) {
         return new TokenExchangeService(
-                new ExternalTokenVerifier(customProperties),
-                AccessControlIdentityResolver.legacyClaims(),
+                externalVerifier(customProperties),
+                testIdentityResolver(),
                 new InternalTokenIssuer(customProperties, new ScopeMapper()),
                 customProperties,
                 TokenConverterMetrics.noop(),
                 audit);
+    }
+
+    private ExternalTokenVerifier externalVerifier(TokenConverterProperties customProperties) {
+        return new ExternalTokenVerifier(customProperties) {
+            @Override
+            public ExternalTokenClaims verify(String token) {
+                Claims claims = Jwts.parser()
+                        .verifyWith(externalKey())
+                        .build()
+                        .parseSignedClaims(token)
+                        .getPayload();
+                return new ExternalTokenClaims(claims.getIssuer(), claims.getSubject(), new HashMap<>(claims));
+            }
+        };
+    }
+
+    private ExternalTokenVerifier rejectingExternalVerifier(TokenConverterProperties customProperties) {
+        return new ExternalTokenVerifier(customProperties) {
+            @Override
+            public ExternalTokenClaims verify(String token) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid external token");
+            }
+        };
+    }
+
+    private AccessControlIdentityResolver testIdentityResolver() {
+        return externalClaims -> new ResolvedIdentity(
+                String.valueOf(externalClaims.get("uid")),
+                externalClaims.issuer(),
+                externalClaims.subject(),
+                externalClaims.stringClaim("email") == null ? externalClaims.subject() : externalClaims.stringClaim("email"),
+                "ACTIVE",
+                roleAssignments(externalClaims.get("roles")));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ResolvedIdentity.RoleAssignment> roleAssignments(Object rawRoles) {
+        if (!(rawRoles instanceof Collection<?> roles)) {
+            return List.of();
+        }
+        return roles.stream()
+                .map(raw -> {
+                    if (raw instanceof Map<?, ?> map) {
+                        Object code = ((Map<String, Object>) map).get("code");
+                        if (code == null || code.toString().isBlank()) {
+                            return null;
+                        }
+                        return new ResolvedIdentity.RoleAssignment(
+                                code.toString(),
+                                stringValue(((Map<String, Object>) map).get("scopeType"), "PLATFORM"),
+                                stringValue(((Map<String, Object>) map).get("scopeId"), null));
+                    }
+                    if (raw != null && !raw.toString().isBlank()) {
+                        return new ResolvedIdentity.RoleAssignment(raw.toString(), "PLATFORM", null);
+                    }
+                    return null;
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    private String stringValue(Object value, String fallback) {
+        return value == null || value.toString().isBlank() ? fallback : value.toString();
     }
 
     private String pem(String label, PrivateKey key) {

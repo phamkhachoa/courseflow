@@ -15,7 +15,6 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets:
-          - identity-service:8080
           - identity-token-converter-service:8080
           - access-control-service:8080
           - user-management-service:8080

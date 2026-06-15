@@ -14,11 +14,15 @@ public final class OutboxRelayDtos {
             String serviceName,
             UUID sourceEventId,
             String eventType,
+            String topic,
+            Integer kafkaPartition,
+            Long kafkaOffset,
             String aggregateId,
             String status,
             int attempts,
             int replayAttempts,
             String payloadHash,
+            String errorClass,
             String lastError,
             Instant createdAt,
             Instant updatedAt,
@@ -32,12 +36,16 @@ public final class OutboxRelayDtos {
             String serviceName,
             UUID sourceEventId,
             String eventType,
+            String topic,
+            Integer kafkaPartition,
+            Long kafkaOffset,
             String aggregateId,
             String status,
             int attempts,
             int replayAttempts,
             String payloadHash,
             long payloadSizeBytes,
+            String errorClass,
             String lastError,
             String lastReplayError,
             String resolvedBy,
@@ -58,7 +66,8 @@ public final class OutboxRelayDtos {
     public record DeadLetterActionRequestDto(
             String idempotencyKey,
             String reason,
-            Boolean dryRun) {
+            Boolean dryRun,
+            UUID approvalId) {
     }
 
     public record DeadLetterActionResponseDto(
@@ -71,5 +80,42 @@ public final class OutboxRelayDtos {
             String reasonCode,
             String payloadHash,
             Instant completedAt) {
+    }
+
+    public record DeadLetterApprovalRequestDto(
+            String action,
+            String reason,
+            String evidenceReference) {
+    }
+
+    public record DeadLetterApprovalReviewRequestDto(
+            String note) {
+    }
+
+    public record DeadLetterApprovalDto(
+            UUID id,
+            UUID deadLetterId,
+            String action,
+            String status,
+            String reason,
+            String evidenceReference,
+            String thresholdPolicy,
+            String payloadHash,
+            String requestHash,
+            String requestedBy,
+            String reviewedBy,
+            String reviewNote,
+            String executedBy,
+            String executionIdempotencyKey,
+            String correlationId,
+            Instant requestedAt,
+            Instant reviewedAt,
+            Instant executedAt) {
+    }
+
+    public record DeadLetterApprovalQueryResponseDto(
+            List<DeadLetterApprovalDto> items,
+            int limit,
+            boolean hasMore) {
     }
 }

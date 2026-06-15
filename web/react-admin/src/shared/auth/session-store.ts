@@ -7,14 +7,6 @@ export type AuthUser = {
   status: string;
 };
 
-export type TokenResponse = {
-  accessToken: string;
-  refreshToken: string;
-  tokenType: string;
-  expiresInSeconds: number;
-  user: AuthUser;
-};
-
 export type StoredSession = {
   accessToken: string;
   refreshToken: string;

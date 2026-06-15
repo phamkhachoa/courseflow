@@ -49,6 +49,8 @@ class CampaignVersionServiceBoundaryTest {
     IncentiveApplicationClientBindingRepository clientBindings;
     @Mock
     IncentiveMetrics metrics;
+    @Mock
+    PromotionLoyaltyReadinessClient loyaltyReadiness;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private CampaignVersionService service;
@@ -66,6 +68,7 @@ class CampaignVersionServiceBoundaryTest {
                 auditEvents,
                 access,
                 new IncentiveDecisionEngine(objectMapper),
+                loyaltyReadiness,
                 objectMapper,
                 metrics);
     }

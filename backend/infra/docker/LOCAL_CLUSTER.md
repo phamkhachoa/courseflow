@@ -257,6 +257,7 @@ hand.
   against the running cluster.
 - For a running OIDC cluster, run `node scripts/keycloak-security-smoke.mjs` from a context that can
   reach the gateway, token converter and one direct domain service.
+- Custom password-login services are not part of the local Keycloak cluster.
 
 ## Course Chat
 

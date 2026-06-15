@@ -6,13 +6,9 @@ spring:
 courseflow:
   security:
     external-token:
-      mode: ${EXTERNAL_TOKEN_MODE:oidc}
-      issuer: ${KEYCLOAK_ISSUER_URI:${JWT_ISSUER:courseflow-identity}}
+      issuer: ${KEYCLOAK_ISSUER_URI:}
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
       audiences: ${KEYCLOAK_AUDIENCE:courseflow-api}
-    external-jwt:
-      secret: ${COURSEFLOW_JWT_SECRET:}
-      issuer: ${JWT_ISSUER:courseflow-identity}
     internal-jwt:
       algorithm: ${COURSEFLOW_INTERNAL_JWT_ALGORITHM:HS256}
       secret: ${COURSEFLOW_INTERNAL_JWT_SECRET:}

@@ -11,4 +11,9 @@
     <include file="db/changelog/changes/004-inbound-dead-letters.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/005-rewards.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/006-processed-inbound-events.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/007-promotion-point-effect-reconciliation.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/008-reward-fulfillment-lifecycle.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/009-loyalty-tiers.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/010-inbound-dlt-maker-checker.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/011-approval-zero-delta-fulfillment.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

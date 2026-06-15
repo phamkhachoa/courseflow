@@ -15,7 +15,9 @@ import org.hibernate.type.SqlTypes;
 public class IncentiveOperationApproval {
 
     public static final String OPERATION_COUPON_IMPORT_COMMIT = "COUPON_IMPORT_COMMIT";
+    public static final String OPERATION_REDEMPTION_REVERSE = "PROMOTION_REDEMPTION_REVERSE";
     public static final String TARGET_COUPON_IMPORT_DRY_RUN = "COUPON_IMPORT_DRY_RUN";
+    public static final String TARGET_REDEMPTION = "PROMOTION_REDEMPTION";
 
     public static final String STATUS_PENDING = "PENDING_APPROVAL";
     public static final String STATUS_APPROVED = "APPROVED";

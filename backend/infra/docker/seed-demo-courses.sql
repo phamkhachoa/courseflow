@@ -3,42 +3,6 @@
 -- CourseFlow local demo catalog.
 -- Safe to run multiple times after the local Compose databases have been created.
 
-\connect cf_identity
-
-WITH seeded_users AS (
-    INSERT INTO users (
-        id, email, email_verified, password_hash, full_name, status,
-        mfa_enabled, must_change_password, created_by
-    )
-    VALUES
-        (2, 'instructor@courseflow.local', TRUE, '$2a$12$9lNOgMCJhc3V1Fudu/xf8.lgFwFcKzP2MOCuMcbt.c4h9u2mUhhYy', 'Lan Nguyen - Lead Instructor', 'ACTIVE', FALSE, FALSE, 'demo-course-seed'),
-        (4, 'student@courseflow.local', TRUE, '$2a$12$9lNOgMCJhc3V1Fudu/xf8.lgFwFcKzP2MOCuMcbt.c4h9u2mUhhYy', 'Minh Tran - Demo Learner', 'ACTIVE', FALSE, FALSE, 'demo-course-seed'),
-        (5, 'student2@courseflow.local', TRUE, '$2a$12$9lNOgMCJhc3V1Fudu/xf8.lgFwFcKzP2MOCuMcbt.c4h9u2mUhhYy', 'An Le - Product Analyst', 'ACTIVE', FALSE, FALSE, 'demo-course-seed')
-    ON CONFLICT (id) DO UPDATE SET
-        email = EXCLUDED.email,
-        email_verified = TRUE,
-        password_hash = EXCLUDED.password_hash,
-        full_name = EXCLUDED.full_name,
-        status = 'ACTIVE',
-        mfa_enabled = FALSE,
-        must_change_password = FALSE,
-        last_modified_on = NOW(),
-        last_modified_by = 'demo-course-seed'
-    RETURNING id
-)
-INSERT INTO user_role_assignments (user_id, role_id, scope_type, scope_id, granted_by)
-SELECT assignment.user_id, roles.id, assignment.scope_type, assignment.scope_id, 'demo-course-seed'
-FROM (VALUES
-    (2::BIGINT, 'INSTRUCTOR', 'PLATFORM', NULL),
-    (4::BIGINT, 'STUDENT', 'PLATFORM', NULL),
-    (5::BIGINT, 'STUDENT', 'PLATFORM', NULL)
-) AS assignment(user_id, role_code, scope_type, scope_id)
-JOIN roles ON roles.code = assignment.role_code
-ON CONFLICT (user_id, role_id, scope_type, COALESCE(scope_id, ''))
-WHERE revoked_at IS NULL DO NOTHING;
-
-SELECT setval('users_id_seq', GREATEST((SELECT MAX(id) FROM users), 5), TRUE);
-
 \connect cf_organization
 
 INSERT INTO departments (id, code, name, faculty, status)

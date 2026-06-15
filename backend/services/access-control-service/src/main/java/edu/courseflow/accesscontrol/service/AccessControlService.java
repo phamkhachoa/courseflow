@@ -86,7 +86,6 @@ public class AccessControlService {
     private final AccessControlAuditLogRepository auditLogs;
     private final AccessControlMetrics metrics;
     private final InternalJwtService internalJwtService;
-    private final boolean allowLegacyBootstrap;
     private final boolean auditAuthzAllowed;
 
     public AccessControlService(
@@ -99,7 +98,6 @@ public class AccessControlService {
             AccessControlAuditLogRepository auditLogs,
             AccessControlMetrics metrics,
             InternalJwtService internalJwtService,
-            @Value("${courseflow.access-control.allow-legacy-bootstrap:false}") boolean allowLegacyBootstrap,
             @Value("${courseflow.access-control.audit-authz-allowed:false}") boolean auditAuthzAllowed) {
         this.users = users;
         this.identityLinks = identityLinks;
@@ -110,7 +108,6 @@ public class AccessControlService {
         this.auditLogs = auditLogs;
         this.metrics = metrics;
         this.internalJwtService = internalJwtService;
-        this.allowLegacyBootstrap = allowLegacyBootstrap;
         this.auditAuthzAllowed = auditAuthzAllowed;
     }
 
@@ -289,9 +286,6 @@ public class AccessControlService {
                     return link.getUser();
                 })
                 .orElse(null);
-        if (user == null && allowLegacyBootstrap) {
-            user = bootstrapLegacyUser(issuer, subject, request);
-        }
         if (user == null) {
             throw new NotFoundException("EXTERNAL_IDENTITY_NOT_LINKED", issuer + ":" + subject);
         }
@@ -533,21 +527,6 @@ public class AccessControlService {
         return new AuthzCheckResultDto(request.userId(), permission, scopeType, scopeId, allowed);
     }
 
-    private AccessUser bootstrapLegacyUser(String issuer, String subject, ResolveIdentityRequest request) {
-        long userId = parseUserId(request.legacyUserId());
-        String email = normalizeEmail(request.email());
-        AccessUser user = users.findById(userId).orElseGet(() -> new AccessUser(userId, email));
-        user.updateEmail(email);
-        users.save(user);
-        ExternalIdentityLink link = identityLinks.findByIssuerAndSubject(issuer, subject)
-                .orElseGet(() -> new ExternalIdentityLink(
-                        user, "legacy-courseflow", issuer, subject, email, Boolean.TRUE.equals(request.emailVerified())));
-        link.relink(user, email, Boolean.TRUE.equals(request.emailVerified()));
-        identityLinks.save(link);
-        grantRoleHints(user, roleHintsOrDefaultStudent(request.roleAssignments()), "legacy-bootstrap");
-        return user;
-    }
-
     private void grantRoleHints(AccessUser user, List<RoleAssignmentHint> hints, String grantedBy) {
         for (RoleAssignmentHint hint : normalizeRoleHints(hints)) {
             roles.findByCode(hint.code()).ifPresent(role -> assignments
@@ -581,11 +560,6 @@ public class AccessControlService {
             }
         }
         return result;
-    }
-
-    private List<RoleAssignmentHint> roleHintsOrDefaultStudent(List<RoleAssignmentHint> hints) {
-        List<RoleAssignmentHint> normalized = normalizeRoleHints(hints);
-        return normalized.isEmpty() ? List.of(new RoleAssignmentHint("STUDENT", "PLATFORM", null)) : normalized;
     }
 
     private List<ResolvedRoleAssignmentDto> resolvedAssignments(Long userId) {

@@ -9,8 +9,10 @@ import edu.courseflow.events.incentive.IncentiveRedemptionCommittedEvent;
 import edu.courseflow.events.incentive.IncentiveRedemptionReversedEvent;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsMutationRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.ReversePointsRequestDto;
+import edu.courseflow.loyalty.model.LoyaltyPromotionPointEffect;
 import edu.courseflow.loyalty.security.PromotionServiceActorFactory;
 import edu.courseflow.loyalty.service.LoyaltyProcessedInboundEventService;
+import edu.courseflow.loyalty.service.LoyaltyPromotionPointEffectService;
 import edu.courseflow.loyalty.service.LoyaltyService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -34,16 +36,19 @@ public class PromotionPointsEarnIntentConsumer {
     private final ObjectMapper objectMapper;
     private final PromotionServiceActorFactory promotionServiceActorFactory;
     private final LoyaltyProcessedInboundEventService processedEvents;
+    private final LoyaltyPromotionPointEffectService expectedEffects;
 
     public PromotionPointsEarnIntentConsumer(
             LoyaltyService loyaltyService,
             ObjectMapper objectMapper,
             PromotionServiceActorFactory promotionServiceActorFactory,
-            LoyaltyProcessedInboundEventService processedEvents) {
+            LoyaltyProcessedInboundEventService processedEvents,
+            LoyaltyPromotionPointEffectService expectedEffects) {
         this.loyaltyService = loyaltyService;
         this.objectMapper = objectMapper;
         this.promotionServiceActorFactory = promotionServiceActorFactory;
         this.processedEvents = processedEvents;
+        this.expectedEffects = expectedEffects;
     }
 
     @KafkaListener(
@@ -51,6 +56,7 @@ public class PromotionPointsEarnIntentConsumer {
             groupId = "${courseflow.loyalty.promotion-points-group:loyalty-service}")
     public void onRedemptionCommitted(ConsumerRecord<String, String> record) throws Exception {
         String payload = record.value();
+        String payloadHash = sha256Hex(payload == null ? "" : payload);
         IncentiveRedemptionCommittedEvent event = objectMapper.readValue(
                 payload, IncentiveRedemptionCommittedEvent.class);
         handleInboundEvent(
@@ -58,6 +64,7 @@ public class PromotionPointsEarnIntentConsumer {
                 "incentive.redemption.committed",
                 event.eventId(),
                 event.redemptionId(),
+                payloadHash,
                 payload,
                 () -> {
                     if (event.effects() == null || event.effects().isEmpty()) {
@@ -67,7 +74,7 @@ public class PromotionPointsEarnIntentConsumer {
                         if (!isPointsEarnIntent(effect)) {
                             continue;
                         }
-                        earnPoints(event, effect);
+                        earnPoints(record.topic(), payloadHash, event, effect);
                     }
                 }
         );
@@ -78,6 +85,7 @@ public class PromotionPointsEarnIntentConsumer {
             groupId = "${courseflow.loyalty.promotion-points-group:loyalty-service}")
     public void onRedemptionReversed(ConsumerRecord<String, String> record) throws Exception {
         String payload = record.value();
+        String payloadHash = sha256Hex(payload == null ? "" : payload);
         IncentiveRedemptionReversedEvent event = objectMapper.readValue(
                 payload, IncentiveRedemptionReversedEvent.class);
         handleInboundEvent(
@@ -85,6 +93,7 @@ public class PromotionPointsEarnIntentConsumer {
                 "incentive.redemption.reversed",
                 event.eventId(),
                 event.redemptionId(),
+                payloadHash,
                 payload,
                 () -> {
                     if (event.effects() == null || event.effects().isEmpty()) {
@@ -94,7 +103,7 @@ public class PromotionPointsEarnIntentConsumer {
                         if (!isPointsEarnIntent(effect)) {
                             continue;
                         }
-                        reversePoints(event, effect);
+                        reversePoints(record.topic(), payloadHash, event, effect);
                     }
                 }
         );
@@ -105,9 +114,9 @@ public class PromotionPointsEarnIntentConsumer {
             String sourceEventType,
             String eventId,
             String aggregateId,
+            String payloadHash,
             String payload,
             ThrowingRunnable handler) throws Exception {
-        String payloadHash = sha256Hex(payload == null ? "" : payload);
         String processedEventId = inboundEventId(eventId, payloadHash);
         if (!processedEvents.shouldProcess(sourceEventType, processedEventId, payloadHash)) {
             return;
@@ -121,7 +130,11 @@ public class PromotionPointsEarnIntentConsumer {
                 payloadHash);
     }
 
-    private void earnPoints(IncentiveRedemptionCommittedEvent event, IncentiveEffectPayload effect) {
+    private void earnPoints(
+            String sourceTopic,
+            String payloadHash,
+            IncentiveRedemptionCommittedEvent event,
+            IncentiveEffectPayload effect) {
         String programId = metadataText(effect, "programId");
         String profileId = firstNonBlank(effect.targetId(), event.profileId());
         Long points = points(effect);
@@ -136,6 +149,23 @@ public class PromotionPointsEarnIntentConsumer {
         }
 
         String operationKey = promotionOperationKey(event, effect);
+        expectedEffects.recordExpectedEffect(new LoyaltyPromotionPointEffect(
+                sourceTopic,
+                "incentive.redemption.committed",
+                inboundEventId(event.eventId(), payloadHash),
+                event.redemptionId().trim(),
+                effect.effectId().trim(),
+                "EARN",
+                event.tenantId().trim(),
+                event.applicationId().trim(),
+                programId,
+                profileId,
+                points,
+                operationKey,
+                operationKey,
+                event.correlationId(),
+                payloadHash,
+                occurredAt(event)));
         loyaltyService.earn(new PointsMutationRequestDto(
                 event.tenantId(),
                 event.applicationId(),
@@ -152,7 +182,11 @@ public class PromotionPointsEarnIntentConsumer {
         ), promotionServiceActorFactory.currentUser());
     }
 
-    private void reversePoints(IncentiveRedemptionReversedEvent event, IncentiveEffectPayload effect) {
+    private void reversePoints(
+            String sourceTopic,
+            String payloadHash,
+            IncentiveRedemptionReversedEvent event,
+            IncentiveEffectPayload effect) {
         String programId = metadataText(effect, "programId");
         if (event.tenantId() == null || event.tenantId().isBlank()
                 || event.applicationId() == null || event.applicationId().isBlank()
@@ -166,6 +200,24 @@ public class PromotionPointsEarnIntentConsumer {
 
         String originalOperationKey = promotionOperationKey(event.redemptionId(), effect.effectId());
         String reversalKey = promotionReversalOperationKey(event.redemptionId(), effect.effectId());
+        Long points = points(effect);
+        expectedEffects.recordExpectedEffect(new LoyaltyPromotionPointEffect(
+                sourceTopic,
+                "incentive.redemption.reversed",
+                inboundEventId(event.eventId(), payloadHash),
+                event.redemptionId().trim(),
+                effect.effectId().trim(),
+                "REVERSE",
+                event.tenantId().trim(),
+                event.applicationId().trim(),
+                programId,
+                firstNonBlank(firstNonBlank(effect.targetId(), event.profileId()), "unknown"),
+                points == null ? 0L : points,
+                originalOperationKey,
+                reversalKey,
+                event.correlationId(),
+                payloadHash,
+                Instant.now()));
         loyaltyService.reverseBySourceReference(
                 event.tenantId(),
                 event.applicationId(),

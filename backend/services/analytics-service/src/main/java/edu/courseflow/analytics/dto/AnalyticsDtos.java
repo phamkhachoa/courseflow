@@ -52,7 +52,8 @@ public final class AnalyticsDtos {
 
     public record AtRiskStudentDto(
         String studentId, String courseId,
-        double engagementScore, String riskLevel, Instant lastActivityAt, int daysSinceActivity
+        double engagementScore, String riskLevel, Instant lastActivityAt, int daysSinceActivity,
+        List<String> riskReasons
     ) {}
 
     public record GradeDistributionDto(

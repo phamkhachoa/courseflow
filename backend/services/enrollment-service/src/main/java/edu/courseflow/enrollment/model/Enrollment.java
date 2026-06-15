@@ -103,6 +103,15 @@ public class Enrollment {
         this.droppedBy = null;
     }
 
+    public void pendingPayment() {
+        this.status = "PENDING_PAYMENT";
+        this.enrolledAt = Instant.now();
+        this.droppedAt = null;
+        this.completedAt = null;
+        this.dropReason = null;
+        this.droppedBy = null;
+    }
+
     public void changeStatus(String actorId, String newStatus, String reason) {
         Instant now = Instant.now();
         this.status = newStatus;
@@ -115,6 +124,8 @@ public class Enrollment {
             this.dropReason = reason == null ? this.dropReason : reason;
         } else if ("ACTIVE".equals(newStatus)) {
             activate();
+        } else if ("PENDING_PAYMENT".equals(newStatus)) {
+            pendingPayment();
         }
     }
 }

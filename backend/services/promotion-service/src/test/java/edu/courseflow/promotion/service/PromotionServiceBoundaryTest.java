@@ -100,6 +100,7 @@ class PromotionServiceBoundaryTest {
                 new IncentiveDecisionEngine(objectMapper),
                 access,
                 campaignVersionService,
+                org.mockito.Mockito.mock(RedemptionReversalApprovalService.class),
                 objectMapper,
                 metrics,
                 couponFingerprints(),

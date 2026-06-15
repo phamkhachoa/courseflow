@@ -26,9 +26,6 @@ type JwtClaims = {
   family_name?: string;
 };
 
-const authMode = (import.meta.env.VITE_AUTH_MODE ?? "keycloak").toLowerCase();
-export const keycloakAuthEnabled = authMode !== "legacy";
-
 const authority = (import.meta.env.VITE_KEYCLOAK_ISSUER_URI ?? "http://localhost:18080/realms/courseflow")
   .replace(/\/$/, "");
 const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? "courseflow-admin-web";

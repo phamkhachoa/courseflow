@@ -357,7 +357,7 @@ public class TokenExchangeService {
             if (!"internal".equals(claims.get("token_use", String.class))) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid actor_token token_use");
             }
-            if ("service".equals(claims.get("actor_type", String.class))) {
+            if (!"user".equals(claims.get("actor_type", String.class))) {
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "actor_token must be a user token");
             }
             if (!audienceMatches(claims, expectedAudience)) {

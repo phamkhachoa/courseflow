@@ -7,14 +7,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
+import edu.courseflow.commonlibrary.exception.ConflictException;
+import edu.courseflow.commonlibrary.exception.ForbiddenException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterActionRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterActionResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalQueryResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalReviewRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterDetailDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterQueryResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterSummaryDto;
 import edu.courseflow.loyalty.model.LoyaltyInboundDeadLetter;
+import edu.courseflow.loyalty.model.LoyaltyInboundDeadLetterApproval;
+import edu.courseflow.loyalty.repository.LoyaltyInboundDeadLetterApprovalRepository;
 import edu.courseflow.loyalty.repository.LoyaltyInboundDeadLetterRepository;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -25,8 +33,10 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
@@ -48,8 +58,11 @@ public class LoyaltyInboundDeadLetterService {
     private static final String EXCEPTION_FQCN_HEADER = "kafka_dlt-exception-fqcn";
     private static final String EXCEPTION_MESSAGE_HEADER = "kafka_dlt-exception-message";
     private static final String EXCEPTION_STACKTRACE_HEADER = "kafka_dlt-exception-stacktrace";
+    private static final String INBOUND_DLT_THRESHOLD_POLICY = "LOYALTY_INBOUND_DLT_DUAL_CONTROL_V1";
+    private static final Set<String> ACTIVE_APPROVAL_STATUSES = Set.of("PENDING", "APPROVED", "EXECUTED");
 
     private final LoyaltyInboundDeadLetterRepository deadLetters;
+    private final LoyaltyInboundDeadLetterApprovalRepository approvals;
     private final LoyaltyAccessService access;
     private final ObjectMapper objectMapper;
     private final KafkaTemplate<Object, Object> kafkaTemplate;
@@ -57,11 +70,13 @@ public class LoyaltyInboundDeadLetterService {
 
     public LoyaltyInboundDeadLetterService(
             LoyaltyInboundDeadLetterRepository deadLetters,
+            LoyaltyInboundDeadLetterApprovalRepository approvals,
             LoyaltyAccessService access,
             ObjectMapper objectMapper,
             KafkaTemplate<Object, Object> kafkaTemplate,
             LoyaltyMetrics metrics) {
         this.deadLetters = deadLetters;
+        this.approvals = approvals;
         this.access = access;
         this.objectMapper = objectMapper;
         this.kafkaTemplate = kafkaTemplate;
@@ -126,6 +141,100 @@ public class LoyaltyInboundDeadLetterService {
         return detail(record(id));
     }
 
+    @Transactional(readOnly = true)
+    public LoyaltyInboundDeadLetterApprovalQueryResponseDto approvals(
+            UUID id,
+            Optional<String> status,
+            Optional<Integer> limit,
+            CurrentUser user) {
+        access.requirePlatformAdmin(user);
+        record(id);
+        int pageSize = boundedLimit(limit.orElse(50));
+        List<LoyaltyInboundDeadLetterApproval> rows = approvals.search(
+                id,
+                normalized(status.orElse(null)),
+                PageRequest.of(0, pageSize + 1));
+        boolean hasMore = rows.size() > pageSize;
+        return new LoyaltyInboundDeadLetterApprovalQueryResponseDto(
+                rows.stream().limit(pageSize).map(this::approvalDto).toList(),
+                pageSize,
+                hasMore);
+    }
+
+    @Transactional
+    public LoyaltyInboundDeadLetterApprovalDto requestApproval(
+            UUID id,
+            LoyaltyInboundDeadLetterApprovalRequestDto request,
+            CurrentUser user) {
+        access.requirePlatformAdmin(user);
+        LoyaltyInboundDeadLetter deadLetter = record(id);
+        String action = approvalAction(request == null ? null : request.action());
+        if ("REPLAY".equals(action) && !deadLetter.replayable()) {
+            throw ConflictException.coded(LOYALTY_DEAD_LETTER_INVALID_STATE, "Inbound dead letter is not replayable");
+        }
+        if ("DISCARD".equals(action) && !deadLetter.discardable()) {
+            throw ConflictException.coded(LOYALTY_DEAD_LETTER_INVALID_STATE, "Inbound dead letter is not discardable");
+        }
+        String reason = required(request == null ? null : request.reason(), "reason");
+        String evidenceReference = required(request == null ? null : request.evidenceReference(), "evidenceReference");
+        String requestHash = approvalRequestHash(deadLetter, action, reason, evidenceReference);
+        LoyaltyInboundDeadLetterApproval existing = approvals
+                .findFirstByDeadLetterIdAndActionAndRequestHashAndStatusInOrderByRequestedAtDesc(
+                        id,
+                        action,
+                        requestHash,
+                        ACTIVE_APPROVAL_STATUSES)
+                .orElse(null);
+        if (existing != null) {
+            return approvalDto(existing);
+        }
+        return approvalDto(approvals.save(new LoyaltyInboundDeadLetterApproval(
+                id,
+                action,
+                reason,
+                evidenceReference,
+                INBOUND_DLT_THRESHOLD_POLICY,
+                deadLetter.getPayloadHash(),
+                requestHash,
+                required(actorId(user), "actorId"))));
+    }
+
+    @Transactional
+    public LoyaltyInboundDeadLetterApprovalDto approveApproval(
+            UUID approvalId,
+            LoyaltyInboundDeadLetterApprovalReviewRequestDto request,
+            CurrentUser user) {
+        access.requirePlatformAdmin(user);
+        LoyaltyInboundDeadLetterApproval approval = approvalForUpdate(approvalId);
+        String reviewer = required(actorId(user), "actorId");
+        if (reviewer.equalsIgnoreCase(approval.getRequestedBy())) {
+            throw ForbiddenException.coded(
+                    LOYALTY_DEAD_LETTER_INVALID_STATE,
+                    "Requester cannot approve their own inbound DLT action");
+        }
+        try {
+            approval.approve(reviewer, required(request == null ? null : request.note(), "note"));
+        } catch (IllegalStateException ex) {
+            throw ConflictException.coded(LOYALTY_DEAD_LETTER_INVALID_STATE, ex.getMessage());
+        }
+        return approvalDto(approval);
+    }
+
+    @Transactional
+    public LoyaltyInboundDeadLetterApprovalDto rejectApproval(
+            UUID approvalId,
+            LoyaltyInboundDeadLetterApprovalReviewRequestDto request,
+            CurrentUser user) {
+        access.requirePlatformAdmin(user);
+        LoyaltyInboundDeadLetterApproval approval = approvalForUpdate(approvalId);
+        try {
+            approval.reject(required(actorId(user), "actorId"), required(request == null ? null : request.note(), "note"));
+        } catch (IllegalStateException ex) {
+            throw ConflictException.coded(LOYALTY_DEAD_LETTER_INVALID_STATE, ex.getMessage());
+        }
+        return approvalDto(approval);
+    }
+
     @Transactional
     public LoyaltyInboundDeadLetterActionResponseDto replay(
             UUID id,
@@ -141,9 +250,11 @@ public class LoyaltyInboundDeadLetterService {
         if (!deadLetter.replayable()) {
             return actionResponse(deadLetter, "REPLAY", "FAILED", false, false, false, "NOT_REPLAYABLE");
         }
+        LoyaltyInboundDeadLetterApproval approval = requireApprovedApproval(deadLetter, "REPLAY", request);
         try {
             kafkaTemplate.send(deadLetter.getSourceTopic(), deadLetter.getRecordKey(), deadLetter.getPayload()).join();
             deadLetter.markReplayed(actorId(user), reason);
+            approval.markExecuted(actorId(user));
             LoyaltyInboundDeadLetter saved = deadLetters.save(deadLetter);
             metrics.inboundDeadLetter("replay", "success", saved.getSourceTopic());
             return actionResponse(saved, "REPLAY", "REPLAYED", false, true, false, "REPLAYED");
@@ -170,8 +281,10 @@ public class LoyaltyInboundDeadLetterService {
         if (!deadLetter.discardable()) {
             return actionResponse(deadLetter, "DISCARD", "FAILED", false, false, false, "NOT_DISCARDABLE");
         }
+        LoyaltyInboundDeadLetterApproval approval = requireApprovedApproval(deadLetter, "DISCARD", request);
         try {
             deadLetter.discard(actorId(user), reason);
+            approval.markExecuted(actorId(user));
         } catch (IllegalStateException ex) {
             throw BadRequestException.coded(LOYALTY_DEAD_LETTER_INVALID_STATE, ex.getMessage());
         }
@@ -201,6 +314,48 @@ public class LoyaltyInboundDeadLetterService {
                 .orElseThrow(() -> NotFoundException.coded(
                         LOYALTY_DEAD_LETTER_NOT_FOUND,
                         "Loyalty inbound dead letter not found"));
+    }
+
+    private LoyaltyInboundDeadLetterApproval approvalForUpdate(UUID id) {
+        return approvals.findByIdForUpdate(id)
+                .orElseThrow(() -> NotFoundException.coded(
+                        LOYALTY_DEAD_LETTER_NOT_FOUND,
+                        "Loyalty inbound dead-letter approval not found"));
+    }
+
+    private LoyaltyInboundDeadLetterApproval requireApprovedApproval(
+            LoyaltyInboundDeadLetter deadLetter,
+            String action,
+            LoyaltyInboundDeadLetterActionRequestDto request) {
+        if (request == null || request.approvalId() == null) {
+            throw ConflictException.coded(
+                    LOYALTY_DEAD_LETTER_INVALID_STATE,
+                    "Inbound DLT " + action.toLowerCase(Locale.ROOT) + " requires an approved approvalId");
+        }
+        LoyaltyInboundDeadLetterApproval approval = approvalForUpdate(request.approvalId());
+        if (!deadLetter.getId().equals(approval.getDeadLetterId()) || !action.equals(approval.getAction())) {
+            throw ConflictException.coded(
+                    LOYALTY_DEAD_LETTER_INVALID_STATE,
+                    "Inbound DLT approval scope does not match the action");
+        }
+        if (!"APPROVED".equals(approval.getStatus())) {
+            throw ConflictException.coded(
+                    LOYALTY_DEAD_LETTER_INVALID_STATE,
+                    "Inbound DLT action requires an approved approval");
+        }
+        String expectedHash = approvalRequestHash(
+                deadLetter,
+                action,
+                required(request.reason(), "reason"),
+                approval.getEvidenceReference());
+        if (!expectedHash.equals(approval.getRequestHash())
+                || !deadLetter.getPayloadHash().equals(approval.getPayloadHash())
+                || !INBOUND_DLT_THRESHOLD_POLICY.equals(approval.getThresholdPolicy())) {
+            throw ConflictException.coded(
+                    LOYALTY_DEAD_LETTER_INVALID_STATE,
+                    "Inbound DLT approval evidence no longer matches the action");
+        }
+        return approval;
     }
 
     private LoyaltyInboundDeadLetterSummaryDto summary(LoyaltyInboundDeadLetter record) {
@@ -255,6 +410,26 @@ public class LoyaltyInboundDeadLetterService {
                 record.getDiscardedAt());
     }
 
+    private LoyaltyInboundDeadLetterApprovalDto approvalDto(LoyaltyInboundDeadLetterApproval approval) {
+        return new LoyaltyInboundDeadLetterApprovalDto(
+                approval.getId(),
+                approval.getDeadLetterId(),
+                approval.getAction(),
+                approval.getStatus(),
+                approval.getReason(),
+                approval.getEvidenceReference(),
+                approval.getThresholdPolicy(),
+                approval.getPayloadHash(),
+                approval.getRequestHash(),
+                approval.getRequestedBy(),
+                approval.getReviewedBy(),
+                approval.getReviewNote(),
+                approval.getExecutedBy(),
+                approval.getRequestedAt(),
+                approval.getReviewedAt(),
+                approval.getExecutedAt());
+    }
+
     private LoyaltyInboundDeadLetterActionResponseDto actionResponse(
             LoyaltyInboundDeadLetter record,
             String action,
@@ -273,6 +448,46 @@ public class LoyaltyInboundDeadLetterService {
                 reasonCode,
                 record.getPayloadHash(),
                 Instant.now());
+    }
+
+    private String approvalAction(String value) {
+        String normalized = required(value, "action").toUpperCase(Locale.ROOT);
+        if (!"REPLAY".equals(normalized) && !"DISCARD".equals(normalized)) {
+            throw BadRequestException.coded(
+                    LOYALTY_DEAD_LETTER_INVALID_STATE,
+                    "action must be REPLAY or DISCARD");
+        }
+        return normalized;
+    }
+
+    private String approvalRequestHash(
+            LoyaltyInboundDeadLetter record,
+            String action,
+            String reason,
+            String evidenceReference) {
+        return payloadHash(String.join(":",
+                "LOYALTY_INBOUND_DLT_APPROVAL",
+                action,
+                record.getId().toString(),
+                nullToEmpty(record.getSourceTopic()),
+                nullToEmpty(record.getDltTopic()),
+                nullToEmpty(record.getConsumerGroup()),
+                Integer.toString(record.getKafkaPartition()),
+                Long.toString(record.getKafkaOffset()),
+                record.getOriginalPartition() == null ? "" : record.getOriginalPartition().toString(),
+                record.getOriginalOffset() == null ? "" : record.getOriginalOffset().toString(),
+                nullToEmpty(record.getRecordKey()),
+                nullToEmpty(record.getStatus()),
+                Integer.toString(record.getReplayAttempts()),
+                nullToEmpty(record.getExceptionClass()),
+                nullToEmpty(record.getPayloadHash()),
+                reason,
+                evidenceReference,
+                INBOUND_DLT_THRESHOLD_POLICY));
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private String sourceTopic(ConsumerRecord<String, String> record) {

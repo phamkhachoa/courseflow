@@ -5,8 +5,8 @@ import axios, {
   type InternalAxiosRequestConfig
 } from "axios";
 import { unwrap } from "@/shared/api/envelope";
-import { keycloakAuthEnabled, refreshKeycloakToken } from "@/shared/auth/keycloak-auth";
-import { sessionStore, type StoredSession, type TokenResponse } from "@/shared/auth/session-store";
+import { refreshKeycloakToken } from "@/shared/auth/keycloak-auth";
+import { sessionStore, type StoredSession } from "@/shared/auth/session-store";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_GATEWAY_URL ?? "http://localhost:8080/api";
@@ -79,11 +79,10 @@ async function refreshAccessToken(): Promise<string> {
   if (!session?.refreshToken) {
     throw new Error("No refresh token available");
   }
-  if (keycloakAuthEnabled) {
-    const refreshed = await refreshKeycloakToken(session.refreshToken);
-    const next = {
-      ...refreshed,
-      user: {
+  const refreshed = await refreshKeycloakToken(session.refreshToken);
+  const next = {
+    ...refreshed,
+    user: {
       ...refreshed.user,
       fullName: refreshed.user.fullName || session.user.fullName,
       avatarUrl: session.user.avatarUrl ?? refreshed.user.avatarUrl,
@@ -91,26 +90,8 @@ async function refreshAccessToken(): Promise<string> {
       status: session.user.status || refreshed.user.status
     }
   };
-    sessionStore.write(next);
-    return next.accessToken;
-  }
-  // Bare axios call so we don't recurse through the interceptors below.
-  const { data: payload } = await axios.post<unknown>(
-    `${API_BASE_URL}/v1/auth/refresh`,
-    { refreshToken: session.refreshToken },
-    { headers: { "Content-Type": "application/json" } }
-  );
-  const data = unwrap<TokenResponse>(payload);
-  sessionStore.write({
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
-    user: {
-      ...data.user,
-      fullName: data.user.fullName || session.user.fullName,
-      avatarUrl: session.user.avatarUrl ?? data.user.avatarUrl
-    }
-  });
-  return data.accessToken;
+  sessionStore.write(next);
+  return next.accessToken;
 }
 
 apiClient.interceptors.response.use(
@@ -120,8 +101,7 @@ apiClient.interceptors.response.use(
       | (InternalAxiosRequestConfig & { _retried?: boolean })
       | undefined;
 
-    const isAuthCall = original?.url?.includes("/v1/auth/");
-    if (error.response?.status !== 401 || !original || original._retried || isAuthCall) {
+    if (error.response?.status !== 401 || !original || original._retried) {
       return Promise.reject(error);
     }
 

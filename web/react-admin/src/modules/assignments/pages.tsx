@@ -40,6 +40,7 @@ import {
   getRubric,
   gradeSubmission,
   listAssignments,
+  listGradingQueue,
   listSubmissions,
   setAssignmentLifecycle,
   upsertRubric
@@ -135,6 +136,12 @@ export function AssignmentListPage() {
     queryFn: () => listAssignments(courseId),
     enabled: Boolean(courseId)
   });
+  const gradingQueue = useQuery({
+    queryKey: queryKeys.assignments.gradingQueue(courseId),
+    queryFn: () => listGradingQueue(courseId),
+    enabled: Boolean(courseId),
+    staleTime: 30_000
+  });
 
   useEffect(() => {
     setCourseId(requestedCourseId);
@@ -149,6 +156,7 @@ export function AssignmentListPage() {
   const courseRows = courses.data ?? [];
   const selectedCourse = courseRows.find((course) => course.id === courseId);
   const assignments = data ?? [];
+  const queueRows = gradingQueue.data ?? [];
   const publishedCount = assignments.filter((assignment) => assignment.status === "PUBLISHED").length;
   const rubricCount = assignments.filter((assignment) => Boolean(assignment.rubricId)).length;
   const urgentCount = assignments.filter((assignment) => dueLabel(assignment.dueAt).urgent).length;
@@ -240,6 +248,65 @@ export function AssignmentListPage() {
           <p className="mt-3 text-xs font-semibold text-slate-500">{rubricCount} assignment có rubric.</p>
         </Card>
       </div>
+
+      <Card className="mb-4">
+        <CardHeader
+          title="Hàng chờ chấm điểm"
+          subtitle={courseId ? `${queueRows.length} bài nộp đang chờ xử lý` : "Chọn course để xem submission cần chấm."}
+        />
+        {!courseId && <EmptyState message="Chọn khóa học để xem grading queue." />}
+        {gradingQueue.isLoading && <Spinner />}
+        {gradingQueue.isError && <ErrorState error={gradingQueue.error} />}
+        {courseId && gradingQueue.data && gradingQueue.data.length === 0 && <EmptyState message="Không có bài nộp cần chấm" />}
+        {gradingQueue.data && gradingQueue.data.length > 0 && (
+          <Table>
+            <thead>
+              <tr>
+                <Th>Assignment</Th>
+                <Th>Học viên</Th>
+                <Th>Nộp lúc</Th>
+                <Th>Trạng thái</Th>
+                <Th>Cấu hình</Th>
+                <Th />
+              </tr>
+            </thead>
+            <tbody>
+              {gradingQueue.data.map((item) => (
+                <tr key={item.submissionId} className="hover:bg-slate-50">
+                  <Td>
+                    <p className="font-semibold text-slate-900">{item.assignmentTitle}</p>
+                    <p className="mt-1 text-xs text-slate-500">Submission {compactId(item.submissionId)}</p>
+                  </Td>
+                  <Td>
+                    <p className="font-semibold text-slate-900">Learner {compactId(item.studentId)}</p>
+                    <p className="mt-1 text-xs text-slate-500">Attempt {item.attemptNo}</p>
+                  </Td>
+                  <Td>{formatDateTime(item.submittedAt)}</Td>
+                  <Td>
+                    <Badge value={item.status} />
+                    {item.isLate && <p className="mt-1 text-xs font-semibold text-amber-700">{item.minutesLate} phút trễ</p>}
+                  </Td>
+                  <Td>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge value="default" label={`${item.maxScore ?? 0} điểm`} />
+                      <Badge value={item.rubricId ? "READY" : "DRAFT"} label={item.rubricId ? "Có rubric" : "Chưa rubric"} />
+                      <Badge value="default" label={`${item.attachmentCount} file`} />
+                    </div>
+                  </Td>
+                  <Td>
+                    <Link to={`${item.assignmentId}/submissions?studentId=${encodeURIComponent(item.studentId)}`}>
+                      <Button size="sm" variant="secondary">
+                        <ClipboardCheck size={14} />
+                        Chấm bài
+                      </Button>
+                    </Link>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </Card>
 
       <Card>
         <CardHeader
@@ -740,7 +807,10 @@ export function SubmissionsPage() {
   const grade = useMutation({
     mutationFn: ({ submissionId, form }: { submissionId: string; form: { score: string; feedback: string } }) =>
       gradeSubmission(submissionId, { rawScore: Number(form.score), feedback: form.feedback }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.assignments.submissions(id, searchedStudentId) })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.assignments.submissions(id, searchedStudentId) });
+      qc.invalidateQueries({ queryKey: queryKeys.assignments.gradingQueue(assignment.data?.courseId ?? "") });
+    }
   });
 
   const getForm = (submissionId: string) =>

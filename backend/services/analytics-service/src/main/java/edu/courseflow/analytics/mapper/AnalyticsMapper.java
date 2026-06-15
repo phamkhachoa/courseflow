@@ -20,6 +20,8 @@ import edu.courseflow.analytics.model.StudentTimeSpent;
 import edu.courseflow.commonlibrary.mapper.CourseFlowMapperConfig;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -31,6 +33,7 @@ public interface AnalyticsMapper {
     EngagementDto toDto(StudentEngagement row);
 
     @Mapping(target = "daysSinceActivity", expression = "java(daysSince(now, row.getLastActivityAt()))")
+    @Mapping(target = "riskReasons", expression = "java(riskReasons(row, now))")
     AtRiskStudentDto toAtRiskDto(StudentEngagement row, Instant now);
 
     GradeDistributionDto.GradeBandDto toDto(GradeDistribution row);
@@ -48,5 +51,25 @@ public interface AnalyticsMapper {
     default int daysSince(Instant now, Instant lastActivity) {
         Instant baseline = lastActivity == null ? now.minus(999, ChronoUnit.DAYS) : lastActivity;
         return (int) ChronoUnit.DAYS.between(baseline, now);
+    }
+
+    default List<String> riskReasons(StudentEngagement row, Instant now) {
+        List<String> reasons = new ArrayList<>();
+        if ("HIGH".equalsIgnoreCase(row.getRiskLevel()) || "MEDIUM".equalsIgnoreCase(row.getRiskLevel())) {
+            reasons.add("ENGAGEMENT_SCORE_LOW");
+        }
+        if (daysSince(now, row.getLastActivityAt()) >= 7) {
+            reasons.add("NO_ACTIVITY_7D");
+        }
+        if (row.getSubmissions7d() == 0) {
+            reasons.add("NO_SUBMISSIONS_7D");
+        }
+        if (row.getTimeSpent7d() < 30) {
+            reasons.add("LOW_TIME_SPENT_7D");
+        }
+        if (row.getPosts7d() == 0) {
+            reasons.add("NO_DISCUSSION_POSTS_7D");
+        }
+        return reasons;
     }
 }

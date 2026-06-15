@@ -52,6 +52,11 @@ class CourseAuthoringServiceAuthzTest {
     private static final UUID DEPARTMENT_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID OTHER_DEPARTMENT_ID = UUID.fromString("20000000-0000-0000-0000-000000000999");
     private static final UUID MODULE_ID = UUID.fromString("30000000-0000-0000-0000-000000001001");
+    private static final List<String> REVIEW_CHECKLIST = List.of(
+            "content-ready",
+            "dependency-ready",
+            "learner-preview-checked",
+            "publish-risk-reviewed");
 
     @Mock
     private CourseJpaRepository courses;
@@ -99,7 +104,7 @@ class CourseAuthoringServiceAuthzTest {
 
         CourseDraftDto result = service.approve(
                 COURSE_ID,
-                new ReviewDecisionRequestDto("ok", List.of("content-ready", "learner-preview-checked")),
+                new ReviewDecisionRequestDto("ok", REVIEW_CHECKLIST),
                 orgAdmin);
 
         assertThat(result).isSameAs(approved);
@@ -111,7 +116,24 @@ class CourseAuthoringServiceAuthzTest {
         assertThat(audit.getValue().getFromState()).isEqualTo("IN_REVIEW");
         assertThat(audit.getValue().getToState()).isEqualTo("APPROVED");
         assertThat(audit.getValue().getNote()).isEqualTo("ok");
-        assertThat(audit.getValue().getChecklist()).containsExactly("content-ready", "learner-preview-checked");
+        assertThat(audit.getValue().getChecklist()).containsExactlyElementsOf(REVIEW_CHECKLIST);
+    }
+
+    @Test
+    void approveRequiresCompleteGovernanceChecklist() {
+        Course course = inReviewCourse("owner-2", DEPARTMENT_ID);
+        CurrentUser orgAdmin = userWithScope(9L, "org-admin@courseflow.local", "ORG_ADMIN", "DEPARTMENT", DEPARTMENT_ID);
+        when(courses.findById(COURSE_ID)).thenReturn(Optional.of(course));
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> service.approve(
+                        COURSE_ID,
+                        new ReviewDecisionRequestDto("ok", List.of("content-ready")),
+                        orgAdmin));
+
+        assertThat(ex.getMessage()).contains("Review checklist is incomplete");
+        assertThat(ex.getMessage()).contains("dependency-ready");
+        assertThat(course.getReviewState()).isEqualTo("IN_REVIEW");
     }
 
     @Test
@@ -138,7 +160,7 @@ class CourseAuthoringServiceAuthzTest {
         when(modules.findByCourseIdOrderByPositionAsc(COURSE_ID)).thenReturn(List.of());
         when(mapper.toDraftDto(course, List.of())).thenReturn(approved);
 
-        CourseDraftDto result = service.approve(COURSE_ID, new ReviewDecisionRequestDto("ok", List.of()), instructor);
+        CourseDraftDto result = service.approve(COURSE_ID, new ReviewDecisionRequestDto("ok", REVIEW_CHECKLIST), instructor);
 
         assertThat(result).isSameAs(approved);
         assertThat(course.getReviewState()).isEqualTo("APPROVED");
@@ -219,6 +241,15 @@ class CourseAuthoringServiceAuthzTest {
         CourseDraftDto result = service.getDraft(COURSE_ID, reviewer);
 
         assertThat(result).isSameAs(draft);
+    }
+
+    @Test
+    void studentCannotPreviewAuthoringDraft() {
+        Course course = inReviewCourse("owner-2", DEPARTMENT_ID);
+        CurrentUser student = new CurrentUser(4L, "learner@courseflow.local", "STUDENT", Set.of("STUDENT"));
+        when(courses.findById(COURSE_ID)).thenReturn(Optional.of(course));
+
+        assertThrows(ForbiddenException.class, () -> service.previewDraft(COURSE_ID, student));
     }
 
     @Test

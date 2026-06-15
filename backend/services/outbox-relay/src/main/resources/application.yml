@@ -44,10 +44,6 @@ courseflow:
     purge-enabled: ${OUTBOX_PURGE_ENABLED:false}
     retention-days: ${OUTBOX_RETENTION_DAYS:7}
     services:
-      - name: identity
-        jdbc-url: ${IDENTITY_DB_URL:jdbc:postgresql://localhost:5432/cf_identity}
-        username: ${IDENTITY_DB_USERNAME:courseflow}
-        password: ${IDENTITY_DB_PASSWORD:courseflow}
       - name: enrollment
         jdbc-url: ${ENROLLMENT_DB_URL:jdbc:postgresql://localhost:5432/cf_enrollment}
         username: ${ENROLLMENT_DB_USERNAME:courseflow}

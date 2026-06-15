@@ -94,6 +94,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class LoyaltyService {
 
     private static final String EXPIRY_APPROVAL_OPERATION = "EXPIRY";
+    private static final String REWARD_REVERSAL_APPROVAL_OPERATION = "REWARD_REDEMPTION_REVERSE";
+    private static final String REWARD_FULFILLMENT_APPROVAL_OPERATION = "REWARD_FULFILLMENT_OVERRIDE";
     private static final String LOT_ALLOCATIONS_METADATA_KEY = "lotAllocations";
     private static final int IDEMPOTENCY_TTL_DAYS = 30;
     private static final long MANUAL_ADJUSTMENT_APPROVAL_THRESHOLD_POINTS = 1_000L;
@@ -112,6 +114,7 @@ public class LoyaltyService {
     private final ObjectMapper objectMapper;
     private final LoyaltyMetrics metrics;
     private final LoyaltyAccessService access;
+    private final LoyaltyTierService tierService;
 
     public LoyaltyService(
             LoyaltyProgramRepository programRepository,
@@ -124,7 +127,8 @@ public class LoyaltyService {
             OutboxEventRepository outboxEventRepository,
             ObjectMapper objectMapper,
             LoyaltyMetrics metrics,
-            LoyaltyAccessService access) {
+            LoyaltyAccessService access,
+            LoyaltyTierService tierService) {
         this.programRepository = programRepository;
         this.accountRepository = accountRepository;
         this.pointsEntryRepository = pointsEntryRepository;
@@ -136,6 +140,7 @@ public class LoyaltyService {
         this.objectMapper = objectMapper;
         this.metrics = metrics;
         this.access = access;
+        this.tierService = tierService;
     }
 
     @Transactional
@@ -173,6 +178,7 @@ public class LoyaltyService {
                 .findByTenantIdAndApplicationIdAndProgramIdAndProfileId(
                         program.getTenantId(), program.getApplicationId(), program.getProgramId(), normalize(request.profileId()))
                 .orElseGet(() -> accountRepository.save(new LoyaltyAccount(program, normalize(request.profileId()))));
+        tierService.evaluateAfterPointsMutation(account, actor(user), "Loyalty account opened", null);
         return toAccountDto(account);
     }
 
@@ -440,6 +446,18 @@ public class LoyaltyService {
                         reviewer, request.note(), approval.getCorrelationId(), json(approvalMetadata(approval)));
                 return toApprovalDto(approval);
             }
+            if (isRewardReversalApproval(approval)) {
+                audit(approval.getTenantId(), approval.getApplicationId(), approval.getId().toString(),
+                        "loyalty-reward-reversal-approval", "loyalty.reward_reversal_approval.approved",
+                        reviewer, request.note(), approval.getCorrelationId(), json(approvalMetadata(approval)));
+                return toApprovalDto(approval);
+            }
+            if (isRewardFulfillmentApproval(approval)) {
+                audit(approval.getTenantId(), approval.getApplicationId(), approval.getId().toString(),
+                        "loyalty-reward-fulfillment-approval", "loyalty.reward_fulfillment_approval.approved",
+                        reviewer, request.note(), approval.getCorrelationId(), json(approvalMetadata(approval)));
+                return toApprovalDto(approval);
+            }
             PointsMutationResponseDto response = adjustInternal(approvalRequest(approval), user, true);
             approval.markExecuted(response.entryId());
         } catch (IllegalStateException ex) {
@@ -470,12 +488,8 @@ public class LoyaltyService {
         } catch (IllegalStateException ex) {
             throw ConflictException.coded(LOYALTY_ADJUSTMENT_APPROVAL_INVALID_STATE, ex.getMessage());
         }
-        String aggregateType = isExpiryApproval(approval)
-                ? "loyalty-expiry-approval"
-                : "loyalty-adjustment-approval";
-        String action = isExpiryApproval(approval)
-                ? "loyalty.expiry_approval.rejected"
-                : "loyalty.adjustment_approval.rejected";
+        String aggregateType = approvalAggregateType(approval);
+        String action = approvalRejectedAction(approval);
         audit(approval.getTenantId(), approval.getApplicationId(), approval.getId().toString(),
                 aggregateType, action,
                 actor(user), request.note(), approval.getCorrelationId(), json(Map.of(
@@ -662,6 +676,7 @@ public class LoyaltyService {
                     null));
             lot.consume(remaining);
             writeSideEffects(entry, program.getPointUnit(), actor(user), request.reason(), request.correlationId());
+            tierService.evaluateAfterPointsMutation(account, actor(user), request.reason(), request.correlationId());
             items.add(new PointsExpiryExecutionItemDto(
                     entry.getId(),
                     account.getId(),
@@ -866,6 +881,7 @@ public class LoyaltyService {
         }
         long balanceAfter = balanceBefore + reverseDelta;
         writeSideEffects(reversal, program.getPointUnit(), actor(user), request.reason(), request.correlationId());
+        tierService.evaluateAfterPointsMutation(account, actor(user), request.reason(), request.correlationId());
         PointsMutationResponseDto response = toMutationResponse(reversal, balanceAfter, false);
         rememberIdempotency(original.getTenantId(), original.getApplicationId(), operationType,
                 request.idempotencyKey(), requestHash, response);
@@ -948,6 +964,7 @@ public class LoyaltyService {
         applyLotMutation(entry, !program.isAllowNegativeBalance());
         long balanceAfter = balanceBefore + pointsDelta;
         writeSideEffects(entry, program.getPointUnit(), actor(user), request.reason(), request.correlationId());
+        tierService.evaluateAfterPointsMutation(account, actor(user), request.reason(), request.correlationId());
         PointsMutationResponseDto response = toMutationResponse(entry, balanceAfter, false);
         rememberIdempotency(program.getTenantId(), program.getApplicationId(), "ADJUST",
                 request.idempotencyKey(), requestHash, response);
@@ -1058,6 +1075,7 @@ public class LoyaltyService {
         applyLotMutation(entry, !program.isAllowNegativeBalance());
         long balanceAfter = balanceBefore + pointsDelta;
         writeSideEffects(entry, program.getPointUnit(), actor(user), request.reason(), request.correlationId());
+        tierService.evaluateAfterPointsMutation(account, actor(user), request.reason(), request.correlationId());
         PointsMutationResponseDto response = toMutationResponse(entry, balanceAfter, false);
         rememberIdempotency(program.getTenantId(), program.getApplicationId(), entryType,
                 request.idempotencyKey(), requestHash, response);
@@ -1129,6 +1147,7 @@ public class LoyaltyService {
         applyLotMutation(entry, !program.isAllowNegativeBalance());
         long balanceAfter = balanceBefore + pointsDelta;
         writeSideEffects(entry, program.getPointUnit(), actor(user), request.reason(), request.correlationId());
+        tierService.evaluateAfterPointsMutation(account, actor(user), request.reason(), request.correlationId());
         PointsMutationResponseDto response = toMutationResponse(entry, balanceAfter, false);
         rememberIdempotency(program.getTenantId(), program.getApplicationId(), "REWARD_REDEEM",
                 request.idempotencyKey(), requestHash, response);
@@ -1226,6 +1245,7 @@ public class LoyaltyService {
                 expiredPoints,
                 expiringSoonPoints,
                 nextExpiryAt,
+                tierService.progressForAccount(account, now),
                 warnings);
     }
 
@@ -1661,6 +1681,40 @@ public class LoyaltyService {
 
     private boolean isExpiryApproval(LoyaltyAdjustmentApproval approval) {
         return EXPIRY_APPROVAL_OPERATION.equalsIgnoreCase(approvalOperationType(approval));
+    }
+
+    private boolean isRewardReversalApproval(LoyaltyAdjustmentApproval approval) {
+        return REWARD_REVERSAL_APPROVAL_OPERATION.equalsIgnoreCase(approvalOperationType(approval));
+    }
+
+    private boolean isRewardFulfillmentApproval(LoyaltyAdjustmentApproval approval) {
+        return REWARD_FULFILLMENT_APPROVAL_OPERATION.equalsIgnoreCase(approvalOperationType(approval));
+    }
+
+    private String approvalAggregateType(LoyaltyAdjustmentApproval approval) {
+        if (isExpiryApproval(approval)) {
+            return "loyalty-expiry-approval";
+        }
+        if (isRewardReversalApproval(approval)) {
+            return "loyalty-reward-reversal-approval";
+        }
+        if (isRewardFulfillmentApproval(approval)) {
+            return "loyalty-reward-fulfillment-approval";
+        }
+        return "loyalty-adjustment-approval";
+    }
+
+    private String approvalRejectedAction(LoyaltyAdjustmentApproval approval) {
+        if (isExpiryApproval(approval)) {
+            return "loyalty.expiry_approval.rejected";
+        }
+        if (isRewardReversalApproval(approval)) {
+            return "loyalty.reward_reversal_approval.rejected";
+        }
+        if (isRewardFulfillmentApproval(approval)) {
+            return "loyalty.reward_fulfillment_approval.rejected";
+        }
+        return "loyalty.adjustment_approval.rejected";
     }
 
     private String approvalOperationType(LoyaltyAdjustmentApproval approval) {

@@ -1,6 +1,7 @@
 package edu.courseflow.gradebook.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
@@ -11,6 +12,8 @@ import edu.courseflow.gradebook.dto.GradebookDtos.GradeCategoryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeEntryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeItemDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeOverrideDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradePublishAuditDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradingQueueItemDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradingSchemeDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradingSchemeEntryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.StudentGradebookDto;
@@ -23,6 +26,7 @@ import edu.courseflow.gradebook.model.GradeCategory;
 import edu.courseflow.gradebook.model.GradeEntry;
 import edu.courseflow.gradebook.model.GradeItem;
 import edu.courseflow.gradebook.model.GradeOverride;
+import edu.courseflow.gradebook.model.GradebookAuditLog;
 import edu.courseflow.gradebook.model.GradingScheme;
 import edu.courseflow.gradebook.model.GradingSchemeEntry;
 import edu.courseflow.gradebook.model.OutboxEvent;
@@ -31,6 +35,7 @@ import edu.courseflow.gradebook.repository.GradeCategoryRepository;
 import edu.courseflow.gradebook.repository.GradeEntryRepository;
 import edu.courseflow.gradebook.repository.GradeItemRepository;
 import edu.courseflow.gradebook.repository.GradeOverrideRepository;
+import edu.courseflow.gradebook.repository.GradebookAuditLogRepository;
 import edu.courseflow.gradebook.repository.GradingSchemeEntryRepository;
 import edu.courseflow.gradebook.repository.GradingSchemeRepository;
 import edu.courseflow.gradebook.repository.OutboxEventRepository;
@@ -48,6 +53,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,11 +62,16 @@ public class GradebookService {
 
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
     private static final BigDecimal MINUTES_PER_DAY = new BigDecimal("1440");
+    private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {
+    };
+    private static final TypeReference<Map<String, Object>> OBJECT_MAP = new TypeReference<>() {
+    };
 
     private final GradeCategoryRepository categories;
     private final GradeItemRepository items;
     private final GradeEntryRepository entries;
     private final GradeOverrideRepository overrides;
+    private final GradebookAuditLogRepository auditLogs;
     private final GradingSchemeRepository schemes;
     private final GradingSchemeEntryRepository schemeEntries;
     private final FinalGradeRepository finalGrades;
@@ -72,6 +83,7 @@ public class GradebookService {
             GradeItemRepository items,
             GradeEntryRepository entries,
             GradeOverrideRepository overrides,
+            GradebookAuditLogRepository auditLogs,
             GradingSchemeRepository schemes,
             GradingSchemeEntryRepository schemeEntries,
             FinalGradeRepository finalGrades,
@@ -82,6 +94,7 @@ public class GradebookService {
         this.items = items;
         this.entries = entries;
         this.overrides = overrides;
+        this.auditLogs = auditLogs;
         this.schemes = schemes;
         this.schemeEntries = schemeEntries;
         this.finalGrades = finalGrades;
@@ -312,6 +325,14 @@ public class GradebookService {
         }
         entry.publish(request.rawScore(), adjusted, isLate, minutesLate, penaltyPct);
         entry = entries.save(entry);
+        List<String> auditReasons = new ArrayList<>();
+        if (oldScore == null) {
+            auditReasons.add("INITIAL_PUBLISH");
+        } else if (oldScore.compareTo(newScore) != 0) {
+            auditReasons.add("GRADE_OVERRIDE");
+        } else {
+            auditReasons.add("GRADE_REPUBLISH");
+        }
         if (oldScore != null && oldScore.compareTo(newScore) != 0) {
             overrides.save(new GradeOverride(
                     entry.getId(),
@@ -320,6 +341,29 @@ public class GradebookService {
                     request.reason().trim(),
                     actorId == null || actorId.isBlank() ? "system" : actorId));
         }
+        Map<String, Object> auditPayload = new HashMap<>();
+        auditPayload.put("sourceType", item.getSourceType());
+        auditPayload.put("sourceId", item.getSourceId());
+        auditPayload.put("rawScore", request.rawScore());
+        auditPayload.put("adjustedScore", adjusted);
+        auditPayload.put("effectiveScore", newScore);
+        auditPayload.put("oldEffectiveScore", oldScore);
+        auditPayload.put("isLate", isLate);
+        auditPayload.put("minutesLate", minutesLate);
+        auditPayload.put("latePenaltyPercent", penaltyPct);
+        if (!isBlank(request.reason())) {
+            auditPayload.put("reason", request.reason().trim());
+        }
+        recordAudit(
+                "GRADE_ENTRY_PUBLISHED",
+                item.getCourseId(),
+                request.studentId(),
+                item.getId(),
+                entry.getId(),
+                null,
+                actorId,
+                auditReasons,
+                auditPayload);
 
         return studentGradebook(item.getCourseId(), request.studentId());
     }
@@ -342,6 +386,110 @@ public class GradebookService {
         }
         return overrides.findByGradeEntryIdOrderByCreatedAtDesc(gradeEntryId).stream()
                 .map(this::toOverrideDto)
+                .toList();
+    }
+
+    public List<GradePublishAuditDto> listGradePublishAudit(
+            UUID courseId,
+            String studentId,
+            UUID gradeItemId,
+            int requestedLimit) {
+        int limit = Math.max(1, Math.min(requestedLimit, 200));
+        PageRequest page = PageRequest.of(0, limit);
+        List<GradebookAuditLog> rows;
+        if (!isBlank(studentId) && gradeItemId != null) {
+            rows = auditLogs.findByCourseIdAndStudentIdAndGradeItemIdOrderByCreatedAtDesc(
+                    courseId, studentId.trim(), gradeItemId, page);
+        } else if (!isBlank(studentId)) {
+            rows = auditLogs.findByCourseIdAndStudentIdOrderByCreatedAtDesc(courseId, studentId.trim(), page);
+        } else if (gradeItemId != null) {
+            rows = auditLogs.findByCourseIdAndGradeItemIdOrderByCreatedAtDesc(courseId, gradeItemId, page);
+        } else {
+            rows = auditLogs.findByCourseIdOrderByCreatedAtDesc(courseId, page);
+        }
+        return rows.stream().map(this::toAuditDto).toList();
+    }
+
+    public List<GradingQueueItemDto> gradingQueue(UUID courseId, String studentId, String status, int requestedLimit) {
+        int limit = Math.max(1, Math.min(requestedLimit, 200));
+        String normalizedStudentId = isBlank(studentId) ? null : studentId.trim();
+        String normalizedStatus = isBlank(status) ? null : status.trim().toUpperCase(Locale.ROOT);
+        Map<UUID, GradeCategory> categoryById = categories.findByCourseIdOrderByPositionAscNameAsc(courseId).stream()
+                .collect(Collectors.toMap(GradeCategory::getId, Function.identity()));
+        List<GradeItem> publishedItems = items.findByCourseId(courseId).stream()
+                .filter(GradeItem::isPublished)
+                .sorted(Comparator
+                        .comparing((GradeItem item) -> Optional.ofNullable(categoryById.get(item.getCategoryId()))
+                                .map(GradeCategory::getPosition)
+                                .orElse(Integer.MAX_VALUE))
+                        .thenComparing(GradeItem::getTitle))
+                .toList();
+        if (publishedItems.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> itemIds = publishedItems.stream().map(GradeItem::getId).toList();
+        List<String> students = normalizedStudentId == null
+                ? entries.distinctStudentsForItems(itemIds)
+                : List.of(normalizedStudentId);
+        if (students.isEmpty()) {
+            return List.of();
+        }
+        Map<String, GradeEntry> entryByStudentAndItem = entries.findByGradeItemIdIn(itemIds).stream()
+                .filter(entry -> normalizedStudentId == null || normalizedStudentId.equals(entry.getStudentId()))
+                .collect(Collectors.toMap(
+                        entry -> queueEntryKey(entry.getStudentId(), entry.getGradeItemId()),
+                        Function.identity(),
+                        (left, right) -> left));
+        Map<String, FinalGrade> finalGradeByStudent = finalGrades.findByCourseId(courseId).stream()
+                .filter(grade -> normalizedStudentId == null || normalizedStudentId.equals(grade.getStudentId()))
+                .collect(Collectors.toMap(FinalGrade::getStudentId, Function.identity(), (left, right) -> left));
+        List<GradingQueueItemDto> queue = new ArrayList<>();
+        for (String student : students) {
+            int missing = 0;
+            int published = 0;
+            for (GradeItem item : publishedItems) {
+                GradeEntry entry = entryByStudentAndItem.get(queueEntryKey(student, item.getId()));
+                if (entry == null) {
+                    missing++;
+                    queue.add(gradingQueueItem(
+                            courseId,
+                            student,
+                            "MISSING_GRADE",
+                            List.of("GRADE_ENTRY_MISSING"),
+                            item,
+                            categoryById.get(item.getCategoryId()),
+                            null,
+                            finalGradeByStudent.get(student)));
+                } else if (!"PUBLISHED".equals(entry.getStatus())) {
+                    queue.add(gradingQueueItem(
+                            courseId,
+                            student,
+                            "GRADE_NOT_PUBLISHED",
+                            List.of("GRADE_ENTRY_NOT_PUBLISHED"),
+                            item,
+                            categoryById.get(item.getCategoryId()),
+                            entry,
+                            finalGradeByStudent.get(student)));
+                } else {
+                    published++;
+                }
+            }
+            FinalGrade finalGrade = finalGradeByStudent.get(student);
+            if (missing == 0 && published == publishedItems.size() && finalGrade == null) {
+                queue.add(gradingQueueFinalizationItem(
+                        courseId,
+                        student,
+                        "FINAL_GRADE_READY",
+                        List.of("FINAL_GRADE_NOT_FINALIZED")));
+            } else if (missing == 0 && finalGrade != null && "FINALIZED".equals(finalGrade.getStatus())) {
+                queue.add(gradingQueueFinalizedItem(courseId, student, finalGrade));
+            }
+        }
+        return queue.stream()
+                .filter(item -> normalizedStatus == null
+                        ? !"FINALIZED".equals(item.status())
+                        : normalizedStatus.equals(item.status()))
+                .limit(limit)
                 .toList();
     }
 
@@ -374,6 +522,16 @@ public class GradebookService {
         payload.put("status", "FINALIZED");
         payload.put("updatedAt", Instant.now().toString());
         outbox.save(new OutboxEvent(finalGrade.getId(), "final-grade", "gradebook.final_grade.updated", toJson(payload)));
+        recordAudit(
+                "FINAL_GRADE_FINALIZED",
+                courseId,
+                studentId,
+                null,
+                null,
+                finalGrade.getId(),
+                actor,
+                List.of(passed ? "FINAL_GRADE_PASSED" : "FINAL_GRADE_FAILED"),
+                payload);
 
         return toFinalGradeDto(finalGrade);
     }
@@ -530,6 +688,128 @@ public class GradebookService {
         return sb.toString();
     }
 
+    private void recordAudit(
+            String action,
+            UUID courseId,
+            String studentId,
+            UUID gradeItemId,
+            UUID gradeEntryId,
+            UUID finalGradeId,
+            String actorId,
+            List<String> reasonCodes,
+            Map<String, Object> payload) {
+        if (auditLogs == null) {
+            return;
+        }
+        auditLogs.save(new GradebookAuditLog(
+                action,
+                courseId,
+                studentId,
+                gradeItemId,
+                gradeEntryId,
+                finalGradeId,
+                actorId,
+                toJson(reasonCodes == null ? List.of() : reasonCodes),
+                toJson(payload == null ? Map.of() : payload)));
+    }
+
+    private GradePublishAuditDto toAuditDto(GradebookAuditLog audit) {
+        return new GradePublishAuditDto(
+                audit.getId().toString(),
+                audit.getAction(),
+                audit.getCourseId().toString(),
+                audit.getStudentId(),
+                audit.getGradeItemId() == null ? null : audit.getGradeItemId().toString(),
+                audit.getGradeEntryId() == null ? null : audit.getGradeEntryId().toString(),
+                audit.getFinalGradeId() == null ? null : audit.getFinalGradeId().toString(),
+                audit.getActorId(),
+                readList(audit.getReasonCodes()),
+                readMap(audit.getPayload()),
+                audit.getCreatedAt());
+    }
+
+    private GradingQueueItemDto gradingQueueItem(
+            UUID courseId,
+            String studentId,
+            String status,
+            List<String> reasonCodes,
+            GradeItem item,
+            GradeCategory category,
+            GradeEntry entry,
+            FinalGrade finalGrade) {
+        return new GradingQueueItemDto(
+                status + ":" + studentId + ":" + item.getId(),
+                courseId.toString(),
+                studentId,
+                status,
+                reasonCodes,
+                item.getId().toString(),
+                entry == null ? null : entry.getId().toString(),
+                finalGrade == null ? null : finalGrade.getId().toString(),
+                item.getTitle(),
+                category == null ? null : category.getName(),
+                item.getSourceType(),
+                item.getSourceId(),
+                entry == null ? null : entry.getRawScore(),
+                entry == null ? null : entry.getAdjustedScore(),
+                item.getMaxScore(),
+                finalGrade == null ? null : finalGrade.getStatus(),
+                entry == null ? null : entry.getGradedAt(),
+                finalGrade == null ? null : finalGrade.getFinalizedAt());
+    }
+
+    private GradingQueueItemDto gradingQueueFinalizationItem(
+            UUID courseId,
+            String studentId,
+            String status,
+            List<String> reasonCodes) {
+        return new GradingQueueItemDto(
+                status + ":" + studentId,
+                courseId.toString(),
+                studentId,
+                status,
+                reasonCodes,
+                null,
+                null,
+                null,
+                "Finalize final grade",
+                null,
+                "FINAL_GRADE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
+
+    private GradingQueueItemDto gradingQueueFinalizedItem(UUID courseId, String studentId, FinalGrade finalGrade) {
+        return new GradingQueueItemDto(
+                "FINALIZED:" + studentId,
+                courseId.toString(),
+                studentId,
+                "FINALIZED",
+                List.of("FINAL_GRADE_FINALIZED"),
+                null,
+                null,
+                finalGrade.getId().toString(),
+                "Final grade finalized",
+                null,
+                "FINAL_GRADE",
+                null,
+                finalGrade.getFinalScore(),
+                null,
+                null,
+                finalGrade.getStatus(),
+                null,
+                finalGrade.getFinalizedAt());
+    }
+
+    private String queueEntryKey(String studentId, UUID gradeItemId) {
+        return studentId + "::" + gradeItemId;
+    }
+
     private GradeItemDto toGradeItemDto(GradeItem item, GradeCategory category) {
         return mapper.toDto(item, category);
     }
@@ -610,6 +890,28 @@ public class GradebookService {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("Unable to serialize JSON payload", ex);
+        }
+    }
+
+    private List<String> readList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(json, STRING_LIST);
+        } catch (JsonProcessingException ex) {
+            return List.of("AUDIT_REASON_PARSE_FAILED");
+        }
+    }
+
+    private Map<String, Object> readMap(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(json, OBJECT_MAP);
+        } catch (JsonProcessingException ex) {
+            return Map.of("parseError", "AUDIT_PAYLOAD_PARSE_FAILED");
         }
     }
 

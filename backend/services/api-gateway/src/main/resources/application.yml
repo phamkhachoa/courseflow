@@ -226,7 +226,7 @@ spring:
         - id: course-user-modules
           uri: ${COURSE_SERVICE_URI:lb://course-service}
           predicates:
-            - Path=/api/v1/courses/*/modules,/api/v1/courses/*/modules/**
+            - Path=/api/v1/courses/*/modules,/api/v1/courses/*/modules/player,/api/v1/courses/*/modules/progress,/api/v1/courses/*/modules/*/progress,/api/v1/courses/*/modules/*/items/*/progress
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: course-user-media-download
@@ -286,7 +286,7 @@ spring:
         - id: enrollment-user
           uri: ${ENROLLMENT_SERVICE_URI:lb://enrollment-service}
           predicates:
-            - Path=/api/v1/enrollments,/api/v1/enrollments/**,/api/v1/waitlist,/api/v1/waitlist/**
+            - Path=/api/v1/enrollments,/api/v1/enrollments/promotion-preview,/api/v1/enrollments/coupons,/api/v1/enrollments/checkout,/api/v1/waitlist,/api/v1/waitlist/**
           filters:
             - RewritePath=/api/v1/(?<segment>.*), /internal/$\{segment}
         - id: deadline-user
@@ -412,17 +412,9 @@ spring:
 courseflow:
   security:
     external-token:
-      # Migration switch:
-      # - legacy: verify CourseFlow HS256 tokens from identity-service.
-      # - oidc: verify Keycloak/OIDC access tokens with issuer + JWKS + audience.
-      # In oidc mode, legacy /api/v1/auth login/register/refresh endpoints are blocked at the edge.
-      mode: ${EXTERNAL_TOKEN_MODE:oidc}
-      issuer: ${KEYCLOAK_ISSUER_URI:${JWT_ISSUER:}}
+      issuer: ${KEYCLOAK_ISSUER_URI:}
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
       audiences: ${KEYCLOAK_AUDIENCE:courseflow-api}
-    jwt:
-      # Required only while EXTERNAL_TOKEN_MODE=legacy. Must match identity-service.
-      secret: ${COURSEFLOW_JWT_SECRET:}
     token-converter:
       # Gateway must fail closed when the converter cannot mint an internal token.
       mode: ${TOKEN_CONVERTER_MODE:required}

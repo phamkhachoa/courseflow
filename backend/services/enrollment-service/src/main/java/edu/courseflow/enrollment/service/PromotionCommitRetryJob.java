@@ -26,5 +26,6 @@ public class PromotionCommitRetryJob {
             return;
         }
         enrollments.retryPromotionCommitFailures(batchSize);
+        enrollments.openReservedPromotionRemediationCases(batchSize);
     }
 }

@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Award, BadgeCheck, Ban, Search, UsersRound } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { listCourses } from "@/modules/courses/api";
 import type { Course } from "@/modules/courses/types";
 import { adminUserLabel, useLearnerUsers } from "@/modules/identity/useLearnerUsers";
@@ -17,7 +18,7 @@ import {
   Select,
   Spinner
 } from "@/shared/ui";
-import { issueCertificate, revokeCertificate, verifyCertificate } from "./api";
+import { getCertificateEligibility, issueCertificate, revokeCertificate, verifyCertificate } from "./api";
 
 function compactId(value?: string) {
   if (!value) return "—";
@@ -57,10 +58,26 @@ function Metric({
 }
 
 export function CertificatesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedCourseId = searchParams.get("courseId") ?? "";
+  const requestedStudentId = searchParams.get("studentId") ?? "";
   const [code, setCode] = useState("");
   const [submitted, setSubmitted] = useState("");
-  const [issueForm, setIssueForm] = useState({ studentId: "", courseId: "", finalGrade: "" });
+  const [issueForm, setIssueForm] = useState({
+    studentId: requestedStudentId,
+    courseId: requestedCourseId,
+    finalGrade: ""
+  });
   const [revokeForm, setRevokeForm] = useState({ certificateId: "", reason: "" });
+
+  function updateIssueScope(next: Partial<{ studentId: string; courseId: string }>) {
+    const updated = { ...issueForm, ...next };
+    setIssueForm(updated);
+    setSearchParams({
+      ...(updated.courseId ? { courseId: updated.courseId } : {}),
+      ...(updated.studentId ? { studentId: updated.studentId } : {})
+    }, { replace: true });
+  }
 
   const courses = useQuery({
     queryKey: queryKeys.courses.list("certificate-picker"),
@@ -80,13 +97,18 @@ export function CertificatesPage() {
     queryFn: () => verifyCertificate(submitted),
     enabled: Boolean(submitted)
   });
+  const eligibility = useQuery({
+    queryKey: queryKeys.certificates.eligibility(issueForm.courseId, issueForm.studentId),
+    queryFn: () => getCertificateEligibility(issueForm.courseId, issueForm.studentId),
+    enabled: Boolean(issueForm.courseId && issueForm.studentId)
+  });
 
   const issue = useMutation({
     mutationFn: () =>
       issueCertificate({
         studentId: issueForm.studentId,
         courseId: issueForm.courseId,
-        finalGrade: Number(issueForm.finalGrade)
+        finalGrade: Number(eligibility.data?.finalGrade ?? issueForm.finalGrade)
       })
   });
 
@@ -100,6 +122,7 @@ export function CertificatesPage() {
   const issuedUser = userById.get(issue.data?.studentId ?? "");
   const selectedCourse = courseById.get(issueForm.courseId);
   const selectedUser = userById.get(issueForm.studentId);
+  const finalGradeValue = eligibility.data?.finalGrade ?? (issueForm.finalGrade ? Number(issueForm.finalGrade) : undefined);
 
   return (
     <div>
@@ -180,7 +203,7 @@ export function CertificatesPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
         <Card>
-          <CardHeader title="Cấp chứng chỉ" subtitle="Chọn learner và course, nhập điểm tổng kết rồi cấp mã xác minh." />
+          <CardHeader title="Cấp chứng chỉ" subtitle="Chọn learner và course, kiểm tra eligibility rồi cấp mã xác minh." />
           <form
             className="space-y-4 p-4"
             onSubmit={(e: FormEvent) => {
@@ -193,7 +216,7 @@ export function CertificatesPage() {
                 <Select
                   id="i-student"
                   value={issueForm.studentId}
-                  onChange={(e) => setIssueForm({ ...issueForm, studentId: e.target.value })}
+                  onChange={(e) => updateIssueScope({ studentId: e.target.value })}
                   required
                 >
                   <option value="">Chọn học viên</option>
@@ -202,13 +225,16 @@ export function CertificatesPage() {
                       {adminUserLabel(user)}
                     </option>
                   ))}
+                  {issueForm.studentId && !selectedUser && (
+                    <option value={issueForm.studentId}>Học viên {compactId(issueForm.studentId)}</option>
+                  )}
                 </Select>
               </FormField>
               <FormField label="Khóa học" htmlFor="i-course">
                 <Select
                   id="i-course"
                   value={issueForm.courseId}
-                  onChange={(e) => setIssueForm({ ...issueForm, courseId: e.target.value })}
+                  onChange={(e) => updateIssueScope({ courseId: e.target.value })}
                   required
                 >
                   <option value="">Chọn khóa học</option>
@@ -217,6 +243,9 @@ export function CertificatesPage() {
                       {courseLabel(course)}
                     </option>
                   ))}
+                  {issueForm.courseId && !selectedCourse && (
+                    <option value={issueForm.courseId}>Khóa {compactId(issueForm.courseId)}</option>
+                  )}
                 </Select>
               </FormField>
             </div>
@@ -232,15 +261,60 @@ export function CertificatesPage() {
               </div>
             )}
 
-            <FormField label="Điểm tổng kết" htmlFor="i-grade" hint="Nhập theo thang điểm backend đang dùng, ví dụ 92.5.">
+            {eligibility.isLoading && <Spinner />}
+            {eligibility.isError && <ErrorState error={eligibility.error} />}
+            {eligibility.data && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">Eligibility checklist</p>
+                    <p className="mt-1 text-slate-500">
+                      Final grade {eligibility.data.finalGrade ?? "—"} · Threshold {eligibility.data.gradeThreshold ?? "—"}
+                    </p>
+                  </div>
+                  <Badge value={eligibility.data.status} />
+                </div>
+                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                  <div className="rounded-md border border-slate-200 bg-white p-2">
+                    <p className="text-xs font-bold uppercase text-slate-400">Completion</p>
+                    <Badge value={eligibility.data.completionEligible ? "READY" : "DRAFT"} label={eligibility.data.completionEligible ? "Đạt" : "Chưa đạt"} />
+                  </div>
+                  <div className="rounded-md border border-slate-200 bg-white p-2">
+                    <p className="text-xs font-bold uppercase text-slate-400">Required items</p>
+                    <Badge value={eligibility.data.requiredItemsEligible ? "READY" : "DRAFT"} label={eligibility.data.requiredItemsEligible ? "Đạt" : "Chưa đạt"} />
+                  </div>
+                  <div className="rounded-md border border-slate-200 bg-white p-2">
+                    <p className="text-xs font-bold uppercase text-slate-400">Final grade</p>
+                    <Badge value={eligibility.data.gradeEligible ? "READY" : "DRAFT"} label={eligibility.data.finalGradeStatus ?? (eligibility.data.gradeEligible ? "Đạt" : "Chưa đạt")} />
+                  </div>
+                </div>
+                {eligibility.data.missingRequirements.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {eligibility.data.missingRequirements.map((item) => (
+                      <div key={item.code} className="rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-800">
+                        <p className="font-semibold">{item.label}</p>
+                        {item.detail && <p className="mt-1 text-xs">{item.detail}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <FormField
+              label="Điểm tổng kết"
+              htmlFor="i-grade"
+              hint={eligibility.data?.finalGrade != null ? "Lấy từ final grade đã chốt trong gradebook." : "Chỉ nhập khi eligibility chưa trả final grade."}
+            >
               <Input
                 id="i-grade"
                 type="number"
                 min="0"
                 step="0.01"
-                value={issueForm.finalGrade}
+                value={eligibility.data?.finalGrade ?? issueForm.finalGrade}
                 onChange={(e) => setIssueForm({ ...issueForm, finalGrade: e.target.value })}
-                required
+                readOnly={eligibility.data?.finalGrade != null}
+                required={eligibility.data?.finalGrade == null}
               />
             </FormField>
             {(courses.isError || usersQuery.isError) && (
@@ -260,7 +334,14 @@ export function CertificatesPage() {
             )}
             <Button
               type="submit"
-              disabled={issue.isPending || !issueForm.studentId || !issueForm.courseId || !issueForm.finalGrade}
+              disabled={
+                issue.isPending ||
+                !issueForm.studentId ||
+                !issueForm.courseId ||
+                !finalGradeValue ||
+                !eligibility.data?.eligible ||
+                eligibility.data?.issued
+              }
             >
               <Award size={16} />
               {issue.isPending ? "Đang cấp" : "Cấp chứng chỉ"}

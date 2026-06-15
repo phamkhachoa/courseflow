@@ -3,6 +3,7 @@ package edu.courseflow.assignment.repository;
 import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.AttachmentRef;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.GradingQueueItemDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RubricCriterionDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.RubricDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmissionAttachmentDto;
@@ -18,9 +19,11 @@ import edu.courseflow.assignment.model.SubmissionAttachment;
 import edu.courseflow.assignment.model.SubmissionRubricScore;
 import edu.courseflow.commonlibrary.exception.NotFoundException;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -146,6 +149,26 @@ public class AssignmentRepository {
         return submissions.findById(submissionId).map(this::toSubmissionDto);
     }
 
+    public List<GradingQueueItemDto> listGradingQueue(List<AssignmentDto> assignmentRows,
+            Collection<String> statuses,
+            int limit) {
+        if (assignmentRows == null || assignmentRows.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> assignmentIds = assignmentRows.stream()
+                .map(assignment -> UUID.fromString(assignment.id()))
+                .toList();
+        PageRequest page = PageRequest.of(0, limit);
+        List<Submission> rows = statuses == null || statuses.isEmpty()
+                ? submissions.findByAssignmentIdInOrderBySubmittedAtAsc(assignmentIds, page)
+                : submissions.findByAssignmentIdInAndStatusInOrderBySubmittedAtAsc(assignmentIds, statuses, page);
+        java.util.Map<String, AssignmentDto> assignmentById = assignmentRows.stream()
+                .collect(java.util.stream.Collectors.toMap(AssignmentDto::id, assignment -> assignment));
+        return rows.stream()
+                .map(submission -> toGradingQueueItem(submission, assignmentById.get(submission.getAssignmentId().toString())))
+                .toList();
+    }
+
     public void recordGrade(UUID submissionId, String graderId, BigDecimal rawScore,
             BigDecimal latePenaltyApplied, BigDecimal finalScore, String feedback) {
         Submission submission = submissions.findById(submissionId).orElseThrow();
@@ -220,6 +243,24 @@ public class AssignmentRepository {
 
     private SubmissionDto toSubmissionDto(Submission submission) {
         return mapper.toDto(submission, listAttachments(submission.getId()));
+    }
+
+    private GradingQueueItemDto toGradingQueueItem(Submission submission, AssignmentDto assignment) {
+        List<SubmissionAttachmentDto> submissionAttachments = listAttachments(submission.getId());
+        return new GradingQueueItemDto(
+                submission.getId().toString(),
+                submission.getAssignmentId().toString(),
+                assignment == null ? "Assignment " + submission.getAssignmentId() : assignment.title(),
+                assignment == null ? null : assignment.courseId(),
+                submission.getStudentId(),
+                submission.getAttemptNo(),
+                submission.getSubmittedAt(),
+                submission.getStatus(),
+                submission.isLate(),
+                submission.getMinutesLate(),
+                assignment == null ? null : assignment.maxScore(),
+                assignment == null ? null : assignment.rubricId(),
+                submissionAttachments.size());
     }
 
     private RubricDto toRubricDto(AssignmentRubric rubric) {

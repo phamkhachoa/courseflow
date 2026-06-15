@@ -10,15 +10,7 @@ import '../../../core/api/dio_client.dart';
 import '../domain/auth_models.dart';
 import 'auth_config.dart';
 
-/// Talks to the configured auth authority.
-///
-/// Legacy mode calls identity-service auth endpoints through the gateway:
-///  - `POST /v1/auth/login`   {email, password} -> TokenResponseDto
-///  - `POST /v1/auth/refresh` {refreshToken}     -> TokenResponseDto
-///  - `POST /v1/auth/logout`
-///  - `GET  /v1/users/me`                        -> UserDto
-///
-/// Keycloak mode uses Authorization Code + PKCE via AppAuth, then hydrates
+/// Talks to Keycloak with Authorization Code + PKCE via AppAuth, then hydrates
 /// display profile data from user-management-service through the gateway.
 class AuthRepository {
   AuthRepository(this._client, [FlutterAppAuth? appAuth])
@@ -27,30 +19,6 @@ class AuthRepository {
   final DioClient _client;
   final FlutterAppAuth _appAuth;
   Dio get _dio => _client.dio;
-
-  bool get keycloakEnabled => kKeycloakAuthEnabled;
-
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-  }) async {
-    if (kKeycloakAuthEnabled) {
-      throw const ApiException(
-        code: 'LEGACY_AUTH_DISABLED',
-        message: 'Password login is disabled when Keycloak auth mode is active.',
-      );
-    }
-    try {
-      final res = await _dio.post<Object?>(
-        '/v1/auth/login',
-        data: {'email': email, 'password': password},
-        options: Options(extra: {'skipAuth': true}),
-      );
-      return AuthSession.fromJson(ApiEnvelope.unwrapObject(res.data));
-    } on DioException catch (e) {
-      throw ApiEnvelope.toApiException(e);
-    }
-  }
 
   Future<AuthSession> loginWithKeycloak() async {
     try {
@@ -89,42 +57,23 @@ class AuthRepository {
   /// Used by the Dio interceptor on `401`. Carries `skipAuth` so it never
   /// recurses through the refresh logic itself.
   Future<AuthSession> refresh(String refreshToken) async {
-    if (kKeycloakAuthEnabled) {
-      return _refreshKeycloak(refreshToken);
-    }
-    try {
-      final res = await _dio.post<Object?>(
-        '/v1/auth/refresh',
-        data: {'refreshToken': refreshToken},
-        options: Options(extra: {'skipAuth': true}),
-      );
-      return AuthSession.fromJson(ApiEnvelope.unwrapObject(res.data));
-    } on DioException catch (e) {
-      throw ApiEnvelope.toApiException(e);
-    }
+    return _refreshKeycloak(refreshToken);
   }
 
   Future<void> logout({String? idToken}) async {
-    if (kKeycloakAuthEnabled) {
-      if (idToken == null || idToken.isEmpty) return;
-      try {
-        await _appAuth.endSession(
-          EndSessionRequest(
-            idTokenHint: idToken,
-            postLogoutRedirectUrl: kKeycloakPostLogoutRedirectUrl,
-            issuer: kKeycloakIssuer,
-            allowInsecureConnections: kKeycloakAllowInsecureConnections,
-          ),
-        );
-      } catch (_) {
-        // Best-effort: local sign-out proceeds regardless of IAM reachability.
-      }
-      return;
-    }
+    if (idToken == null || idToken.isEmpty) return;
     try {
-      await _dio.post<Object?>('/v1/auth/logout');
-    } on DioException catch (_) {
-      // Best-effort: local sign-out proceeds regardless of server reachability.
+      await _appAuth.endSession(
+        EndSessionRequest(
+          idTokenHint: idToken,
+          postLogoutRedirectUrl: kKeycloakPostLogoutRedirectUrl,
+          issuer: kKeycloakIssuer,
+          allowInsecureConnections: kKeycloakAllowInsecureConnections,
+        ),
+      );
+    } catch (_) {
+      // Best-effort: local sign-out proceeds regardless of IAM reachability.
+      return;
     }
   }
 

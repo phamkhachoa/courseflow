@@ -20,6 +20,10 @@ import edu.courseflow.promotion.dto.PromotionDtos.CancelReservationResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CommitReservationRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CommitReservationResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CouponDto;
+import edu.courseflow.promotion.dto.PromotionDtos.CouponDistributionActionRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.CouponDistributionDto;
+import edu.courseflow.promotion.dto.PromotionDtos.CouponDistributionPreviewResponseDto;
+import edu.courseflow.promotion.dto.PromotionDtos.CouponDistributionQueryResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CouponImportApprovalDecisionRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CouponImportApprovalResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CouponImportCommitRequestDto;
@@ -34,15 +38,24 @@ import edu.courseflow.promotion.dto.PromotionDtos.CouponStorageInventoryDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CreateApplicationClientBindingRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CreateApplicationRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CreateCampaignRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.CreateCouponDistributionRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CreateCouponRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.EvaluateIncentivesRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.EvaluateIncentivesResponseDto;
+import edu.courseflow.promotion.dto.PromotionDtos.ExperimentPreviewRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.ExperimentPreviewResponseDto;
+import edu.courseflow.promotion.dto.PromotionDtos.FraudScorePreviewRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.FraudScorePreviewResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.GenerateCouponsRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.GenerateCouponsResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.IncentiveCatalogDto;
 import edu.courseflow.promotion.dto.PromotionDtos.IncentiveReconciliationQueryResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.LearnerCouponWalletDto;
+import edu.courseflow.promotion.dto.PromotionDtos.PreviewCouponDistributionRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.RedemptionDto;
+import edu.courseflow.promotion.dto.PromotionDtos.RedemptionReversalApprovalDecisionRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.RedemptionReversalApprovalRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.RedemptionReversalApprovalResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.ReservationDto;
 import edu.courseflow.promotion.dto.PromotionDtos.ReserveIncentiveRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.ReserveIncentiveResponseDto;
@@ -68,6 +81,7 @@ import edu.courseflow.promotion.dto.PromotionDtos.UpdateCampaignStatusRequestDto
 import edu.courseflow.promotion.dto.PromotionDtos.UpdateCampaignVersionDraftRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.UpdateCouponStatusRequestDto;
 import edu.courseflow.promotion.service.CampaignVersionService;
+import edu.courseflow.promotion.service.CouponDistributionService;
 import edu.courseflow.promotion.service.CouponImportApprovalService;
 import edu.courseflow.promotion.service.CouponImportCommitService;
 import edu.courseflow.promotion.service.CouponImportDryRunService;
@@ -75,8 +89,11 @@ import edu.courseflow.promotion.service.CouponImportQueryService;
 import edu.courseflow.promotion.service.IncentiveAccessService;
 import edu.courseflow.promotion.service.IncentiveAuditQueryService;
 import edu.courseflow.promotion.service.IncentiveCatalogService;
+import edu.courseflow.promotion.service.IncentiveExperimentService;
+import edu.courseflow.promotion.service.IncentiveFraudScoringService;
 import edu.courseflow.promotion.service.IncentiveReconciliationService;
 import edu.courseflow.promotion.service.PromotionService;
+import edu.courseflow.promotion.service.RedemptionReversalApprovalService;
 import edu.courseflow.promotion.service.RetentionApprovalService;
 import edu.courseflow.promotion.service.RetentionDryRunService;
 import edu.courseflow.promotion.service.RetentionExecutionService;
@@ -108,6 +125,8 @@ public class PromotionController {
     private final CampaignVersionService campaignVersions;
     private final IncentiveAuditQueryService auditQueries;
     private final IncentiveReconciliationService reconciliation;
+    private final IncentiveFraudScoringService fraudScoring;
+    private final IncentiveExperimentService experiments;
     private final IncentiveCatalogService catalog;
     private final RetentionDryRunService retention;
     private final RetentionExecutionService retentionExecutions;
@@ -116,12 +135,16 @@ public class PromotionController {
     private final CouponImportApprovalService couponImportApprovals;
     private final CouponImportCommitService couponImportCommits;
     private final CouponImportQueryService couponImportQueries;
+    private final CouponDistributionService couponDistributions;
+    private final RedemptionReversalApprovalService redemptionReversalApprovals;
 
     public PromotionController(PromotionService promotions,
                                IncentiveAccessService access,
                                CampaignVersionService campaignVersions,
                                IncentiveAuditQueryService auditQueries,
                                IncentiveReconciliationService reconciliation,
+                               IncentiveFraudScoringService fraudScoring,
+                               IncentiveExperimentService experiments,
                                IncentiveCatalogService catalog,
                                RetentionDryRunService retention,
                                RetentionExecutionService retentionExecutions,
@@ -129,12 +152,16 @@ public class PromotionController {
                                CouponImportDryRunService couponImports,
                                CouponImportApprovalService couponImportApprovals,
                                CouponImportCommitService couponImportCommits,
-                               CouponImportQueryService couponImportQueries) {
+                               CouponImportQueryService couponImportQueries,
+                               CouponDistributionService couponDistributions,
+                               RedemptionReversalApprovalService redemptionReversalApprovals) {
         this.promotions = promotions;
         this.access = access;
         this.campaignVersions = campaignVersions;
         this.auditQueries = auditQueries;
         this.reconciliation = reconciliation;
+        this.fraudScoring = fraudScoring;
+        this.experiments = experiments;
         this.catalog = catalog;
         this.retention = retention;
         this.retentionExecutions = retentionExecutions;
@@ -143,6 +170,8 @@ public class PromotionController {
         this.couponImportApprovals = couponImportApprovals;
         this.couponImportCommits = couponImportCommits;
         this.couponImportQueries = couponImportQueries;
+        this.couponDistributions = couponDistributions;
+        this.redemptionReversalApprovals = redemptionReversalApprovals;
     }
 
     @GetMapping("/catalog")
@@ -823,12 +852,92 @@ public class PromotionController {
         return promotions.generateCoupons(request, user, correlationId);
     }
 
+    @PostMapping("/coupon-distributions:preview")
+    public CouponDistributionPreviewResponseDto previewCouponDistribution(
+            @Valid @RequestBody PreviewCouponDistributionRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false)
+            String correlationId,
+            CurrentUser user) {
+        return couponDistributions.preview(request, user, correlationId);
+    }
+
+    @PostMapping("/coupon-distributions")
+    public CouponDistributionDto createCouponDistribution(
+            @Valid @RequestBody CreateCouponDistributionRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false)
+            String correlationId,
+            CurrentUser user) {
+        return couponDistributions.create(request, user, correlationId);
+    }
+
+    @GetMapping("/coupon-distributions")
+    public CouponDistributionQueryResponseDto couponDistributions(
+            @RequestParam Optional<String> tenantId,
+            @RequestParam Optional<String> applicationId,
+            @RequestParam Optional<UUID> campaignId,
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return couponDistributions.list(tenantId, applicationId, campaignId, status, limit, user);
+    }
+
+    @GetMapping("/coupon-distributions/{distributionId}")
+    public CouponDistributionDto couponDistribution(@PathVariable UUID distributionId, CurrentUser user) {
+        return couponDistributions.get(distributionId, user);
+    }
+
+    @PostMapping("/coupon-distributions/{distributionId}:approve")
+    public CouponDistributionDto approveCouponDistribution(
+            @PathVariable UUID distributionId,
+            @RequestBody(required = false) CouponDistributionActionRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false)
+            String correlationId,
+            CurrentUser user) {
+        return couponDistributions.approve(distributionId, request, user, correlationId);
+    }
+
+    @PostMapping("/coupon-distributions/{distributionId}:issue")
+    public CouponDistributionDto issueCouponDistribution(
+            @PathVariable UUID distributionId,
+            @RequestBody(required = false) CouponDistributionActionRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false)
+            String correlationId,
+            CurrentUser user) {
+        return couponDistributions.issue(distributionId, request, user, correlationId);
+    }
+
+    @PostMapping("/coupon-distributions/{distributionId}:revoke")
+    public CouponDistributionDto revokeCouponDistribution(
+            @PathVariable UUID distributionId,
+            @RequestBody(required = false) CouponDistributionActionRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false)
+            String correlationId,
+            CurrentUser user) {
+        return couponDistributions.revoke(distributionId, request, user, correlationId);
+    }
+
     @PostMapping("/admin/preview")
     public AdminPreviewIncentivesResponseDto adminPreview(
             @Valid @RequestBody AdminPreviewIncentivesRequestDto request,
             @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false) String correlationId,
             CurrentUser user) {
         return promotions.preview(request, user, correlationId);
+    }
+
+    @PostMapping("/admin/fraud-score:preview")
+    public FraudScorePreviewResponseDto previewFraudScore(
+            @Valid @RequestBody FraudScorePreviewRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false) String correlationId,
+            CurrentUser user) {
+        return fraudScoring.preview(request, user, correlationId);
+    }
+
+    @PostMapping("/admin/experiments:preview")
+    public ExperimentPreviewResponseDto previewExperiment(
+            @Valid @RequestBody ExperimentPreviewRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false) String correlationId,
+            CurrentUser user) {
+        return experiments.preview(request, user, correlationId);
     }
 
     @GetMapping("/reservations")
@@ -960,6 +1069,59 @@ public class PromotionController {
                 user);
     }
 
+    @PostMapping("/redemptions/{redemptionId}/reversal-approvals")
+    public RedemptionReversalApprovalResponseDto requestRedemptionReversalApproval(
+            @PathVariable UUID redemptionId,
+            @Valid @RequestBody RedemptionReversalApprovalRequestDto request,
+            @RequestHeader(GatewayHeaders.CORRELATION_ID)
+            String correlationId,
+            CurrentUser user) {
+        return redemptionReversalApprovals.requestApproval(redemptionId, request, user, correlationId);
+    }
+
+    @GetMapping("/redemptions/reversal-approvals")
+    public List<RedemptionReversalApprovalResponseDto> redemptionReversalApprovals(
+            @RequestParam String tenantId,
+            @RequestParam String applicationId,
+            @RequestParam Optional<UUID> campaignId,
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return redemptionReversalApprovals.queue(
+                tenantId,
+                applicationId,
+                campaignId.orElse(null),
+                status.orElse(null),
+                limit.orElse(null),
+                user);
+    }
+
+    @GetMapping("/redemptions/reversal-approvals/{approvalId}")
+    public RedemptionReversalApprovalResponseDto redemptionReversalApproval(@PathVariable UUID approvalId,
+                                                                            CurrentUser user) {
+        return redemptionReversalApprovals.approval(approvalId, user);
+    }
+
+    @PostMapping("/redemptions/reversal-approvals/{approvalId}:approve")
+    public RedemptionReversalApprovalResponseDto approveRedemptionReversal(
+            @PathVariable UUID approvalId,
+            @RequestBody(required = false) RedemptionReversalApprovalDecisionRequestDto request,
+            @RequestHeader(GatewayHeaders.CORRELATION_ID)
+            String correlationId,
+            CurrentUser user) {
+        return redemptionReversalApprovals.approve(approvalId, request, user, correlationId);
+    }
+
+    @PostMapping("/redemptions/reversal-approvals/{approvalId}:reject")
+    public RedemptionReversalApprovalResponseDto rejectRedemptionReversal(
+            @PathVariable UUID approvalId,
+            @RequestBody(required = false) RedemptionReversalApprovalDecisionRequestDto request,
+            @RequestHeader(GatewayHeaders.CORRELATION_ID)
+            String correlationId,
+            CurrentUser user) {
+        return redemptionReversalApprovals.reject(approvalId, request, user, correlationId);
+    }
+
     @PostMapping("/redemptions/{redemptionId}/reverse")
     public ReverseRedemptionResponseDto reverseRedemption(@PathVariable UUID redemptionId,
                                                           @Valid @RequestBody
@@ -972,7 +1134,9 @@ public class PromotionController {
                                                           CurrentUser user) {
         return promotions.reverse(redemptionId, new ReverseRedemptionRequestDto(
                 firstNonBlank(idempotencyKeyHeader, request.idempotencyKey()),
-                request.reason()), user, correlationId);
+                request.reason(),
+                request.approvalId(),
+                request.changeTicket()), user, correlationId);
     }
 
     @GetMapping("/audit")

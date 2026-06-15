@@ -2,7 +2,9 @@ package edu.courseflow.course.controller;
 
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.course.dto.AuthoringDtos.CourseDraftDto;
+import edu.courseflow.course.dto.AuthoringDtos.CourseDraftPreviewDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseReviewAuditDto;
+import edu.courseflow.course.dto.AuthoringDtos.CourseReviewChecklistItemDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseReviewQueueItemDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseVersionDiffDto;
 import edu.courseflow.course.dto.AuthoringDtos.CourseVersionDto;
@@ -50,6 +52,11 @@ public class CourseAuthoringController {
         return authoring.getDraft(courseId, user);
     }
 
+    @GetMapping("/{courseId}/preview")
+    public CourseDraftPreviewDto previewDraft(@PathVariable UUID courseId, CurrentUser user) {
+        return authoring.previewDraft(courseId, user);
+    }
+
     @PutMapping("/{courseId}/curriculum")
     public CourseDraftDto updateCurriculum(@PathVariable UUID courseId, @Valid @RequestBody UpdateCurriculumRequestDto request, CurrentUser user) {
         return authoring.updateCurriculum(courseId, request, user);
@@ -75,6 +82,11 @@ public class CourseAuthoringController {
     @GetMapping("/review-queue")
     public List<CourseReviewQueueItemDto> listReviewQueue(CurrentUser user) {
         return authoring.listReviewQueue(user);
+    }
+
+    @GetMapping("/review-checklist")
+    public List<CourseReviewChecklistItemDto> reviewChecklist(CurrentUser user) {
+        return authoring.reviewChecklist(user);
     }
 
     @PostMapping("/{courseId}/versions")

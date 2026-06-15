@@ -64,10 +64,13 @@ class DeadLetterRepositoryPostgresTest {
                 "reservation-1",
                 "{\"coupon\":\"secret\"}",
                 5,
+                "SerializationException",
                 "serialization failed",
                 "sha256:payload");
 
-        DeadLetterRecord open = repository.search("OPEN", "promotion", null, null, 10).getFirst();
+        DeadLetterRecord open = repository.search("OPEN", "promotion", null, null, "payload", 10).getFirst();
+        assertThat(open.topic()).isEqualTo("incentive.redemption.committed");
+        assertThat(open.errorClass()).isEqualTo("SerializationException");
 
         DeadLetterRecord claimed = repository.claimForReplay(open.id(), "worker-a", 300).orElseThrow();
         assertThat(claimed.status()).isEqualTo("REPLAYING");
@@ -97,9 +100,10 @@ class DeadLetterRepositoryPostgresTest {
                 "reservation-1",
                 "{}",
                 2,
+                "TimeoutException",
                 "poison",
                 "sha256:payload");
-        DeadLetterRecord deadLetter = repository.search("OPEN", "promotion", null, null, 10).getFirst();
+        DeadLetterRecord deadLetter = repository.search("OPEN", "promotion", null, null, null, 10).getFirst();
 
         assertThat(repository.insertOperatorAction(
                 "idem-1",

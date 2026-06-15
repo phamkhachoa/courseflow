@@ -7,15 +7,13 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { hydrateSessionProfile, setAuthFailureHandler } from "@/shared/api/client";
-import { loginRequest, logoutRequest } from "./auth-api";
-import { keycloakAuthEnabled, redirectToKeycloakLogout } from "./keycloak-auth";
+import { setAuthFailureHandler } from "@/shared/api/client";
+import { redirectToKeycloakLogout } from "./keycloak-auth";
 import { sessionStore, type AuthUser, type StoredSession } from "./session-store";
 
 type AuthContextValue = {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 };
 
@@ -26,14 +24,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     const current = sessionStore.read();
-    if (!keycloakAuthEnabled) {
-      void logoutRequest();
-    }
     sessionStore.clear();
     setSession(null);
-    if (keycloakAuthEnabled) {
-      redirectToKeycloakLogout(current);
-    }
+    redirectToKeycloakLogout(current);
   }, []);
 
   // When the api client gives up on refreshing, drop the session.
@@ -42,26 +35,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setAuthFailureHandler(null);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const token = await loginRequest(email, password);
-    const next: StoredSession = {
-      accessToken: token.accessToken,
-      refreshToken: token.refreshToken,
-      user: token.user
-    };
-    sessionStore.write(next);
-    const hydrated = await hydrateSessionProfile().catch(() => next);
-    setSession(hydrated ?? next);
-  }, []);
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
       isAuthenticated: Boolean(session?.accessToken),
-      login,
       logout
     }),
-    [session, login, logout]
+    [session, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -840,10 +840,12 @@ paths:
     patch:
       tags: [Rewards]
       operationId: updateLoyaltyRewardRedemptionFulfillment
-      summary: Update reward redemption fulfillment status.
+      summary: Execute approved reward redemption fulfillment override.
       description: >
-        Admin support operation for manual reward fulfillment. It changes fulfillment status/ref/note
-        only; point return must use reward-redemption reverse so the ledger remains immutable.
+        Admin support operation for manual reward fulfillment. Live execution requires an approved
+        maker-checker approval id from `fulfillment-approvals`, verifies redemption scope/request
+        hash/current fulfillment state, then changes fulfillment status/ref/note only. Point return
+        must use reward-redemption reverse so the ledger remains immutable.
       parameters:
         - name: redemptionId
           in: path
@@ -860,6 +862,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/LoyaltyRewardRedemption" }
+  "/internal/loyalty/reward-redemptions/{redemptionId}/fulfillment-approvals":
+    post:
+      tags: [Rewards]
+      operationId: submitLoyaltyRewardFulfillmentApproval
+      summary: Submit reward fulfillment override for maker-checker approval.
+      description: >
+        Captures the current fulfillment state and requested target state in an immutable approval
+        hash. A different reviewer approves through the shared adjustment approval queue before the
+        fulfillment PATCH can execute with this approval id.
+      parameters:
+        - name: redemptionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubmitRewardFulfillmentApprovalRequest" }
+      responses:
+        "200":
+          description: Created fulfillment approval request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyAdjustmentApproval" }
   "/internal/loyalty/dead-letters":
     get:
       tags: [Operations]
@@ -911,11 +938,93 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterDetail" }
+  "/internal/loyalty/dead-letters/{deadLetterId}/approvals":
+    get:
+      tags: [Operations]
+      operationId: searchLoyaltyInboundDeadLetterApprovals
+      summary: Search maker-checker approvals for a loyalty inbound DLT record.
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, APPROVED, REJECTED, EXECUTED] }
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Matching DLT approvals.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApprovalQuery" }
+    post:
+      tags: [Operations]
+      operationId: requestLoyaltyInboundDeadLetterApproval
+      summary: Request maker-checker approval for a live loyalty inbound DLT action.
+      parameters:
+        - name: deadLetterId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApprovalRequest" }
+      responses:
+        "200":
+          description: Approval request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApproval" }
+  "/internal/loyalty/dead-letters/approvals/{approvalId}:approve":
+    post:
+      tags: [Operations]
+      operationId: approveLoyaltyInboundDeadLetterApproval
+      summary: Approve a loyalty inbound DLT action request.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApprovalReviewRequest" }
+      responses:
+        "200":
+          description: Approved DLT action request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApproval" }
+  "/internal/loyalty/dead-letters/approvals/{approvalId}:reject":
+    post:
+      tags: [Operations]
+      operationId: rejectLoyaltyInboundDeadLetterApproval
+      summary: Reject a loyalty inbound DLT action request.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApprovalReviewRequest" }
+      responses:
+        "200":
+          description: Rejected DLT action request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApproval" }
   "/internal/loyalty/dead-letters/{deadLetterId}:replay":
     post:
       tags: [Operations]
       operationId: replayLoyaltyInboundDeadLetter
-      summary: Replay an OPEN or FAILED inbound DLT record to its source topic.
+      summary: Replay an OPEN or FAILED inbound DLT record to its source topic after approval.
       parameters:
         - name: deadLetterId
           in: path
@@ -1313,11 +1422,31 @@ components:
         note: { type: string }
     UpdateRewardFulfillmentStatusRequest:
       type: object
-      required: [status]
+      required: [status, idempotencyKey, reason, correlationId, approvalId]
       properties:
         status: { type: string, enum: [PENDING, ISSUED, MANUAL_REQUIRED, FAILED] }
         fulfillmentRef: { type: string, nullable: true }
         note: { type: string, nullable: true }
+        idempotencyKey: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+        approvalId: { type: string, format: uuid }
+    SubmitRewardFulfillmentApprovalRequest:
+      type: object
+      required: [status, idempotencyKey, reason, correlationId]
+      properties:
+        status: { type: string, enum: [PENDING, ISSUED, MANUAL_REQUIRED, FAILED] }
+        fulfillmentRef: { type: string, nullable: true }
+        note: { type: string, nullable: true }
+        idempotencyKey: { type: string }
+        reason: { type: string }
+        correlationId: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
     LoyaltyReward:
       type: object
       properties:
@@ -1910,6 +2039,10 @@ components:
       properties:
         reason: { type: string }
         dryRun: { type: boolean }
+        approvalId:
+          type: string
+          format: uuid
+          description: Required for live replay/discard; omitted for dry-run.
     LoyaltyInboundDeadLetterActionResponse:
       type: object
       properties:
@@ -1922,6 +2055,45 @@ components:
         reasonCode: { type: string }
         payloadHash: { type: string }
         completedAt: { type: string, format: date-time }
+    LoyaltyInboundDeadLetterApprovalRequest:
+      type: object
+      required: [action, reason, evidenceReference]
+      properties:
+        action: { type: string, enum: [REPLAY, DISCARD] }
+        reason: { type: string }
+        evidenceReference: { type: string }
+    LoyaltyInboundDeadLetterApprovalReviewRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string }
+    LoyaltyInboundDeadLetterApproval:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        deadLetterId: { type: string, format: uuid }
+        action: { type: string, enum: [REPLAY, DISCARD] }
+        status: { type: string, enum: [PENDING, APPROVED, REJECTED, EXECUTED] }
+        reason: { type: string }
+        evidenceReference: { type: string }
+        thresholdPolicy: { type: string }
+        payloadHash: { type: string }
+        requestHash: { type: string }
+        requestedBy: { type: string }
+        reviewedBy: { type: string }
+        reviewNote: { type: string }
+        executedBy: { type: string }
+        requestedAt: { type: string, format: date-time }
+        reviewedAt: { type: string, format: date-time }
+        executedAt: { type: string, format: date-time }
+    LoyaltyInboundDeadLetterApprovalQuery:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LoyaltyInboundDeadLetterApproval" }
+        limit: { type: integer }
+        hasMore: { type: boolean }
     LoyaltyAuditEvent:
       type: object
       properties:

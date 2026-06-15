@@ -87,6 +87,22 @@ public final class AssignmentDtos {
                         List<SubmissionAttachmentDto> attachments) {
         }
 
+        public record GradingQueueItemDto(
+                        String submissionId,
+                        String assignmentId,
+                        String assignmentTitle,
+                        String courseId,
+                        String studentId,
+                        int attemptNo,
+                        Instant submittedAt,
+                        String status,
+                        boolean isLate,
+                        int minutesLate,
+                        BigDecimal maxScore,
+                        String rubricId,
+                        int attachmentCount) {
+        }
+
         public record CreateAssignmentRequestDto(
                         @NotBlank String courseId,
                         @NotBlank String title,

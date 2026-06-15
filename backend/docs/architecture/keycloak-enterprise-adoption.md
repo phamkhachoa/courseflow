@@ -23,16 +23,13 @@ the product decides what the caller can do inside product-specific resources.
 
 ## Current State
 
-The repository now supports two external-token modes during migration:
-
-- `legacy`: `identity-service` signs CourseFlow HS256 user tokens. This remains for local/demo
-  compatibility and should not be used for the production target.
-- `oidc`: Keycloak issues external OAuth2/OIDC access tokens, `api-gateway` validates issuer, JWKS
-  and audience, then `identity-token-converter-service` validates the token again, resolves the
-  CourseFlow user through `access-control-service`, and issues a short-lived internal JWT.
+Keycloak is the only supported external login authority. It issues external OAuth2/OIDC access
+tokens, `api-gateway` validates issuer, JWKS and audience, then
+`identity-token-converter-service` validates the token again, resolves the CourseFlow user through
+`access-control-service`, and issues a short-lived internal JWT.
 
 `common-library` validates internal JWTs and protects propagated `X-User-*` headers. In OIDC mode,
-legacy auth endpoints are blocked at the gateway so Keycloak is the only supported edge login
+custom auth endpoints are blocked at the gateway so Keycloak remains the only supported edge login
 authority. Admin user lifecycle now goes through `user-management-service`, which provisions and
 deactivates Keycloak users through the Keycloak Admin API, mirrors CourseFlow authorization data in
 `access-control-service`, and keeps profile data in `user-management-service`.
@@ -122,9 +119,8 @@ IAM service beside Keycloak:
   timezone, public profile, learner/instructor profile views and batch profile summaries. Public
   profile reads only expose profiles marked `PUBLIC`; summary batch lookup is the preferred
   authenticated/internal way to hydrate avatar/name in UI lists.
-- `identity-service` remains only as a temporary legacy auth/account compatibility service while
-  custom password/JWT auth is being phased out. It should not own long-term password/session policy,
-  LMS authorization or profile directory data.
+- The former custom password/JWT service has been decommissioned; long-term password/session policy,
+  LMS authorization and profile directory data live in Keycloak, access-control and user-management.
 - Keycloak/admin events or provisioning callbacks may feed CourseFlow user lifecycle, but random
   domain services must not call Keycloak Admin API directly.
 
@@ -232,20 +228,17 @@ Production requirements:
 ### Phase 1: OIDC verifier under the current gateway
 
 - Add a gateway external-token verifier abstraction.
-- Keep the current HS256 verifier temporarily for local compatibility.
 - Add a Keycloak verifier using issuer URI, JWKS, audience validation and clock skew.
 - Add the same verifier capability to `identity-token-converter-service`.
 - Add tests for issuer mismatch, audience mismatch, expired token, key rotation and missing subject.
 
-Implementation note: gateway and converter now expose `EXTERNAL_TOKEN_MODE=legacy|oidc` plus
-`KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWK_SET_URI` and `KEYCLOAK_AUDIENCE`. In `legacy` mode they keep
-accepting CourseFlow HS256 tokens. In `oidc` mode they validate external access tokens with issuer,
-JWKS and audience before the converter resolves CourseFlow roles from `access-control-service`.
+Implementation note: gateway and converter now validate external access tokens with
+`KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWK_SET_URI` and `KEYCLOAK_AUDIENCE` before the converter resolves
+CourseFlow roles from `access-control-service`.
 Local Docker now imports `backend/infra/docker/keycloak/courseflow-realm.json`, which defines the
 CourseFlow realm, learner/admin public PKCE clients and the `courseflow-api` audience mapper. The
-React admin can use Authorization Code + PKCE with `VITE_AUTH_MODE=keycloak`; the learner web can use
-the same flow with `NEXT_PUBLIC_AUTH_MODE=keycloak`. The Flutter app has a Keycloak/AppAuth mode via
-`COURSEFLOW_AUTH_MODE=keycloak` and the `courseflow-mobile` public PKCE client. The local realm
+React admin and learner web use Authorization Code + PKCE. The Flutter app uses Keycloak/AppAuth
+with the `courseflow-mobile` public PKCE client. The local realm
 includes demo users only for developer testing. Production uses
 `backend/infra/docker/keycloak/courseflow-realm.prod-template.json` as a no-demo-users starting point
 and does not import the local realm. Full Keycloak e2e tests and mobile platform callback
@@ -282,8 +275,8 @@ configuration remain follow-up work.
   grant product roles inline; role assignment is a separate access-control operation with explicit
   `roleId`, `scopeType` and `scopeId`.
 - `GET /api/v1/users/me` is also routed to `user-management-service` as a compatibility facade. It
-  no longer reads from `identity-service`; access-control remains the canonical source for
-  CourseFlow user id/email/status/primary role, and user-management owns display name/avatar.
+  resolves CourseFlow user id/email/status/primary role from access-control, and user-management owns
+  display name/avatar.
 - Web and mobile clients must not treat Keycloak `realm_access.roles` as CourseFlow product roles.
   After Keycloak login they hydrate `/api/v1/users/me`; `user-management-service` returns profile
   fields plus the role/status resolved from `access-control-service`.
@@ -292,22 +285,18 @@ configuration remain follow-up work.
 
 - Move learner web, admin web and mobile login to Authorization Code + PKCE.
 - Remove password handling from frontend clients.
-- Keep custom `/auth/login` only behind an explicit local legacy compatibility profile.
-- The default gateway route table no longer exposes `/api/v1/auth/**`. In `EXTERNAL_TOKEN_MODE=oidc`,
-  the global gateway filter also returns `410 Gone` for every `/api/v1/auth/**` path so clients use
-  Keycloak as the edge login authority even if a legacy route is mounted for local testing.
+- The default gateway route table no longer exposes `/api/v1/auth/**`; the global gateway filter
+  returns `410 Gone` for every `/api/v1/auth/**` path so clients use Keycloak as the edge login
+  authority.
 - Move MFA and password reset flows to Keycloak required actions.
 - Update logout to use OIDC logout and revoke/clear refresh tokens.
 
 ### Phase 4: Decommission custom external JWT
 
-- Stop issuing CourseFlow HS256 user access tokens from `identity-service`.
-- Remove `COURSEFLOW_JWT_SECRET` from external user auth paths.
+- Stop issuing CourseFlow HS256 user access tokens.
+- Remove the external user-auth shared HMAC secret.
 - Keep CourseFlow user authorization in `access-control-service` and profile/directory data in
-  `user-management-service`; `identity-service` must not be an STS client and should be retired once
-  the temporary legacy password endpoints are removed. In the production compose overlay,
-  `identity-service` is placed behind the `legacy-identity` profile so it is not part of the default
-  Keycloak deployment.
+  `user-management-service`.
 - Keep downstream services unchanged where possible because they already consume internal JWT.
 
 ### Phase 5: Harden internal service authentication
@@ -358,7 +347,7 @@ configuration remain follow-up work.
 - Current implementation: access-control-service supports service-supplied scope ancestry for child
   resource checks only when the caller has `internal:authz:assert-topology`, while preserving
   exact-scope behavior for callers that do not send ancestors.
-- Current implementation: chat WebSocket STOMP `CONNECT` exchanges the presented Keycloak/legacy
+- Current implementation: chat WebSocket STOMP `CONNECT` exchanges the presented Keycloak
   external bearer token through `identity-token-converter-service`, verifies the returned internal
   JWT locally, and uses its scoped role assignments for course access checks.
 
@@ -374,7 +363,7 @@ configuration remain follow-up work.
 - Do not let internal services rely on `X-User-*` without internal token verification.
 - Do not keep shared HMAC token signing as the final enterprise design.
 - Do not treat distributed RSA private keys as the final enterprise design; move signing into STS/JWKS.
-- Do not let WebSocket/STOMP services verify legacy CourseFlow JWTs directly in Keycloak mode.
+- Do not let WebSocket/STOMP services verify external bearer tokens directly.
 - Do not let the token converter fall back to external token role claims in production.
 - Do not use wildcard STS client allowlists in production.
 - Do not reuse one STS client secret across all internal services in production.
@@ -391,7 +380,7 @@ CourseFlow should not be called enterprise-ready for Keycloak until all gates pa
 - Production profile uses RS256 for CourseFlow internal JWTs.
 - Domain services reject forged `X-User-*` headers without valid internal JWT.
 - Frontend login uses Authorization Code + PKCE.
-- Custom password grant/login is disabled or explicitly marked legacy.
+- Custom password grant/login is disabled.
 - Identity mapping uses immutable Keycloak subject plus issuer.
 - Admin/operator roles are coarse in Keycloak and fine-grained LMS permissions remain in CourseFlow.
 - Access-control rejects invalid scope types, missing non-platform `scopeId` values and permission
@@ -427,8 +416,8 @@ P0:
 
 P1:
 
-- Register mobile redirect schemes in generated Android/iOS platform projects, run mobile Keycloak
-  e2e, and disable the legacy password mode for production mobile builds.
+- Register mobile redirect schemes in generated Android/iOS platform projects and run mobile
+  Keycloak e2e.
 - Move MFA/password reset to Keycloak.
 - Add Keycloak event sync for user lifecycle and audit.
 - Add operator dashboards for token exchange failures, JWKS refresh failures and denied

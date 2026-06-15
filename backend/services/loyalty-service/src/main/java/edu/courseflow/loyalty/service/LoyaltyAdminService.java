@@ -79,6 +79,8 @@ public class LoyaltyAdminService {
     };
     private static final String BALANCE_BUCKET_PROJECTION_MODE = "FIFO_BY_EXPIRY_THEN_OCCURRED_AT_READ_MODEL";
     private static final String LOT_ALLOCATIONS_METADATA_KEY = "lotAllocations";
+    private static final String REWARD_REVERSAL_APPROVAL_OPERATION = "REWARD_REDEMPTION_REVERSE";
+    private static final String REWARD_FULFILLMENT_APPROVAL_OPERATION = "REWARD_FULFILLMENT_OVERRIDE";
     private static final Instant NO_EXPIRY = Instant.parse("9999-12-31T23:59:59Z");
 
     private final LoyaltyProgramRepository programs;
@@ -631,7 +633,7 @@ public class LoyaltyAdminService {
         List<LoyaltyAuditEventDto> audit = auditEvents.search(
                         approval.getTenantId(),
                         approval.getApplicationId(),
-                        operationType.equals("EXPIRY") ? "loyalty-expiry-approval" : "loyalty-adjustment-approval",
+                        approvalAggregateType(operationType),
                         approval.getId().toString(),
                         null,
                         null,
@@ -934,6 +936,19 @@ public class LoyaltyAdminService {
         return raw == null || raw.toString().isBlank() ? "ADJUSTMENT" : raw.toString().trim();
     }
 
+    private String approvalAggregateType(String operationType) {
+        if ("EXPIRY".equalsIgnoreCase(operationType)) {
+            return "loyalty-expiry-approval";
+        }
+        if (REWARD_REVERSAL_APPROVAL_OPERATION.equalsIgnoreCase(operationType)) {
+            return "loyalty-reward-reversal-approval";
+        }
+        if (REWARD_FULFILLMENT_APPROVAL_OPERATION.equalsIgnoreCase(operationType)) {
+            return "loyalty-reward-fulfillment-approval";
+        }
+        return "loyalty-adjustment-approval";
+    }
+
     private List<LoyaltyPointsEntry> evidenceLedgerEntries(
             LoyaltyAdjustmentApproval approval,
             String operationType) {
@@ -950,6 +965,9 @@ public class LoyaltyAdminService {
                     approval.getCorrelationId(),
                     null,
                     PageRequest.of(0, 500));
+        }
+        if (REWARD_FULFILLMENT_APPROVAL_OPERATION.equalsIgnoreCase(operationType)) {
+            return List.of();
         }
         return pointsEntries.findEvidenceEntries(
                 approval.getTenantId(),
@@ -975,6 +993,11 @@ public class LoyaltyAdminService {
                 && approval.getExecutedEntryId() != null
                 && ledgerEntries.isEmpty()) {
             warnings.add("EXECUTED_ADJUSTMENT_ENTRY_NOT_FOUND");
+        }
+        if (REWARD_REVERSAL_APPROVAL_OPERATION.equalsIgnoreCase(operationType)
+                && "EXECUTED".equals(approval.getStatus())
+                && ledgerEntries.isEmpty()) {
+            warnings.add("EXECUTED_REWARD_REVERSAL_HAS_NO_LEDGER_ENTRIES");
         }
         if (ledgerEntries.stream().anyMatch(entry -> "PENDING_OUTBOX".equals(entry.outboxStatus()))) {
             warnings.add("PENDING_OUTBOX_EVENTS");

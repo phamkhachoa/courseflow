@@ -53,6 +53,9 @@ public class Course {
     @Column(name = "current_version_no", nullable = false)
     private int currentVersionNo = 1;
 
+    @Column(name = "published_version_no")
+    private Integer publishedVersionNo;
+
     @Column(name = "review_state", nullable = false, length = 40)
     private String reviewState = "DRAFT";
 
@@ -175,6 +178,15 @@ public class Course {
 
     public void setCurrentVersionNo(int currentVersionNo) {
         this.currentVersionNo = currentVersionNo;
+        touch();
+    }
+
+    public Integer getPublishedVersionNo() {
+        return publishedVersionNo;
+    }
+
+    public void publishVersion(int publishedVersionNo) {
+        this.publishedVersionNo = publishedVersionNo;
         touch();
     }
 

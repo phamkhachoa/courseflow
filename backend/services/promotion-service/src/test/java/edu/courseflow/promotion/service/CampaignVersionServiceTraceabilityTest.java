@@ -41,6 +41,8 @@ class CampaignVersionServiceTraceabilityTest {
     IncentiveAccessService access;
     @Mock
     IncentiveMetrics metrics;
+    @Mock
+    PromotionLoyaltyReadinessClient loyaltyReadiness;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
     private CampaignVersionService service;
@@ -54,6 +56,7 @@ class CampaignVersionServiceTraceabilityTest {
                 auditEvents,
                 access,
                 decisions,
+                loyaltyReadiness,
                 objectMapper,
                 metrics);
     }

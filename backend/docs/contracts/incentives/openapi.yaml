@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: CourseFlow Generic Incentive API
-  version: 2.0.0-contract.2s
+  version: 2.0.0-contract.2t
   summary: Portable promotion, coupon, reservation, redemption and retention APIs.
   description: >
     Static OpenAPI contract for the generic incentive platform. The service is not LMS-specific:
@@ -1040,6 +1040,170 @@ paths:
                 $ref: "#/components/schemas/GenerateCouponsResponse"
         default:
           $ref: "#/components/responses/Error"
+  /internal/incentives/coupon-distributions:preview:
+    post:
+      tags: [Coupons]
+      operationId: previewCouponDistribution
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewCouponDistributionRequest"
+      responses:
+        "200":
+          description: Distribution preview with deduplicated recipients and a payload hash.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDistributionPreviewResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupon-distributions:
+    get:
+      tags: [Coupons]
+      operationId: listCouponDistributions
+      parameters:
+        - $ref: "#/components/parameters/TenantIdQuery"
+        - $ref: "#/components/parameters/ApplicationIdQuery"
+        - $ref: "#/components/parameters/CampaignIdQuery"
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Coupon distribution operations.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDistributionQueryResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Coupons]
+      operationId: createCouponDistribution
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCouponDistributionRequest"
+      responses:
+        "200":
+          description: Created distribution awaiting approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDistribution"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupon-distributions/{distributionId}:
+    get:
+      tags: [Coupons]
+      operationId: getCouponDistribution
+      parameters:
+        - name: distributionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Distribution detail with recipient status, coupon ids and notification state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDistribution"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupon-distributions/{distributionId}:approve:
+    post:
+      tags: [Coupons]
+      operationId: approveCouponDistribution
+      parameters:
+        - name: distributionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponDistributionActionRequest"
+      responses:
+        "200":
+          description: Approved distribution.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDistribution"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupon-distributions/{distributionId}:issue:
+    post:
+      tags: [Coupons]
+      operationId: issueCouponDistribution
+      parameters:
+        - name: distributionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponDistributionActionRequest"
+      responses:
+        "200":
+          description: Issued distribution. Coupon responses remain masked.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDistribution"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/coupon-distributions/{distributionId}:revoke:
+    post:
+      tags: [Coupons]
+      operationId: revokeCouponDistribution
+      parameters:
+        - name: distributionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponDistributionActionRequest"
+      responses:
+        "200":
+          description: Revoked distribution. Issued coupons are voided.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDistribution"
+        default:
+          $ref: "#/components/responses/Error"
   /internal/incentives/admin/preview:
     post:
       tags: [Runtime]
@@ -1054,11 +1218,53 @@ paths:
               $ref: "#/components/schemas/AdminPreviewRequest"
       responses:
         "200":
-          description: No-ledger preview response.
+          description: No-ledger simulation response with winner, totals, reason codes and quota exposure.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminPreviewResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/admin/experiments:preview:
+    post:
+      tags: [Runtime]
+      operationId: previewIncentiveExperiment
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExperimentPreviewRequest"
+      responses:
+        "200":
+          description: No-ledger deterministic experiment traffic allocation preview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentPreviewResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/admin/fraud-score:preview:
+    post:
+      tags: [Runtime]
+      operationId: previewIncentiveFraudScore
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FraudScorePreviewRequest"
+      responses:
+        "200":
+          description: No-ledger fraud score preview with explainable signals and recommended action.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FraudScorePreviewResponse"
         default:
           $ref: "#/components/responses/Error"
   /internal/incentives/evaluate:
@@ -1343,14 +1549,144 @@ paths:
                 $ref: "#/components/schemas/IncentiveReconciliationQueryResponse"
         default:
           $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/{redemptionId}/reversal-approvals:
+    post:
+      tags: [Redemptions]
+      operationId: requestIncentiveRedemptionReversalApproval
+      summary: Request maker-checker approval for an operator redemption reversal.
+      parameters:
+        - $ref: "#/components/parameters/RedemptionId"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RedemptionReversalApprovalRequest"
+      responses:
+        "200":
+          description: Pending reversal approval with hash-bound evidence.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedemptionReversalApproval"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/reversal-approvals:
+    get:
+      tags: [Redemptions]
+      operationId: listIncentiveRedemptionReversalApprovals
+      summary: List redemption reversal maker-checker approvals.
+      parameters:
+        - name: tenantId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: applicationId
+          in: query
+          required: true
+          schema: { type: string }
+        - name: campaignId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [PENDING_APPROVAL, APPROVED, REJECTED, EXECUTED] }
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Reversal approvals.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RedemptionReversalApproval"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/reversal-approvals/{approvalId}:
+    get:
+      tags: [Redemptions]
+      operationId: getIncentiveRedemptionReversalApproval
+      summary: Get one redemption reversal approval.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Reversal approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedemptionReversalApproval"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/reversal-approvals/{approvalId}:approve:
+    post:
+      tags: [Redemptions]
+      operationId: approveIncentiveRedemptionReversalApproval
+      summary: Approve a redemption reversal approval as a reviewer.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RedemptionReversalApprovalDecision"
+      responses:
+        "200":
+          description: Approved reversal approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedemptionReversalApproval"
+        default:
+          $ref: "#/components/responses/Error"
+  /internal/incentives/redemptions/reversal-approvals/{approvalId}:reject:
+    post:
+      tags: [Redemptions]
+      operationId: rejectIncentiveRedemptionReversalApproval
+      summary: Reject a redemption reversal approval as a reviewer.
+      parameters:
+        - name: approvalId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RedemptionReversalApprovalDecision"
+      responses:
+        "200":
+          description: Rejected reversal approval.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RedemptionReversalApproval"
+        default:
+          $ref: "#/components/responses/Error"
   /internal/incentives/redemptions/{redemptionId}/reverse:
     post:
       tags: [Redemptions]
       operationId: reverseIncentiveRedemption
-      summary: Service-to-service/admin support reversal through a compensating ledger entry.
+      summary: Execute a compensating redemption reversal.
       description: >
         Trusted mutation. `Idempotency-Key` is the canonical retry key; the request-body
-        `idempotencyKey` field remains a compatibility fallback.
+        `idempotencyKey` field remains a compatibility fallback. Runtime service actors with the
+        bound `reverse` operation may execute automated compensation directly. Operator/admin
+        support reversals must reference an approved, unexpired reversal approval.
       security:
         - internalJwt:
             - internal:promotion:reverse
@@ -2481,6 +2817,224 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Coupon"
+    CouponDistributionRecipientInput:
+      type: object
+      required: [profileId]
+      properties:
+        profileId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    PreviewCouponDistributionRequest:
+      type: object
+      required: [campaignId, sourceType, recipients]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        sourceType:
+          type: string
+          enum: [COHORT, SECTION, COURSE, SEGMENT, MANUAL]
+        sourceReference:
+          type: string
+        notifyLearners:
+          type: boolean
+        startsAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        maxRedemptions:
+          type: integer
+        maxRedemptionsPerProfile:
+          type: integer
+        metadata:
+          type: object
+          additionalProperties: true
+        recipients:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CouponDistributionRecipientInput"
+    CreateCouponDistributionRequest:
+      allOf:
+        - $ref: "#/components/schemas/PreviewCouponDistributionRequest"
+        - type: object
+          required: [name, previewHash]
+          properties:
+            name:
+              type: string
+            previewHash:
+              type: string
+            reason:
+              type: string
+    CouponDistributionActionRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+    CouponDistributionPreviewRecipient:
+      type: object
+      required: [profileId, status]
+      properties:
+        profileId:
+          type: string
+        status:
+          type: string
+          enum: [READY, DUPLICATE]
+        reason:
+          type: ["string", "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+    CouponDistributionPreviewResponse:
+      type: object
+      required: [campaignId, sourceType, notifyLearners, requestedRecipients, uniqueRecipients, duplicateRecipients, previewHash, sampleRecipients]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        sourceType:
+          type: string
+        sourceReference:
+          type: ["string", "null"]
+        notifyLearners:
+          type: boolean
+        requestedRecipients:
+          type: integer
+        uniqueRecipients:
+          type: integer
+        duplicateRecipients:
+          type: integer
+        previewHash:
+          type: string
+        sampleRecipients:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponDistributionPreviewRecipient"
+    CouponDistributionRecipient:
+      type: object
+      required: [id, distributionId, profileId, status, notificationStatus, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        distributionId:
+          type: string
+          format: uuid
+        profileId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ISSUED, REVOKED, SKIPPED]
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        notificationStatus:
+          type: string
+          enum: [SUPPRESSED, QUEUED]
+        failureReason:
+          type: ["string", "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        issuedAt:
+          type: ["string", "null"]
+          format: date-time
+        revokedAt:
+          type: ["string", "null"]
+          format: date-time
+    CouponDistribution:
+      type: object
+      required: [id, tenantId, applicationId, campaignId, name, sourceType, status, notifyLearners, recipientCount, issuedCount, revokedCount, previewHash, createdAt, updatedAt, recipients]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sourceType:
+          type: string
+          enum: [COHORT, SECTION, COURSE, SEGMENT, MANUAL]
+        sourceReference:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [PENDING_APPROVAL, APPROVED, ISSUED, REVOKED]
+        notifyLearners:
+          type: boolean
+        startsAt:
+          type: ["string", "null"]
+          format: date-time
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        maxRedemptions:
+          type: ["integer", "null"]
+        maxRedemptionsPerProfile:
+          type: ["integer", "null"]
+        recipientCount:
+          type: integer
+        issuedCount:
+          type: integer
+        revokedCount:
+          type: integer
+        previewHash:
+          type: string
+        reason:
+          type: ["string", "null"]
+        metadata:
+          type: object
+          additionalProperties: true
+        createdBy:
+          type: ["string", "null"]
+        approvedBy:
+          type: ["string", "null"]
+        issuedBy:
+          type: ["string", "null"]
+        revokedBy:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        approvedAt:
+          type: ["string", "null"]
+          format: date-time
+        issuedAt:
+          type: ["string", "null"]
+          format: date-time
+        revokedAt:
+          type: ["string", "null"]
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        recipients:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponDistributionRecipient"
+    CouponDistributionQueryResponse:
+      type: object
+      required: [items, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponDistribution"
+        limit:
+          type: integer
     CouponStorageInventory:
       type: object
       required: [legacyFallbackEnabled, fallbackDisableReady, totalCoupons, legacyCoupons, malformedCoupons, generatedAt, items]
@@ -3236,16 +3790,308 @@ components:
           type: string
     AdminPreviewResponse:
       type: object
-      required: [preview, ledgerImpact, contextHash, decision]
+      required: [preview, ledgerImpact, contextHash, decision, totals, quotaExposure, candidates, generatedAt]
       properties:
         preview:
           type: boolean
         ledgerImpact:
           type: boolean
+          description: Always false. Admin simulation must not reserve quota, commit ledger, or publish outbox events.
         contextHash:
           type: string
         decision:
           $ref: "#/components/schemas/EvaluateIncentivesResponse"
+        winningCampaignId:
+          type: ["string", "null"]
+          format: uuid
+        winningCampaignVersion:
+          type: ["integer", "null"]
+        winningCampaignCode:
+          type: ["string", "null"]
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        totals:
+          $ref: "#/components/schemas/AdminSimulationTotals"
+        quotaExposure:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSimulationQuotaExposure"
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSimulationCandidate"
+        generatedAt:
+          type: string
+          format: date-time
+    ExperimentVariantPreviewRequest:
+      type: object
+      required: [key, weightBps]
+      properties:
+        key:
+          type: string
+          description: Stable variant key. `__HOLDOUT__` is reserved for implicit holdout traffic.
+        weightBps:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          description: Variant traffic allocation in basis points.
+        holdout:
+          type: boolean
+          description: True when the allocation is a no-benefit holdout/control variant.
+        campaignCode:
+          type: string
+          description: Optional campaign code linked by operators for analysis; preview does not enforce it.
+        metadata:
+          type: object
+          additionalProperties: true
+    ExperimentPreviewRequest:
+      type: object
+      required: [context, experimentKey, variants]
+      properties:
+        context:
+          $ref: "#/components/schemas/EvaluateIncentivesRequest"
+        experimentKey:
+          type: string
+        assignmentUnit:
+          type: string
+          enum: [PROFILE, EXTERNAL_REFERENCE, ATTRIBUTE]
+          default: PROFILE
+        assignmentAttributeKey:
+          type: string
+          description: Required when assignmentUnit is ATTRIBUTE.
+        variants:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ExperimentVariantPreviewRequest"
+        note:
+          type: string
+    ExperimentVariantAllocation:
+      type: object
+      required: [key, weightBps, holdout, startBucketInclusive, endBucketExclusive, selected, metadata]
+      properties:
+        key:
+          type: string
+        weightBps:
+          type: integer
+        holdout:
+          type: boolean
+        campaignCode:
+          type: ["string", "null"]
+        startBucketInclusive:
+          type: integer
+          minimum: 0
+          maximum: 9999
+        endBucketExclusive:
+          type: integer
+          minimum: 0
+          maximum: 10000
+        selected:
+          type: boolean
+        metadata:
+          type: object
+          additionalProperties: true
+    ExperimentPreviewResponse:
+      type: object
+      required: [preview, ledgerImpact, policyVersion, tenantId, applicationId, experimentKey, assignmentUnit, assignmentKeyHash, bucket, selectedVariantKey, holdout, recommendedAction, reasonCodes, variants, generatedAt]
+      properties:
+        preview:
+          type: boolean
+        ledgerImpact:
+          type: boolean
+          description: Always false. Experiment preview does not reserve quota, commit ledger, evaluate campaigns or publish outbox events.
+        policyVersion:
+          type: string
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        experimentKey:
+          type: string
+        assignmentUnit:
+          type: string
+          enum: [PROFILE, EXTERNAL_REFERENCE, ATTRIBUTE]
+        assignmentKeyHash:
+          type: string
+          description: SHA-256 hash of the assignment key. Raw profile/external reference values are not returned.
+        bucket:
+          type: integer
+          minimum: 0
+          maximum: 9999
+        selectedVariantKey:
+          type: string
+        holdout:
+          type: boolean
+        recommendedAction:
+          type: string
+          enum: [APPLY_VARIANT, HOLDOUT]
+        reasonCodes:
+          type: array
+          items:
+            type: string
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentVariantAllocation"
+        generatedAt:
+          type: string
+          format: date-time
+    FraudScorePreviewRequest:
+      type: object
+      required: [context]
+      properties:
+        context:
+          $ref: "#/components/schemas/EvaluateIncentivesRequest"
+        lookbackMinutes:
+          type: integer
+          minimum: 1
+          maximum: 10080
+        sourceClientId:
+          type: string
+          description: Optional runtime source client id to include in attribution checks.
+        note:
+          type: string
+    FraudScoreSignal:
+      type: object
+      required: [code, severity, points, message, evidence]
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH]
+        points:
+          type: integer
+          minimum: 0
+        message:
+          type: string
+        evidence:
+          type: object
+          additionalProperties: true
+          description: Bounded non-secret counts and bands. Raw coupon codes are never returned.
+    FraudScorePreviewResponse:
+      type: object
+      required: [preview, ledgerImpact, policyVersion, tenantId, applicationId, profileId, lookbackMinutes, score, severity, recommendedAction, signals, generatedAt]
+      properties:
+        preview:
+          type: boolean
+        ledgerImpact:
+          type: boolean
+          description: Always false. Fraud score preview must not mutate quota, ledger, redemptions or outbox.
+        policyVersion:
+          type: string
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        profileId:
+          type: string
+        lookbackMinutes:
+          type: integer
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        recommendedAction:
+          type: string
+          enum: [ALLOW, CHALLENGE, REVIEW, BLOCK]
+        signals:
+          type: array
+          items:
+            $ref: "#/components/schemas/FraudScoreSignal"
+        generatedAt:
+          type: string
+          format: date-time
+    AdminSimulationTotals:
+      type: object
+      required: [subtotal, totalDiscount, finalAmount, totalPoints]
+      properties:
+        subtotal:
+          type: number
+        totalDiscount:
+          type: number
+        finalAmount:
+          type: number
+        currency:
+          type: ["string", "null"]
+        totalPoints:
+          type: number
+    AdminSimulationQuotaExposure:
+      type: object
+      required: [scopeType, scopeId, profileId, limit, used, remaining, available, wouldConsume]
+      properties:
+        scopeType:
+          type: string
+        scopeId:
+          type: string
+        profileId:
+          type: string
+        limit:
+          type: integer
+        used:
+          type: integer
+        remaining:
+          type: integer
+        available:
+          type: boolean
+        wouldConsume:
+          type: boolean
+          description: True when the runtime winner or simulation-only WOULD_STACK candidate would consume this quota if that policy path were reserved.
+    AdminSimulationCandidate:
+      type: object
+      required: [campaignId, matched, selected, exclusive, stackable, stackingStatus, stackingReasonCodes, effects, reasonCodes, quotaExposure]
+      properties:
+        campaignId:
+          type: string
+          format: uuid
+        campaignVersion:
+          type: ["integer", "null"]
+        campaignCode:
+          type: ["string", "null"]
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        matched:
+          type: boolean
+        selected:
+          type: boolean
+          description: True only for the current runtime single-winner decision.
+        exclusive:
+          type: boolean
+        stackable:
+          type: boolean
+        stackingStatus:
+          type: string
+          enum:
+            - SELECTED_PRIMARY
+            - WOULD_STACK
+            - BLOCKED_BY_EXCLUSIVE_WINNER
+            - BLOCKED_BY_PRIMARY_NON_STACKABLE
+            - BLOCKED_BY_CANDIDATE_EXCLUSIVE
+            - BLOCKED_BY_CANDIDATE_NON_STACKABLE
+            - QUOTA_EXHAUSTED
+            - NOT_SELECTED
+        stackingReasonCodes:
+          type: array
+          description: Simulation-only governance reasons. WOULD_STACK does not mean checkout reservation commits multiple campaigns.
+          items:
+            type: string
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/IncentiveEffect"
+        reasonCodes:
+          type: array
+          items:
+            type: string
+        quotaExposure:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminSimulationQuotaExposure"
     ReserveIncentiveRequest:
       type: object
       required: [context]
@@ -3593,6 +4439,114 @@ components:
           description: Compatibility fallback when the Idempotency-Key header cannot be sent.
         reason:
           type: string
+        approvalId:
+          type: string
+          format: uuid
+          description: Required for operator/admin support reversals.
+        changeTicket:
+          type: string
+          description: Must match the approved reversal evidence when approvalId is supplied.
+    RedemptionReversalApprovalRequest:
+      type: object
+      required: [idempotencyKey, reason, changeTicket]
+      properties:
+        idempotencyKey:
+          type: string
+          description: Execution idempotency key approved for the later reverse call.
+        reason:
+          type: string
+        changeTicket:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    RedemptionReversalApprovalDecision:
+      type: object
+      properties:
+        note:
+          type: string
+    RedemptionReversalApproval:
+      type: object
+      required:
+        - approvalId
+        - status
+        - redemptionId
+        - tenantId
+        - applicationId
+        - campaignId
+        - idempotencyKey
+        - requestHash
+        - resultHash
+        - subjectHash
+        - reason
+        - changeTicket
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING_APPROVAL, APPROVED, REJECTED, EXECUTED]
+        redemptionId:
+          type: string
+          format: uuid
+        reservationId:
+          type: ["string", "null"]
+          format: uuid
+        tenantId:
+          type: string
+        applicationId:
+          type: string
+        campaignId:
+          type: string
+          format: uuid
+        campaignVersion:
+          type: ["integer", "null"]
+        couponId:
+          type: ["string", "null"]
+          format: uuid
+        profileId:
+          type: ["string", "null"]
+        externalReference:
+          type: ["string", "null"]
+        idempotencyKey:
+          type: ["string", "null"]
+        requestHash:
+          type: string
+        resultHash:
+          type: string
+        subjectHash:
+          type: string
+        reason:
+          type: string
+        changeTicket:
+          type: string
+        requestedBy:
+          type: ["string", "null"]
+        approvedBy:
+          type: ["string", "null"]
+        rejectedBy:
+          type: ["string", "null"]
+        executedBy:
+          type: ["string", "null"]
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: ["string", "null"]
+          format: date-time
+        approvedAt:
+          type: ["string", "null"]
+          format: date-time
+        rejectedAt:
+          type: ["string", "null"]
+          format: date-time
+        executedAt:
+          type: ["string", "null"]
+          format: date-time
+        subject:
+          type: object
+          additionalProperties: true
     ReverseRedemptionResponse:
       type: object
       required: [reversed, redemptionId, status, effects, reasonCodes, idempotencyReplay]

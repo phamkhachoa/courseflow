@@ -13,7 +13,31 @@ export type LearnerLoyaltyBalance = {
   expiredPoints: number;
   expiringSoonPoints: number;
   nextExpiryAt?: string | null;
+  tierProgress?: LoyaltyTierProgress | null;
   warnings: string[];
+};
+
+export type LoyaltyTierProgress = {
+  stateId?: string | null;
+  accountId: string;
+  currentTierPolicyId?: string | null;
+  currentTierCode: string;
+  currentTierName: string;
+  currentTierRank: number;
+  qualificationPoints: number;
+  qualificationWindowDays?: number | null;
+  qualificationWindowStartedAt?: string | null;
+  qualificationWindowEndsAt?: string | null;
+  currentPeriodStartedAt?: string | null;
+  qualifiedAt?: string | null;
+  graceUntil?: string | null;
+  nextTierPolicyId?: string | null;
+  nextTierCode?: string | null;
+  nextTierName?: string | null;
+  nextTierRank?: number | null;
+  nextTierPointsRequired?: number | null;
+  pointsToNext?: number | null;
+  evaluatedAt?: string | null;
 };
 
 export type LearnerLoyaltyBalanceResponse = {
@@ -108,6 +132,15 @@ export type LoyaltyRewardRedemption = {
   fulfillmentStatus: string;
   fulfillmentRef?: string | null;
   fulfillmentNote?: string | null;
+  fulfillmentProvider?: string | null;
+  fulfillmentAttemptCount?: number;
+  fulfillmentLastAttemptAt?: string | null;
+  fulfillmentNextAttemptAt?: string | null;
+  fulfillmentSlaDueAt?: string | null;
+  fulfillmentErrorClass?: string | null;
+  fulfillmentErrorMessage?: string | null;
+  fulfillmentCallbackReceivedAt?: string | null;
+  fulfillmentCallbackPayloadHash?: string | null;
   rewardSnapshot?: Record<string, unknown> | null;
   correlationId?: string | null;
   note?: string | null;

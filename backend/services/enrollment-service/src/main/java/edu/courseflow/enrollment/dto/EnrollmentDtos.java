@@ -128,8 +128,87 @@ public final class EnrollmentDtos {
     ) {
     }
 
+    public record EnrollmentOrderDto(
+            String id,
+            String enrollmentId,
+            String checkoutAttemptId,
+            String studentId,
+            String courseId,
+            String status,
+            BigDecimal amount,
+            String currency,
+            String paymentProvider,
+            String paymentReference,
+            String failureReason,
+            Instant paidAt,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+    }
+
+    public record EnrollmentRemediationCaseDto(
+            String id,
+            String caseType,
+            String status,
+            String severity,
+            String enrollmentId,
+            String checkoutAttemptId,
+            String promotionApplicationId,
+            String orderId,
+            String studentId,
+            String courseId,
+            String assigneeId,
+            String note,
+            String reasonCode,
+            Instant slaDueAt,
+            long slaAgeMinutes,
+            boolean slaBreached,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant closedAt,
+            List<EnrollmentRemediationCaseActionDto> actionHistory,
+            List<EnrollmentRemediationCaseActionDto> retryHistory
+    ) {
+    }
+
+    public record EnrollmentRemediationCaseActionDto(
+            String id,
+            String action,
+            String actorId,
+            String note,
+            String fromStatus,
+            String toStatus,
+            Map<String, Object> payload,
+            Instant createdAt
+    ) {
+    }
+
     public record PromotionApplicationActionRequestDto(
             String reason,
+            String correlationId
+    ) {
+    }
+
+    public record PaymentStatusUpdateRequestDto(
+            @NotBlank String paymentStatus,
+            String paymentProvider,
+            String paymentReference,
+            BigDecimal paidAmount,
+            String currency,
+            String note,
+            String correlationId
+    ) {
+    }
+
+    public record RemediationCaseActionRequestDto(
+            String note,
+            String correlationId
+    ) {
+    }
+
+    public record RemediationCaseAssignRequestDto(
+            @NotBlank String assigneeId,
+            String note,
             String correlationId
     ) {
     }
@@ -137,11 +216,141 @@ public final class EnrollmentDtos {
     public record EnrollmentCheckoutResponseDto(
             EnrollmentDto enrollment,
             EnrollmentPromotionApplicationDto promotion,
-            String attemptId
+            String attemptId,
+            EnrollmentOrderDto order
     ) {
         public EnrollmentCheckoutResponseDto(EnrollmentDto enrollment, EnrollmentPromotionApplicationDto promotion) {
-            this(enrollment, promotion, null);
+            this(enrollment, promotion, null, null);
         }
+
+        public EnrollmentCheckoutResponseDto(
+                EnrollmentDto enrollment,
+                EnrollmentPromotionApplicationDto promotion,
+                String attemptId) {
+            this(enrollment, promotion, attemptId, null);
+        }
+    }
+
+    public record EnrollmentBenefitReconciliationEntryDto(
+            String reconciliationKey,
+            String reconciliationStatus,
+            List<String> reasonCodes,
+            String severity,
+            String enrollmentId,
+            String studentId,
+            String courseId,
+            String enrollmentStatus,
+            Instant enrolledAt,
+            Instant droppedAt,
+            String dropReason,
+            String orderId,
+            String orderStatus,
+            BigDecimal orderAmount,
+            String currency,
+            Instant paidAt,
+            Instant orderCreatedAt,
+            Instant orderUpdatedAt,
+            String promotionApplicationId,
+            String promotionStatus,
+            String reservationId,
+            String redemptionId,
+            int promotionRetryCount,
+            Instant promotionNextRetryAt,
+            String promotionLastRetryError,
+            Instant promotionUpdatedAt
+    ) {
+    }
+
+    public record EnrollmentBenefitReconciliationQueryResponseDto(
+            List<EnrollmentBenefitReconciliationEntryDto> items,
+            int limit,
+            boolean hasMore,
+            Instant generatedAt
+    ) {
+    }
+
+    public record RefundDropPolicyEvaluateRequestDto(
+            @NotBlank String enrollmentId,
+            String reason,
+            Instant requestedAt,
+            Integer refundWindowDays,
+            String paymentStatus,
+            BigDecimal paidAmount,
+            String currency,
+            Instant paidAt,
+            String promotionStatus,
+            String reservationId,
+            String redemptionId,
+            Long loyaltyPointsEarned,
+            Long loyaltyPointsReversed,
+            String loyaltyEarnEntryId,
+            String rewardStatus,
+            String rewardRedemptionId,
+            String rewardFulfillmentStatus,
+            Boolean rewardFulfilled,
+            Map<String, Object> evidence
+    ) {
+    }
+
+    public record RefundDropPolicyFactsDto(
+            String enrollmentStatus,
+            Instant enrolledAt,
+            Instant droppedAt,
+            Instant completedAt,
+            String dropReason,
+            String orderId,
+            String paymentStatus,
+            BigDecimal paidAmount,
+            String currency,
+            Instant paidAt,
+            int refundWindowDays,
+            Instant refundWindowEndsAt,
+            boolean withinRefundWindow,
+            String promotionApplicationId,
+            String promotionStatus,
+            String reservationId,
+            String redemptionId,
+            long loyaltyPointsEarned,
+            long loyaltyPointsReversed,
+            long loyaltyPointsOutstanding,
+            String loyaltyEarnEntryId,
+            String rewardStatus,
+            String rewardRedemptionId,
+            String rewardFulfillmentStatus,
+            Boolean rewardFulfilled
+    ) {
+    }
+
+    public record RefundDropPolicyActionDto(
+            String domain,
+            String action,
+            String decision,
+            String severity,
+            boolean required,
+            boolean blocking,
+            boolean makerCheckerRequired,
+            String endpoint,
+            String idempotencyKey,
+            List<String> reasonCodes,
+            Map<String, Object> evidence
+    ) {
+    }
+
+    public record RefundDropPolicyEvaluationResponseDto(
+            String enrollmentId,
+            String studentId,
+            String courseId,
+            String matrixStatus,
+            String severity,
+            boolean dropAllowed,
+            boolean refundEligible,
+            boolean manualReviewRequired,
+            List<String> reasonCodes,
+            RefundDropPolicyFactsDto facts,
+            List<RefundDropPolicyActionDto> actions,
+            Map<String, Object> auditPreview,
+            Instant generatedAt
+    ) {
     }
 
     public record LearnerCouponDto(

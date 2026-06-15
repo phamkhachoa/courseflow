@@ -80,6 +80,8 @@ class PromotionServiceTraceabilityTest {
     @Mock
     CampaignVersionService campaignVersionService;
     @Mock
+    RedemptionReversalApprovalService reversalApprovals;
+    @Mock
     IncentiveMetrics metrics;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -101,6 +103,7 @@ class PromotionServiceTraceabilityTest {
                 new IncentiveDecisionEngine(objectMapper),
                 access,
                 campaignVersionService,
+                reversalApprovals,
                 objectMapper,
                 metrics,
                 couponFingerprints(),

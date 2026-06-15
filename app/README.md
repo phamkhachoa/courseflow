@@ -38,19 +38,14 @@ Recommended stack: Dio + Retrofit for typed API clients, Riverpod for state, fre
 
 ## Authentication
 
-The app supports two auth modes:
-
-- `keycloak` (default): uses Authorization Code + PKCE with Keycloak through `flutter_appauth`, then calls the
-  gateway with the Keycloak access token. Profile display fields are hydrated from
-  `user-management-service` through `/api/v1/users/me/profile`.
-- `legacy`: local compatibility mode for the retired identity-service password flow. It calls
-  CourseFlow legacy `/v1/auth/login` and `/v1/auth/refresh` and should not be used for production.
+The app uses Authorization Code + PKCE with Keycloak through `flutter_appauth`, then calls the
+gateway with the Keycloak access token. Profile display fields are hydrated from
+`user-management-service` through `/api/v1/users/me/profile`.
 
 Run the app against local Keycloak with:
 
 ```bash
 flutter run \
-  --dart-define=COURSEFLOW_AUTH_MODE=keycloak \
   --dart-define=COURSEFLOW_KEYCLOAK_ISSUER=http://localhost:18080/realms/courseflow \
   --dart-define=COURSEFLOW_KEYCLOAK_CLIENT_ID=courseflow-mobile \
   --dart-define=COURSEFLOW_KEYCLOAK_REDIRECT_URL=courseflow://auth/callback

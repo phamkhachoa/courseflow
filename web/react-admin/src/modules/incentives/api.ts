@@ -5,6 +5,8 @@ import type {
   ApplicationFilters,
   AuditFilters,
   AuditQueryResponse,
+  AdminPreviewIncentivesRequest,
+  AdminPreviewIncentivesResponse,
   Campaign,
   CampaignFilters,
   CampaignVersion,
@@ -14,6 +16,11 @@ import type {
   CampaignVersionTransitionRequest,
   CampaignVersionValidation,
   Coupon,
+  CouponDistribution,
+  CouponDistributionActionRequest,
+  CouponDistributionFilters,
+  CouponDistributionPreviewResponse,
+  CouponDistributionQueryResponse,
   CouponFilters,
   CouponStorageInventory,
   CouponImportApproval,
@@ -36,6 +43,7 @@ import type {
   CreateApplicationClientBindingRequest,
   CreateApplicationRequest,
   CreateCampaignRequest,
+  CreateCouponDistributionRequest,
   CreateCouponRequest,
   GenerateCouponsRequest,
   GenerateCouponsResponse,
@@ -50,11 +58,17 @@ import type {
   LoyaltyAdjustmentApprovalQueryResponse,
   LoyaltyApprovalEvidencePack,
   LoyaltyBalanceBucketResponse,
+  LoyaltyBenefitReconciliationFilters,
+  LoyaltyBenefitReconciliationQueryResponse,
   LoyaltyClientBinding,
   LoyaltyFinanceCloseoutExport,
   LoyaltyFinanceCloseoutFilters,
   LoyaltyInboundDeadLetterActionRequest,
   LoyaltyInboundDeadLetterActionResponse,
+  LoyaltyInboundDeadLetterApproval,
+  LoyaltyInboundDeadLetterApprovalQueryResponse,
+  LoyaltyInboundDeadLetterApprovalRequest,
+  LoyaltyInboundDeadLetterApprovalReviewRequest,
   LoyaltyInboundDeadLetterDetail,
   LoyaltyInboundDeadLetterFilters,
   LoyaltyInboundDeadLetterQueryResponse,
@@ -64,6 +78,7 @@ import type {
   LoyaltyExpiryDryRunResponse,
   LoyaltyExpiryExecutionRequest,
   LoyaltyExpiryExecutionResponse,
+  CreateLoyaltyTierPolicyRequest,
   LoyaltyPointsMutationResponse,
   LoyaltyProgram,
   LoyaltyProgramFilters,
@@ -74,15 +89,35 @@ import type {
   LoyaltyRewardRedemption,
   LoyaltyRewardRedemptionFilters,
   LoyaltyRewardRedemptionQueryResponse,
+  LoyaltyTierFilters,
+  LoyaltyTierPolicy,
+  LoyaltyTierRecalculateResponse,
+  LoyaltyTierStateQueryResponse,
+  OutboxDeadLetterApproval,
+  OutboxDeadLetterApprovalQueryResponse,
+  OutboxDeadLetterApprovalRequest,
+  OutboxDeadLetterApprovalReviewRequest,
+  OutboxDeadLetterActionRequest,
+  OutboxDeadLetterActionResponse,
+  OutboxDeadLetterFilters,
+  OutboxDeadLetterQueryResponse,
   PointLotBackfillRequest,
   PointLotBackfillResponse,
+  PreviewCouponDistributionRequest,
   RedeemLoyaltyRewardRequest,
+  RecalculateLoyaltyTiersRequest,
+  RetryLoyaltyRewardFulfillmentRequest,
+  RewardFulfillmentRunResponse,
   ReverseLoyaltyRewardRedemptionRequest,
   Reservation,
   ReservationFilters,
   ReviewLoyaltyAdjustmentApprovalRequest,
   Redemption,
   RedemptionFilters,
+  RedemptionReversalApproval,
+  RedemptionReversalApprovalDecisionRequest,
+  RedemptionReversalApprovalFilters,
+  RedemptionReversalApprovalRequest,
   ReviewQueueFilters,
   ReverseRedemptionRequest,
   RollbackCampaignVersionRequest,
@@ -103,11 +138,14 @@ import type {
   SubmittedCampaignVersion,
   SubmitLoyaltyAdjustmentApprovalRequest,
   SubmitLoyaltyExpiryApprovalRequest,
+  SubmitLoyaltyRewardFulfillmentApprovalRequest,
   UpdateApplicationStatusRequest,
   UpdateCampaignVersionDraftRequest,
   UpdateCouponStatusRequest,
   UpdateLoyaltyProgramRequest,
   UpdateLoyaltyAccountStatusRequest,
+  UpdateLoyaltyTierPolicyRequest,
+  UpdateLoyaltyTierPolicyStatusRequest,
   UpdateLoyaltyRewardFulfillmentRequest,
   UpdateLoyaltyProgramStatusRequest,
   UpdateLoyaltyRewardRequest,
@@ -117,6 +155,7 @@ import type {
 
 const basePath = "/admin/v1/incentives";
 const loyaltyBasePath = "/admin/v1/loyalty";
+const outboxBasePath = "/admin/v1/outbox";
 
 function cleanParams<T extends Record<string, unknown>>(params: T): Partial<T> {
   return Object.fromEntries(
@@ -302,6 +341,16 @@ export function publishCampaignVersion(
   return transitionCampaignVersion(campaignId, versionNumber, "publish", input);
 }
 
+export async function previewIncentives(
+  input: AdminPreviewIncentivesRequest,
+  correlationId?: string
+): Promise<AdminPreviewIncentivesResponse> {
+  const { data } = await apiClient.post(`${basePath}/admin/preview`, input, {
+    headers: correlationHeaders("admin-incentive-simulation", correlationId)
+  });
+  return unwrap<AdminPreviewIncentivesResponse>(data);
+}
+
 export async function createCoupon(input: CreateCouponRequest): Promise<Coupon> {
   const { data } = await apiClient.post(`${basePath}/coupons`, input);
   return unwrap<Coupon>(data);
@@ -334,6 +383,66 @@ export async function updateCouponStatus(couponId: string, input: UpdateCouponSt
 export async function generateCoupons(input: GenerateCouponsRequest): Promise<GenerateCouponsResponse> {
   const { data } = await apiClient.post(`${basePath}/coupons:generate`, input);
   return unwrap<GenerateCouponsResponse>(data);
+}
+
+export async function previewCouponDistribution(
+  input: PreviewCouponDistributionRequest,
+  correlationId?: string
+): Promise<CouponDistributionPreviewResponse> {
+  const { data } = await apiClient.post(`${basePath}/coupon-distributions:preview`, input, {
+    headers: correlationHeaders("admin-coupon-distribution-preview", correlationId)
+  });
+  return unwrap<CouponDistributionPreviewResponse>(data);
+}
+
+export async function createCouponDistribution(
+  input: CreateCouponDistributionRequest,
+  correlationId?: string
+): Promise<CouponDistribution> {
+  const { data } = await apiClient.post(`${basePath}/coupon-distributions`, input, {
+    headers: correlationHeaders("admin-coupon-distribution-create", correlationId)
+  });
+  return unwrap<CouponDistribution>(data);
+}
+
+export async function listCouponDistributions(
+  filters: CouponDistributionFilters = {}
+): Promise<CouponDistributionQueryResponse> {
+  const { data } = await apiClient.get(`${basePath}/coupon-distributions`, { params: cleanParams(filters) });
+  return unwrap<CouponDistributionQueryResponse>(data);
+}
+
+export async function approveCouponDistribution(
+  distributionId: string,
+  input: CouponDistributionActionRequest = {},
+  correlationId?: string
+): Promise<CouponDistribution> {
+  const { data } = await apiClient.post(`${basePath}/coupon-distributions/${distributionId}:approve`, input, {
+    headers: correlationHeaders("admin-coupon-distribution-approve", correlationId)
+  });
+  return unwrap<CouponDistribution>(data);
+}
+
+export async function issueCouponDistribution(
+  distributionId: string,
+  input: CouponDistributionActionRequest = {},
+  correlationId?: string
+): Promise<CouponDistribution> {
+  const { data } = await apiClient.post(`${basePath}/coupon-distributions/${distributionId}:issue`, input, {
+    headers: correlationHeaders("admin-coupon-distribution-issue", correlationId)
+  });
+  return unwrap<CouponDistribution>(data);
+}
+
+export async function revokeCouponDistribution(
+  distributionId: string,
+  input: CouponDistributionActionRequest = {},
+  correlationId?: string
+): Promise<CouponDistribution> {
+  const { data } = await apiClient.post(`${basePath}/coupon-distributions/${distributionId}:revoke`, input, {
+    headers: correlationHeaders("admin-coupon-distribution-revoke", correlationId)
+  });
+  return unwrap<CouponDistribution>(data);
 }
 
 export async function runCouponImportDryRun(
@@ -482,6 +591,48 @@ export async function getRedemption(redemptionId: string): Promise<Redemption> {
   return unwrap<Redemption>(data);
 }
 
+export async function submitRedemptionReversalApproval(
+  redemptionId: string,
+  input: RedemptionReversalApprovalRequest,
+  correlationId?: string
+): Promise<RedemptionReversalApproval> {
+  const { data } = await apiClient.post(`${basePath}/redemptions/${redemptionId}/reversal-approvals`, input, {
+    headers: correlationHeaders("admin-redemption-reversal-approval", correlationId)
+  });
+  return unwrap<RedemptionReversalApproval>(data);
+}
+
+export async function listRedemptionReversalApprovals(
+  filters: RedemptionReversalApprovalFilters = {}
+): Promise<RedemptionReversalApproval[]> {
+  const { data } = await apiClient.get(`${basePath}/redemptions/reversal-approvals`, {
+    params: cleanParams(filters)
+  });
+  return unwrapList<RedemptionReversalApproval>(data);
+}
+
+export async function approveRedemptionReversalApproval(
+  approvalId: string,
+  input: RedemptionReversalApprovalDecisionRequest = {},
+  correlationId?: string
+): Promise<RedemptionReversalApproval> {
+  const { data } = await apiClient.post(`${basePath}/redemptions/reversal-approvals/${approvalId}:approve`, input, {
+    headers: correlationHeaders("admin-redemption-reversal-approve", correlationId)
+  });
+  return unwrap<RedemptionReversalApproval>(data);
+}
+
+export async function rejectRedemptionReversalApproval(
+  approvalId: string,
+  input: RedemptionReversalApprovalDecisionRequest = {},
+  correlationId?: string
+): Promise<RedemptionReversalApproval> {
+  const { data } = await apiClient.post(`${basePath}/redemptions/reversal-approvals/${approvalId}:reject`, input, {
+    headers: correlationHeaders("admin-redemption-reversal-reject", correlationId)
+  });
+  return unwrap<RedemptionReversalApproval>(data);
+}
+
 export async function queryReconciliation(
   filters: IncentiveReconciliationFilters = {}
 ): Promise<IncentiveReconciliationQueryResponse> {
@@ -493,7 +644,12 @@ export async function reverseRedemption(
   redemptionId: string,
   input: ReverseRedemptionRequest
 ): Promise<{ reversed: boolean; redemptionId: string; status: string; idempotencyReplay: boolean }> {
-  const { data } = await apiClient.post(`${basePath}/redemptions/${redemptionId}/reverse`, input);
+  const { data } = await apiClient.post(`${basePath}/redemptions/${redemptionId}/reverse`, input, {
+    headers: {
+      ...correlationHeaders("admin-redemption-reversal-execute"),
+      "Idempotency-Key": input.idempotencyKey
+    }
+  });
   return unwrap(data);
 }
 
@@ -552,6 +708,52 @@ export async function updateLoyaltyProgramStatus(
     headers: correlationHeaders("loyalty-program-status", correlationId)
   });
   return unwrap<LoyaltyProgram>(data);
+}
+
+export async function listLoyaltyTierPolicies(filters: LoyaltyTierFilters = {}): Promise<LoyaltyTierPolicy[]> {
+  const { data } = await apiClient.get(`${loyaltyBasePath}/tier-policies`, { params: cleanParams(filters) });
+  return unwrapList<LoyaltyTierPolicy>(data);
+}
+
+export async function createLoyaltyTierPolicy(input: CreateLoyaltyTierPolicyRequest): Promise<LoyaltyTierPolicy> {
+  const { data } = await apiClient.post(`${loyaltyBasePath}/tier-policies`, input);
+  return unwrap<LoyaltyTierPolicy>(data);
+}
+
+export async function updateLoyaltyTierPolicy(
+  policyId: string,
+  input: UpdateLoyaltyTierPolicyRequest,
+  correlationId?: string
+): Promise<LoyaltyTierPolicy> {
+  const { data } = await apiClient.patch(`${loyaltyBasePath}/tier-policies/${policyId}`, input, {
+    headers: correlationHeaders("loyalty-tier-policy-update", correlationId)
+  });
+  return unwrap<LoyaltyTierPolicy>(data);
+}
+
+export async function updateLoyaltyTierPolicyStatus(
+  policyId: string,
+  input: UpdateLoyaltyTierPolicyStatusRequest,
+  correlationId?: string
+): Promise<LoyaltyTierPolicy> {
+  const { data } = await apiClient.patch(`${loyaltyBasePath}/tier-policies/${policyId}/status`, input, {
+    headers: correlationHeaders("loyalty-tier-policy-status", correlationId)
+  });
+  return unwrap<LoyaltyTierPolicy>(data);
+}
+
+export async function queryLoyaltyTierStates(filters: LoyaltyTierFilters = {}): Promise<LoyaltyTierStateQueryResponse> {
+  const { data } = await apiClient.get(`${loyaltyBasePath}/tier-states`, { params: cleanParams(filters) });
+  return unwrap<LoyaltyTierStateQueryResponse>(data);
+}
+
+export async function recalculateLoyaltyTiers(
+  input: RecalculateLoyaltyTiersRequest
+): Promise<LoyaltyTierRecalculateResponse> {
+  const { data } = await apiClient.post(`${loyaltyBasePath}/tier-states:recalculate`, input, {
+    headers: correlationHeaders("loyalty-tier-recalculate", input.correlationId)
+  });
+  return unwrap<LoyaltyTierRecalculateResponse>(data);
 }
 
 export async function upsertLoyaltyClientBinding(
@@ -681,6 +883,15 @@ export async function queryLoyaltyReconciliation(
   return unwrap<LoyaltyReconciliationQueryResponse>(data);
 }
 
+export async function queryLoyaltyBenefitReconciliation(
+  filters: LoyaltyBenefitReconciliationFilters = {}
+): Promise<LoyaltyBenefitReconciliationQueryResponse> {
+  const { data } = await apiClient.get(`${loyaltyBasePath}/benefit-reconciliation/entries`, {
+    params: cleanParams(filters)
+  });
+  return unwrap<LoyaltyBenefitReconciliationQueryResponse>(data);
+}
+
 export async function queryLoyaltyFinanceCloseout(
   filters: LoyaltyFinanceCloseoutFilters = {}
 ): Promise<LoyaltyFinanceCloseoutExport> {
@@ -752,8 +963,40 @@ export async function updateLoyaltyRewardFulfillment(
   redemptionId: string,
   input: UpdateLoyaltyRewardFulfillmentRequest
 ): Promise<LoyaltyRewardRedemption> {
-  const { data } = await apiClient.patch(`${loyaltyBasePath}/reward-redemptions/${redemptionId}/fulfillment`, input);
+  const { data } = await apiClient.patch(`${loyaltyBasePath}/reward-redemptions/${redemptionId}/fulfillment`, input, {
+    headers: correlationHeaders("loyalty-reward-fulfillment-execute", input.correlationId)
+  });
   return unwrap<LoyaltyRewardRedemption>(data);
+}
+
+export async function submitLoyaltyRewardFulfillmentApproval(
+  redemptionId: string,
+  input: SubmitLoyaltyRewardFulfillmentApprovalRequest
+): Promise<LoyaltyAdjustmentApproval> {
+  const { data } = await apiClient.post(
+    `${loyaltyBasePath}/reward-redemptions/${redemptionId}/fulfillment-approvals`,
+    input,
+    { headers: correlationHeaders("loyalty-reward-fulfillment-approval", input.correlationId) }
+  );
+  return unwrap<LoyaltyAdjustmentApproval>(data);
+}
+
+export async function retryLoyaltyRewardFulfillment(
+  redemptionId: string,
+  input: RetryLoyaltyRewardFulfillmentRequest = {}
+): Promise<LoyaltyRewardRedemption> {
+  const { data } = await apiClient.post(
+    `${loyaltyBasePath}/reward-redemptions/${redemptionId}/fulfillment:retry`,
+    input
+  );
+  return unwrap<LoyaltyRewardRedemption>(data);
+}
+
+export async function runDueLoyaltyRewardFulfillments(limit = 50): Promise<RewardFulfillmentRunResponse> {
+  const { data } = await apiClient.post(`${loyaltyBasePath}/reward-fulfillment:run-due`, undefined, {
+    params: cleanParams({ limit })
+  });
+  return unwrap<RewardFulfillmentRunResponse>(data);
 }
 
 export async function queryLearnerLoyaltyRewards(
@@ -787,6 +1030,40 @@ export async function getLoyaltyDeadLetter(deadLetterId: string): Promise<Loyalt
   return unwrap<LoyaltyInboundDeadLetterDetail>(data);
 }
 
+export async function queryLoyaltyDeadLetterApprovals(
+  deadLetterId: string,
+  filters: { status?: string; limit?: number } = {}
+): Promise<LoyaltyInboundDeadLetterApprovalQueryResponse> {
+  const { data } = await apiClient.get(`${loyaltyBasePath}/dead-letters/${deadLetterId}/approvals`, {
+    params: cleanParams(filters)
+  });
+  return unwrap<LoyaltyInboundDeadLetterApprovalQueryResponse>(data);
+}
+
+export async function requestLoyaltyDeadLetterApproval(
+  deadLetterId: string,
+  input: LoyaltyInboundDeadLetterApprovalRequest
+): Promise<LoyaltyInboundDeadLetterApproval> {
+  const { data } = await apiClient.post(`${loyaltyBasePath}/dead-letters/${deadLetterId}/approvals`, input);
+  return unwrap<LoyaltyInboundDeadLetterApproval>(data);
+}
+
+export async function approveLoyaltyDeadLetterApproval(
+  approvalId: string,
+  input: LoyaltyInboundDeadLetterApprovalReviewRequest
+): Promise<LoyaltyInboundDeadLetterApproval> {
+  const { data } = await apiClient.post(`${loyaltyBasePath}/dead-letters/approvals/${approvalId}:approve`, input);
+  return unwrap<LoyaltyInboundDeadLetterApproval>(data);
+}
+
+export async function rejectLoyaltyDeadLetterApproval(
+  approvalId: string,
+  input: LoyaltyInboundDeadLetterApprovalReviewRequest
+): Promise<LoyaltyInboundDeadLetterApproval> {
+  const { data } = await apiClient.post(`${loyaltyBasePath}/dead-letters/approvals/${approvalId}:reject`, input);
+  return unwrap<LoyaltyInboundDeadLetterApproval>(data);
+}
+
 export async function replayLoyaltyDeadLetter(
   deadLetterId: string,
   input: LoyaltyInboundDeadLetterActionRequest
@@ -806,6 +1083,90 @@ export async function discardLoyaltyDeadLetter(
 export async function queryLoyaltyAudit(filters: AuditFilters = {}): Promise<AuditQueryResponse> {
   const { data } = await apiClient.get(`${loyaltyBasePath}/audit`, { params: cleanParams(filters) });
   return unwrap<AuditQueryResponse>(data);
+}
+
+export async function queryOutboxDeadLetters(
+  filters: OutboxDeadLetterFilters = {}
+): Promise<OutboxDeadLetterQueryResponse> {
+  const { data } = await apiClient.get(`${outboxBasePath}/dead-letters`, {
+    params: cleanParams(filters)
+  });
+  return unwrap<OutboxDeadLetterQueryResponse>(data);
+}
+
+function outboxDeadLetterActionBody(input: OutboxDeadLetterActionRequest) {
+  return {
+    idempotencyKey: input.idempotencyKey,
+    reason: input.reason,
+    dryRun: input.dryRun,
+    approvalId: input.approvalId
+  };
+}
+
+export async function queryOutboxDeadLetterApprovals(
+  deadLetterId: string,
+  filters: { status?: string; limit?: number } = {}
+): Promise<OutboxDeadLetterApprovalQueryResponse> {
+  const { data } = await apiClient.get(`${outboxBasePath}/dead-letters/${deadLetterId}/approvals`, {
+    params: cleanParams(filters)
+  });
+  return unwrap<OutboxDeadLetterApprovalQueryResponse>(data);
+}
+
+export async function requestOutboxDeadLetterApproval(
+  deadLetterId: string,
+  input: OutboxDeadLetterApprovalRequest
+): Promise<OutboxDeadLetterApproval> {
+  const { data } = await apiClient.post(
+    `${outboxBasePath}/dead-letters/${deadLetterId}/approvals`,
+    {
+      action: input.action,
+      reason: input.reason,
+      evidenceReference: input.evidenceReference
+    },
+    { headers: correlationHeaders("outbox-dlt-approval", input.correlationId) }
+  );
+  return unwrap<OutboxDeadLetterApproval>(data);
+}
+
+export async function approveOutboxDeadLetterApproval(
+  approvalId: string,
+  input: OutboxDeadLetterApprovalReviewRequest
+): Promise<OutboxDeadLetterApproval> {
+  const { data } = await apiClient.post(`${outboxBasePath}/dead-letters/approvals/${approvalId}:approve`, input);
+  return unwrap<OutboxDeadLetterApproval>(data);
+}
+
+export async function rejectOutboxDeadLetterApproval(
+  approvalId: string,
+  input: OutboxDeadLetterApprovalReviewRequest
+): Promise<OutboxDeadLetterApproval> {
+  const { data } = await apiClient.post(`${outboxBasePath}/dead-letters/approvals/${approvalId}:reject`, input);
+  return unwrap<OutboxDeadLetterApproval>(data);
+}
+
+export async function replayOutboxDeadLetter(
+  deadLetterId: string,
+  input: OutboxDeadLetterActionRequest
+): Promise<OutboxDeadLetterActionResponse> {
+  const { data } = await apiClient.post(
+    `${outboxBasePath}/dead-letters/${deadLetterId}:replay`,
+    outboxDeadLetterActionBody(input),
+    { headers: correlationHeaders("outbox-dlt-replay", input.correlationId) }
+  );
+  return unwrap<OutboxDeadLetterActionResponse>(data);
+}
+
+export async function discardOutboxDeadLetter(
+  deadLetterId: string,
+  input: OutboxDeadLetterActionRequest
+): Promise<OutboxDeadLetterActionResponse> {
+  const { data } = await apiClient.post(
+    `${outboxBasePath}/dead-letters/${deadLetterId}:discard`,
+    outboxDeadLetterActionBody(input),
+    { headers: correlationHeaders("outbox-dlt-discard", input.correlationId) }
+  );
+  return unwrap<OutboxDeadLetterActionResponse>(data);
 }
 
 export async function loyaltyProgramTimeline(programId: string, limit = 25): Promise<AuditQueryResponse> {

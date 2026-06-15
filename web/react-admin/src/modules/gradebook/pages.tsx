@@ -42,9 +42,12 @@ import {
   getStudentGradebook,
   listCategories,
   listGradeItems,
+  listGradePublishAudit,
+  listGradingQueue,
   listGradingSchemes,
   type GradeEntry,
   type GradeItem,
+  type GradingQueueItem,
   upsertEntry
 } from "./api";
 
@@ -60,6 +63,14 @@ function formatNumber(value?: number | null, suffix = "") {
   return `${Number(value.toFixed(2))}${suffix}`;
 }
 
+function formatDateTime(value?: string) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 function scoreFor(entry: GradeEntry) {
   return entry.adjustedScore ?? entry.rawScore;
 }
@@ -68,6 +79,20 @@ function entryPercent(entry: GradeEntry) {
   const score = scoreFor(entry);
   if (score === undefined || score === null || !entry.maxScore) return null;
   return Math.round((score / entry.maxScore) * 100);
+}
+
+function queueScore(item: GradingQueueItem) {
+  const score = item.adjustedScore ?? item.rawScore;
+  if (score === undefined || score === null) return "—";
+  return item.maxScore ? `${formatNumber(score)} / ${formatNumber(item.maxScore)}` : formatNumber(score);
+}
+
+function queueStatusDetail(item: GradingQueueItem) {
+  if (item.status === "MISSING_GRADE") return "Cần nhập điểm";
+  if (item.status === "FINAL_GRADE_READY") return "Có thể chốt điểm";
+  if (item.status === "FINALIZED") return "Đã finalize";
+  if (item.status === "GRADE_NOT_PUBLISHED") return "Chưa publish";
+  return item.reasonCodes[0] ?? item.status;
 }
 
 function gradeItemMeta(item: GradeItem) {
@@ -203,6 +228,16 @@ export function GradebookPage() {
     queryFn: () => listGradingSchemes(courseId),
     enabled: Boolean(courseId)
   });
+  const audit = useQuery({
+    queryKey: queryKeys.gradebook.audit(courseId, studentId),
+    queryFn: () => listGradePublishAudit(courseId, { studentId: studentId || undefined, limit: 50 }),
+    enabled: Boolean(courseId)
+  });
+  const gradingQueue = useQuery({
+    queryKey: queryKeys.gradebook.gradingQueue(courseId, studentId || undefined),
+    queryFn: () => listGradingQueue(courseId, { studentId: studentId || undefined, limit: 50 }),
+    enabled: Boolean(courseId)
+  });
 
   const gradeItems = items.data ?? [];
   const gradeEntries = grades.data?.entries ?? [];
@@ -218,6 +253,9 @@ export function GradebookPage() {
     (sum, category) => sum + (category.weightPercent ?? 0),
     0
   );
+  const queueItems = gradingQueue.data ?? [];
+  const missingQueueCount = queueItems.filter((item) => item.status === "MISSING_GRADE").length;
+  const finalizeReadyCount = queueItems.filter((item) => item.status === "FINAL_GRADE_READY").length;
 
   const [entry, setEntry] = useState({
     gradeItemId: "",
@@ -244,6 +282,8 @@ export function GradebookPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.gradebook.student(courseId, studentId) });
       qc.invalidateQueries({ queryKey: queryKeys.gradebook.items(courseId) });
+      qc.invalidateQueries({ queryKey: queryKeys.gradebook.audit(courseId, studentId) });
+      qc.invalidateQueries({ queryKey: queryKeys.gradebook.gradingQueue(courseId, studentId || undefined) });
       setEntry((current) => ({ ...current, rawScore: "", minutesLate: "", reason: "" }));
     }
   });
@@ -252,6 +292,8 @@ export function GradebookPage() {
     mutationFn: () => finalizeGrade(courseId, studentId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.gradebook.student(courseId, studentId) });
+      qc.invalidateQueries({ queryKey: queryKeys.gradebook.audit(courseId, studentId) });
+      qc.invalidateQueries({ queryKey: queryKeys.gradebook.gradingQueue(courseId, studentId || undefined) });
     }
   });
 
@@ -639,6 +681,133 @@ export function GradebookPage() {
                     <Td>
                       <Badge value={grade.status ?? "DRAFT"} />
                     </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <CardHeader
+            title="Grading queue"
+            subtitle={
+              courseId
+                ? `${missingQueueCount} mục thiếu điểm · ${finalizeReadyCount} learner sẵn sàng finalize`
+                : "Chọn course để xem hàng đợi chấm điểm."
+            }
+          />
+          {!courseId && <EmptyState message="Chọn course để xem grading queue." />}
+          {courseId && gradingQueue.isLoading && <Spinner />}
+          {gradingQueue.isError && <ErrorState error={gradingQueue.error} />}
+          {courseId && gradingQueue.data && gradingQueue.data.length === 0 && (
+            <EmptyState message="Không có grading task mở cho scope này." />
+          )}
+          {queueItems.length > 0 && (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Status</Th>
+                  <Th>Learner</Th>
+                  <Th>Target</Th>
+                  <Th>Evidence</Th>
+                  <Th />
+                </tr>
+              </thead>
+              <tbody>
+                {queueItems.map((item) => (
+                  <tr key={item.queueKey} className={cn(item.status !== "FINALIZED" && "bg-amber-50/50")}>
+                    <Td>
+                      <Badge value={item.status} />
+                      <p className="mt-1 text-xs text-slate-500">{queueStatusDetail(item)}</p>
+                    </Td>
+                    <Td>
+                      <p className="font-semibold text-slate-900">
+                        {adminUserLabel(userById.get(item.studentId), compactId(item.studentId))}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">ID {compactId(item.studentId)}</p>
+                    </Td>
+                    <Td>
+                      <p className="font-semibold text-slate-900">{item.title ?? "Final grade"}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {[item.categoryName, item.sourceType, compactId(item.gradeItemId)].filter(Boolean).join(" · ") || "Course finalization"}
+                      </p>
+                    </Td>
+                    <Td>
+                      <p className="text-sm font-semibold text-slate-800">{queueScore(item)}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {item.reasonCodes.join(", ") || item.finalGradeStatus || "—"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        graded {formatDateTime(item.gradedAt ?? undefined)} · finalized {formatDateTime(item.finalizedAt ?? undefined)}
+                      </p>
+                    </Td>
+                    <Td>
+                      <Button
+                        size="sm"
+                        variant={item.status === "FINAL_GRADE_READY" ? "primary" : "secondary"}
+                        onClick={() => {
+                          updateScope(courseId, item.studentId);
+                          if (item.gradeItemId) {
+                            setEntry((current) => ({ ...current, gradeItemId: item.gradeItemId ?? "" }));
+                          }
+                        }}
+                      >
+                        {item.status === "FINAL_GRADE_READY" ? "Mở finalize" : "Mở chấm"}
+                      </Button>
+                    </Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+        </Card>
+
+        <Card className="xl:col-span-2">
+          <CardHeader
+            title="Grade publish audit"
+            subtitle={studentId ? `Lịch sử theo ${selectedLearnerLabel}` : "Lịch sử publish/finalize gần nhất của course."}
+          />
+          {!courseId && <EmptyState message="Chọn course để xem audit." />}
+          {courseId && audit.isLoading && <Spinner />}
+          {audit.isError && <ErrorState error={audit.error} />}
+          {courseId && audit.data && audit.data.length === 0 && <EmptyState message="Chưa có audit publish/finalize." />}
+          {audit.data && audit.data.length > 0 && (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Thời điểm</Th>
+                  <Th>Action</Th>
+                  <Th>Learner</Th>
+                  <Th>Target</Th>
+                  <Th>Reason</Th>
+                  <Th>Actor</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {audit.data.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50">
+                    <Td>{formatDateTime(row.createdAt)}</Td>
+                    <Td><Badge value={row.action} /></Td>
+                    <Td>{row.studentId ? compactId(row.studentId) : "—"}</Td>
+                    <Td>
+                      <p className="text-xs text-slate-500">Item {compactId(row.gradeItemId)}</p>
+                      <p className="text-xs text-slate-500">Entry {compactId(row.gradeEntryId)}</p>
+                      <p className="text-xs text-slate-500">Final {compactId(row.finalGradeId)}</p>
+                    </Td>
+                    <Td>
+                      <div className="flex flex-wrap gap-1">
+                        {row.reasonCodes.map((reason) => (
+                          <span key={reason} className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                            {reason}
+                          </span>
+                        ))}
+                      </div>
+                      <pre className="mt-2 max-w-[360px] overflow-auto rounded-md bg-slate-950 p-2 text-[11px] leading-4 text-slate-100">
+                        {JSON.stringify(row.payload)}
+                      </pre>
+                    </Td>
+                    <Td>{row.actorId ?? "system"}</Td>
                   </tr>
                 ))}
               </tbody>

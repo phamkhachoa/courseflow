@@ -11,6 +11,7 @@ import {
   Gift,
   History,
   Link2,
+  Medal,
   Pencil,
   Plus,
   RefreshCcw,
@@ -48,7 +49,9 @@ import { cn } from "@/shared/ui/cn";
 import {
   adjustLoyaltyPoints,
   approveLoyaltyAdjustmentApproval,
+  approveLoyaltyDeadLetterApproval,
   backfillLoyaltyPointLots,
+  createLoyaltyTierPolicy,
   createLoyaltyReward,
   createLoyaltyProgram,
   discardLoyaltyDeadLetter,
@@ -59,6 +62,7 @@ import {
   listLoyaltyAdjustmentApprovals,
   listLoyaltyAccounts,
   listLoyaltyPrograms,
+  listLoyaltyTierPolicies,
   loyaltyAccountTimeline,
   loyaltyProgramTimeline,
   listLoyaltyRewards,
@@ -69,14 +73,22 @@ import {
   queryLoyaltyFinanceCloseout,
   queryLoyaltyReconciliation,
   queryLoyaltyRewardRedemptions,
+  queryLoyaltyTierStates,
+  recalculateLoyaltyTiers,
   rejectLoyaltyAdjustmentApproval,
   replayLoyaltyDeadLetter,
+  requestLoyaltyDeadLetterApproval,
+  retryLoyaltyRewardFulfillment,
   retentionOperationId,
   reverseLoyaltyRewardRedemption,
+  runDueLoyaltyRewardFulfillments,
   runLoyaltyExpiryDryRun,
   submitLoyaltyAdjustmentApproval,
   submitLoyaltyExpiryApproval,
+  submitLoyaltyRewardFulfillmentApproval,
   updateLoyaltyAccountStatus,
+  updateLoyaltyTierPolicy,
+  updateLoyaltyTierPolicyStatus,
   updateLoyaltyRewardFulfillment,
   updateLoyaltyReward,
   updateLoyaltyRewardStatus,
@@ -108,6 +120,7 @@ import type {
   LoyaltyExpiryExecutionResponse,
   LoyaltyFinanceCloseoutExport,
   LoyaltyInboundDeadLetter,
+  LoyaltyInboundDeadLetterApproval,
   LoyaltyInboundDeadLetterDetail,
   LoyaltyInboundDeadLetterFilters,
   LoyaltyClientBinding,
@@ -120,10 +133,13 @@ import type {
   LoyaltyReward,
   LoyaltyRewardFilters,
   LoyaltyRewardRedemption,
-  LoyaltyRewardRedemptionFilters
+  LoyaltyRewardRedemptionFilters,
+  LoyaltyTierFilters,
+  LoyaltyTierPolicy,
+  LoyaltyTierState
 } from "./types";
 
-type LoyaltyTab = "programs" | "accounts" | "approvals" | "expiry" | "reconciliation" | "rewards" | "deadLetters" | "audit";
+type LoyaltyTab = "programs" | "accounts" | "tiers" | "approvals" | "expiry" | "reconciliation" | "rewards" | "deadLetters" | "audit";
 
 const DEFAULT_TENANT_ID = "courseflow";
 const DEFAULT_APPLICATION_ID = "lms";
@@ -136,6 +152,7 @@ const APPROVAL_STATUSES = ["PENDING", "APPROVED", "REJECTED", "EXECUTED"];
 const REWARD_STATUSES = ["DRAFT", "ACTIVE", "SUSPENDED", "ARCHIVED"];
 const REDEMPTION_STATUSES = ["COMMITTED", "REVERSED"];
 const FULFILLMENT_STATUSES = ["PENDING", "ISSUED", "MANUAL_REQUIRED", "FAILED"];
+const TIER_STATUSES = ["DRAFT", "ACTIVE", "SUSPENDED", "ARCHIVED"];
 const DEAD_LETTER_STATUSES = ["OPEN", "FAILED", "REPLAYED", "DISCARDED"];
 const DEFAULT_BINDING_OPERATIONS = "earn, adjust, reverse";
 
@@ -207,6 +224,21 @@ type RewardForm = {
   perProfileLimit: string;
   fulfillmentType: string;
   fulfillmentConfigJson: string;
+};
+
+type TierPolicyForm = {
+  mode: "create" | "edit";
+  policyId?: string;
+  tenantId: string;
+  applicationId: string;
+  programId: string;
+  tierCode: string;
+  name: string;
+  rank: string;
+  qualificationPoints: string;
+  qualificationWindowDays: string;
+  downgradeGraceDays: string;
+  benefitsJson: string;
 };
 
 function StatusPill({ value, label }: { value?: string | null; label?: ReactNode }) {
@@ -398,6 +430,22 @@ function newRewardForm(): RewardForm {
   };
 }
 
+function newTierPolicyForm(): TierPolicyForm {
+  return {
+    mode: "create",
+    tenantId: DEFAULT_TENANT_ID,
+    applicationId: DEFAULT_APPLICATION_ID,
+    programId: "",
+    tierCode: "",
+    name: "",
+    rank: "1",
+    qualificationPoints: "500",
+    qualificationWindowDays: "365",
+    downgradeGraceDays: "30",
+    benefitsJson: "{}"
+  };
+}
+
 function editRewardForm(reward: LoyaltyReward): RewardForm {
   return {
     mode: "edit",
@@ -416,6 +464,23 @@ function editRewardForm(reward: LoyaltyReward): RewardForm {
     perProfileLimit: reward.perProfileLimit === undefined || reward.perProfileLimit === null ? "" : String(reward.perProfileLimit),
     fulfillmentType: reward.fulfillmentType || "MANUAL",
     fulfillmentConfigJson: formatJson(reward.fulfillmentConfig ?? {})
+  };
+}
+
+function editTierPolicyForm(policy: LoyaltyTierPolicy): TierPolicyForm {
+  return {
+    mode: "edit",
+    policyId: policy.id,
+    tenantId: policy.tenantId,
+    applicationId: policy.applicationId,
+    programId: policy.programId,
+    tierCode: policy.tierCode,
+    name: policy.name,
+    rank: String(policy.rank),
+    qualificationPoints: String(policy.qualificationPoints),
+    qualificationWindowDays: String(policy.qualificationWindowDays),
+    downgradeGraceDays: String(policy.downgradeGraceDays),
+    benefitsJson: formatJson(policy.benefits ?? {})
   };
 }
 
@@ -1420,7 +1485,10 @@ function ApprovalsPanel() {
   }
 
   function operationLabel(approval?: LoyaltyAdjustmentApproval | null) {
-    return approval?.operationType === "EXPIRY" ? "expiry" : "adjustment";
+    if (approval?.operationType === "EXPIRY") return "expiry";
+    if (approval?.operationType === "REWARD_REDEMPTION_REVERSE") return "reward reversal";
+    if (approval?.operationType === "REWARD_FULFILLMENT_OVERRIDE") return "reward fulfillment";
+    return "adjustment";
   }
 
   function approvalDescription(approval?: LoyaltyAdjustmentApproval | null) {
@@ -1429,6 +1497,12 @@ function ApprovalsPanel() {
     }
     if (approval.operationType === "EXPIRY") {
       return `Expiry · ${formatDateTime(approval.metadata?.asOf as string)} · ${compactId(approval.metadata?.resultHash as string, 10, 6)}`;
+    }
+    if (approval.operationType === "REWARD_REDEMPTION_REVERSE") {
+      return `${approval.metadata?.rewardCode ?? "Reward"} · reverse ${approval.pointsDelta} points`;
+    }
+    if (approval.operationType === "REWARD_FULFILLMENT_OVERRIDE") {
+      return `${approval.metadata?.rewardCode ?? "Reward"} · ${approval.metadata?.currentFulfillmentStatus ?? "-"} to ${approval.metadata?.targetFulfillmentStatus ?? "-"}`;
     }
     return `${approval.profileId} · ${approval.pointsDelta} points`;
   }
@@ -1512,8 +1586,14 @@ function ApprovalsPanel() {
                     <p className="mt-1 font-mono text-xs text-slate-400">{compactId(approval.id)}</p>
                   </Td>
                   <Td>
-                    <Badge value={approval.operationType} label={approval.operationType === "EXPIRY" ? "Expiry" : "Adjustment"} tone={approval.operationType === "EXPIRY" ? "danger" : "brand"} />
-                    <p className="mt-2 font-semibold text-slate-900">{approval.operationType === "EXPIRY" ? "Expiry batch" : approval.profileId}</p>
+                    <Badge value={approval.operationType} label={operationLabel(approval)} tone={approval.operationType === "EXPIRY" ? "danger" : "brand"} />
+                    <p className="mt-2 font-semibold text-slate-900">
+                      {approval.operationType === "EXPIRY"
+                        ? "Expiry batch"
+                        : approval.operationType === "REWARD_FULFILLMENT_OVERRIDE"
+                          ? approval.metadata?.rewardCode as string ?? "Reward fulfillment"
+                          : approval.profileId}
+                    </p>
                     <p className="mt-1 text-xs text-slate-400">
                       {approval.operationType === "EXPIRY" ? formatDateTime(approval.metadata?.asOf as string) : approval.programId}
                     </p>
@@ -1526,6 +1606,8 @@ function ApprovalsPanel() {
                     <p className="mt-1 text-xs text-slate-400">
                       {approval.operationType === "EXPIRY"
                         ? compactId(approval.metadata?.resultHash as string, 10, 6)
+                        : approval.operationType === "REWARD_FULFILLMENT_OVERRIDE"
+                          ? `${approval.metadata?.currentFulfillmentStatus ?? "-"} to ${approval.metadata?.targetFulfillmentStatus ?? "-"}`
                         : approval.reason}
                     </p>
                   </Td>
@@ -2403,6 +2485,388 @@ function ReconciliationTable({ rows }: { rows: LoyaltyReconciliationEntry[] }) {
   );
 }
 
+function TiersPanel() {
+  const [filters, setFilters] = useState<LoyaltyTierFilters>({
+    tenantId: DEFAULT_TENANT_ID,
+    applicationId: DEFAULT_APPLICATION_ID,
+    limit: 50
+  });
+  const [draftFilters, setDraftFilters] = useState<LoyaltyTierFilters>(filters);
+  const [stateFilters, setStateFilters] = useState<LoyaltyTierFilters>({
+    tenantId: DEFAULT_TENANT_ID,
+    applicationId: DEFAULT_APPLICATION_ID,
+    limit: 50
+  });
+  const [policyForm, setPolicyForm] = useState<TierPolicyForm>(newTierPolicyForm());
+  const queryClient = useQueryClient();
+
+  const policiesQuery = useQuery({
+    queryKey: queryKeys.incentives.loyaltyTierPolicies(filters),
+    queryFn: () => listLoyaltyTierPolicies(filters),
+    retry: 1
+  });
+
+  const statesQuery = useQuery({
+    queryKey: queryKeys.incentives.loyaltyTierStates(stateFilters),
+    queryFn: () => queryLoyaltyTierStates(stateFilters),
+    retry: 1
+  });
+
+  const savePolicyMutation = useMutation({
+    mutationFn: () => {
+      const payload = tierPolicyPayload(policyForm);
+      if (policyForm.mode === "edit" && policyForm.policyId) {
+        return updateLoyaltyTierPolicy(policyForm.policyId, {
+          name: payload.name,
+          rank: payload.rank,
+          qualificationPoints: payload.qualificationPoints,
+          qualificationWindowDays: payload.qualificationWindowDays,
+          downgradeGraceDays: payload.downgradeGraceDays,
+          benefits: payload.benefits
+        });
+      }
+      return createLoyaltyTierPolicy(payload);
+    },
+    onSuccess: (policy) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty });
+      setPolicyForm(editTierPolicyForm(policy));
+    }
+  });
+
+  const policyStatusMutation = useMutation({
+    mutationFn: ({ policy, status }: { policy: LoyaltyTierPolicy; status: string }) =>
+      updateLoyaltyTierPolicyStatus(policy.id, {
+        status,
+        note: `Tier policy status changed to ${status}`
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty })
+  });
+
+  const recalcMutation = useMutation({
+    mutationFn: () =>
+      recalculateLoyaltyTiers({
+        tenantId: stateFilters.tenantId,
+        applicationId: stateFilters.applicationId,
+        programId: stateFilters.programId,
+        profileId: stateFilters.profileId,
+        limit: stateFilters.limit ?? 50,
+        reason: "Recalculate loyalty tier states from admin console",
+        correlationId: retentionOperationId("loyalty-tier-recalculate")
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty })
+  });
+
+  const policies = policiesQuery.data ?? [];
+  const states = statesQuery.data?.items ?? [];
+  const activePolicyCount = policies.filter((policy) => policy.status === "ACTIVE").length;
+  const graceCount = states.filter((state) => state.progress.graceUntil).length;
+
+  function applyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFilters(draftFilters);
+    setStateFilters({
+      tenantId: draftFilters.tenantId,
+      applicationId: draftFilters.applicationId,
+      programId: draftFilters.programId,
+      profileId: stateFilters.profileId,
+      tierCode: stateFilters.tierCode,
+      limit: stateFilters.limit ?? 50
+    });
+  }
+
+  function submitPolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    savePolicyMutation.mutate();
+  }
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={applyFilters}>
+        <Toolbar>
+          <FormField label="Tenant">
+            <Input value={draftFilters.tenantId ?? ""} onChange={(event) => setDraftFilters({ ...draftFilters, tenantId: event.target.value })} />
+          </FormField>
+          <FormField label="Application">
+            <Input value={draftFilters.applicationId ?? ""} onChange={(event) => setDraftFilters({ ...draftFilters, applicationId: event.target.value })} />
+          </FormField>
+          <FormField label="Program ID">
+            <Input value={draftFilters.programId ?? ""} onChange={(event) => setDraftFilters({ ...draftFilters, programId: event.target.value })} />
+          </FormField>
+          <FormField label="Status">
+            <Select value={draftFilters.status ?? ""} onChange={(event) => setDraftFilters({ ...draftFilters, status: event.target.value })}>
+              <option value="">All</option>
+              {TIER_STATUSES.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Limit">
+            <Input
+              value={String(draftFilters.limit ?? "")}
+              inputMode="numeric"
+              onChange={(event) => setDraftFilters({ ...draftFilters, limit: toNumberOrUndefined(event.target.value) })}
+            />
+          </FormField>
+          <FilterActions>
+            <Button type="submit">
+              <Search size={16} />
+              Query
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => policiesQuery.refetch()}>
+              <RefreshCcw size={16} />
+              Refresh
+            </Button>
+          </FilterActions>
+        </Toolbar>
+      </form>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <StatCard label="Policies" value={policies.length} icon={<Medal size={18} />} tone="info" />
+        <StatCard label="Active tiers" value={activePolicyCount} tone={activePolicyCount > 0 ? "success" : "neutral"} />
+        <StatCard label="States" value={states.length} tone="brand" />
+        <StatCard label="In grace" value={graceCount} tone={graceCount > 0 ? "warning" : "success"} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
+        <Card>
+          <CardHeader
+            title={policyForm.mode === "edit" ? "Edit tier policy" : "New tier policy"}
+            subtitle="Qualification window, downgrade grace và benefit metadata theo loyalty program."
+            actions={
+              <Button size="sm" variant="secondary" onClick={() => setPolicyForm(newTierPolicyForm())}>
+                <Plus size={16} />
+                New
+              </Button>
+            }
+          />
+          <form className="grid gap-3 p-4 pt-0" onSubmit={submitPolicy}>
+            <div className="grid gap-3 md:grid-cols-2">
+              <FormField label="Tenant" required>
+                <Input disabled={policyForm.mode === "edit"} value={policyForm.tenantId} onChange={(event) => setPolicyForm({ ...policyForm, tenantId: event.target.value })} />
+              </FormField>
+              <FormField label="Application" required>
+                <Input disabled={policyForm.mode === "edit"} value={policyForm.applicationId} onChange={(event) => setPolicyForm({ ...policyForm, applicationId: event.target.value })} />
+              </FormField>
+            </div>
+            <FormField label="Program ID" required>
+              <Input disabled={policyForm.mode === "edit"} value={policyForm.programId} onChange={(event) => setPolicyForm({ ...policyForm, programId: event.target.value })} />
+            </FormField>
+            <div className="grid gap-3 md:grid-cols-2">
+              <FormField label="Tier code" required>
+                <Input disabled={policyForm.mode === "edit"} value={policyForm.tierCode} onChange={(event) => setPolicyForm({ ...policyForm, tierCode: event.target.value })} />
+              </FormField>
+              <FormField label="Name" required>
+                <Input value={policyForm.name} onChange={(event) => setPolicyForm({ ...policyForm, name: event.target.value })} />
+              </FormField>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <FormField label="Rank" required>
+                <Input value={policyForm.rank} inputMode="numeric" onChange={(event) => setPolicyForm({ ...policyForm, rank: event.target.value })} />
+              </FormField>
+              <FormField label="Qualification points" required>
+                <Input value={policyForm.qualificationPoints} inputMode="numeric" onChange={(event) => setPolicyForm({ ...policyForm, qualificationPoints: event.target.value })} />
+              </FormField>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <FormField label="Window days" required>
+                <Input value={policyForm.qualificationWindowDays} inputMode="numeric" onChange={(event) => setPolicyForm({ ...policyForm, qualificationWindowDays: event.target.value })} />
+              </FormField>
+              <FormField label="Grace days" required>
+                <Input value={policyForm.downgradeGraceDays} inputMode="numeric" onChange={(event) => setPolicyForm({ ...policyForm, downgradeGraceDays: event.target.value })} />
+              </FormField>
+            </div>
+            <FormField label="Benefits JSON">
+              <Textarea value={policyForm.benefitsJson} onChange={(event) => setPolicyForm({ ...policyForm, benefitsJson: event.target.value })} rows={4} />
+            </FormField>
+            {savePolicyMutation.isError && <ErrorState error={savePolicyMutation.error} />}
+            <Button
+              type="submit"
+              disabled={savePolicyMutation.isPending || !policyForm.programId.trim() || !policyForm.tierCode.trim() || !policyForm.name.trim()}
+            >
+              {policyForm.mode === "edit" ? <Pencil size={16} /> : <Plus size={16} />}
+              {policyForm.mode === "edit" ? "Save policy" : "Create policy"}
+            </Button>
+          </form>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Tier policies"
+            subtitle="Active policies are evaluated from lowest to highest rank."
+            actions={<Badge value="RESULT" label={`${policies.length} policies`} tone="slate" />}
+          />
+          {policiesQuery.isLoading && <Spinner />}
+          {policiesQuery.isError && <ErrorState error={policiesQuery.error} />}
+          {!policiesQuery.isLoading && !policiesQuery.isError && policies.length === 0 && <EmptyState message="Chưa có tier policy phù hợp." />}
+          {policies.length > 0 && (
+            <TierPolicyTable
+              policies={policies}
+              onEdit={(policy) => setPolicyForm(editTierPolicyForm(policy))}
+              onChangeStatus={(policy, status) => policyStatusMutation.mutate({ policy, status })}
+              isStatusPending={policyStatusMutation.isPending}
+            />
+          )}
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader
+          title="Tier states"
+          subtitle="Current learner tier, qualification window và progress lên tier tiếp theo."
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge value="RESULT" label={`${states.length} states`} tone="slate" />
+              <Button size="sm" variant="secondary" disabled={recalcMutation.isPending} onClick={() => recalcMutation.mutate()}>
+                <RefreshCcw size={16} />
+                Recalculate
+              </Button>
+            </div>
+          }
+        />
+        <Toolbar className="mb-4">
+          <FormField label="Profile ID">
+            <Input value={stateFilters.profileId ?? ""} onChange={(event) => setStateFilters({ ...stateFilters, profileId: event.target.value })} />
+          </FormField>
+          <FormField label="Tier code">
+            <Input value={stateFilters.tierCode ?? ""} onChange={(event) => setStateFilters({ ...stateFilters, tierCode: event.target.value })} />
+          </FormField>
+          <FilterActions>
+            <Button type="button" variant="secondary" onClick={() => statesQuery.refetch()}>
+              <RefreshCcw size={16} />
+              Refresh
+            </Button>
+          </FilterActions>
+        </Toolbar>
+        {statesQuery.isLoading && <Spinner />}
+        {statesQuery.isError && <ErrorState error={statesQuery.error} />}
+        {!statesQuery.isLoading && !statesQuery.isError && states.length === 0 && <EmptyState message="Chưa có tier state phù hợp." />}
+        {states.length > 0 && <TierStateTable states={states} />}
+        {recalcMutation.isError && <ErrorState error={recalcMutation.error} />}
+        {recalcMutation.data && (
+          <Notice tone="neutral" title="Tier recalculation">
+            Scanned {recalcMutation.data.scanned}, changed {recalcMutation.data.changed}.
+          </Notice>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function TierPolicyTable({
+  policies,
+  onEdit,
+  onChangeStatus,
+  isStatusPending
+}: {
+  policies: LoyaltyTierPolicy[];
+  onEdit: (policy: LoyaltyTierPolicy) => void;
+  onChangeStatus: (policy: LoyaltyTierPolicy, status: string) => void;
+  isStatusPending?: boolean;
+}) {
+  return (
+    <Table>
+      <thead>
+        <tr>
+          <Th>Tier</Th>
+          <Th>Status</Th>
+          <Th>Qualification</Th>
+          <Th>Grace</Th>
+          <Th>Updated</Th>
+          <Th>Actions</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {policies.map((policy) => (
+          <tr key={policy.id}>
+            <Td>
+              <p className="font-semibold text-slate-900">{policy.tierCode} · rank {policy.rank}</p>
+              <p className="mt-1 text-xs text-slate-500">{policy.name}</p>
+              <p className="mt-1 font-mono text-xs text-slate-400">{policy.programId}</p>
+            </Td>
+            <Td><StatusPill value={policy.status} /></Td>
+            <Td>
+              <p className="font-semibold text-slate-900">{policy.qualificationPoints} points</p>
+              <p className="mt-1 text-xs text-slate-400">{policy.qualificationWindowDays} day window</p>
+            </Td>
+            <Td>{policy.downgradeGraceDays} days</Td>
+            <Td>{formatDateTime(policy.updatedAt ?? policy.createdAt)}</Td>
+            <Td>
+              <div className="flex flex-wrap gap-2">
+                <Button size="xs" variant="secondary" onClick={() => onEdit(policy)}>
+                  <Pencil size={14} />
+                  Edit
+                </Button>
+                {TIER_STATUSES.filter((status) => status !== policy.status).slice(0, 2).map((status) => (
+                  <Button
+                    key={status}
+                    size="xs"
+                    variant={status === "ARCHIVED" ? "danger" : "outline"}
+                    disabled={isStatusPending}
+                    onClick={() => onChangeStatus(policy, status)}
+                  >
+                    {statusLabel(status)}
+                  </Button>
+                ))}
+              </div>
+            </Td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
+function TierStateTable({ states }: { states: LoyaltyTierState[] }) {
+  return (
+    <Table>
+      <thead>
+        <tr>
+          <Th>Profile</Th>
+          <Th>Current tier</Th>
+          <Th>Qualification</Th>
+          <Th>Next tier</Th>
+          <Th>Grace</Th>
+          <Th>Evaluated</Th>
+        </tr>
+      </thead>
+      <tbody>
+        {states.map((state) => (
+          <tr key={state.id}>
+            <Td>
+              <p className="font-mono text-xs text-slate-600">{state.profileId}</p>
+              <p className="mt-1 font-mono text-xs text-slate-400">{compactId(state.accountId)}</p>
+            </Td>
+            <Td>
+              <StatusPill value={state.progress.currentTierCode} />
+              <p className="mt-1 text-xs text-slate-500">{state.progress.currentTierName} · rank {state.progress.currentTierRank}</p>
+            </Td>
+            <Td>
+              <p className="font-semibold text-slate-900">{state.progress.qualificationPoints} points</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {state.progress.qualificationWindowDays ?? "-"} days · from {formatDateTime(state.progress.qualificationWindowStartedAt)}
+              </p>
+            </Td>
+            <Td>
+              {state.progress.nextTierCode ? (
+                <>
+                  <p className="font-semibold text-slate-900">{state.progress.nextTierCode}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {state.progress.pointsToNext ?? 0} / {state.progress.nextTierPointsRequired ?? 0} points left
+                  </p>
+                </>
+              ) : (
+                <span className="text-sm text-slate-400">Top tier</span>
+              )}
+            </Td>
+            <Td>{state.progress.graceUntil ? formatDateTime(state.progress.graceUntil) : "-"}</Td>
+            <Td>{formatDateTime(state.progress.evaluatedAt ?? state.updatedAt)}</Td>
+          </tr>
+        ))}
+      </tbody>
+    </Table>
+  );
+}
+
 function RewardsPanel() {
   const [filters, setFilters] = useState<LoyaltyRewardFilters>({
     tenantId: DEFAULT_TENANT_ID,
@@ -2420,6 +2884,16 @@ function RewardsPanel() {
     redemption: LoyaltyRewardRedemption;
     reason: string;
     operationId: string;
+  } | null>(null);
+  const [fulfillmentAction, setFulfillmentAction] = useState<{
+    redemption: LoyaltyRewardRedemption;
+    status: string;
+    fulfillmentRef: string;
+    note: string;
+    reason: string;
+    operationId: string;
+    approvalId: string;
+    approval?: LoyaltyAdjustmentApproval | null;
   } | null>(null);
   const queryClient = useQueryClient();
 
@@ -2474,13 +2948,57 @@ function RewardsPanel() {
     }
   });
 
+  const fulfillmentApprovalMutation = useMutation({
+    mutationFn: () => {
+      if (!fulfillmentAction) throw new Error("Missing reward fulfillment approval target");
+      return submitLoyaltyRewardFulfillmentApproval(fulfillmentAction.redemption.id, {
+        status: fulfillmentAction.status,
+        fulfillmentRef: fulfillmentAction.fulfillmentRef.trim() || undefined,
+        note: fulfillmentAction.note.trim() || undefined,
+        idempotencyKey: fulfillmentAction.operationId,
+        correlationId: fulfillmentAction.operationId,
+        reason: fulfillmentAction.reason.trim() || `Reward fulfillment marked ${fulfillmentAction.status}`,
+        metadata: { source: "web-admin", rewardCode: fulfillmentAction.redemption.rewardCode }
+      });
+    },
+    onSuccess: (approval) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty });
+      setFulfillmentAction((current) => current ? { ...current, approvalId: approval.id, approval } : current);
+    }
+  });
+
   const fulfillmentMutation = useMutation({
-    mutationFn: ({ redemption, status }: { redemption: LoyaltyRewardRedemption; status: string }) =>
-      updateLoyaltyRewardFulfillment(redemption.id, {
-        status,
-        fulfillmentRef: status === "ISSUED" ? `manual:${redemption.id}` : undefined,
-        note: `Reward fulfillment marked ${status}`
+    mutationFn: () => {
+      if (!fulfillmentAction) throw new Error("Missing reward fulfillment execution target");
+      if (!fulfillmentAction.approvalId.trim()) throw new Error("Missing approved fulfillment approval id");
+      return updateLoyaltyRewardFulfillment(fulfillmentAction.redemption.id, {
+        status: fulfillmentAction.status,
+        fulfillmentRef: fulfillmentAction.fulfillmentRef.trim() || undefined,
+        note: fulfillmentAction.note.trim() || undefined,
+        idempotencyKey: fulfillmentAction.operationId,
+        correlationId: fulfillmentAction.operationId,
+        reason: fulfillmentAction.reason.trim() || `Reward fulfillment marked ${fulfillmentAction.status}`,
+        metadata: { source: "web-admin", rewardCode: fulfillmentAction.redemption.rewardCode },
+        approvalId: fulfillmentAction.approvalId.trim()
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty });
+      setFulfillmentAction(null);
+    }
+  });
+
+  const retryFulfillmentMutation = useMutation({
+    mutationFn: (redemption: LoyaltyRewardRedemption) =>
+      retryLoyaltyRewardFulfillment(redemption.id, {
+        reason: "Retry reward fulfillment from loyalty operations",
+        correlationId: retentionOperationId("loyalty-reward-fulfillment-retry")
       }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty })
+  });
+
+  const runDueFulfillmentMutation = useMutation({
+    mutationFn: () => runDueLoyaltyRewardFulfillments(redemptionFilters.limit ?? 50),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty })
   });
 
@@ -2523,6 +3041,21 @@ function RewardsPanel() {
       redemption,
       reason: "Reverse reward redemption and return burned points",
       operationId: retentionOperationId("loyalty-reward-reverse")
+    });
+  }
+
+  function openFulfillment(redemption: LoyaltyRewardRedemption, status: string) {
+    fulfillmentApprovalMutation.reset();
+    fulfillmentMutation.reset();
+    setFulfillmentAction({
+      redemption,
+      status,
+      fulfillmentRef: status === "ISSUED" ? `manual:${redemption.id}` : redemption.fulfillmentRef ?? "",
+      note: `Reward fulfillment marked ${status}`,
+      reason: `Reward fulfillment marked ${status}`,
+      operationId: retentionOperationId("loyalty-reward-fulfillment"),
+      approvalId: "",
+      approval: null
     });
   }
 
@@ -2624,6 +3157,8 @@ function RewardsPanel() {
                 <Select value={rewardForm.fulfillmentType} onChange={(event) => setRewardForm({ ...rewardForm, fulfillmentType: event.target.value })}>
                   <option value="MANUAL">MANUAL</option>
                   <option value="AUTO_ISSUE">AUTO_ISSUE</option>
+                  <option value="WEBHOOK">WEBHOOK</option>
+                  <option value="HTTP_POST">HTTP_POST</option>
                 </Select>
               </FormField>
             </div>
@@ -2678,7 +3213,20 @@ function RewardsPanel() {
         <CardHeader
           title="Reward redemptions"
           subtitle="History dùng để đối chiếu burn ledger và fulfillment."
-          actions={<Badge value="RESULT" label={`${redemptions.length} redemptions`} tone="slate" />}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge value="RESULT" label={`${redemptions.length} redemptions`} tone="slate" />
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={runDueFulfillmentMutation.isPending}
+                onClick={() => runDueFulfillmentMutation.mutate()}
+              >
+                <RefreshCcw size={16} />
+                Run due
+              </Button>
+            </div>
+          }
         />
         <Toolbar className="mb-4">
           <FormField label="Profile ID">
@@ -2720,10 +3268,19 @@ function RewardsPanel() {
           <RewardRedemptionTable
             redemptions={redemptions}
             onReverse={openReverse}
-            onFulfillment={(redemption, status) => fulfillmentMutation.mutate({ redemption, status })}
+            onFulfillment={openFulfillment}
+            onRetry={(redemption) => retryFulfillmentMutation.mutate(redemption)}
             isReversePending={reverseMutation.isPending}
             isFulfillmentPending={fulfillmentMutation.isPending}
+            isRetryPending={retryFulfillmentMutation.isPending}
           />
+        )}
+        {retryFulfillmentMutation.isError && <ErrorState error={retryFulfillmentMutation.error} />}
+        {runDueFulfillmentMutation.isError && <ErrorState error={runDueFulfillmentMutation.error} />}
+        {runDueFulfillmentMutation.data && (
+          <Notice tone="neutral" title="Fulfillment run">
+            Scanned {runDueFulfillmentMutation.data.scanned}, dispatched {runDueFulfillmentMutation.data.dispatched}, issued {runDueFulfillmentMutation.data.issued}, failed {runDueFulfillmentMutation.data.failed}.
+          </Notice>
         )}
       </Card>
 
@@ -2749,6 +3306,80 @@ function RewardsPanel() {
             />
           </FormField>
           {reverseMutation.isError && <ErrorState error={reverseMutation.error} />}
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={Boolean(fulfillmentAction)}
+        onOpenChange={(open) => !open && setFulfillmentAction(null)}
+        title="Reward fulfillment override"
+        description={fulfillmentAction ? `${fulfillmentAction.redemption.rewardCode} · ${compactId(fulfillmentAction.redemption.id)}` : undefined}
+        confirmLabel="Execute with approval"
+        tone="primary"
+        isPending={fulfillmentMutation.isPending}
+        onConfirm={() => fulfillmentMutation.mutate()}
+      >
+        <div className="space-y-3">
+          <Notice tone="warning" title="Maker-checker required">
+            Submit approval trước, reviewer approve ở tab Approvals, rồi execute bằng approval ID đã duyệt.
+          </Notice>
+          <div className="grid gap-3 md:grid-cols-2">
+            <FormField label="Target status">
+              <Select
+                value={fulfillmentAction?.status ?? "ISSUED"}
+                onChange={(event) => fulfillmentAction && setFulfillmentAction({ ...fulfillmentAction, status: event.target.value })}
+              >
+                {FULFILLMENT_STATUSES.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Fulfillment ref">
+              <Input
+                value={fulfillmentAction?.fulfillmentRef ?? ""}
+                onChange={(event) => fulfillmentAction && setFulfillmentAction({ ...fulfillmentAction, fulfillmentRef: event.target.value })}
+              />
+            </FormField>
+          </div>
+          <FormField label="Reason" required>
+            <Textarea
+              value={fulfillmentAction?.reason ?? ""}
+              onChange={(event) => fulfillmentAction && setFulfillmentAction({ ...fulfillmentAction, reason: event.target.value })}
+              rows={3}
+            />
+          </FormField>
+          <FormField label="Note">
+            <Input
+              value={fulfillmentAction?.note ?? ""}
+              onChange={(event) => fulfillmentAction && setFulfillmentAction({ ...fulfillmentAction, note: event.target.value })}
+            />
+          </FormField>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <FormField label="Approval ID">
+              <Input
+                value={fulfillmentAction?.approvalId ?? ""}
+                onChange={(event) => fulfillmentAction && setFulfillmentAction({ ...fulfillmentAction, approvalId: event.target.value })}
+                placeholder="Paste approved fulfillment approval id"
+              />
+            </FormField>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={fulfillmentApprovalMutation.isPending}
+                onClick={() => fulfillmentApprovalMutation.mutate()}
+              >
+                <ShieldCheck size={16} />
+                Submit approval
+              </Button>
+            </div>
+          </div>
+          {fulfillmentAction?.approval && (
+            <Notice tone={fulfillmentAction.approval.status === "APPROVED" ? "success" : "info"} title={`Approval ${fulfillmentAction.approval.status}`}>
+              {compactId(fulfillmentAction.approval.id, 18, 8)} · {fulfillmentAction.approval.operationType}
+            </Notice>
+          )}
+          {fulfillmentApprovalMutation.isError && <ErrorState error={fulfillmentApprovalMutation.error} />}
           {fulfillmentMutation.isError && <ErrorState error={fulfillmentMutation.error} />}
         </div>
       </ConfirmDialog>
@@ -2776,11 +3407,31 @@ function rewardPayload(form: RewardForm) {
   };
 }
 
+function tierPolicyPayload(form: TierPolicyForm) {
+  const benefits = parseJsonObject(form.benefitsJson, "Benefits");
+  return {
+    tenantId: form.tenantId.trim(),
+    applicationId: form.applicationId.trim(),
+    programId: form.programId.trim(),
+    tierCode: form.tierCode.trim(),
+    name: form.name.trim(),
+    rank: toNumberOrUndefined(form.rank) ?? 1,
+    qualificationPoints: toNumberOrUndefined(form.qualificationPoints) ?? 0,
+    qualificationWindowDays: toNumberOrUndefined(form.qualificationWindowDays) ?? 365,
+    downgradeGraceDays: toNumberOrUndefined(form.downgradeGraceDays) ?? 30,
+    benefits
+  };
+}
+
 function parseRewardConfig(value: string) {
+  return parseJsonObject(value, "Fulfillment config");
+}
+
+function parseJsonObject(value: string, label: string) {
   if (!value.trim()) return {};
   const parsed = JSON.parse(value) as unknown;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Fulfillment config must be a JSON object");
+    throw new Error(`${label} must be a JSON object`);
   }
   return parsed as Record<string, unknown>;
 }
@@ -2864,14 +3515,18 @@ function RewardRedemptionTable({
   redemptions,
   onReverse,
   onFulfillment,
+  onRetry,
   isReversePending,
-  isFulfillmentPending
+  isFulfillmentPending,
+  isRetryPending
 }: {
   redemptions: LoyaltyRewardRedemption[];
   onReverse: (redemption: LoyaltyRewardRedemption) => void;
   onFulfillment: (redemption: LoyaltyRewardRedemption, status: string) => void;
+  onRetry: (redemption: LoyaltyRewardRedemption) => void;
   isReversePending?: boolean;
   isFulfillmentPending?: boolean;
+  isRetryPending?: boolean;
 }) {
   return (
     <Table>
@@ -2912,6 +3567,24 @@ function RewardRedemptionTable({
               )}
               {redemption.fulfillmentNote && (
                 <p className="mt-1 text-xs text-slate-500">{redemption.fulfillmentNote}</p>
+              )}
+              <p className="mt-1 text-xs text-slate-400">
+                {redemption.fulfillmentProvider ?? "MANUAL"} · attempt {redemption.fulfillmentAttemptCount ?? 0}
+              </p>
+              {(redemption.fulfillmentNextAttemptAt || redemption.fulfillmentSlaDueAt) && (
+                <p className="mt-1 text-xs text-slate-400">
+                  next {formatDateTime(redemption.fulfillmentNextAttemptAt)} · SLA {formatDateTime(redemption.fulfillmentSlaDueAt)}
+                </p>
+              )}
+              {redemption.fulfillmentErrorClass && (
+                <p className="mt-1 text-xs text-red-500">
+                  {redemption.fulfillmentErrorClass}: {redemption.fulfillmentErrorMessage ?? "-"}
+                </p>
+              )}
+              {redemption.fulfillmentCallbackPayloadHash && (
+                <p className="mt-1 font-mono text-xs text-slate-400">
+                  callback {compactId(redemption.fulfillmentCallbackPayloadHash)}
+                </p>
               )}
               {redemption.reversalEntryId && (
                 <p className="mt-1 font-mono text-xs text-red-500">reverse {compactId(redemption.reversalEntryId)}</p>
@@ -2961,6 +3634,17 @@ function RewardRedemptionTable({
                     Fail
                   </Button>
                 )}
+                {redemption.status !== "REVERSED" && redemption.fulfillmentStatus !== "ISSUED" && (
+                  <Button
+                    size="xs"
+                    variant="secondary"
+                    disabled={isRetryPending}
+                    onClick={() => onRetry(redemption)}
+                  >
+                    <RefreshCcw size={14} />
+                    Retry
+                  </Button>
+                )}
               </div>
             </Td>
           </tr>
@@ -2983,6 +3667,10 @@ function DeadLetterOperationsPanel() {
     dryRun: boolean;
   } | null>(null);
   const [actionReason, setActionReason] = useState("Reviewed by loyalty operations");
+  const [approvalEvidence, setApprovalEvidence] = useState("");
+  const [approvalId, setApprovalId] = useState("");
+  const [approvalReviewNote, setApprovalReviewNote] = useState("Checked evidence and threshold policy");
+  const [approvalResult, setApprovalResult] = useState<LoyaltyInboundDeadLetterApproval | null>(null);
   const queryClient = useQueryClient();
 
   const deadLettersQuery = useQuery({
@@ -3001,7 +3689,11 @@ function DeadLetterOperationsPanel() {
   const actionMutation = useMutation({
     mutationFn: async () => {
       if (!actionTarget) throw new Error("Missing dead-letter action target");
-      const input = { reason: actionReason, dryRun: actionTarget.dryRun };
+      const input = {
+        reason: actionReason,
+        dryRun: actionTarget.dryRun,
+        approvalId: actionTarget.dryRun ? undefined : approvalId.trim() || undefined
+      };
       return actionTarget.action === "replay"
         ? replayLoyaltyDeadLetter(actionTarget.deadLetter.id, input)
         : discardLoyaltyDeadLetter(actionTarget.deadLetter.id, input);
@@ -3010,6 +3702,36 @@ function DeadLetterOperationsPanel() {
       queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty });
       setActionTarget(null);
       setActionReason("Reviewed by loyalty operations");
+      setApprovalResult(null);
+    }
+  });
+
+  const approvalMutation = useMutation({
+    mutationFn: async () => {
+      if (!actionTarget) throw new Error("Missing dead-letter action target");
+      return requestLoyaltyDeadLetterApproval(actionTarget.deadLetter.id, {
+        action: actionTarget.action === "replay" ? "REPLAY" : "DISCARD",
+        reason: actionReason,
+        evidenceReference: approvalEvidence
+      });
+    },
+    onSuccess: (response) => {
+      setApprovalResult(response);
+      setApprovalId(response.id);
+      queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty });
+    }
+  });
+
+  const approvalReviewMutation = useMutation({
+    mutationFn: async () => {
+      const targetApprovalId = approvalId.trim();
+      if (!targetApprovalId) throw new Error("Missing loyalty DLT approval id");
+      return approveLoyaltyDeadLetterApproval(targetApprovalId, { note: approvalReviewNote });
+    },
+    onSuccess: (response) => {
+      setApprovalResult(response);
+      setApprovalId(response.id);
+      queryClient.invalidateQueries({ queryKey: queryKeys.incentives.loyalty });
     }
   });
 
@@ -3028,8 +3750,14 @@ function DeadLetterOperationsPanel() {
 
   function openAction(deadLetter: LoyaltyInboundDeadLetter, action: "replay" | "discard", dryRun = false) {
     actionMutation.reset();
+    approvalMutation.reset();
+    approvalReviewMutation.reset();
     setActionTarget({ deadLetter, action, dryRun });
     setActionReason(action === "replay" ? "Replay after payload/consumer issue review" : "Discard after manual resolution");
+    setApprovalEvidence(`${deadLetter.dltTopic}:${deadLetter.kafkaPartition}:${deadLetter.kafkaOffset}:${deadLetter.payloadHash}`);
+    setApprovalId("");
+    setApprovalReviewNote("Checked evidence and threshold policy");
+    setApprovalResult(null);
   }
 
   return (
@@ -3142,6 +3870,42 @@ function DeadLetterOperationsPanel() {
           <FormField label="Reason" required>
             <Textarea value={actionReason} onChange={(event) => setActionReason(event.target.value)} rows={3} />
           </FormField>
+          {actionTarget && !actionTarget.dryRun && (
+            <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+              <FormField label="Evidence reference" required>
+                <Input value={approvalEvidence} onChange={(event) => setApprovalEvidence(event.target.value)} />
+              </FormField>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={approvalMutation.isPending}
+                  onClick={() => approvalMutation.mutate()}
+                >
+                  Request approval
+                </Button>
+                {approvalResult && (
+                  <Badge value={approvalResult.status} label={compactId(approvalResult.id, 18, 8)} tone={statusTone(approvalResult.status)} />
+                )}
+              </div>
+              <FormField label="Approval ID" required>
+                <Input value={approvalId} onChange={(event) => setApprovalId(event.target.value)} />
+              </FormField>
+              <FormField label="Review note" required>
+                <Input value={approvalReviewNote} onChange={(event) => setApprovalReviewNote(event.target.value)} />
+              </FormField>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={approvalReviewMutation.isPending || !approvalId.trim()}
+                onClick={() => approvalReviewMutation.mutate()}
+              >
+                Approve approval
+              </Button>
+              {approvalMutation.isError && <ErrorState error={approvalMutation.error} />}
+              {approvalReviewMutation.isError && <ErrorState error={approvalReviewMutation.error} />}
+            </div>
+          )}
           {actionMutation.isError && <ErrorState error={actionMutation.error} />}
         </div>
       </ConfirmDialog>
@@ -3447,6 +4211,10 @@ export function LoyaltyControlPlanePage() {
           <WalletCards size={16} />
           Accounts & ledger
         </TabButton>
+        <TabButton active={tab === "tiers"} onClick={() => setTab("tiers")}>
+          <Medal size={16} />
+          Tiers
+        </TabButton>
         <TabButton active={tab === "approvals"} onClick={() => setTab("approvals")}>
           <ClipboardCheck size={16} />
           Approvals
@@ -3477,6 +4245,7 @@ export function LoyaltyControlPlanePage() {
         <div>
           {tab === "programs" && <ProgramsPanel />}
           {tab === "accounts" && <AccountsPanel />}
+          {tab === "tiers" && <TiersPanel />}
           {tab === "approvals" && <ApprovalsPanel />}
           {tab === "expiry" && <ExpiryDryRunPanel />}
           {tab === "reconciliation" && <ReconciliationPanel />}

@@ -52,6 +52,41 @@ export type StudentGradebook = {
   entries: GradeEntry[];
 };
 
+export type GradePublishAudit = {
+  id: string;
+  action: string;
+  courseId: string;
+  studentId?: string;
+  gradeItemId?: string;
+  gradeEntryId?: string;
+  finalGradeId?: string;
+  actorId?: string;
+  reasonCodes: string[];
+  payload: Record<string, unknown>;
+  createdAt?: string;
+};
+
+export type GradingQueueItem = {
+  queueKey: string;
+  courseId: string;
+  studentId: string;
+  status: string;
+  reasonCodes: string[];
+  gradeItemId?: string | null;
+  gradeEntryId?: string | null;
+  finalGradeId?: string | null;
+  title?: string | null;
+  categoryName?: string | null;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  rawScore?: number | null;
+  adjustedScore?: number | null;
+  maxScore?: number | null;
+  finalGradeStatus?: string | null;
+  gradedAt?: string | null;
+  finalizedAt?: string | null;
+};
+
 export async function listGradeItems(courseId: string): Promise<GradeItem[]> {
   const { data } = await apiClient.get(`/admin/v1/gradebook/courses/${courseId}/items`);
   return unwrap<GradeItem[]>(data);
@@ -73,6 +108,26 @@ export async function upsertEntry(input: {
   // The grader is taken from the authenticated caller, never sent in the body.
   const { data } = await apiClient.post("/admin/v1/gradebook/entries", input);
   return unwrap<StudentGradebook>(data);
+}
+
+export async function listGradePublishAudit(
+  courseId: string,
+  filters?: { studentId?: string; gradeItemId?: string; limit?: number }
+): Promise<GradePublishAudit[]> {
+  const { data } = await apiClient.get(`/admin/v1/gradebook/courses/${courseId}/grade-publish-audit`, {
+    params: filters
+  });
+  return unwrap<GradePublishAudit[]>(data);
+}
+
+export async function listGradingQueue(
+  courseId: string,
+  filters?: { studentId?: string; status?: string; limit?: number }
+): Promise<GradingQueueItem[]> {
+  const { data } = await apiClient.get(`/admin/v1/gradebook/courses/${courseId}/grading-queue`, {
+    params: filters
+  });
+  return unwrap<GradingQueueItem[]>(data);
 }
 
 // ---- Grade categories (weights) ----

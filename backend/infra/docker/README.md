@@ -239,10 +239,8 @@ and `enrollment-service` that also have matching application client bindings; `p
 `internal:promotion:admin` by default. The next enterprise hardening step is operational key rotation and e2e
 verification against the running cluster.
 
-In `EXTERNAL_TOKEN_MODE=oidc`, Keycloak is the only supported edge login authority. The gateway
-blocks legacy `/api/v1/auth/login`, `/api/v1/auth/register`, `/api/v1/auth/refresh`, and email
-verification endpoints so clients cannot accidentally obtain identity-service tokens that are no
-longer trusted by the edge.
+Keycloak is the only supported edge login authority. The gateway blocks `/api/v1/auth/login`,
+`/api/v1/auth/register`, `/api/v1/auth/refresh`, and email verification endpoints with `410 Gone`.
 
 Local Docker imports `infra/docker/keycloak/courseflow-realm.json`, which includes demo users for
 developer testing. Production must not mount/import that local realm. Use
@@ -250,16 +248,13 @@ developer testing. Production must not mount/import that local realm. Use
 the placeholder web domains, rotate the `keycloak-user-lifecycle` client secret, and provision real
 users through the approved IAM/user lifecycle flow. The admin user create/deactivate/privacy-export
 paths call Keycloak Admin REST through that lifecycle client, while CourseFlow profile and
-authorization data remain in `user-management-service` and `access-control-service`. The legacy
-`identity-service` is behind the `legacy-identity` profile in the production overlay and is not part
-of the default Keycloak deployment.
+authorization data remain in `user-management-service` and `access-control-service`.
 `scripts/validate-prod-profile.sh` also validates the production realm template for PKCE, API
 audience mapping, password/session/OTP policy, no demo users and no localhost redirects.
 The prod profile also requires `ACCESS_CONTROL_RESOLUTION_MODE=required` and an explicit
 `COURSEFLOW_STS_ALLOWED_CLIENTS` allowlist. Do not use the local/demo wildcard `*` in production,
-and do not include the legacy `identity-service` in the Keycloak production allowlist, because STS
-client credentials must identify the calling service instead of letting one shared secret impersonate
-any service name.
+because STS client credentials must identify the calling service instead of letting one shared secret
+impersonate any service name.
 Services running in STS mode also require `TOKEN_CONVERTER_URI`; chat WebSocket auth uses the same
 converter to exchange STOMP bearer tokens before trusting internal JWT claims.
 Service location is intentionally separate from authentication: gateway routing uses Eureka-backed
@@ -269,7 +264,8 @@ Service location is intentionally separate from authentication: gateway routing 
 `ACCESS_CONTROL_AUDIT_AUTHZ_ALLOWED=true` only when the environment needs full allow/deny decision
 audit, because this can produce high-volume audit rows.
 
-When `SPRING_LIQUIBASE_CONTEXTS=prod,demo` is enabled, demo accounts are seeded in `identity-service` with password `password`:
+When local Docker imports `infra/docker/keycloak/courseflow-realm.json`, demo accounts are available
+in Keycloak with password `password`:
 
 - `admin@courseflow.local`
 - `professor@courseflow.local`

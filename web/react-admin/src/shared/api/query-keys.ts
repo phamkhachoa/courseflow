@@ -29,6 +29,7 @@ export const queryKeys = {
   },
   assignments: {
     list: (courseId?: string) => ["assignments", "list", courseId ?? ""] as const,
+    gradingQueue: (courseId?: string) => ["assignments", "grading-queue", courseId ?? ""] as const,
     detail: (id: string) => ["assignments", "detail", id] as const,
     submissions: (assignmentId: string, studentId?: string) =>
       ["assignments", "submissions", assignmentId, studentId ?? ""] as const,
@@ -44,8 +45,10 @@ export const queryKeys = {
   },
   analytics: {
     course: (courseId: string) => ["analytics", "course", courseId] as const,
+    atRisk: (courseId: string) => ["analytics", "at-risk", courseId] as const,
     completion: (courseId: string) => ["analytics", "completion", courseId] as const,
-    org: (orgId: string) => ["analytics", "org", orgId] as const
+    org: (orgId: string) => ["analytics", "org", orgId] as const,
+    marketingFunnel: (filters?: Record<string, unknown>) => ["analytics", "marketing-funnel", filters ?? {}] as const
   },
   incentives: {
     all: ["incentives"] as const,
@@ -65,6 +68,8 @@ export const queryKeys = {
     coupon: (id: string) => ["incentives", "coupon", id] as const,
     couponStorageInventory: (filters?: Record<string, unknown>) =>
       ["incentives", "coupons", "storage-inventory", filters ?? {}] as const,
+    couponDistributions: (filters?: Record<string, unknown>) =>
+      ["incentives", "coupon-distributions", filters ?? {}] as const,
     couponImportDryRun: (dryRunId?: string) =>
       ["incentives", "coupon-import", "dry-run", dryRunId ?? "selected"] as const,
     couponImportDryRuns: (filters?: Record<string, unknown>) =>
@@ -81,6 +86,8 @@ export const queryKeys = {
     reservation: (id?: string) => ["incentives", "reservation", id ?? "selected"] as const,
     redemptions: (filters?: Record<string, unknown>) => ["incentives", "redemptions", filters ?? {}] as const,
     redemption: (id: string) => ["incentives", "redemption", id] as const,
+    redemptionReversalApprovals: (filters?: Record<string, unknown>) =>
+      ["incentives", "redemptions", "reversal-approvals", filters ?? {}] as const,
     reconciliation: (filters?: Record<string, unknown>) =>
       ["incentives", "reconciliation", filters ?? {}] as const,
     audit: (filters?: Record<string, unknown>) => ["incentives", "audit", filters ?? {}] as const,
@@ -91,6 +98,10 @@ export const queryKeys = {
     loyaltyProgram: (id?: string) => ["incentives", "loyalty", "program", id ?? "selected"] as const,
     loyaltyAccounts: (filters?: Record<string, unknown>) =>
       ["incentives", "loyalty", "accounts", filters ?? {}] as const,
+    loyaltyTierPolicies: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "tier-policies", filters ?? {}] as const,
+    loyaltyTierStates: (filters?: Record<string, unknown>) =>
+      ["incentives", "loyalty", "tier-states", filters ?? {}] as const,
     loyaltyLedger: (filters?: Record<string, unknown>) =>
       ["incentives", "loyalty", "ledger", filters ?? {}] as const,
     loyaltyBalanceBuckets: (accountId?: string, asOf?: string) =>
@@ -115,6 +126,9 @@ export const queryKeys = {
     loyaltyAudit: (filters?: Record<string, unknown>) => ["incentives", "loyalty", "audit", filters ?? {}] as const,
     loyaltyTimeline: (type: string, id?: string) =>
       ["incentives", "loyalty", "timeline", type, id ?? "selected"] as const,
+    opsConsole: (filters?: Record<string, unknown>) => ["incentives", "ops-console", filters ?? {}] as const,
+    outboxDeadLetters: (filters?: Record<string, unknown>) =>
+      ["incentives", "outbox", "dead-letters", filters ?? {}] as const,
     retentionPolicies: ["incentives", "retention", "policies"] as const,
     retentionDryRun: (scope?: Record<string, unknown>) => ["incentives", "retention", "dry-run", scope ?? {}] as const,
     retentionRestoreDrill: (restoreDrillRef?: string) =>
@@ -130,6 +144,10 @@ export const queryKeys = {
     items: (courseId: string) => ["gradebook", "items", courseId] as const,
     student: (courseId: string, studentId: string) =>
       ["gradebook", "student", courseId, studentId] as const,
+    audit: (courseId: string, studentId?: string) =>
+      ["gradebook", "audit", courseId, studentId ?? ""] as const,
+    gradingQueue: (courseId: string, studentId?: string, status?: string) =>
+      ["gradebook", "grading-queue", courseId, studentId ?? "", status ?? ""] as const,
     schemes: (courseId: string) => ["gradebook", "schemes", courseId] as const,
     categories: (courseId: string) => ["gradebook", "categories", courseId] as const
   },
@@ -144,7 +162,9 @@ export const queryKeys = {
     list: (courseId: string) => ["course-modules", "list", courseId] as const
   },
   certificates: {
-    verify: (code: string) => ["certificates", "verify", code] as const
+    verify: (code: string) => ["certificates", "verify", code] as const,
+    eligibility: (courseId: string, studentId: string) =>
+      ["certificates", "eligibility", courseId, studentId] as const
   },
   peerReview: {
     settings: (assignmentId: string) => ["peer-review", "settings", assignmentId] as const
@@ -170,6 +190,7 @@ export const queryKeys = {
   },
   authoring: {
     draft: (courseId: string) => ["authoring", "draft", courseId] as const,
+    preview: (courseId: string) => ["authoring", "preview", courseId] as const,
     versions: (courseId: string) => ["authoring", "versions", courseId] as const,
     versionDiff: (courseId: string, versionNo?: number) => ["authoring", "version-diff", courseId, versionNo ?? "latest"] as const,
     reviewHistory: (courseId: string) => ["authoring", "review-history", courseId] as const,

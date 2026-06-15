@@ -3,6 +3,7 @@ package edu.courseflow.loyalty.controller;
 import edu.courseflow.commonlibrary.constants.GatewayHeaders;
 import edu.courseflow.commonlibrary.web.CurrentUser;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.CreateAccountRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.CreateLoyaltyTierPolicyRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.CreateProgramRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.CreateRewardRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LedgerQueryResponseDto;
@@ -15,9 +16,14 @@ import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyAdjustmentApprovalQueryResp
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyApprovalEvidencePackDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyAuditQueryResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyBalanceBucketResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyBenefitReconciliationQueryResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyFinanceCloseoutExportDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterActionRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterActionResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalQueryResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterApprovalReviewRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterDetailDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyInboundDeadLetterQueryResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyProgramAdminDto;
@@ -28,6 +34,9 @@ import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyReconciliationQueryResponse
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyRewardDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyRewardRedemptionDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyRewardRedemptionQueryResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyTierPolicyDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyTierRecalculateResponseDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.LoyaltyTierStateQueryResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointLotBackfillRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointLotBackfillResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsAdjustmentRequestDto;
@@ -38,11 +47,19 @@ import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsExpiryExecutionResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsMutationRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.PointsMutationResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.RedeemRewardRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RecalculateLoyaltyTiersRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.ReviewLoyaltyAdjustmentApprovalRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.ReversePointsRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RetryRewardFulfillmentRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RewardFulfillmentCallbackRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.RewardFulfillmentRunResponseDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.SubmitPointsAdjustmentApprovalRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.SubmitPointsExpiryApprovalRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.SubmitRewardFulfillmentApprovalRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.SubmitRewardRedemptionReversalApprovalRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateAccountStatusRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateLoyaltyTierPolicyRequestDto;
+import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateLoyaltyTierPolicyStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateProgramRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateProgramStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateRewardFulfillmentStatusRequestDto;
@@ -50,9 +67,11 @@ import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateRewardRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpdateRewardStatusRequestDto;
 import edu.courseflow.loyalty.dto.LoyaltyDtos.UpsertClientBindingRequestDto;
 import edu.courseflow.loyalty.service.LoyaltyAdminService;
+import edu.courseflow.loyalty.service.LoyaltyBenefitReconciliationService;
 import edu.courseflow.loyalty.service.LoyaltyInboundDeadLetterService;
 import edu.courseflow.loyalty.service.LoyaltyRewardService;
 import edu.courseflow.loyalty.service.LoyaltyService;
+import edu.courseflow.loyalty.service.LoyaltyTierService;
 import edu.courseflow.loyalty.service.LoyaltyWalletService;
 import jakarta.validation.Valid;
 import java.time.Instant;
@@ -77,19 +96,25 @@ public class LoyaltyController {
     private final LoyaltyAdminService adminService;
     private final LoyaltyInboundDeadLetterService deadLetterService;
     private final LoyaltyRewardService rewardService;
+    private final LoyaltyTierService tierService;
     private final LoyaltyWalletService walletService;
+    private final LoyaltyBenefitReconciliationService benefitReconciliationService;
 
     public LoyaltyController(
             LoyaltyService loyaltyService,
             LoyaltyAdminService adminService,
             LoyaltyInboundDeadLetterService deadLetterService,
             LoyaltyRewardService rewardService,
-            LoyaltyWalletService walletService) {
+            LoyaltyTierService tierService,
+            LoyaltyWalletService walletService,
+            LoyaltyBenefitReconciliationService benefitReconciliationService) {
         this.loyaltyService = loyaltyService;
         this.adminService = adminService;
         this.deadLetterService = deadLetterService;
         this.rewardService = rewardService;
+        this.tierService = tierService;
         this.walletService = walletService;
+        this.benefitReconciliationService = benefitReconciliationService;
     }
 
     @GetMapping("/programs")
@@ -244,6 +269,61 @@ public class LoyaltyController {
         return adminService.accountTimeline(accountId, limit, user);
     }
 
+    @GetMapping("/tier-policies")
+    public List<LoyaltyTierPolicyDto> tierPolicies(
+            @RequestParam Optional<String> tenantId,
+            @RequestParam Optional<String> applicationId,
+            @RequestParam Optional<String> programId,
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return tierService.listPolicies(tenantId, applicationId, programId, status, limit, user);
+    }
+
+    @PostMapping("/tier-policies")
+    public LoyaltyTierPolicyDto createTierPolicy(
+            @Valid @RequestBody CreateLoyaltyTierPolicyRequestDto request,
+            CurrentUser user) {
+        return tierService.createPolicy(request, user);
+    }
+
+    @PatchMapping("/tier-policies/{policyId}")
+    public LoyaltyTierPolicyDto updateTierPolicy(
+            @PathVariable UUID policyId,
+            @Valid @RequestBody UpdateLoyaltyTierPolicyRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false) String correlationId,
+            CurrentUser user) {
+        return tierService.updatePolicy(policyId, request, correlationId, user);
+    }
+
+    @PatchMapping("/tier-policies/{policyId}/status")
+    public LoyaltyTierPolicyDto updateTierPolicyStatus(
+            @PathVariable UUID policyId,
+            @Valid @RequestBody UpdateLoyaltyTierPolicyStatusRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false) String correlationId,
+            CurrentUser user) {
+        return tierService.updatePolicyStatus(policyId, request, correlationId, user);
+    }
+
+    @GetMapping("/tier-states")
+    public LoyaltyTierStateQueryResponseDto tierStates(
+            @RequestParam Optional<String> tenantId,
+            @RequestParam Optional<String> applicationId,
+            @RequestParam Optional<String> programId,
+            @RequestParam Optional<String> profileId,
+            @RequestParam Optional<String> tierCode,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return tierService.listStates(tenantId, applicationId, programId, profileId, tierCode, limit, user);
+    }
+
+    @PostMapping("/tier-states:recalculate")
+    public LoyaltyTierRecalculateResponseDto recalculateTierStates(
+            @Valid @RequestBody RecalculateLoyaltyTiersRequestDto request,
+            CurrentUser user) {
+        return tierService.recalculate(request, user);
+    }
+
     @GetMapping("/accounts/{accountId}/balance-buckets")
     public LoyaltyBalanceBucketResponseDto balanceBuckets(
             @PathVariable UUID accountId,
@@ -369,6 +449,35 @@ public class LoyaltyController {
                 tenantId, applicationId, programId, profileId, accountId, entryType, from, to, limit, user);
     }
 
+    @GetMapping("/benefit-reconciliation/entries")
+    public LoyaltyBenefitReconciliationQueryResponseDto benefitReconciliationEntries(
+            @RequestParam String tenantId,
+            @RequestParam String applicationId,
+            @RequestParam Optional<String> programId,
+            @RequestParam Optional<String> profileId,
+            @RequestParam Optional<String> redemptionId,
+            @RequestParam Optional<String> itemType,
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<Boolean> includeMatched,
+            @RequestParam Optional<Instant> from,
+            @RequestParam Optional<Instant> to,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return benefitReconciliationService.query(
+                tenantId,
+                applicationId,
+                programId,
+                profileId,
+                redemptionId,
+                itemType,
+                status,
+                includeMatched,
+                from,
+                to,
+                limit,
+                user);
+    }
+
     @GetMapping("/finance/closeout")
     public LoyaltyFinanceCloseoutExportDto financeCloseout(
             @RequestParam String tenantId,
@@ -454,12 +563,51 @@ public class LoyaltyController {
         return rewardService.reverseRedemption(redemptionId, request, user);
     }
 
+    @PostMapping("/reward-redemptions/{redemptionId}/reversal-approvals")
+    public LoyaltyAdjustmentApprovalDto submitRewardRedemptionReversalApproval(
+            @PathVariable UUID redemptionId,
+            @Valid @RequestBody SubmitRewardRedemptionReversalApprovalRequestDto request,
+            CurrentUser user) {
+        return rewardService.submitReversalApproval(redemptionId, request, user);
+    }
+
+    @PostMapping("/reward-redemptions/{redemptionId}/fulfillment-approvals")
+    public LoyaltyAdjustmentApprovalDto submitRewardFulfillmentApproval(
+            @PathVariable UUID redemptionId,
+            @Valid @RequestBody SubmitRewardFulfillmentApprovalRequestDto request,
+            CurrentUser user) {
+        return rewardService.submitFulfillmentApproval(redemptionId, request, user);
+    }
+
     @PatchMapping("/reward-redemptions/{redemptionId}/fulfillment")
     public LoyaltyRewardRedemptionDto updateRewardRedemptionFulfillment(
             @PathVariable UUID redemptionId,
             @Valid @RequestBody UpdateRewardFulfillmentStatusRequestDto request,
             CurrentUser user) {
         return rewardService.updateFulfillment(redemptionId, request, user);
+    }
+
+    @PostMapping("/reward-redemptions/{redemptionId}/fulfillment:retry")
+    public LoyaltyRewardRedemptionDto retryRewardRedemptionFulfillment(
+            @PathVariable UUID redemptionId,
+            @RequestBody(required = false) RetryRewardFulfillmentRequestDto request,
+            CurrentUser user) {
+        return rewardService.retryFulfillment(redemptionId, request, user);
+    }
+
+    @PostMapping("/reward-fulfillment:run-due")
+    public RewardFulfillmentRunResponseDto runDueRewardFulfillments(
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return rewardService.runDueFulfillments(limit, user);
+    }
+
+    @PostMapping("/reward-fulfillment/{provider}/callbacks")
+    public LoyaltyRewardRedemptionDto rewardFulfillmentCallback(
+            @PathVariable String provider,
+            @Valid @RequestBody RewardFulfillmentCallbackRequestDto request,
+            CurrentUser user) {
+        return rewardService.applyFulfillmentCallback(provider, request, user);
     }
 
     @GetMapping("/dead-letters")
@@ -478,6 +626,39 @@ public class LoyaltyController {
     @GetMapping("/dead-letters/{id}")
     public LoyaltyInboundDeadLetterDetailDto deadLetter(@PathVariable UUID id, CurrentUser user) {
         return deadLetterService.get(id, user);
+    }
+
+    @GetMapping("/dead-letters/{id}/approvals")
+    public LoyaltyInboundDeadLetterApprovalQueryResponseDto deadLetterApprovals(
+            @PathVariable UUID id,
+            @RequestParam Optional<String> status,
+            @RequestParam Optional<Integer> limit,
+            CurrentUser user) {
+        return deadLetterService.approvals(id, status, limit, user);
+    }
+
+    @PostMapping("/dead-letters/{id}/approvals")
+    public LoyaltyInboundDeadLetterApprovalDto requestDeadLetterApproval(
+            @PathVariable UUID id,
+            @Valid @RequestBody LoyaltyInboundDeadLetterApprovalRequestDto request,
+            CurrentUser user) {
+        return deadLetterService.requestApproval(id, request, user);
+    }
+
+    @PostMapping("/dead-letters/approvals/{approvalId}:approve")
+    public LoyaltyInboundDeadLetterApprovalDto approveDeadLetterApproval(
+            @PathVariable UUID approvalId,
+            @Valid @RequestBody LoyaltyInboundDeadLetterApprovalReviewRequestDto request,
+            CurrentUser user) {
+        return deadLetterService.approveApproval(approvalId, request, user);
+    }
+
+    @PostMapping("/dead-letters/approvals/{approvalId}:reject")
+    public LoyaltyInboundDeadLetterApprovalDto rejectDeadLetterApproval(
+            @PathVariable UUID approvalId,
+            @Valid @RequestBody LoyaltyInboundDeadLetterApprovalReviewRequestDto request,
+            CurrentUser user) {
+        return deadLetterService.rejectApproval(approvalId, request, user);
     }
 
     @PostMapping("/dead-letters/{id}:replay")

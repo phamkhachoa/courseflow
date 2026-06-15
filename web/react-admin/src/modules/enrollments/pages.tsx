@@ -37,12 +37,14 @@ import {
   addToWaitlist,
   cancelPromotionApplicationReservation,
   createEnrollment,
+  evaluateRefundDropPolicy,
   getStats,
   listEnrollments,
   listPromotionApplications,
   retryPromotionApplicationCommit,
   listWaitlist,
-  setCapacity
+  setCapacity,
+  type RefundDropPolicyEvaluationResponse
 } from "./api";
 
 function compactId(value?: string) {
@@ -106,6 +108,176 @@ function userLabel(user?: AdminUser, fallbackId?: string) {
   return `${user.fullName || user.email} · ${user.email}`;
 }
 
+type RefundPolicyForm = {
+  enrollmentId: string;
+  reason: string;
+  refundWindowDays: string;
+  paymentStatus: string;
+  paidAmount: string;
+  currency: string;
+  paidAt: string;
+  promotionStatus: string;
+  reservationId: string;
+  redemptionId: string;
+  loyaltyPointsEarned: string;
+  loyaltyPointsReversed: string;
+  loyaltyEarnEntryId: string;
+  rewardStatus: string;
+  rewardRedemptionId: string;
+  rewardFulfillmentStatus: string;
+  rewardFulfilled: boolean;
+};
+
+const defaultRefundPolicyForm: RefundPolicyForm = {
+  enrollmentId: "",
+  reason: "Learner refund/drop request",
+  refundWindowDays: "14",
+  paymentStatus: "",
+  paidAmount: "",
+  currency: "USD",
+  paidAt: "",
+  promotionStatus: "",
+  reservationId: "",
+  redemptionId: "",
+  loyaltyPointsEarned: "",
+  loyaltyPointsReversed: "",
+  loyaltyEarnEntryId: "",
+  rewardStatus: "",
+  rewardRedemptionId: "",
+  rewardFulfillmentStatus: "",
+  rewardFulfilled: false
+};
+
+function optionalText(value: string) {
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
+function optionalNumber(value: string) {
+  const normalized = value.trim();
+  return normalized ? Number(normalized) : undefined;
+}
+
+function optionalIsoDate(value: string) {
+  const normalized = value.trim();
+  return normalized ? new Date(normalized).toISOString() : undefined;
+}
+
+function refundPolicyPayload(form: RefundPolicyForm) {
+  return {
+    enrollmentId: form.enrollmentId.trim(),
+    reason: optionalText(form.reason),
+    refundWindowDays: optionalNumber(form.refundWindowDays),
+    paymentStatus: optionalText(form.paymentStatus),
+    paidAmount: optionalNumber(form.paidAmount),
+    currency: optionalText(form.currency),
+    paidAt: optionalIsoDate(form.paidAt),
+    promotionStatus: optionalText(form.promotionStatus),
+    reservationId: optionalText(form.reservationId),
+    redemptionId: optionalText(form.redemptionId),
+    loyaltyPointsEarned: optionalNumber(form.loyaltyPointsEarned),
+    loyaltyPointsReversed: optionalNumber(form.loyaltyPointsReversed),
+    loyaltyEarnEntryId: optionalText(form.loyaltyEarnEntryId),
+    rewardStatus: optionalText(form.rewardStatus),
+    rewardRedemptionId: optionalText(form.rewardRedemptionId),
+    rewardFulfillmentStatus: optionalText(form.rewardFulfillmentStatus),
+    rewardFulfilled: form.rewardFulfilled,
+    evidence: { source: "admin-enrollment-ops" }
+  };
+}
+
+function policyStatusLabel(value?: string) {
+  const labels: Record<string, string> = {
+    ACTION_REQUIRED: "Cần xử lý",
+    MANUAL_REVIEW: "Cần duyệt",
+    NO_ACTION: "Không cần xử lý"
+  };
+  return labels[value ?? ""] ?? value ?? "Chưa chạy";
+}
+
+function decisionLabel(value?: string) {
+  const labels: Record<string, string> = {
+    REQUIRED: "Phải làm",
+    NOT_REQUIRED: "Không cần",
+    ALREADY_DONE: "Đã xong",
+    MANUAL_REVIEW: "Cần duyệt",
+    BLOCKED: "Đang chặn"
+  };
+  return labels[value ?? ""] ?? value ?? "Chưa rõ";
+}
+
+function severityTone(value?: string) {
+  if (value === "CRITICAL") return "danger" as const;
+  if (value === "HIGH") return "warning" as const;
+  if (value === "MEDIUM") return "info" as const;
+  return "slate" as const;
+}
+
+function RefundPolicyResult({ result }: { result: RefundDropPolicyEvaluationResponse }) {
+  return (
+    <div className="border-t border-black/10 p-4">
+      <div className="grid gap-3 md:grid-cols-4">
+        <div>
+          <p className="text-xs font-bold uppercase text-slate-400">Matrix</p>
+          <Badge value={result.matrixStatus} label={policyStatusLabel(result.matrixStatus)} className="mt-2" />
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase text-slate-400">Severity</p>
+          <Badge value={result.severity} label={result.severity} tone={severityTone(result.severity)} className="mt-2" />
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase text-slate-400">Refund</p>
+          <Badge value={result.refundEligible ? "REQUIRED" : "SKIPPED"} label={result.refundEligible ? "Eligible" : "Không tự động"} className="mt-2" />
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase text-slate-400">Manual review</p>
+          <Badge value={result.manualReviewRequired ? "MANUAL_REVIEW" : "READY"} label={result.manualReviewRequired ? "Có" : "Không"} className="mt-2" />
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-3">
+        <p>Payment {result.facts.paymentStatus ?? "—"} · {result.facts.paidAmount ?? "0"} {result.facts.currency ?? ""}</p>
+        <p>Promotion {result.facts.promotionStatus ?? "—"} · redemption {compactId(result.facts.redemptionId ?? undefined)}</p>
+        <p>Points outstanding {result.facts.loyaltyPointsOutstanding} · reward {result.facts.rewardFulfillmentStatus ?? result.facts.rewardStatus ?? "—"}</p>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {result.reasonCodes.slice(0, 8).map((reason) => (
+          <Badge key={reason} value={reason} label={reason} tone="slate" />
+        ))}
+      </div>
+      <div className="mt-4">
+        <Table>
+          <thead>
+            <tr>
+              <Th>Domain</Th>
+              <Th>Action</Th>
+              <Th>Decision</Th>
+              <Th>Endpoint</Th>
+              <Th>Idempotency</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.actions.map((action) => (
+              <tr key={`${action.domain}-${action.action}`} className="hover:bg-slate-50">
+                <Td>{action.domain}</Td>
+                <Td>
+                  <p className="font-semibold text-slate-900">{action.action}</p>
+                  {action.makerCheckerRequired && <p className="mt-1 text-xs text-amber-700">maker-checker</p>}
+                </Td>
+                <Td>
+                  <Badge value={action.decision} label={decisionLabel(action.decision)} tone={severityTone(action.severity)} />
+                  {action.blocking && <p className="mt-1 text-xs text-slate-500">blocking</p>}
+                </Td>
+                <Td><span className="break-all text-xs text-slate-600">{action.endpoint ?? "—"}</span></Td>
+                <Td><span className="break-all text-xs text-slate-600">{action.idempotencyKey ?? "—"}</span></Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 function Metric({
   icon,
   label,
@@ -150,6 +322,7 @@ export function EnrollmentsPage() {
   const [capacity, setCapacityValue] = useState("");
   const [enrollForm, setEnrollForm] = useState({ courseId: "", studentId: "" });
   const [waitForm, setWaitForm] = useState({ courseId: "", studentId: "" });
+  const [refundPolicyForm, setRefundPolicyForm] = useState<RefundPolicyForm>(defaultRefundPolicyForm);
 
   const courses = useQuery({
     queryKey: queryKeys.courses.list("enrollment-picker"),
@@ -240,6 +413,10 @@ export function EnrollmentsPage() {
     mutationFn: ({ id }: { id: string }) =>
       cancelPromotionApplicationReservation(id, { reason: "Operator cancelled coupon hold from admin enrollment ops queue" }),
     onSuccess: (row) => invalidateEnrollmentData(row.courseId)
+  });
+
+  const evaluateRefundPolicy = useMutation({
+    mutationFn: () => evaluateRefundDropPolicy(refundPolicyPayload(refundPolicyForm))
   });
 
   const promotionActionPending = retryPromotionApplication.isPending || cancelPromotionApplication.isPending;
@@ -454,6 +631,219 @@ export function EnrollmentsPage() {
         )}
       </Card>
 
+      <Card className="mb-4">
+        <CardHeader
+          title="Refund/drop policy matrix"
+          subtitle="Dry-run drop, refund, discount reversal, points clawback và reward reversal theo facts hiện có."
+        />
+        <form
+          className="space-y-4 p-4"
+          onSubmit={(event: FormEvent) => {
+            event.preventDefault();
+            evaluateRefundPolicy.mutate();
+          }}
+        >
+          <div className="grid gap-3 lg:grid-cols-4">
+            <FormField label="Enrollment ID" htmlFor="policy-enrollment">
+              <Input
+                id="policy-enrollment"
+                list="policy-enrollment-options"
+                value={refundPolicyForm.enrollmentId}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, enrollmentId: event.target.value })}
+                placeholder="UUID"
+                required
+              />
+              <datalist id="policy-enrollment-options">
+                {(enrollments.data ?? []).map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.status} · {row.studentId}
+                  </option>
+                ))}
+              </datalist>
+            </FormField>
+            <FormField label="Reason" htmlFor="policy-reason">
+              <Input
+                id="policy-reason"
+                value={refundPolicyForm.reason}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, reason: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Refund window" htmlFor="policy-window">
+              <Input
+                id="policy-window"
+                type="number"
+                min={0}
+                max={365}
+                value={refundPolicyForm.refundWindowDays}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, refundWindowDays: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Payment override" htmlFor="policy-payment">
+              <Select
+                id="policy-payment"
+                value={refundPolicyForm.paymentStatus}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, paymentStatus: event.target.value })}
+              >
+                <option value="">Dùng order hiện có</option>
+                <option value="PAID">PAID</option>
+                <option value="PAYMENT_PENDING">PAYMENT_PENDING</option>
+                <option value="PAYMENT_FAILED">PAYMENT_FAILED</option>
+                <option value="EXPIRED">EXPIRED</option>
+                <option value="MANUAL_REVIEW">MANUAL_REVIEW</option>
+              </Select>
+            </FormField>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-4">
+            <FormField label="Paid amount" htmlFor="policy-paid-amount">
+              <Input
+                id="policy-paid-amount"
+                type="number"
+                min={0}
+                step="0.01"
+                value={refundPolicyForm.paidAmount}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, paidAmount: event.target.value })}
+                placeholder="Auto"
+              />
+            </FormField>
+            <FormField label="Currency" htmlFor="policy-currency">
+              <Input
+                id="policy-currency"
+                value={refundPolicyForm.currency}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, currency: event.target.value.toUpperCase() })}
+              />
+            </FormField>
+            <FormField label="Paid at" htmlFor="policy-paid-at">
+              <Input
+                id="policy-paid-at"
+                type="datetime-local"
+                value={refundPolicyForm.paidAt}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, paidAt: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Promotion override" htmlFor="policy-promotion">
+              <Select
+                id="policy-promotion"
+                value={refundPolicyForm.promotionStatus}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, promotionStatus: event.target.value })}
+              >
+                <option value="">Dùng application hiện có</option>
+                <option value="RESERVED">RESERVED</option>
+                <option value="APPLIED">APPLIED</option>
+                <option value="COMMIT_FAILED">COMMIT_FAILED</option>
+                <option value="REVERSED">REVERSED</option>
+                <option value="CANCELLED">CANCELLED</option>
+                <option value="MANUAL_REVIEW">MANUAL_REVIEW</option>
+                <option value="SKIPPED">SKIPPED</option>
+              </Select>
+            </FormField>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-4">
+            <FormField label="Reservation ID" htmlFor="policy-reservation">
+              <Input
+                id="policy-reservation"
+                value={refundPolicyForm.reservationId}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, reservationId: event.target.value })}
+                placeholder="Auto"
+              />
+            </FormField>
+            <FormField label="Redemption ID" htmlFor="policy-redemption">
+              <Input
+                id="policy-redemption"
+                value={refundPolicyForm.redemptionId}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, redemptionId: event.target.value })}
+                placeholder="Auto"
+              />
+            </FormField>
+            <FormField label="Points earned" htmlFor="policy-points-earned">
+              <Input
+                id="policy-points-earned"
+                type="number"
+                min={0}
+                value={refundPolicyForm.loyaltyPointsEarned}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, loyaltyPointsEarned: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Points reversed" htmlFor="policy-points-reversed">
+              <Input
+                id="policy-points-reversed"
+                type="number"
+                min={0}
+                value={refundPolicyForm.loyaltyPointsReversed}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, loyaltyPointsReversed: event.target.value })}
+              />
+            </FormField>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-4">
+            <FormField label="Earn entry ID" htmlFor="policy-earn-entry">
+              <Input
+                id="policy-earn-entry"
+                value={refundPolicyForm.loyaltyEarnEntryId}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, loyaltyEarnEntryId: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Reward status" htmlFor="policy-reward-status">
+              <Select
+                id="policy-reward-status"
+                value={refundPolicyForm.rewardStatus}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, rewardStatus: event.target.value })}
+              >
+                <option value="">Không có reward</option>
+                <option value="COMMITTED">COMMITTED</option>
+                <option value="REVERSED">REVERSED</option>
+                <option value="FAILED">FAILED</option>
+              </Select>
+            </FormField>
+            <FormField label="Reward redemption" htmlFor="policy-reward-redemption">
+              <Input
+                id="policy-reward-redemption"
+                value={refundPolicyForm.rewardRedemptionId}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, rewardRedemptionId: event.target.value })}
+              />
+            </FormField>
+            <FormField label="Fulfillment" htmlFor="policy-fulfillment">
+              <Select
+                id="policy-fulfillment"
+                value={refundPolicyForm.rewardFulfillmentStatus}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, rewardFulfillmentStatus: event.target.value })}
+              >
+                <option value="">Không có</option>
+                <option value="PENDING">PENDING</option>
+                <option value="ISSUED">ISSUED</option>
+                <option value="MANUAL_REQUIRED">MANUAL_REQUIRED</option>
+                <option value="FAILED">FAILED</option>
+              </Select>
+            </FormField>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={refundPolicyForm.rewardFulfilled}
+                onChange={(event) => setRefundPolicyForm({ ...refundPolicyForm, rewardFulfilled: event.target.checked })}
+                className="size-4 rounded border-slate-300 text-brand-600"
+              />
+              Reward fulfilled
+            </label>
+            <Button type="submit" disabled={evaluateRefundPolicy.isPending || !refundPolicyForm.enrollmentId.trim()}>
+              <ListChecks size={16} />
+              {evaluateRefundPolicy.isPending ? "Đang chạy" : "Run matrix"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setRefundPolicyForm(defaultRefundPolicyForm);
+                evaluateRefundPolicy.reset();
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+          {evaluateRefundPolicy.isError && <ErrorState error={evaluateRefundPolicy.error} />}
+        </form>
+        {evaluateRefundPolicy.data && <RefundPolicyResult result={evaluateRefundPolicy.data} />}
+      </Card>
+
       {courseId && (
         <Card className="mb-4">
           <CardHeader
@@ -514,6 +904,7 @@ export function EnrollmentsPage() {
                   <Th>Học viên</Th>
                   <Th>Trạng thái</Th>
                   <Th>Mốc thời gian</Th>
+                  <Th>Policy</Th>
                 </tr>
               </thead>
               <tbody>
@@ -539,6 +930,20 @@ export function EnrollmentsPage() {
                         </p>
                         {row.completedAt && <p className="mt-1 text-xs text-emerald-600">Hoàn thành {new Date(row.completedAt).toLocaleDateString("vi-VN")}</p>}
                         {row.droppedAt && <p className="mt-1 text-xs text-red-600">Rời khóa {new Date(row.droppedAt).toLocaleDateString("vi-VN")}</p>}
+                      </Td>
+                      <Td>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="secondary"
+                          onClick={() => {
+                            setRefundPolicyForm((current) => ({ ...current, enrollmentId: row.id }));
+                            evaluateRefundPolicy.reset();
+                          }}
+                        >
+                          <ListChecks size={14} />
+                          Matrix
+                        </Button>
                       </Td>
                     </tr>
                   );

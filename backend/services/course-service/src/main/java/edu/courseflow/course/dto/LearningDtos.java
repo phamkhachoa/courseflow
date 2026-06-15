@@ -77,6 +77,7 @@ public final class LearningDtos {
     public record LearnerCoursePlayerDto(
             Instant generatedAt,
             String courseId,
+            Integer publishedVersionNo,
             List<CourseModuleDto> modules,
             CourseProgressDto progress,
             CertificateEligibilityDto certificateEligibility,
@@ -84,6 +85,19 @@ public final class LearningDtos {
             List<CoursePlayerModuleStateDto> moduleStates,
             List<CoursePlayerItemStateDto> itemStates
     ) {
+        public LearnerCoursePlayerDto(
+                Instant generatedAt,
+                String courseId,
+                List<CourseModuleDto> modules,
+                CourseProgressDto progress,
+                CertificateEligibilityDto certificateEligibility,
+                CoursePlayerNextActionDto nextAction,
+                List<CoursePlayerModuleStateDto> moduleStates,
+                List<CoursePlayerItemStateDto> itemStates
+        ) {
+            this(generatedAt, courseId, null, modules, progress, certificateEligibility, nextAction, moduleStates,
+                    itemStates);
+        }
     }
 
     public record CertificateEligibilityDto(
@@ -156,6 +170,58 @@ public final class LearningDtos {
             boolean locked,
             String lockedReasonCode,
             String lockedReasonText,
+            String sourceStatus,
+            Instant sourceDueAt,
+            Instant sourceLockAt
+    ) {
+    }
+
+    public record LearnerLearningPathDto(
+            Instant generatedAt,
+            String courseId,
+            Integer publishedVersionNo,
+            String studentId,
+            String cohortId,
+            String sectionId,
+            CourseProgressDto progress,
+            CoursePlayerNextActionDto nextAction,
+            List<LearningPathModuleDto> modules
+    ) {
+    }
+
+    public record LearningPathModuleDto(
+            String moduleId,
+            String title,
+            String description,
+            int position,
+            boolean locked,
+            String lockedReasonCode,
+            String lockedReasonText,
+            int percentComplete,
+            int totalItems,
+            int completedItems,
+            int totalRequiredItems,
+            int completedRequiredItems,
+            boolean completed,
+            List<CoursePlayerPrerequisiteDto> unmetPrerequisites,
+            List<LearningPathItemDto> items
+    ) {
+    }
+
+    public record LearningPathItemDto(
+            String itemId,
+            String itemType,
+            String refId,
+            String title,
+            Integer estimatedMinutes,
+            int position,
+            boolean required,
+            String progressStatus,
+            String progressType,
+            Instant completedAt,
+            String completionMode,
+            boolean locked,
+            String lockedReasonCode,
             String sourceStatus,
             Instant sourceDueAt,
             Instant sourceLockAt

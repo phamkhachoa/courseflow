@@ -197,6 +197,7 @@ public class MultiServiceOutboxPoller {
                     row.aggregateId(),
                     row.payload(),
                     attemptCount,
+                    rootClass(ex),
                     rootMessage(ex),
                     DeadLetterService.payloadHash(row.payload()));
             metrics.deadLetterCreated(relay.name(), row.eventType());

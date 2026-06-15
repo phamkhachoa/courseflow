@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
  * This script intentionally uses only public/admin gateway routes and disposable data. It proves
  * that the production-pilot guardrails added during Product Hardening are reachable through the
  * real edge:
- *   - auth through /api/v1/auth/login
+ *   - Keycloak/OIDC bearer tokens accepted by the gateway
  *   - public catalog read
  *   - protected module content access
  *   - admin authoring readiness review + publish workflow
@@ -37,7 +37,8 @@ const DIRECT_SERVICE_DOCKER_NETWORK =
   process.env.COURSEFLOW_SMOKE_DOCKER_NETWORK ?? "courseflow-v2-backend_default";
 const CURL_IMAGE = process.env.COURSEFLOW_SMOKE_CURL_IMAGE ?? "curlimages/curl:8.10.1";
 const ADMIN_EMAIL = process.env.COURSEFLOW_SMOKE_ADMIN_EMAIL ?? "admin@courseflow.local";
-const ADMIN_PASSWORD = process.env.COURSEFLOW_SMOKE_ADMIN_PASSWORD ?? "password";
+const LEARNER_EMAIL = process.env.COURSEFLOW_SMOKE_LEARNER_EMAIL ?? "student@courseflow.local";
+const LEARNER_USER_ID = process.env.COURSEFLOW_SMOKE_LEARNER_USER_ID ?? "4";
 const DEPARTMENT_ID =
   process.env.COURSEFLOW_SMOKE_DEPARTMENT_ID ?? "20000000-0000-0000-0000-000000000001";
 const RUN_ID = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
@@ -54,12 +55,10 @@ async function main() {
   console.log(`API: ${API_BASE}`);
   console.log(`Disposable user: ${DISPOSABLE_EMAIL}`);
 
-  const adminSession = await post("/v1/auth/login", {
-    email: ADMIN_EMAIL,
-    password: ADMIN_PASSWORD
-  });
-  adminToken = adminSession.accessToken;
-  record("admin login", Boolean(adminToken), "Access token issued");
+  adminToken = requiredBearerToken("COURSEFLOW_SMOKE_ADMIN_TOKEN");
+  const learnerToken = requiredBearerToken("COURSEFLOW_SMOKE_LEARNER_TOKEN");
+  record("admin bearer token supplied", Boolean(adminToken), `admin=${ADMIN_EMAIL}`);
+  record("learner bearer token supplied", Boolean(learnerToken), `learner=${LEARNER_EMAIL} userId=${LEARNER_USER_ID}`);
 
   const courses = await get("/v1/courses");
   const courseRows = list(courses);
@@ -81,7 +80,7 @@ async function main() {
   record("admin create disposable user", Boolean(user.id), `userId=${user.id}`);
 
   await assertUnreadyReferencesBlocked();
-  await runGoldenLearningFlow(user);
+  await runGoldenLearningFlow({ id: LEARNER_USER_ID, email: LEARNER_EMAIL }, learnerToken);
 
   const notification = await postAdmin("/admin/v1/notifications", {
     userId: String(user.id),
@@ -118,7 +117,7 @@ async function main() {
   printSummary();
 }
 
-async function runGoldenLearningFlow(user) {
+async function runGoldenLearningFlow(user, learnerToken) {
   const code = `SMK${RUN_ID.slice(-8)}`;
   const slug = `smoke-golden-${RUN_ID.toLowerCase()}`;
   let draft = await postAdmin("/admin/v1/authoring/courses", {
@@ -227,13 +226,6 @@ async function runGoldenLearningFlow(user) {
 
   const published = await postAdmin(`/admin/v1/courses/${encodeURIComponent(courseId)}/publish`, {});
   record("publish disposable course", published.status === "PUBLISHED", `status=${published.status}`);
-
-  const learnerSession = await post("/v1/auth/login", {
-    email: DISPOSABLE_EMAIL,
-    password: DISPOSABLE_PASSWORD
-  });
-  const learnerToken = learnerSession.accessToken;
-  record("learner login", Boolean(learnerToken), "Access token issued");
 
   await expectStatus(
     "learner cannot download snapshot document before enrollment",
@@ -677,12 +669,16 @@ function stripTrailingSlash(value) {
   return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
-async function get(path) {
-  return request("GET", path);
+function requiredBearerToken(name) {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required. Provide a Keycloak access token for the smoke run.`);
+  }
+  return value.replace(/^Bearer\s+/i, "").trim();
 }
 
-async function post(path, body) {
-  return request("POST", path, body);
+async function get(path) {
+  return request("GET", path);
 }
 
 async function getAdmin(path) {

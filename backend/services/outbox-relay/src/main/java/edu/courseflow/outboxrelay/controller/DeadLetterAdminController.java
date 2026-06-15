@@ -3,6 +3,10 @@ package edu.courseflow.outboxrelay.controller;
 import edu.courseflow.commonlibrary.constants.GatewayHeaders;
 import edu.courseflow.commonlibrary.exception.ForbiddenException;
 import edu.courseflow.commonlibrary.web.CurrentUser;
+import edu.courseflow.outboxrelay.dto.OutboxRelayDtos.DeadLetterApprovalDto;
+import edu.courseflow.outboxrelay.dto.OutboxRelayDtos.DeadLetterApprovalQueryResponseDto;
+import edu.courseflow.outboxrelay.dto.OutboxRelayDtos.DeadLetterApprovalRequestDto;
+import edu.courseflow.outboxrelay.dto.OutboxRelayDtos.DeadLetterApprovalReviewRequestDto;
 import edu.courseflow.outboxrelay.dto.OutboxRelayDtos.DeadLetterActionRequestDto;
 import edu.courseflow.outboxrelay.dto.OutboxRelayDtos.DeadLetterActionResponseDto;
 import edu.courseflow.outboxrelay.dto.OutboxRelayDtos.DeadLetterDetailDto;
@@ -34,16 +38,55 @@ public class DeadLetterAdminController {
             @RequestParam(required = false) String service,
             @RequestParam(required = false) String eventType,
             @RequestParam(required = false) String aggregateId,
+            @RequestParam(required = false) String payloadHash,
             @RequestParam(required = false) Integer limit,
             CurrentUser user) {
         requirePlatformAdmin(user);
-        return deadLetters.search(status, service, eventType, aggregateId, limit);
+        return deadLetters.search(status, service, eventType, aggregateId, payloadHash, limit);
     }
 
     @GetMapping("/{id}")
     public DeadLetterDetailDto get(@PathVariable UUID id, CurrentUser user) {
         requirePlatformAdmin(user);
         return deadLetters.get(id);
+    }
+
+    @GetMapping("/{id}/approvals")
+    public DeadLetterApprovalQueryResponseDto approvals(
+            @PathVariable UUID id,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer limit,
+            CurrentUser user) {
+        requirePlatformAdmin(user);
+        return deadLetters.approvals(id, status, limit);
+    }
+
+    @PostMapping("/{id}/approvals")
+    public DeadLetterApprovalDto requestApproval(
+            @PathVariable UUID id,
+            @RequestBody DeadLetterApprovalRequestDto request,
+            @RequestHeader(value = GatewayHeaders.CORRELATION_ID, required = false) String correlationId,
+            CurrentUser user) {
+        requirePlatformAdmin(user);
+        return deadLetters.requestApproval(id, request, actorId(user), correlationId);
+    }
+
+    @PostMapping("/approvals/{approvalId}:approve")
+    public DeadLetterApprovalDto approveApproval(
+            @PathVariable UUID approvalId,
+            @RequestBody DeadLetterApprovalReviewRequestDto request,
+            CurrentUser user) {
+        requirePlatformAdmin(user);
+        return deadLetters.approveApproval(approvalId, request, actorId(user));
+    }
+
+    @PostMapping("/approvals/{approvalId}:reject")
+    public DeadLetterApprovalDto rejectApproval(
+            @PathVariable UUID approvalId,
+            @RequestBody DeadLetterApprovalReviewRequestDto request,
+            CurrentUser user) {
+        requirePlatformAdmin(user);
+        return deadLetters.rejectApproval(approvalId, request, actorId(user));
     }
 
     @PostMapping("/{id}:replay")

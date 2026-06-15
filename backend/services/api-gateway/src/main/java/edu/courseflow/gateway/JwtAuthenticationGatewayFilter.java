@@ -26,7 +26,7 @@ import reactor.core.publisher.Mono;
  * The gateway is the single trust boundary. For every inbound request it:
  * <ol>
  *   <li>strips any client-supplied {@code X-User-*} headers so identity cannot be spoofed;</li>
- *   <li>validates the external Bearer JWT (legacy HS256 or OAuth2/OIDC JWKS);</li>
+ *   <li>validates the external Bearer JWT with OAuth2/OIDC JWKS;</li>
  *   <li>exchanges the external JWT for a short-lived internal JWT;</li>
  *   <li>forwards identity derived from the verified internal JWT via legacy {@code X-User-*}
  *       headers, plus {@code X-Internal-Authorization}.</li>
@@ -37,43 +37,54 @@ import reactor.core.publisher.Mono;
 @Component
 public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
 
-    private static final Set<String> PUBLIC_AUTH_PATHS = Set.of(
-            "/api/v1/auth/login",
-            "/api/v1/auth/register",
-            "/api/v1/auth/refresh",
-            "/api/v1/auth/email/verify",
-            "/api/v1/auth/email/resend"
-    );
-
-    /** Roles allowed through the operator-gated edge (user administration). */
-    private static final Set<String> OPERATOR_ROLES = Set.of("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA");
+    /** Roles allowed through the operator-gated edge. Domain services still enforce fine-grained authz. */
+    private static final Set<String> OPERATOR_ROLES = Set.of(
+            "ADMIN",
+            "ORG_ADMIN",
+            "INSTRUCTOR",
+            "PROFESSOR",
+            "TA",
+            "INCENTIVE_ADMIN",
+            "INCENTIVE_REVIEWER",
+            "INCENTIVE_OPERATOR",
+            "LOYALTY_ADMIN",
+            "LOYALTY_REVIEWER",
+            "LOYALTY_OPERATOR");
 
     /** Most-privileged first; used to pick the single {@code X-User-Role} value for legacy callers. */
     private static final List<String> ROLE_RANK =
-            List.of("ADMIN", "ORG_ADMIN", "INSTRUCTOR", "PROFESSOR", "TA", "STUDENT");
+            List.of(
+                    "ADMIN",
+                    "ORG_ADMIN",
+                    "INCENTIVE_ADMIN",
+                    "INCENTIVE_REVIEWER",
+                    "INCENTIVE_OPERATOR",
+                    "LOYALTY_ADMIN",
+                    "LOYALTY_REVIEWER",
+                    "LOYALTY_OPERATOR",
+                    "INSTRUCTOR",
+                    "PROFESSOR",
+                    "TA",
+                    "STUDENT");
 
     private final GatewayExternalTokenVerifier externalTokenVerifier;
-    private final ExternalTokenProperties externalTokenProperties;
     private final InternalTokenConverterClient tokenConverter;
     private final InternalJwtService internalJwtService;
 
     @Autowired
     public JwtAuthenticationGatewayFilter(GatewayExternalTokenVerifier externalTokenVerifier,
-            ExternalTokenProperties externalTokenProperties,
             InternalTokenConverterClient tokenConverter,
             InternalJwtService internalJwtService) {
         this.externalTokenVerifier = externalTokenVerifier;
-        this.externalTokenProperties = externalTokenProperties;
         this.tokenConverter = tokenConverter == null ? InternalTokenConverterClient.disabled() : tokenConverter;
         this.internalJwtService = internalJwtService;
     }
 
     JwtAuthenticationGatewayFilter(GatewayExternalTokenVerifier externalTokenVerifier,
-            ExternalTokenProperties externalTokenProperties,
             InternalTokenConverterClient tokenConverter,
             InternalJwtService internalJwtService,
             boolean testConstructor) {
-        this(externalTokenVerifier, externalTokenProperties, tokenConverter, internalJwtService);
+        this(externalTokenVerifier, tokenConverter, internalJwtService);
     }
 
     @Override
@@ -91,8 +102,8 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
             headers.remove(GatewayHeaders.INTERNAL_AUTHORIZATION);
         });
 
-        if (isLegacyAuthPath(path) && !externalTokenProperties.legacyMode()) {
-            return error(exchange, HttpStatus.GONE, "Gone", "Legacy auth endpoints are disabled in OIDC mode");
+        if (isDeletedAuthPath(path)) {
+            return error(exchange, HttpStatus.GONE, "Gone", "CourseFlow password auth endpoints have been removed; use Keycloak/OIDC");
         }
 
         if (isPublic(path, request.getMethod().name())) {
@@ -142,13 +153,13 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
         if (path.startsWith("/ws")) {
             return true;
         }
-        if ("/actuator/health".equals(path) || PUBLIC_AUTH_PATHS.contains(path)) {
+        if ("/actuator/health".equals(path)) {
             return true;
         }
         return "GET".equalsIgnoreCase(method) && isPublicReadPath(path);
     }
 
-    private boolean isLegacyAuthPath(String path) {
+    private boolean isDeletedAuthPath(String path) {
         return path.startsWith("/api/v1/auth/");
     }
 
@@ -177,8 +188,8 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
 
     /**
      * Pull role assignment tuples out of the verified internal JWT. The converter writes
-     * `role_assignments` as an array of `{code, scopeType, scopeId}` maps; older/legacy internal
-     * tokens may only have `roles`, so we tolerate both shapes.
+     * `role_assignments` as an array of `{code, scopeType, scopeId}` maps; older internal tokens may
+     * only have `roles`, so we tolerate both shapes.
      */
     @SuppressWarnings("unchecked")
     private List<RoleClaim> extractRoleClaims(Claims claims) {
@@ -216,6 +227,12 @@ public class JwtAuthenticationGatewayFilter implements GlobalFilter, Ordered {
     }
 
     private IdentityHeaders identityHeaders(Claims claims, String path) {
+        if (!"internal".equals(claims.get("token_use", String.class))) {
+            throw new IllegalArgumentException("Internal token has invalid token_use");
+        }
+        if (!"user".equals(claims.get("actor_type", String.class))) {
+            throw new IllegalArgumentException("Internal token is not a user token");
+        }
         String userId = requireClaim(claims, "uid");
         String email = claims.get("email", String.class);
         List<RoleClaim> roleClaims = extractRoleClaims(claims);

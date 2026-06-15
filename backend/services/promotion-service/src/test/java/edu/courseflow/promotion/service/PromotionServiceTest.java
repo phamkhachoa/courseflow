@@ -86,6 +86,8 @@ class PromotionServiceTest {
     @Mock
     CampaignVersionService campaignVersionService;
     @Mock
+    RedemptionReversalApprovalService reversalApprovals;
+    @Mock
     IncentiveMetrics metrics;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -116,6 +118,7 @@ class PromotionServiceTest {
                 new IncentiveDecisionEngine(objectMapper),
                 access,
                 campaignVersionService,
+                reversalApprovals,
                 objectMapper,
                 metrics,
                 couponFingerprints,
@@ -153,6 +156,11 @@ class PromotionServiceTest {
         assertThat(response.contextHash()).isNotBlank();
         assertThat(response.decision().eligible()).isTrue();
         assertThat(response.decision().campaignCode()).isEqualTo("WELCOME10");
+        assertThat(response.winningCampaignId()).isEqualTo(response.decision().campaignId());
+        assertThat(response.totals().totalDiscount()).isEqualByComparingTo("10.00");
+        assertThat(response.totals().finalAmount()).isEqualByComparingTo("120.00");
+        assertThat(response.candidates()).hasSize(1);
+        assertThat(response.candidates().getFirst().selected()).isTrue();
         verifyNoInteractions(reservations, redemptions, ledgerEntries, idempotencyKeys, outboxEvents);
         ArgumentCaptor<IncentiveAuditEvent> auditCaptor = ArgumentCaptor.forClass(IncentiveAuditEvent.class);
         verify(auditEvents).save(auditCaptor.capture());
@@ -163,12 +171,112 @@ class PromotionServiceTest {
         assertThat(audit.getCorrelationId()).isEqualTo("corr-preview-1");
         assertThat(audit.getSourceClientId()).isEqualTo("api-gateway");
         assertThat(audit.getPayloadJson()).contains("\"ledgerImpact\":false");
+        assertThat(audit.getPayloadJson()).contains("\"candidateCount\":1");
+        assertThat(audit.getPayloadJson()).contains("\"totalDiscount\":10.00");
         assertThat(audit.getPayloadJson()).contains("\"masks\":[\"WE****ET\"]");
         assertThat(audit.getPayloadJson()).contains("\"profileHash\":\"hmac-sha256:");
         assertThat(audit.getPayloadJson())
                 .doesNotContain("WELCOME-SECRET")
                 .doesNotContain("profile-1")
                 .doesNotContain("cart-1");
+    }
+
+    @Test
+    void adminPreviewReturnsQuotaExposureWithoutConsumingQuota() {
+        CurrentUser admin = adminUser();
+        EvaluateIncentivesRequestDto context = request(List.of());
+        IncentiveCampaignVersion version = campaign(false, 5);
+        IncentiveQuotaCounter counter = new IncentiveQuotaCounter(
+                "courseflow",
+                "lms",
+                "CAMPAIGN",
+                version.getCampaignId().toString(),
+                IncentiveQuotaCounter.WILDCARD_PROFILE,
+                5);
+        counter.consume();
+        counter.consume();
+        when(campaignVersions.findActivePublished(eq("courseflow"), eq("lms"), any()))
+                .thenReturn(List.of(version));
+        when(quotaCounters.findByTenantIdAndApplicationIdAndScopeTypeAndScopeIdAndProfileId(
+                eq("courseflow"),
+                eq("lms"),
+                eq("CAMPAIGN"),
+                eq(version.getCampaignId().toString()),
+                eq(IncentiveQuotaCounter.WILDCARD_PROFILE)))
+                .thenReturn(Optional.of(counter));
+        when(access.sourceClientId(admin)).thenReturn("api-gateway");
+
+        var response = service.preview(
+                new AdminPreviewIncentivesRequestDto(context, "quota simulation"),
+                admin,
+                "corr-quota-simulation");
+
+        assertThat(response.decision().eligible()).isTrue();
+        assertThat(response.quotaExposure()).hasSize(1);
+        assertThat(response.quotaExposure().getFirst().limit()).isEqualTo(5);
+        assertThat(response.quotaExposure().getFirst().used()).isEqualTo(2);
+        assertThat(response.quotaExposure().getFirst().remaining()).isEqualTo(3);
+        assertThat(response.quotaExposure().getFirst().available()).isTrue();
+        assertThat(response.quotaExposure().getFirst().wouldConsume()).isTrue();
+        assertThat(response.candidates()).hasSize(1);
+        assertThat(response.candidates().getFirst().quotaExposure().getFirst().remaining()).isEqualTo(3);
+        assertThat(counter.getUsedCount()).isEqualTo(2);
+        verifyNoInteractions(reservations, redemptions, ledgerEntries, idempotencyKeys, outboxEvents);
+    }
+
+    @Test
+    void adminPreviewMarksStackingCompatibleCandidatesWithoutChangingRuntimeWinner() {
+        CurrentUser admin = adminUser();
+        EvaluateIncentivesRequestDto context = request(List.of());
+        IncentiveCampaignVersion primary = campaign("WELCOME10", 100, false, true, false, 10, null);
+        IncentiveCampaignVersion secondary = campaign("SPRING5", 90, false, true, false, 5, null);
+        when(campaignVersions.findActivePublished(eq("courseflow"), eq("lms"), any()))
+                .thenReturn(List.of(primary, secondary));
+        when(access.sourceClientId(admin)).thenReturn("api-gateway");
+
+        var response = service.preview(
+                new AdminPreviewIncentivesRequestDto(context, "stacking simulation"),
+                admin,
+                "corr-stacking-simulation");
+
+        assertThat(response.decision().campaignId()).isEqualTo(primary.getCampaignId());
+        assertThat(response.decision().effects()).hasSize(1);
+        assertThat(response.totals().totalDiscount()).isEqualByComparingTo("10.00");
+        assertThat(response.candidates()).hasSize(2);
+        assertThat(response.candidates().get(0).selected()).isTrue();
+        assertThat(response.candidates().get(0).stackingStatus()).isEqualTo("SELECTED_PRIMARY");
+        assertThat(response.candidates().get(0).stackingReasonCodes()).contains("RUNTIME_SINGLE_WINNER");
+        assertThat(response.candidates().get(1).selected()).isFalse();
+        assertThat(response.candidates().get(1).stackingStatus()).isEqualTo("WOULD_STACK");
+        assertThat(response.candidates().get(1).stackingReasonCodes())
+                .containsExactly("STACKING_COMPATIBLE", "SIMULATION_ONLY");
+        assertThat(response.candidates().get(1).exclusive()).isFalse();
+        assertThat(response.candidates().get(1).stackable()).isTrue();
+        verifyNoInteractions(reservations, redemptions, ledgerEntries, idempotencyKeys, outboxEvents);
+    }
+
+    @Test
+    void adminPreviewMarksPolicyBlockedStackingCandidate() {
+        CurrentUser admin = adminUser();
+        EvaluateIncentivesRequestDto context = request(List.of());
+        IncentiveCampaignVersion primary = campaign("WELCOME10", 100, false, false, false, 10, null);
+        IncentiveCampaignVersion secondary = campaign("SPRING5", 90, false, true, false, 5, null);
+        when(campaignVersions.findActivePublished(eq("courseflow"), eq("lms"), any()))
+                .thenReturn(List.of(primary, secondary));
+        when(access.sourceClientId(admin)).thenReturn("api-gateway");
+
+        var response = service.preview(
+                new AdminPreviewIncentivesRequestDto(context, "blocked stacking simulation"),
+                admin,
+                "corr-blocked-stacking-simulation");
+
+        assertThat(response.candidates()).hasSize(2);
+        assertThat(response.candidates().get(0).stackable()).isFalse();
+        assertThat(response.candidates().get(0).stackingStatus()).isEqualTo("SELECTED_PRIMARY");
+        assertThat(response.candidates().get(1).stackingStatus()).isEqualTo("BLOCKED_BY_PRIMARY_NON_STACKABLE");
+        assertThat(response.candidates().get(1).stackingReasonCodes()).containsExactly("WINNER_NOT_STACKABLE");
+        assertThat(response.candidates().get(1).selected()).isFalse();
+        verifyNoInteractions(reservations, redemptions, ledgerEntries, idempotencyKeys, outboxEvents);
     }
 
     @Test
@@ -747,19 +855,29 @@ class PromotionServiceTest {
     }
 
     private IncentiveCampaignVersion campaign(boolean couponRequired, Integer maxRedemptions) {
+        return campaign("WELCOME10", 100, false, true, couponRequired, 10, maxRedemptions);
+    }
+
+    private IncentiveCampaignVersion campaign(String code,
+                                              int priority,
+                                              boolean exclusive,
+                                              boolean stackable,
+                                              boolean couponRequired,
+                                              int discountAmount,
+                                              Integer maxRedemptions) {
         IncentiveDecisionEngine engine = new IncentiveDecisionEngine(objectMapper);
         IncentiveCampaign campaign = new IncentiveCampaign(
                 "courseflow",
                 "lms",
-                "WELCOME10",
-                "Welcome",
+                code,
+                code,
                 null,
                 "PROMOTION",
                 Instant.now().minusSeconds(60),
                 Instant.now().plusSeconds(3600),
-                100,
-                false,
-                true,
+                priority,
+                exclusive,
+                stackable,
                 couponRequired,
                 "ALL",
                 "USD",
@@ -770,7 +888,7 @@ class PromotionServiceTest {
                 engine.toActionsJson(List.of(new ActionSpecDto(
                         "ORDER_FIXED_OFF",
                         1,
-                        Map.of("amount", 10)))),
+                        Map.of("amount", discountAmount)))),
                 maxRedemptions,
                 null,
                 "test");

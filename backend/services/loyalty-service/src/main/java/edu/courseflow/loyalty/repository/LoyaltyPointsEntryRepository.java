@@ -24,6 +24,13 @@ public interface LoyaltyPointsEntryRepository extends JpaRepository<LoyaltyPoint
     Optional<LoyaltyPointsEntry> findFirstByProgramUuidAndEntryTypeAndSourceReferenceAndReversalOfEntryIdIsNull(
             UUID programUuid, String entryType, String sourceReference);
 
+    Optional<LoyaltyPointsEntry> findFirstByTenantIdAndApplicationIdAndProgramIdAndEntryTypeAndSourceReference(
+            String tenantId,
+            String applicationId,
+            String programId,
+            String entryType,
+            String sourceReference);
+
     Optional<LoyaltyPointsEntry> findFirstByReversalOfEntryId(UUID reversalOfEntryId);
 
     List<LoyaltyPointsEntry> findTop100ByAccountIdOrderByCreatedAtDesc(UUID accountId);
@@ -108,4 +115,18 @@ public interface LoyaltyPointsEntryRepository extends JpaRepository<LoyaltyPoint
 
     @Query("select coalesce(sum(e.pointsDelta), 0) from LoyaltyPointsEntry e where e.accountId = :accountId")
     long balance(@Param("accountId") UUID accountId);
+
+    @Query("""
+            select coalesce(sum(e.pointsDelta), 0)
+            from LoyaltyPointsEntry e
+            where e.accountId = :accountId
+              and e.entryType in ('EARN', 'ADJUST')
+              and e.pointsDelta > 0
+              and e.occurredAt >= :from
+              and e.occurredAt <= :to
+            """)
+    long qualifyingPositivePoints(
+            @Param("accountId") UUID accountId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
 }

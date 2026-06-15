@@ -64,6 +64,36 @@ export type CourseDraft = {
   modules: CourseModule[];
 };
 
+export type CourseDraftPreviewItem = {
+  moduleId: string;
+  moduleTitle: string;
+  itemId: string;
+  itemType: string;
+  title: string;
+  estimatedMinutes?: number;
+  required: boolean;
+};
+
+export type CourseDraftPreview = {
+  courseId: string;
+  title: string;
+  slug: string;
+  summary?: string;
+  status: string;
+  reviewState?: string;
+  currentVersionNo: number;
+  generatedAt?: string;
+  readinessStatus: string;
+  moduleCount: number;
+  itemCount: number;
+  requiredItemCount: number;
+  totalEstimatedMinutes: number;
+  firstRequiredItem?: CourseDraftPreviewItem | null;
+  nextAction?: CourseDraftPreviewItem | null;
+  modules: CourseModule[];
+  issues: string[];
+};
+
 export type CourseModule = {
   moduleId: string;
   title: string;
@@ -110,6 +140,12 @@ export type CourseReviewAudit = {
   note?: string;
   checklist?: string[];
   createdAt?: string;
+};
+
+export type CourseReviewChecklistItem = {
+  id: string;
+  label: string;
+  required: boolean;
 };
 
 export type CourseReviewQueueItem = {
@@ -205,6 +241,11 @@ export async function createCourseDraft(input: {
 export async function getCourseDraft(courseId: string): Promise<CourseDraft> {
   const { data } = await apiClient.get(`/admin/v1/authoring/courses/${courseId}/draft`);
   return unwrap<CourseDraft>(data);
+}
+
+export async function getCourseDraftPreview(courseId: string): Promise<CourseDraftPreview> {
+  const { data } = await apiClient.get(`/admin/v1/authoring/courses/${courseId}/preview`);
+  return unwrap<CourseDraftPreview>(data);
 }
 
 export async function updateCurriculum(
@@ -315,6 +356,11 @@ export async function rollbackCourseVersion(
 export async function listCourseReviewHistory(courseId: string): Promise<CourseReviewAudit[]> {
   const { data } = await apiClient.get(`/admin/v1/authoring/courses/${courseId}/review-history`);
   return unwrap<CourseReviewAudit[]>(data);
+}
+
+export async function getCourseReviewChecklist(): Promise<CourseReviewChecklistItem[]> {
+  const { data } = await apiClient.get("/admin/v1/authoring/courses/review-checklist");
+  return unwrap<CourseReviewChecklistItem[]>(data);
 }
 
 export async function listCourseReviewQueue(): Promise<CourseReviewQueueItem[]> {

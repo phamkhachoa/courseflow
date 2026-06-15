@@ -4,9 +4,9 @@ import { PageShell } from "@/shared/ui";
 export default function LoyaltyPage() {
   return (
     <PageShell
-      eyebrow="Điểm thưởng"
-      title="Ví loyalty"
-      description="Theo dõi điểm, expiry buckets, reward khả dụng và lịch sử đổi thưởng."
+      eyebrow="Ưu đãi học tập"
+      title="Incentive Hub"
+      description="Theo dõi coupon, điểm, reward, benefit pending, lý do chưa đủ điều kiện và support case."
     >
       <LoyaltyWalletView />
     </PageShell>

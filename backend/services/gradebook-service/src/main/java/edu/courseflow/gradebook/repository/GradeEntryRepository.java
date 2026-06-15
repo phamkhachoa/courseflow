@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 public interface GradeEntryRepository extends JpaRepository<GradeEntry, UUID> {
     Optional<GradeEntry> findByGradeItemIdAndStudentId(UUID gradeItemId, String studentId);
     List<GradeEntry> findByGradeItemIdInAndStudentIdAndStatus(Collection<UUID> gradeItemIds, String studentId, String status);
+    List<GradeEntry> findByGradeItemIdIn(Collection<UUID> gradeItemIds);
 
     @Query("""
             select distinct e.studentId

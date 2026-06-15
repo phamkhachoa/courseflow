@@ -238,6 +238,20 @@ export function Badge({
   );
 }
 
+export function StatusBadge({
+  value,
+  label,
+  tone,
+  className
+}: {
+  value?: string | null;
+  label?: ReactNode;
+  tone?: BadgeTone;
+  className?: string;
+}) {
+  return <Badge value={value ?? undefined} label={label ?? value ?? "-"} tone={tone} className={className} />;
+}
+
 // --- Enterprise patterns ----------------------------------------------------
 type NoticeTone = "info" | "success" | "warning" | "danger" | "neutral";
 
@@ -432,6 +446,96 @@ export function PageHeader({
       {actions && <div className="shrink-0">{actions}</div>}
     </div>
   );
+}
+
+export function SectionHeader({
+  title,
+  description,
+  actions,
+  className,
+  compact = false
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+  compact?: boolean;
+}) {
+  return (
+    <header className={cn("flex flex-wrap items-start justify-between gap-3", compact ? "py-2" : "py-3", className)}>
+      <div className="min-w-0">
+        <h2 className="text-base font-bold text-slate-950">{title}</h2>
+        {description && <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>}
+      </div>
+      {actions && <div className="shrink-0">{actions}</div>}
+    </header>
+  );
+}
+
+type DescriptionListItem = {
+  label: ReactNode;
+  value?: ReactNode;
+  mono?: boolean;
+  className?: string;
+};
+
+const descriptionColumns: Record<1 | 2 | 3 | 4, string> = {
+  1: "",
+  2: "md:grid-cols-2",
+  3: "md:grid-cols-3",
+  4: "md:grid-cols-4"
+};
+
+export function DescriptionList({
+  items,
+  columns = 2,
+  className
+}: {
+  items: DescriptionListItem[];
+  columns?: 1 | 2 | 3 | 4;
+  className?: string;
+}) {
+  return (
+    <dl className={cn("grid gap-3", descriptionColumns[columns], className)}>
+      {items.map((item, index) => (
+        <div key={index} className={cn("min-w-0 rounded-md border border-slate-200 bg-white p-3", item.className)}>
+          <dt className="text-xs font-bold uppercase text-slate-400">{item.label}</dt>
+          <dd className={cn("mt-1 break-words text-sm font-semibold text-slate-800", item.mono && "font-mono text-xs")}>
+            {item.value ?? "-"}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+export function DataState({
+  loading,
+  error,
+  empty,
+  loadingLabel,
+  emptyMessage = "Không có dữ liệu",
+  emptyAction,
+  children
+}: {
+  loading?: boolean;
+  error?: unknown;
+  empty?: boolean;
+  loadingLabel?: string;
+  emptyMessage?: string;
+  emptyAction?: ReactNode;
+  children: ReactNode;
+}) {
+  if (loading) {
+    return <Spinner label={loadingLabel} />;
+  }
+  if (error) {
+    return <ErrorState error={error} />;
+  }
+  if (empty) {
+    return <EmptyState message={emptyMessage} action={emptyAction} />;
+  }
+  return <>{children}</>;
 }
 
 // --- Drawer / Dialog -------------------------------------------------------

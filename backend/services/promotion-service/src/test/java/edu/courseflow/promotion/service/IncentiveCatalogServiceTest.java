@@ -17,7 +17,8 @@ class IncentiveCatalogServiceTest {
         assertThat(catalog.rules()).extracting("type")
                 .containsExactly("MIN_ORDER_AMOUNT", "PROFILE_SEGMENT", "ITEM_CATEGORY_INCLUDE", "CHANNEL_MATCH");
         assertThat(catalog.actions()).extracting("type")
-                .containsExactly("ORDER_PERCENT_OFF", "ORDER_FIXED_OFF", "LINE_FIXED_OFF", "FREE_SHIPPING");
+                .containsExactly("ORDER_PERCENT_OFF", "ORDER_FIXED_OFF", "LINE_FIXED_OFF", "FREE_SHIPPING",
+                        "LOYALTY_POINTS_EARN");
         assertThat(catalog.effects()).extracting("benefitType")
                 .contains("DISCOUNT", "CREDIT", "ENTITLEMENT", "POINTS_EARN_INTENT");
         assertThat(catalog.reasonCodes()).extracting("code")

@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { compactId, splitCommaList, statusLabel, toNumberOrUndefined } from "./labels";
 import { parseSpecList } from "./json";
 import { retentionOperationId } from "./api";
+import {
+  isActionableDeadLetterStatus,
+  isOpenDeadLetterStatus,
+  loyaltyDltOpsFilters,
+  outboxDltOpsFilters
+} from "./ops-console-helpers";
 import { parseRestoreDrillEvidenceJson } from "./retention-evidence";
 import {
   couponImportApprovalDecisionGate,
@@ -168,6 +174,28 @@ describe("incentive admin helpers", () => {
     expect(retentionOperationId("corr-retention-exec")).toMatch(/^corr-retention-exec-/);
   });
 
+  it("queries ops console DLT without hiding failed actionable records", () => {
+    expect(loyaltyDltOpsFilters({ dltPayloadHash: "sha256:abc", limit: 25 })).toEqual({
+      payloadHash: "sha256:abc",
+      limit: 25
+    });
+    expect(outboxDltOpsFilters({
+      dltPayloadHash: "sha256:def",
+      outboxService: "promotion-service",
+      outboxEventType: "PromotionCommitted",
+      limit: 50
+    }, "enrollment-1")).toEqual({
+      service: "promotion-service",
+      eventType: "PromotionCommitted",
+      aggregateId: "enrollment-1",
+      payloadHash: "sha256:def",
+      limit: 50
+    });
+    expect(isOpenDeadLetterStatus("FAILED")).toBe(true);
+    expect(isActionableDeadLetterStatus("FAILED")).toBe(true);
+    expect(isActionableDeadLetterStatus("DISCARDED")).toBe(false);
+  });
+
   it("parses postgres restore drill evidence into safe restore-drill fields", () => {
     const evidence = parseRestoreDrillEvidenceJson(JSON.stringify({
       artifactType: "postgres_restore_drill_evidence",
@@ -195,9 +223,9 @@ describe("incentive admin helpers", () => {
     expect(() =>
       parseRestoreDrillEvidenceJson(JSON.stringify({
         artifactType: "postgres_restore_drill_evidence",
-        restoreDrillRef: "restore-drill-cf_identity",
-        databaseName: "cf_identity",
-        backupPath: "/tmp/backup/cf_identity.dump",
+        restoreDrillRef: "restore-drill-cf_access_control",
+        databaseName: "cf_access_control",
+        backupPath: "/tmp/backup/cf_access_control.dump",
         artifactHash: `sha256:${"a".repeat(64)}`,
         status: "PASSED",
         checkedAt: "2026-06-14T10:03:01Z"
@@ -254,7 +282,7 @@ describe("incentive admin helpers", () => {
 
     expect(
       restoreDrillIssues(
-        { ...passedRestoreDrill, databaseName: "cf_identity", artifactHash: "sha256:not-a-hash" },
+        { ...passedRestoreDrill, databaseName: "cf_access_control", artifactHash: "sha256:not-a-hash" },
         passedRestoreDrill.restoreDrillRef,
         retentionDryRun,
         fixedNow

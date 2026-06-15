@@ -428,6 +428,123 @@ public final class PromotionDtos {
     ) {
     }
 
+    public record CouponDistributionRecipientInputDto(
+            @NotBlank String profileId,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record PreviewCouponDistributionRequestDto(
+            @NotNull UUID campaignId,
+            @NotBlank String sourceType,
+            String sourceReference,
+            Boolean notifyLearners,
+            Instant startsAt,
+            Instant expiresAt,
+            Integer maxRedemptions,
+            Integer maxRedemptionsPerProfile,
+            Map<String, Object> metadata,
+            @NotEmpty @Valid List<CouponDistributionRecipientInputDto> recipients
+    ) {
+    }
+
+    public record CouponDistributionPreviewRecipientDto(
+            String profileId,
+            String status,
+            String reason,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record CouponDistributionPreviewResponseDto(
+            UUID campaignId,
+            String sourceType,
+            String sourceReference,
+            boolean notifyLearners,
+            int requestedRecipients,
+            int uniqueRecipients,
+            int duplicateRecipients,
+            String previewHash,
+            List<CouponDistributionPreviewRecipientDto> sampleRecipients
+    ) {
+    }
+
+    public record CreateCouponDistributionRequestDto(
+            @NotNull UUID campaignId,
+            @NotBlank String name,
+            @NotBlank String sourceType,
+            String sourceReference,
+            Boolean notifyLearners,
+            Instant startsAt,
+            Instant expiresAt,
+            Integer maxRedemptions,
+            Integer maxRedemptionsPerProfile,
+            Map<String, Object> metadata,
+            @NotBlank String previewHash,
+            String reason,
+            @NotEmpty @Valid List<CouponDistributionRecipientInputDto> recipients
+    ) {
+    }
+
+    public record CouponDistributionActionRequestDto(
+            String reason
+    ) {
+    }
+
+    public record CouponDistributionRecipientDto(
+            UUID id,
+            UUID distributionId,
+            String profileId,
+            String status,
+            UUID couponId,
+            String notificationStatus,
+            String failureReason,
+            Map<String, Object> metadata,
+            Instant createdAt,
+            Instant issuedAt,
+            Instant revokedAt
+    ) {
+    }
+
+    public record CouponDistributionDto(
+            UUID id,
+            String tenantId,
+            String applicationId,
+            UUID campaignId,
+            String name,
+            String sourceType,
+            String sourceReference,
+            String status,
+            boolean notifyLearners,
+            Instant startsAt,
+            Instant expiresAt,
+            Integer maxRedemptions,
+            Integer maxRedemptionsPerProfile,
+            int recipientCount,
+            int issuedCount,
+            int revokedCount,
+            String previewHash,
+            String reason,
+            Map<String, Object> metadata,
+            String createdBy,
+            String approvedBy,
+            String issuedBy,
+            String revokedBy,
+            Instant createdAt,
+            Instant approvedAt,
+            Instant issuedAt,
+            Instant revokedAt,
+            Instant updatedAt,
+            List<CouponDistributionRecipientDto> recipients
+    ) {
+    }
+
+    public record CouponDistributionQueryResponseDto(
+            List<CouponDistributionDto> items,
+            int limit
+    ) {
+    }
+
     public record CouponImportDryRunRequestDto(
             @NotNull UUID campaignId,
             @NotBlank String csvContent,
@@ -633,6 +750,50 @@ public final class PromotionDtos {
             Instant approvedAt,
             Instant rejectedAt,
             Instant committedAt
+    ) {
+    }
+
+    public record RedemptionReversalApprovalRequestDto(
+            @NotBlank String idempotencyKey,
+            @NotBlank String reason,
+            @NotBlank String changeTicket,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record RedemptionReversalApprovalDecisionRequestDto(
+            String note
+    ) {
+    }
+
+    public record RedemptionReversalApprovalResponseDto(
+            UUID approvalId,
+            String status,
+            UUID redemptionId,
+            UUID reservationId,
+            String tenantId,
+            String applicationId,
+            UUID campaignId,
+            Integer campaignVersion,
+            UUID couponId,
+            String profileId,
+            String externalReference,
+            String idempotencyKey,
+            String requestHash,
+            String resultHash,
+            String subjectHash,
+            String reason,
+            String changeTicket,
+            String requestedBy,
+            String approvedBy,
+            String rejectedBy,
+            String executedBy,
+            Instant expiresAt,
+            Instant createdAt,
+            Instant approvedAt,
+            Instant rejectedAt,
+            Instant executedAt,
+            Map<String, Object> subject
     ) {
     }
 
@@ -1167,11 +1328,159 @@ public final class PromotionDtos {
     ) {
     }
 
+    public record AdminSimulationTotalsDto(
+            BigDecimal subtotal,
+            BigDecimal totalDiscount,
+            BigDecimal finalAmount,
+            String currency,
+            BigDecimal totalPoints
+    ) {
+    }
+
+    public record AdminSimulationQuotaExposureDto(
+            String scopeType,
+            String scopeId,
+            String profileId,
+            int limit,
+            int used,
+            int remaining,
+            boolean available,
+            boolean wouldConsume
+    ) {
+    }
+
+    public record AdminSimulationCandidateDto(
+            UUID campaignId,
+            Integer campaignVersion,
+            String campaignCode,
+            UUID couponId,
+            boolean matched,
+            boolean selected,
+            boolean exclusive,
+            boolean stackable,
+            String stackingStatus,
+            List<String> stackingReasonCodes,
+            List<IncentiveEffectDto> effects,
+            List<String> reasonCodes,
+            List<AdminSimulationQuotaExposureDto> quotaExposure
+    ) {
+    }
+
     public record AdminPreviewIncentivesResponseDto(
             boolean preview,
             boolean ledgerImpact,
             String contextHash,
-            EvaluateIncentivesResponseDto decision
+            EvaluateIncentivesResponseDto decision,
+            UUID winningCampaignId,
+            Integer winningCampaignVersion,
+            String winningCampaignCode,
+            UUID couponId,
+            AdminSimulationTotalsDto totals,
+            List<AdminSimulationQuotaExposureDto> quotaExposure,
+            List<AdminSimulationCandidateDto> candidates,
+            Instant generatedAt
+    ) {
+        public AdminPreviewIncentivesResponseDto(
+                boolean preview,
+                boolean ledgerImpact,
+                String contextHash,
+                EvaluateIncentivesResponseDto decision) {
+            this(
+                    preview,
+                    ledgerImpact,
+                    contextHash,
+                    decision,
+                    decision == null ? null : decision.campaignId(),
+                    decision == null ? null : decision.campaignVersion(),
+                    decision == null ? null : decision.campaignCode(),
+                    decision == null ? null : decision.couponId(),
+                    null,
+                    List.of(),
+                    List.of(),
+                    Instant.now());
+        }
+    }
+
+    public record ExperimentVariantPreviewRequestDto(
+            @NotBlank String key,
+            @Min(0) Integer weightBps,
+            Boolean holdout,
+            String campaignCode,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record ExperimentPreviewRequestDto(
+            @NotNull @Valid EvaluateIncentivesRequestDto context,
+            @NotBlank String experimentKey,
+            String assignmentUnit,
+            String assignmentAttributeKey,
+            @NotEmpty @Valid List<ExperimentVariantPreviewRequestDto> variants,
+            String note
+    ) {
+    }
+
+    public record ExperimentVariantAllocationDto(
+            String key,
+            int weightBps,
+            boolean holdout,
+            String campaignCode,
+            int startBucketInclusive,
+            int endBucketExclusive,
+            boolean selected,
+            Map<String, Object> metadata
+    ) {
+    }
+
+    public record ExperimentPreviewResponseDto(
+            boolean preview,
+            boolean ledgerImpact,
+            String policyVersion,
+            String tenantId,
+            String applicationId,
+            String experimentKey,
+            String assignmentUnit,
+            String assignmentKeyHash,
+            int bucket,
+            String selectedVariantKey,
+            boolean holdout,
+            String recommendedAction,
+            List<String> reasonCodes,
+            List<ExperimentVariantAllocationDto> variants,
+            Instant generatedAt
+    ) {
+    }
+
+    public record FraudScorePreviewRequestDto(
+            @NotNull @Valid EvaluateIncentivesRequestDto context,
+            Integer lookbackMinutes,
+            String sourceClientId,
+            String note
+    ) {
+    }
+
+    public record FraudScoreSignalDto(
+            String code,
+            String severity,
+            int points,
+            String message,
+            Map<String, Object> evidence
+    ) {
+    }
+
+    public record FraudScorePreviewResponseDto(
+            boolean preview,
+            boolean ledgerImpact,
+            String policyVersion,
+            String tenantId,
+            String applicationId,
+            String profileId,
+            int lookbackMinutes,
+            int score,
+            String severity,
+            String recommendedAction,
+            List<FraudScoreSignalDto> signals,
+            Instant generatedAt
     ) {
     }
 
@@ -1230,8 +1539,17 @@ public final class PromotionDtos {
 
     public record ReverseRedemptionRequestDto(
             String idempotencyKey,
-            @NotBlank String reason
+            @NotBlank String reason,
+            UUID approvalId,
+            String changeTicket
     ) {
+        public ReverseRedemptionRequestDto(String idempotencyKey, String reason) {
+            this(idempotencyKey, reason, null, null);
+        }
+
+        public ReverseRedemptionRequestDto(String idempotencyKey, String reason, UUID approvalId) {
+            this(idempotencyKey, reason, approvalId, null);
+        }
     }
 
     public record ReverseRedemptionResponseDto(

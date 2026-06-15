@@ -47,6 +47,12 @@ import edu.courseflow.promotion.dto.PromotionDtos.CouponStorageInventoryItemDto;
 import edu.courseflow.promotion.dto.PromotionDtos.CreateApplicationRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.EvaluateIncentivesRequestDto;
 import edu.courseflow.promotion.dto.PromotionDtos.EvaluateIncentivesResponseDto;
+import edu.courseflow.promotion.dto.PromotionDtos.ExperimentPreviewRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.ExperimentPreviewResponseDto;
+import edu.courseflow.promotion.dto.PromotionDtos.ExperimentVariantAllocationDto;
+import edu.courseflow.promotion.dto.PromotionDtos.ExperimentVariantPreviewRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.FraudScorePreviewRequestDto;
+import edu.courseflow.promotion.dto.PromotionDtos.FraudScorePreviewResponseDto;
 import edu.courseflow.promotion.dto.PromotionDtos.IncentiveCatalogDto;
 import edu.courseflow.promotion.dto.PromotionDtos.IncentiveReconciliationEffectDto;
 import edu.courseflow.promotion.dto.PromotionDtos.IncentiveReconciliationEntryDto;
@@ -64,6 +70,7 @@ import edu.courseflow.promotion.dto.PromotionDtos.RetentionPolicyDto;
 import edu.courseflow.promotion.dto.PromotionDtos.RetentionPolicyRegistryDto;
 import edu.courseflow.promotion.dto.PromotionDtos.TransactionContextDto;
 import edu.courseflow.promotion.service.CampaignVersionService;
+import edu.courseflow.promotion.service.CouponDistributionService;
 import edu.courseflow.promotion.service.CouponImportApprovalService;
 import edu.courseflow.promotion.service.CouponImportCommitService;
 import edu.courseflow.promotion.service.CouponImportDryRunService;
@@ -71,9 +78,12 @@ import edu.courseflow.promotion.service.CouponImportQueryService;
 import edu.courseflow.promotion.service.IncentiveAccessService;
 import edu.courseflow.promotion.service.IncentiveAuditQueryService;
 import edu.courseflow.promotion.service.IncentiveCatalogService;
+import edu.courseflow.promotion.service.IncentiveExperimentService;
+import edu.courseflow.promotion.service.IncentiveFraudScoringService;
 import edu.courseflow.promotion.service.IncentiveReconciliationService;
 import edu.courseflow.promotion.service.PromotionService;
 import edu.courseflow.promotion.service.PromotionErrorCodes;
+import edu.courseflow.promotion.service.RedemptionReversalApprovalService;
 import edu.courseflow.promotion.service.RetentionApprovalService;
 import edu.courseflow.promotion.service.RetentionDryRunService;
 import edu.courseflow.promotion.service.RetentionExecutionService;
@@ -105,6 +115,10 @@ class PromotionControllerSecurityTest {
     private final IncentiveAuditQueryService auditQueries = org.mockito.Mockito.mock(IncentiveAuditQueryService.class);
     private final IncentiveReconciliationService reconciliation =
             org.mockito.Mockito.mock(IncentiveReconciliationService.class);
+    private final IncentiveFraudScoringService fraudScoring =
+            org.mockito.Mockito.mock(IncentiveFraudScoringService.class);
+    private final IncentiveExperimentService experiments =
+            org.mockito.Mockito.mock(IncentiveExperimentService.class);
     private final IncentiveCatalogService catalog = org.mockito.Mockito.mock(IncentiveCatalogService.class);
     private final RetentionDryRunService retention = org.mockito.Mockito.mock(RetentionDryRunService.class);
     private final RetentionExecutionService retentionExecutions = org.mockito.Mockito.mock(RetentionExecutionService.class);
@@ -116,6 +130,10 @@ class PromotionControllerSecurityTest {
             org.mockito.Mockito.mock(CouponImportCommitService.class);
     private final CouponImportQueryService couponImportQueries =
             org.mockito.Mockito.mock(CouponImportQueryService.class);
+    private final CouponDistributionService couponDistributions =
+            org.mockito.Mockito.mock(CouponDistributionService.class);
+    private final RedemptionReversalApprovalService redemptionReversalApprovals =
+            org.mockito.Mockito.mock(RedemptionReversalApprovalService.class);
     private final InternalJwtService internalJwtService = new InternalJwtService(new InternalJwtProperties(
             INTERNAL_SECRET,
             "courseflow-token-converter",
@@ -130,8 +148,10 @@ class PromotionControllerSecurityTest {
         mvc = MockMvcBuilders
                 .standaloneSetup(new PromotionController(
                         promotions, access, campaignVersions, auditQueries,
-                        reconciliation, catalog, retention, retentionExecutions, retentionApprovals, couponImports,
-                        couponImportApprovals, couponImportCommits, couponImportQueries))
+                        reconciliation, fraudScoring, experiments, catalog, retention, retentionExecutions,
+                        retentionApprovals,
+                        couponImports, couponImportApprovals, couponImportCommits, couponImportQueries,
+                        couponDistributions, redemptionReversalApprovals))
                 .setControllerAdvice(new ApiExceptionHandler())
                 .setCustomArgumentResolvers(new CurrentUserArgumentResolver())
                 .addFilters(new TrustedGatewayHeaderFilter(internalJwtService))
@@ -189,6 +209,90 @@ class PromotionControllerSecurityTest {
                 .andExpect(jsonPath("$.contextHash").value("context-hash"));
 
         verify(promotions).preview(any(), any(CurrentUser.class), eq("corr-preview"));
+    }
+
+    @Test
+    void fraudScorePreviewForwardsCorrelationIdAndCurrentUser() throws Exception {
+        when(fraudScoring.preview(any(), any(), eq("corr-fraud")))
+                .thenReturn(new FraudScorePreviewResponseDto(
+                        true,
+                        false,
+                        "promotion-fraud-score-v1",
+                        "courseflow",
+                        "lms",
+                        "profile-1",
+                        60,
+                        55,
+                        "HIGH",
+                        "REVIEW",
+                        List.of(),
+                        Instant.parse("2026-06-15T00:00:00Z")));
+
+        mvc.perform(post("/internal/incentives/admin/fraud-score:preview")
+                        .headers(userHeaders())
+                        .header(GatewayHeaders.CORRELATION_ID, "corr-fraud")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new FraudScorePreviewRequestDto(request(), 60, "checkout-service", "risk review"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.policyVersion").value("promotion-fraud-score-v1"))
+                .andExpect(jsonPath("$.score").value(55))
+                .andExpect(jsonPath("$.recommendedAction").value("REVIEW"));
+
+        verify(fraudScoring).preview(any(), any(CurrentUser.class), eq("corr-fraud"));
+    }
+
+    @Test
+    void experimentPreviewForwardsCorrelationIdAndCurrentUser() throws Exception {
+        when(experiments.preview(any(), any(), eq("corr-exp")))
+                .thenReturn(new ExperimentPreviewResponseDto(
+                        true,
+                        false,
+                        "promotion-experiment-preview-v1",
+                        "courseflow",
+                        "lms",
+                        "checkout-price-test",
+                        "PROFILE",
+                        "hash-1",
+                        4321,
+                        "discount-10",
+                        false,
+                        "APPLY_VARIANT",
+                        List.of("EXPERIMENT_PREVIEW_ONLY", "EXPERIMENT_VARIANT_SELECTED"),
+                        List.of(new ExperimentVariantAllocationDto(
+                                "discount-10",
+                                5000,
+                                false,
+                                "SAVE10",
+                                0,
+                                5000,
+                                true,
+                                Map.of())),
+                        Instant.parse("2026-06-15T00:00:00Z")));
+
+        mvc.perform(post("/internal/incentives/admin/experiments:preview")
+                        .headers(userHeaders())
+                        .header(GatewayHeaders.CORRELATION_ID, "corr-exp")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new ExperimentPreviewRequestDto(
+                                        request(),
+                                        "checkout-price-test",
+                                        "PROFILE",
+                                        null,
+                                        List.of(
+                                                new ExperimentVariantPreviewRequestDto(
+                                                        "discount-10", 5000, false, "SAVE10", Map.of()),
+                                                new ExperimentVariantPreviewRequestDto(
+                                                        "holdout", 5000, true, null, Map.of())),
+                                        "traffic review"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.policyVersion").value("promotion-experiment-preview-v1"))
+                .andExpect(jsonPath("$.ledgerImpact").value(false))
+                .andExpect(jsonPath("$.selectedVariantKey").value("discount-10"))
+                .andExpect(jsonPath("$.recommendedAction").value("APPLY_VARIANT"));
+
+        verify(experiments).preview(any(), any(CurrentUser.class), eq("corr-exp"));
     }
 
     @Test

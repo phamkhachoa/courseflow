@@ -20,6 +20,9 @@ const CouponImportConsolePage = lazy(() =>
   import("./operations-pages").then(({ CouponImportConsolePage }) => ({ default: CouponImportConsolePage }))
 );
 const ReconciliationPage = lazy(() => import("./operations-pages").then(({ ReconciliationPage }) => ({ default: ReconciliationPage })));
+const IncentiveOpsConsolePage = lazy(() =>
+  import("./ops-console-page").then(({ IncentiveOpsConsolePage }) => ({ default: IncentiveOpsConsolePage }))
+);
 
 export const incentivesRoutes: RouteObject[] = [
   { index: true, element: lazyRouteElement(IncentiveDashboardPage) },
@@ -33,6 +36,7 @@ export const incentivesRoutes: RouteObject[] = [
   { path: "coupon-imports", element: lazyRouteElement(CouponImportConsolePage) },
   { path: "redemptions", element: lazyRouteElement(RedemptionSupportPage) },
   { path: "redemptions/:redemptionId", element: lazyRouteElement(RedemptionDetailPage) },
+  { path: "ops-console", element: lazyRouteElement(IncentiveOpsConsolePage) },
   { path: "reconciliation", element: lazyRouteElement(ReconciliationPage) },
   { path: "loyalty", element: lazyRouteElement(LoyaltyControlPlanePage) },
   { path: "retention", element: lazyRouteElement(RetentionConsolePage) },

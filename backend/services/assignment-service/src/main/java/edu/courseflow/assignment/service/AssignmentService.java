@@ -7,6 +7,7 @@ import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentReadinessDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.AttachmentRef;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.GradingQueueItemDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.LearnerSourceStatusDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedDownloadDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.PresignedUploadDto;
@@ -32,6 +33,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -119,6 +121,20 @@ public class AssignmentService {
     public List<SubmissionDto> listSubmissions(UUID assignmentId, String studentId) {
         get(assignmentId);
         return assignments.listSubmissionsForStudent(assignmentId, studentId);
+    }
+
+    public List<GradingQueueItemDto> gradingQueue(UUID courseId, UUID assignmentId, String status, int requestedLimit) {
+        int limit = Math.max(1, Math.min(requestedLimit, 200));
+        List<AssignmentDto> courseAssignments = assignments.listByCourse(courseId);
+        if (assignmentId != null) {
+            courseAssignments = courseAssignments.stream()
+                    .filter(assignment -> assignment.id().equals(assignmentId.toString()))
+                    .toList();
+            if (courseAssignments.isEmpty()) {
+                throw new BadRequestException("ASSIGNMENT_NOT_IN_COURSE");
+            }
+        }
+        return assignments.listGradingQueue(courseAssignments, gradingQueueStatuses(status), limit);
     }
 
     public SubmissionDto getSubmission(UUID submissionId) {
@@ -274,6 +290,17 @@ public class AssignmentService {
             return "OVERDUE";
         }
         return "READY";
+    }
+
+    private List<String> gradingQueueStatuses(String status) {
+        if (status == null || status.isBlank()) {
+            return List.of("SUBMITTED", "RESUBMITTED");
+        }
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if ("ALL".equals(normalized)) {
+            return List.of();
+        }
+        return List.of(normalized);
     }
 
     @Transactional

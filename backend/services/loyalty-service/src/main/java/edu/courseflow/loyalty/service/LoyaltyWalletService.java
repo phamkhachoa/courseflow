@@ -52,6 +52,7 @@ public class LoyaltyWalletService {
     private final LoyaltyPointLotRepository pointLots;
     private final LoyaltyRewardRepository rewards;
     private final LoyaltyRewardRedemptionRepository redemptions;
+    private final LoyaltyTierService tierService;
     private final ObjectMapper objectMapper;
 
     public LoyaltyWalletService(
@@ -61,6 +62,7 @@ public class LoyaltyWalletService {
             LoyaltyPointLotRepository pointLots,
             LoyaltyRewardRepository rewards,
             LoyaltyRewardRedemptionRepository redemptions,
+            LoyaltyTierService tierService,
             ObjectMapper objectMapper) {
         this.accounts = accounts;
         this.programs = programs;
@@ -68,6 +70,7 @@ public class LoyaltyWalletService {
         this.pointLots = pointLots;
         this.rewards = rewards;
         this.redemptions = redemptions;
+        this.tierService = tierService;
         this.objectMapper = objectMapper;
     }
 
@@ -242,6 +245,7 @@ public class LoyaltyWalletService {
                 expiredPoints,
                 expiringSoonPoints,
                 nextExpiryAt,
+                tierService.progressForAccount(account, now),
                 warnings);
     }
 
@@ -330,6 +334,15 @@ public class LoyaltyWalletService {
                 redemption.getFulfillmentStatus(),
                 redemption.getFulfillmentRef(),
                 redemption.getFulfillmentNote(),
+                redemption.getFulfillmentProvider(),
+                redemption.getFulfillmentAttemptCount(),
+                redemption.getFulfillmentLastAttemptAt(),
+                redemption.getFulfillmentNextAttemptAt(),
+                redemption.getFulfillmentSlaDueAt(),
+                redemption.getFulfillmentErrorClass(),
+                redemption.getFulfillmentErrorMessage(),
+                redemption.getFulfillmentCallbackReceivedAt(),
+                redemption.getFulfillmentCallbackPayloadHash(),
                 readMap(redemption.getRewardSnapshotJson()),
                 redemption.getCorrelationId(),
                 redemption.getNote(),

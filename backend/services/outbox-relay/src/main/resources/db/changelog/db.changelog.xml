@@ -13,4 +13,6 @@
     <include file="db/changelog/changes/000-pgcrypto.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/003-dead-letter-replay.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004-dead-letter-governance.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/005-dead-letter-maker-checker.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

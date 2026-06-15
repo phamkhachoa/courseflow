@@ -28,4 +28,6 @@
     <include file="db/changelog/changes/021-retention-approval-query-indexes.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/022-enrollment-runtime-binding.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/023-enrollment-runtime-reverse-binding.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/024-coupon-distribution-lifecycle.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/025-redemption-reversal-approval.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

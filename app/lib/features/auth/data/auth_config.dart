@@ -1,10 +1,3 @@
-const String kAuthMode = String.fromEnvironment(
-  'COURSEFLOW_AUTH_MODE',
-  defaultValue: 'keycloak',
-);
-
-const bool kKeycloakAuthEnabled = kAuthMode == 'keycloak';
-
 const String kKeycloakIssuer = String.fromEnvironment(
   'COURSEFLOW_KEYCLOAK_ISSUER',
   defaultValue: 'http://localhost:18080/realms/courseflow',

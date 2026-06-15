@@ -1,9 +1,6 @@
 package edu.courseflow.tokenconverter.service;
 
 import edu.courseflow.tokenconverter.config.TokenConverterProperties;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -22,40 +19,14 @@ public class ExternalTokenVerifier {
 
     public ExternalTokenVerifier(TokenConverterProperties properties) {
         this.properties = properties;
-        this.oidcDecoder = properties.oidcExternalTokenMode() ? oidcDecoder(properties) : null;
+        this.oidcDecoder = oidcDecoder(properties);
     }
 
     public ExternalTokenClaims verify(String token) {
         if (token == null || token.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "subject_token is required");
         }
-        if (properties.oidcExternalTokenMode()) {
-            return verifyOidc(token);
-        }
-        return verifyLegacy(token);
-    }
-
-    private ExternalTokenClaims verifyLegacy(String token) {
-        try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(properties.externalJwtKey())
-                    .clockSkewSeconds(properties.clockSkewSeconds())
-                    .build()
-                    .parseSignedClaims(token.trim())
-                    .getPayload();
-            if (!properties.externalJwtIssuer().equals(claims.getIssuer())) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unexpected external token issuer");
-            }
-            requireClaim(claims, "uid");
-            if (claims.getSubject() == null || claims.getSubject().isBlank()) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "External token subject is missing");
-            }
-            return new ExternalTokenClaims(claims.getIssuer(), claims.getSubject(), new LinkedHashMap<>(claims));
-        } catch (ResponseStatusException ex) {
-            throw ex;
-        } catch (JwtException | IllegalArgumentException ex) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid external token", ex);
-        }
+        return verifyOidc(token);
     }
 
     private ExternalTokenClaims verifyOidc(String token) {
@@ -81,10 +52,4 @@ public class ExternalTokenVerifier {
         return decoder;
     }
 
-    private void requireClaim(Claims claims, String name) {
-        Object value = claims.get(name);
-        if (value == null || value.toString().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "External token claim is missing: " + name);
-        }
-    }
 }

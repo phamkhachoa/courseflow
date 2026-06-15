@@ -25,6 +25,7 @@ export type CourseModule = {
 
 export type CourseProgress = {
   courseId: string;
+  publishedVersionNo?: number | null;
   studentId: string;
   totalModules: number;
   completedModules: number;
@@ -110,6 +111,7 @@ export type CertificateEligibility = {
 export type LearnerCoursePlayer = {
   generatedAt: string;
   courseId: string;
+  publishedVersionNo?: number | null;
   modules: CourseModule[];
   progress: CourseProgress;
   certificateEligibility?: CertificateEligibility | null;

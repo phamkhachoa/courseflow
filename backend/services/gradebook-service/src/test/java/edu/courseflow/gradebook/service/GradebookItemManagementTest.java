@@ -3,25 +3,33 @@ package edu.courseflow.gradebook.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.commonlibrary.exception.BadRequestException;
+import edu.courseflow.gradebook.dto.GradebookDtos.FinalGradeDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradeCategoryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.GradeItemDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradingSchemeDto;
+import edu.courseflow.gradebook.dto.GradebookDtos.GradingSchemeEntryDto;
 import edu.courseflow.gradebook.dto.GradebookDtos.UpsertGradeItemRequestDto;
 import edu.courseflow.gradebook.mapper.GradebookMapper;
+import edu.courseflow.gradebook.model.FinalGrade;
 import edu.courseflow.gradebook.model.GradeCategory;
 import edu.courseflow.gradebook.model.GradeItem;
+import edu.courseflow.gradebook.model.GradingScheme;
+import edu.courseflow.gradebook.model.GradingSchemeEntry;
 import edu.courseflow.gradebook.repository.FinalGradeRepository;
 import edu.courseflow.gradebook.repository.GradeCategoryRepository;
 import edu.courseflow.gradebook.repository.GradeEntryRepository;
 import edu.courseflow.gradebook.repository.GradeItemRepository;
 import edu.courseflow.gradebook.repository.GradeOverrideRepository;
+import edu.courseflow.gradebook.repository.GradebookAuditLogRepository;
 import edu.courseflow.gradebook.repository.GradingSchemeEntryRepository;
 import edu.courseflow.gradebook.repository.GradingSchemeRepository;
 import edu.courseflow.gradebook.repository.OutboxEventRepository;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +54,8 @@ class GradebookItemManagementTest {
     @Mock
     private GradeOverrideRepository overrides;
     @Mock
+    private GradebookAuditLogRepository auditLogs;
+    @Mock
     private GradingSchemeRepository schemes;
     @Mock
     private GradingSchemeEntryRepository schemeEntries;
@@ -53,8 +63,6 @@ class GradebookItemManagementTest {
     private FinalGradeRepository finalGrades;
     @Mock
     private OutboxEventRepository outbox;
-    @Mock
-    private GradebookMapper mapper;
 
     private GradeCategory category;
     private GradebookService service;
@@ -68,12 +76,13 @@ class GradebookItemManagementTest {
                 items,
                 entries,
                 overrides,
+                auditLogs,
                 schemes,
                 schemeEntries,
                 finalGrades,
                 outbox,
                 new ObjectMapper(),
-                mapper);
+                new TestGradebookMapper());
     }
 
     @Test
@@ -81,14 +90,6 @@ class GradebookItemManagementTest {
         when(categories.findById(CATEGORY_ID)).thenReturn(Optional.of(category));
         when(items.findBySourceTypeAndSourceId("ASSIGNMENT", "assignment-1")).thenReturn(Optional.empty());
         when(items.save(any(GradeItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(mapper.toDto(any(GradeItem.class), eq(category))).thenAnswer(invocation -> {
-            GradeItem item = invocation.getArgument(0);
-            return new GradeItemDto(
-                    item.getId().toString(), COURSE_ID.toString(), "Assignments", item.getSourceType(),
-                    item.getSourceId(), item.getTitle(), item.getMaxScore(), item.getWeightPercent(),
-                    category.getWeightPercent(), category.getAggregationMethod(), category.getDropLowest(),
-                    item.getLatePenaltyPercent(), item.isPublished());
-        });
 
         GradeItemDto dto = service.createGradeItem(COURSE_ID, request("assignment", "assignment-1", false));
 
@@ -135,5 +136,45 @@ class GradebookItemManagementTest {
                 new BigDecimal("1"),
                 BigDecimal.ZERO,
                 published);
+    }
+
+    private static final class TestGradebookMapper implements GradebookMapper {
+        @Override
+        public GradeItemDto toDto(GradeItem item, GradeCategory category) {
+            return new GradeItemDto(
+                    item.getId().toString(),
+                    item.getCourseId().toString(),
+                    category.getName(),
+                    item.getSourceType(),
+                    item.getSourceId(),
+                    item.getTitle(),
+                    item.getMaxScore(),
+                    item.getWeightPercent(),
+                    category.getWeightPercent(),
+                    category.getAggregationMethod(),
+                    category.getDropLowest(),
+                    item.getLatePenaltyPercent(),
+                    item.isPublished());
+        }
+
+        @Override
+        public GradeCategoryDto toDto(GradeCategory category) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public FinalGradeDto toDto(FinalGrade grade) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public GradingSchemeEntryDto toDto(GradingSchemeEntry entry) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public GradingSchemeDto toDto(GradingScheme scheme, List<GradingSchemeEntryDto> entries) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

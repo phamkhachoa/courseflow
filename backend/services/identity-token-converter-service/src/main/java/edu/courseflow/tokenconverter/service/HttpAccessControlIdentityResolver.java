@@ -19,7 +19,6 @@ public class HttpAccessControlIdentityResolver implements AccessControlIdentityR
     private final AccessControlProperties properties;
     private final InternalJwtService internalJwt;
     private final RestClient client;
-    private final AccessControlIdentityResolver fallback = AccessControlIdentityResolver.legacyClaims();
 
     public HttpAccessControlIdentityResolver(
             AccessControlProperties properties,
@@ -39,7 +38,7 @@ public class HttpAccessControlIdentityResolver implements AccessControlIdentityR
     @Override
     public ResolvedIdentity resolve(ExternalTokenClaims externalClaims) {
         if (!properties.enabled()) {
-            return fallback.resolve(externalClaims);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "access-control identity resolution is disabled");
         }
         try {
             ResolveIdentityRequest request = toRequest(externalClaims);
@@ -58,18 +57,16 @@ public class HttpAccessControlIdentityResolver implements AccessControlIdentityR
             if (properties.required()) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "access-control identity resolution failed", ex);
             }
-            return fallback.resolve(externalClaims);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "access-control identity resolution failed", ex);
         }
     }
 
     private ResolveIdentityRequest toRequest(ExternalTokenClaims claims) {
-        Object legacyUserId = claims.get("uid");
         return new ResolveIdentityRequest(
                 claims.issuer(),
                 claims.subject(),
                 claims.stringClaim("email") == null ? claims.subject() : claims.stringClaim("email"),
                 Boolean.TRUE.equals(claims.get("email_verified")),
-                legacyUserId == null ? null : legacyUserId.toString(),
                 roleAssignments(claims.get("roles")));
     }
 
@@ -108,7 +105,6 @@ public class HttpAccessControlIdentityResolver implements AccessControlIdentityR
             String subject,
             String email,
             Boolean emailVerified,
-            String legacyUserId,
             List<RoleAssignmentHint> roleAssignments) {
     }
 

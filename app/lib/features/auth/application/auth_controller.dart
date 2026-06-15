@@ -55,10 +55,8 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> login({required String email, required String password}) async {
-    final session = _repo.keycloakEnabled
-        ? await _repo.loginWithKeycloak()
-        : await _repo.login(email: email, password: password);
+  Future<void> login() async {
+    final session = await _repo.loginWithKeycloak();
     await _persist(session);
     state = AuthState(status: AuthStatus.authenticated, user: session.user);
   }

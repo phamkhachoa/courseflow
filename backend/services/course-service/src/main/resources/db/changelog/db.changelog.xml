@@ -18,4 +18,5 @@
     <include file="db/changelog/changes/006-course-review-audit.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/007-module-item-status.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/008-course-pricing.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/009-course-published-version-pointer.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

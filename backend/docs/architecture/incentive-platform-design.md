@@ -157,10 +157,11 @@ Implemented capabilities:
 - Audit explorer filters by tenant, application, aggregate type/id, action, actor, and time range with bounded limits.
 - Timeline endpoints expose campaign, application, and redemption/reservation history for support.
 - Application registry and client binding mutations now write audit events.
-- Redemption reversal is idempotent, requires either a trusted service actor with
-  `internal:promotion:reverse` plus a bound `reverse` operation or an admin/operator user through the
-  bound gateway client, writes ledger `REVERSE`, audit `redemption.reversed`, and outbox
-  `incentive.redemption.reversed`.
+- Redemption reversal is idempotent. Trusted runtime service actors with `internal:promotion:reverse`
+  plus a bound `reverse` operation may execute automated compensation directly. Admin/operator
+  support reversal requires a hash-bound maker-checker approval with reason, change ticket, reviewer,
+  non-self execution, audit `redemption.reversal_approval_*`, ledger `REVERSE`, audit
+  `redemption.reversed`, and outbox `incentive.redemption.reversed`.
 - Reversal does not release committed quota by default.
 - Migration 005 adds audit query indexes, `rollback_source_version`, `campaign_version NOT NULL`, and a unique reversed outbox event guard.
 - Minimal Micrometer observability was added for version transitions, reversal results, and audit query duration.
@@ -230,7 +231,7 @@ Sprint 2C+ backlog:
 - Admin Ops UI for Campaign Workspace, Version Review Queue, Redemption Support Console, and Audit Explorer.
 - Domain metrics and alerts beyond the minimal Sprint 2B metrics.
 - Full loyalty points/tier/reward ledger.
-- Advanced stacking policy.
+- Runtime multi-campaign stacking beyond admin simulation policy analysis.
 - Fraud/abuse controls and velocity limits.
 - Refund proration policy for partial line-level returns.
 
@@ -259,7 +260,7 @@ Deferred:
 
 - Full loyalty earn/burn/tier/reward catalog.
 - BOGO and cheapest-item-free.
-- Advanced stacking of multiple campaigns.
+- Runtime advanced stacking of multiple campaigns.
 - Bulk coupon import/export.
 - Fraud ML and complex personalization.
 - Admin UI.
@@ -1448,12 +1449,16 @@ Implemented production behavior:
 - `relay_delivery_states` persists publish failure attempts across relay restart/replica movement.
 - `relay_operator_actions` makes replay/discard idempotent by `(idempotencyKey, action,
   deadLetterId)`.
+- `relay_dead_letter_approvals` adds maker-checker for live replay/discard: the maker submits action,
+  reason, evidence reference, payload hash, request hash, and `OUTBOX_DLT_DUAL_CONTROL_V1`; a
+  different platform admin must approve before execution.
 - Dead-letter API responses expose only metadata, error text, payload size, and `payloadHash`; raw
   event payload is never returned by list/detail/replay responses.
 - `POST /internal/outbox/dead-letters/{id}:replay` reuses the original `event_type`, `aggregate_id`,
-  and stored payload. Operators cannot override the Kafka topic or payload.
+  and stored payload. Operators cannot override the Kafka topic or payload. Live replay requires an
+  approved `approvalId`; dry-run does not.
 - `POST /internal/outbox/dead-letters/{id}:discard` records the resolution actor and note without
-  deleting the row.
+  deleting the row. Live discard also requires an approved `approvalId`.
 - Gateway route `/api/admin/v1/outbox/**` maps to `outbox-relay`; the controller requires platform
   `ADMIN`.
 - Outbox relay metrics include publish failures, created dead letters, replay results, open dead
@@ -1465,10 +1470,15 @@ Operational runbook:
 
 1. Inspect `GET /api/admin/v1/outbox/dead-letters?status=OPEN&service=promotion`.
 2. Fix the downstream broker/topic/consumer/config issue first.
-3. Replay with an idempotency key and reason:
+3. Submit approval with action, reason, and evidence:
+   `POST /api/admin/v1/outbox/dead-letters/{id}/approvals`.
+4. A different platform admin approves:
+   `POST /api/admin/v1/outbox/dead-letters/approvals/{approvalId}:approve`.
+5. Replay with an idempotency key, reason, and approved `approvalId`:
    `POST /api/admin/v1/outbox/dead-letters/{id}:replay`.
-4. If the event is intentionally abandoned, discard with an idempotency key and reason.
-5. Treat replay as at-least-once. Consumers must continue deduplicating by the stable event identity
+6. If the event is intentionally abandoned, discard with an idempotency key, reason, and approved
+   `approvalId`.
+7. Treat replay as at-least-once. Consumers must continue deduplicating by the stable event identity
    in the payload.
 
 ## Sprint 2P-C - Reservation Expiry Multi-Replica Safety
@@ -1669,6 +1679,10 @@ Sprint 2S operations/correctness update:
 - The current resolver is still intentionally single-best: published campaign versions are evaluated
   by deterministic priority order (`priority desc`, `createdAt asc`). Full multi-campaign stacking
   and compatibility groups remain a separate runtime policy sprint.
+- Admin preview/simulation exposes simulation-only stacking governance for each matched candidate:
+  `stackingStatus`, `stackingReasonCodes`, `exclusive`, `stackable`, and would-consume quota
+  exposure. `WOULD_STACK` means policy-compatible under the sample context; it does not mean runtime
+  reservation/commit already applies multiple campaigns.
 
 Sprint 2T operations console/history update:
 
@@ -1725,7 +1739,7 @@ Sprint 2V runtime smoke gate update:
   no open `promotion` rows.
 - Runtime reversal is deliberately service-callable for trusted source clients such as checkout/order
   services when they hold `internal:promotion:reverse` and an application binding that includes
-  `reverse`; user/operator reversal still requires incentive admin access plus the gateway binding.
+  `reverse`; user/operator reversal requires incentive admin access plus maker-checker approval.
 - CI validates the script syntax in lightweight artifact checks and runs it in the manual local
   cluster smoke job after the product hardening gateway smoke.
 - Staging promotion smoke is intentionally fixture-pinned: it requires
@@ -1877,6 +1891,42 @@ Sprint 2AB coupon brute-force guard update:
   `promotion_coupon_abuse_guard_total{result="limited"}` after the runtime smoke. It prefers
   `increase()`, and also handles a fresh-deploy first-scrape case where Prometheus only has a
   recent `max_over_time()` sample after the guard event.
+
+P2 fraud scoring preview update:
+
+- Added `POST /internal/incentives/admin/fraud-score:preview` for operator/support review of a
+  checkout or learner incentive context. Gateway alias is
+  `/api/admin/v1/incentives/admin/fraud-score:preview`.
+- The score is explainable and non-mutating: it returns a 0-100 score, severity,
+  `recommendedAction` (`ALLOW`, `CHALLENGE`, `REVIEW`, `BLOCK`), reason signals, bounded evidence,
+  and `ledgerImpact=false`. It does not reserve quota, commit ledger, publish outbox events, or
+  change runtime `evaluate`/`reserve` enforcement.
+- Signals combine safe context features such as coupon selector count, missing source client, and
+  transaction value with recent reservation/redemption/reversal/coupon-id velocity from the
+  promotion ledger. Raw coupon codes are not written to audit payloads.
+- Each preview writes `fraud_score.previewed` to incentive audit with policy version, score,
+  recommended action, lookback window, and signal codes so support decisions can be traced.
+- Coupon brute-force protection remains owned by `CouponAbuseGuard`; fraud scoring is the operator
+  explainability layer and can be promoted to enforcement only after threshold governance and false
+  positive review are approved.
+
+P2 A/B incentive testing preview update:
+
+- Added `POST /internal/incentives/admin/experiments:preview` for deterministic traffic-allocation
+  preview before publish. Gateway alias is `/api/admin/v1/incentives/admin/experiments:preview`.
+- The request takes a normal incentive context plus an `experimentKey`, assignment unit
+  (`PROFILE`, `EXTERNAL_REFERENCE` or `ATTRIBUTE`) and weighted variants in basis points. If
+  configured weights total less than 10000 bps the remaining traffic is represented as an implicit
+  `__HOLDOUT__` variant, which lets operators dry-run gradual rollout and holdout design.
+- The response is non-mutating: `ledgerImpact=false`, bucket, selected variant, selected holdout
+  state, recommended action, reason codes and allocation bands. It does not alter campaign
+  evaluation, reservations, quota counters, ledger entries, coupon usage or outbox events.
+- Each preview writes `experiment.previewed` to incentive audit with policy version, bucket,
+  selected variant and assignment-key hash. Raw profile ids, external references and coupon codes
+  are not written to the audit payload.
+- Runtime enforcement is intentionally deferred until experiment id/variant attribution is added to
+  reservation, redemption, ledger and reconciliation rows. Until then this endpoint is an operator
+  simulation and governance tool, not a production assignment source of truth.
 
 Sprint 2AC hot quota/concurrency release gate update:
 
@@ -2156,8 +2206,9 @@ Known Sprint 2R follow-up:
 - Add CI/lint automation for OpenAPI, AsyncAPI, JSON Schema, and example validation if the current
   JUnit contract checks are not enough for release governance.
 - Add component/API tests for the web-admin coupon import and reconciliation flows.
-- Add full multi-campaign stacking/compatibility policy only after the single-best runtime path is
-  fully covered by production smoke and load tests.
+- Promote simulation-only stacking analysis to runtime multi-campaign reservation/commit only after
+  the reservation schema, quota consumption, discount netting, and production smoke/load tests cover
+  multi-campaign benefit application.
 
 Sprint 2AZ coupon import machine-readable error contract:
 
@@ -2354,11 +2405,15 @@ Sprint 2BH proposed backlog from BA/PO/SA review:
   `loyalty.inbound_dead_letter` counters plus open/unresolved gauges, Prometheus alerts for
   unresolved DLT and replay publish failures, and web-admin adds a DLT Ops tab with filters,
   details, dry-run, replay, and discard actions.
+- Implemented maker-checker for loyalty inbound DLT live replay/discard. Operators submit action,
+  reason, evidence reference, payload hash, request hash, and `LOYALTY_INBOUND_DLT_DUAL_CONTROL_V1`;
+  a different platform admin must approve before replay/discard can execute with `approvalId`.
 - DLT runbook: inspect `GET /api/admin/v1/loyalty/dead-letters?status=OPEN`, open detail and compare
   `payloadHash`, exception class/message, source topic and Kafka position; fix the consumer/config or
-  upstream payload issue first; dry-run replay; then call
-  `POST /api/admin/v1/loyalty/dead-letters/{id}:replay` with a reason. Use discard only when the
-  event has been manually compensated or is confirmed non-retryable.
+  upstream payload issue first; dry-run replay; submit and approve
+  `POST /api/admin/v1/loyalty/dead-letters/{id}/approvals`; then call
+  `POST /api/admin/v1/loyalty/dead-letters/{id}:replay` with reason and approved `approvalId`. Use
+  discard only when the event has been manually compensated or is confirmed non-retryable.
 - P1 Loyalty reward catalog and redemption skeleton. Keep it separate from promotion decisioning:
   rewards consume loyalty points, promotion may award loyalty points, and both reconcile by source
   references rather than database joins.
@@ -2369,10 +2424,12 @@ Sprint 2BH proposed backlog from BA/PO/SA review:
   a Rewards tab for catalog and redemption operations. Redemption support can inspect detail and
   reverse the original burn through a linked `REVERSE` ledger entry; fulfillment remains a skeleton
   `MANUAL`/`AUTO_ISSUE` state machine until the dedicated fulfillment integration sprint.
-- Implemented reward fulfillment support operation. Admins can mark redemption fulfillment as
-  `ISSUED`, `MANUAL_REQUIRED`, or `FAILED` with a fulfillment reference/note from the reward
-  redemptions table. Fulfillment changes do not mutate points; returning points remains a linked
-  reward redemption reversal.
+- Implemented maker-checker for manual reward fulfillment override. Operators submit
+  `REWARD_FULFILLMENT_OVERRIDE` approval with current/target fulfillment state, idempotency key,
+  reason, correlation id and request hash; a different reviewer approves in the shared loyalty
+  operation approval queue, then execution requires the approved `approvalId` and fails if the
+  redemption fulfillment state drifted. Fulfillment changes do not mutate points; returning points
+  remains a linked reward redemption reversal.
 - P1 Learner wallet detail page. Show program balances, expiring buckets, recent ledger entries,
   source labels and certificate/reward eligibility hints without exposing internal hashes.
 - Implemented first P1 Learner wallet detail. `loyalty-service` exposes

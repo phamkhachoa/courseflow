@@ -14,11 +14,13 @@ import edu.courseflow.enrollment.model.Enrollment;
 import edu.courseflow.enrollment.model.EnrollmentAuditLog;
 import edu.courseflow.enrollment.model.OutboxEvent;
 import edu.courseflow.enrollment.model.WaitlistEntry;
+import edu.courseflow.enrollment.repository.EnrollmentJpaRepository.EnrollmentBenefitReconciliationRow;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -74,6 +76,18 @@ public class EnrollmentRepository {
         return rows.stream().map(this::toEnrollmentDto).toList();
     }
 
+    public List<EnrollmentBenefitReconciliationRow> benefitReconciliationRows(
+            UUID enrollmentId,
+            UUID courseId,
+            String studentId,
+            int limit) {
+        return enrollments.benefitReconciliationRows(
+                enrollmentId,
+                courseId,
+                studentId,
+                PageRequest.of(0, Math.max(1, limit)));
+    }
+
     public Optional<EnrollmentDto> find(String studentId, UUID courseId) {
         return enrollments.findByStudentIdAndCourseId(studentId, courseId).map(this::toEnrollmentDto);
     }
@@ -105,9 +119,36 @@ public class EnrollmentRepository {
         return toEnrollmentDto(enrollments.save(enrollment));
     }
 
+    public EnrollmentDto enrollPendingPayment(String studentId, UUID courseId, String actorId, String reason) {
+        Enrollment enrollment = enrollments.findByStudentIdAndCourseId(studentId, courseId)
+                .map(existing -> {
+                    if ("ACTIVE".equals(existing.getStatus())) {
+                        throw new ConflictException("Student already actively enrolled");
+                    }
+                    if ("COMPLETED".equals(existing.getStatus())) {
+                        throw new ConflictException("Enrollment already completed; cannot re-enroll");
+                    }
+                    existing.pendingPayment();
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    Enrollment created = new Enrollment(UUID.randomUUID(), studentId, courseId, null);
+                    created.pendingPayment();
+                    return created;
+                });
+        Enrollment saved = enrollments.save(enrollment);
+        insertAudit(saved.getId(), actorId, "CHECKOUT_PENDING_PAYMENT", null, "PENDING_PAYMENT", reason);
+        return toEnrollmentDto(saved);
+    }
+
     /** Active-enrollment seat count for a course. */
     public int countActive(UUID courseId) {
         return enrollments.countByCourseIdAndStatus(courseId, "ACTIVE");
+    }
+
+    /** Seat holds include payment-pending checkout rows so paid learners cannot oversell a course. */
+    public int countOccupiedSeats(UUID courseId) {
+        return enrollments.countByCourseIdAndStatusIn(courseId, List.of("ACTIVE", "PENDING_PAYMENT"));
     }
 
     /**
@@ -252,8 +293,30 @@ public class EnrollmentRepository {
                 .toList();
     }
 
+    public List<AuditLogEntryDto> auditLog(
+            UUID enrollmentId,
+            UUID courseId,
+            String studentId,
+            String correlationId,
+            int limit) {
+        return auditLog.queryOperationsAudit(
+                        enrollmentId,
+                        courseId,
+                        studentId,
+                        correlationId,
+                        PageRequest.of(0, Math.max(1, limit)))
+                .stream()
+                .map(mapper::toDto)
+                .toList();
+    }
+
     public void outbox(UUID aggregateId, String aggregateType, String eventType, String payload) {
         outbox.save(new OutboxEvent(aggregateId, aggregateType, eventType, payload));
+    }
+
+    public void recordAudit(UUID enrollmentId, String actorId, String action,
+                             String oldStatus, String newStatus, String reason) {
+        insertAudit(enrollmentId, actorId == null ? "system" : actorId, action, oldStatus, newStatus, reason);
     }
 
     private void insertAudit(UUID enrollmentId, String actorId, String action,

@@ -145,10 +145,10 @@ check_access_control_resolution_mode() {
 check_gateway_identity_routes() {
   local gateway_config="$backend_dir/services/api-gateway/src/main/resources/application.yml"
   if grep -Eq 'id:[[:space:]]*identity-auth-v1' "$gateway_config"; then
-    fail "/api/v1/auth/** must not route to identity-service in the Keycloak gateway profile"
+    fail "/api/v1/auth/** must not be routed in the Keycloak gateway profile"
   fi
   if grep -Eq 'id:[[:space:]]*identity-user-me' "$gateway_config"; then
-    fail "/api/v1/users/me must route to user-management-service, not identity-service"
+    fail "/api/v1/users/me must route to user-management-service"
   fi
   if grep -Eq 'id:[[:space:]]*identity-admin-users' "$gateway_config"; then
     fail "/api/admin/v1/users routes must use user-management-service/access-control-service in the Keycloak profile"
@@ -156,7 +156,7 @@ check_gateway_identity_routes() {
 }
 
 check_sts_allowed_clients() {
-  local default_clients="api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,checkout-service,promotion-service,loyalty-service,outbox-relay"
+  local default_clients="api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,promotion-service,loyalty-service,outbox-relay"
   local clients="${COURSEFLOW_STS_ALLOWED_CLIENTS:-$default_clients}"
   local normalized
   normalized="$(printf '%s' "$clients" | tr '[:space:]' ',' | tr -s ',')"
@@ -168,16 +168,11 @@ check_sts_allowed_clients() {
       fail "COURSEFLOW_STS_ALLOWED_CLIENTS must not use wildcard '*' in the prod profile"
       ;;
   esac
-  case ",$normalized," in
-    *,identity-service,*)
-      fail "identity-service must not be an STS client in the Keycloak production profile"
-      ;;
-  esac
   local required
   for required in api-gateway access-control-service user-management-service organization-service course-service \
     enrollment-service assignment-service deadline-service announcement-service portfolio-service discussion-service \
     notification-service chat-service media-service search-service analytics-service gradebook-service quiz-service \
-    certificate-service peer-review-service live-session-service review-service checkout-service promotion-service \
+    certificate-service peer-review-service live-session-service review-service promotion-service \
     loyalty-service outbox-relay; do
     case ",$normalized," in
       *,"$required",*)
@@ -248,7 +243,6 @@ const requiredClients = [
   "peer-review-service",
   "live-session-service",
   "review-service",
-  "checkout-service",
   "promotion-service",
   "loyalty-service",
   "outbox-relay"
@@ -270,22 +264,11 @@ const promotionRuntimeScopes = new Set([
   "internal:promotion:cancel",
   "internal:promotion:reverse"
 ]);
-const promotionRuntimeClients = new Set(["enrollment-service", "checkout-service"]);
+const promotionRuntimeClients = new Set(["enrollment-service"]);
 const loyaltyAdminScope = "internal:loyalty:admin";
-const loyaltyCheckoutScopes = new Set([
-  "internal:loyalty:earn",
-  "internal:loyalty:burn",
-  "internal:loyalty:reverse",
-  "internal:loyalty:read"
-]);
 const loyaltyServiceScopes = new Set([
   "internal:loyalty:admin",
   "internal:loyalty:read"
-]);
-const loyaltyMutationScopes = new Set([
-  "internal:loyalty:earn",
-  "internal:loyalty:burn",
-  "internal:loyalty:reverse"
 ]);
 const loyaltyOperatorScopes = new Set([
   "internal:loyalty:admin",
@@ -316,10 +299,7 @@ const defaultClientScopes =
   + "peer-review-service=internal:service;"
   + "live-session-service=internal:service;"
   + "review-service=internal:service;"
-  + "checkout-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,"
-  + "internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,"
-  + "internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:read;"
-  + "promotion-service=internal:service,internal:promotion:admin;"
+  + "promotion-service=internal:service,internal:promotion:admin,internal:loyalty:earn,internal:loyalty:reverse;"
   + "loyalty-service=internal:service,internal:loyalty:admin,internal:loyalty:read;"
   + "outbox-relay=internal:service";
 const privilegedScopes = new Set([
@@ -355,7 +335,7 @@ function parseMap(raw, name, valuesAsScopes = false, required = true) {
     }
     const client = entry.slice(0, separator).trim();
     const value = entry.slice(separator + 1).trim();
-    if (client === "*" || client === "identity-service") {
+    if (client === "*") {
       violations.push(`${name} must not include client ${client}`);
     }
     if (map.has(client)) {
@@ -446,10 +426,16 @@ for (const [client, clientScopes] of scopes) {
     if (scope === promotionAdminScope && client !== "promotion-service") {
       violations.push(`${client} must not be granted promotion admin scope ${scope} by default`);
     }
-    if (scope === "internal:loyalty:read" && !["checkout-service", "loyalty-service"].includes(client)) {
+    if (scope === "internal:loyalty:read" && client !== "loyalty-service") {
       violations.push(`${client} must not be granted loyalty read scope ${scope} by default`);
     }
-    if (loyaltyMutationScopes.has(scope) && client !== "checkout-service") {
+    if (scope === "internal:loyalty:earn" && client !== "promotion-service") {
+      violations.push(`${client} must not be granted loyalty earn scope ${scope} by default`);
+    }
+    if (scope === "internal:loyalty:reverse" && client !== "promotion-service") {
+      violations.push(`${client} must not be granted loyalty reverse scope ${scope} by default`);
+    }
+    if (scope === "internal:loyalty:burn") {
       violations.push(`${client} must not be granted loyalty mutation scope ${scope} by default`);
     }
     if (loyaltyOperatorScopes.has(scope) && client !== "loyalty-service") {
@@ -493,15 +479,15 @@ for (const client of promotionRuntimeClients) {
     }
   }
 }
-const checkoutScopes = new Set(scopes.get("checkout-service") ?? []);
-for (const scope of loyaltyCheckoutScopes) {
-  if (!checkoutScopes.has(scope)) {
-    violations.push(`checkout-service must be granted ${scope}`);
-  }
-}
 const promotionScopes = new Set(scopes.get("promotion-service") ?? []);
 if (!promotionScopes.has(promotionAdminScope)) {
   violations.push(`promotion-service must be granted ${promotionAdminScope}`);
+}
+if (!promotionScopes.has("internal:loyalty:earn")) {
+  violations.push("promotion-service must be granted internal:loyalty:earn for loyalty readiness checks");
+}
+if (!promotionScopes.has("internal:loyalty:reverse")) {
+  violations.push("promotion-service must be granted internal:loyalty:reverse for promotion reversal compensation");
 }
 const loyaltyScopes = new Set(scopes.get("loyalty-service") ?? []);
 for (const scope of loyaltyServiceScopes) {
@@ -554,10 +540,6 @@ check_secret KEYCLOAK_ADMIN_PASSWORD 12 \
   courseflow
 check_value COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT
 check_not_local_url COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT
-check_value EXTERNAL_TOKEN_MODE
-if [ "${EXTERNAL_TOKEN_MODE}" != "oidc" ]; then
-  fail "EXTERNAL_TOKEN_MODE must be oidc in the prod profile"
-fi
 check_value COURSEFLOW_INTERNAL_JWT_ALGORITHM
 if [ "${COURSEFLOW_INTERNAL_JWT_ALGORITHM}" != "RS256" ]; then
   fail "COURSEFLOW_INTERNAL_JWT_ALGORITHM must be RS256 in the prod profile"
@@ -762,7 +744,6 @@ const secretViolations = [];
 const keycloakViolations = [];
 const internalJwtViolations = [];
 const tokenConverterViolations = [];
-const legacyIdentityViolations = [];
 const requiredClients = [
   "api-gateway",
   "access-control-service",
@@ -786,7 +767,6 @@ const requiredClients = [
   "peer-review-service",
   "live-session-service",
   "review-service",
-  "checkout-service",
   "promotion-service",
   "loyalty-service",
   "outbox-relay"
@@ -799,22 +779,11 @@ const promotionRuntimeScopes = new Set([
   "internal:promotion:cancel",
   "internal:promotion:reverse"
 ]);
-const promotionRuntimeClients = new Set(["enrollment-service", "checkout-service"]);
+const promotionRuntimeClients = new Set(["enrollment-service"]);
 const loyaltyAdminScope = "internal:loyalty:admin";
-const loyaltyCheckoutScopes = new Set([
-  "internal:loyalty:earn",
-  "internal:loyalty:burn",
-  "internal:loyalty:reverse",
-  "internal:loyalty:read"
-]);
 const loyaltyServiceScopes = new Set([
   "internal:loyalty:admin",
   "internal:loyalty:read"
-]);
-const loyaltyMutationScopes = new Set([
-  "internal:loyalty:earn",
-  "internal:loyalty:burn",
-  "internal:loyalty:reverse"
 ]);
 const loyaltyOperatorScopes = new Set([
   "internal:loyalty:admin",
@@ -895,9 +864,6 @@ for (const [serviceName, service] of Object.entries(services)) {
       secretViolations.push(`${serviceName}.${key} includes demo`);
     }
     if (upperKey === "COURSEFLOW_INTERNAL_JWT_SECRET" && internalJwtAlgorithm === "RS256") {
-      continue;
-    }
-    if (upperKey === "COURSEFLOW_JWT_SECRET") {
       continue;
     }
     if (/(PASSWORD|SECRET|TOKEN|ACCESS_KEY)$/.test(upperKey)) {
@@ -1000,9 +966,6 @@ if (!tokenConverter) {
   if (allowedClients.includes("*")) {
     tokenConverterViolations.push("COURSEFLOW_STS_ALLOWED_CLIENTS must not include wildcard '*'");
   }
-  if (allowedClients.includes("identity-service")) {
-    tokenConverterViolations.push("identity-service must not be an STS client in the Keycloak production profile");
-  }
   const allowedClientSet = new Set(allowedClients);
   for (const client of requiredClients) {
     if (!allowedClientSet.has(client)) {
@@ -1049,12 +1012,22 @@ if (!tokenConverter) {
           `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include promotion admin scope ${scope}`
         );
       }
-      if (scope === "internal:loyalty:read" && !["checkout-service", "loyalty-service"].includes(client)) {
+      if (scope === "internal:loyalty:read" && client !== "loyalty-service") {
         tokenConverterViolations.push(
           `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include loyalty read scope ${scope}`
         );
       }
-      if (loyaltyMutationScopes.has(scope) && client !== "checkout-service") {
+      if (scope === "internal:loyalty:earn" && client !== "promotion-service") {
+        tokenConverterViolations.push(
+          `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include loyalty earn scope ${scope}`
+        );
+      }
+      if (scope === "internal:loyalty:reverse" && client !== "promotion-service") {
+        tokenConverterViolations.push(
+          `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include loyalty reverse scope ${scope}`
+        );
+      }
+      if (scope === "internal:loyalty:burn") {
         tokenConverterViolations.push(
           `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include loyalty mutation scope ${scope}`
         );
@@ -1074,15 +1047,15 @@ if (!tokenConverter) {
       }
     }
   }
-  const checkoutScopes = new Set(tokenConverterClientScopes.get("checkout-service") ?? []);
-  for (const scope of loyaltyCheckoutScopes) {
-    if (!checkoutScopes.has(scope)) {
-      tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SCOPES[checkout-service] must include ${scope}`);
-    }
-  }
   const promotionScopes = new Set(tokenConverterClientScopes.get("promotion-service") ?? []);
   if (!promotionScopes.has(promotionAdminScope)) {
     tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SCOPES[promotion-service] must include ${promotionAdminScope}`);
+  }
+  if (!promotionScopes.has("internal:loyalty:earn")) {
+    tokenConverterViolations.push("COURSEFLOW_STS_CLIENT_SCOPES[promotion-service] must include internal:loyalty:earn");
+  }
+  if (!promotionScopes.has("internal:loyalty:reverse")) {
+    tokenConverterViolations.push("COURSEFLOW_STS_CLIENT_SCOPES[promotion-service] must include internal:loyalty:reverse");
   }
   const loyaltyScopes = new Set(tokenConverterClientScopes.get("loyalty-service") ?? []);
   for (const scope of loyaltyServiceScopes) {
@@ -1093,7 +1066,7 @@ if (!tokenConverter) {
 }
 
 for (const [serviceName, service] of Object.entries(services)) {
-  if (serviceName === "identity-token-converter-service" || serviceName === "identity-service") {
+  if (serviceName === "identity-token-converter-service") {
     continue;
   }
   const serviceEnv = new Map(envEntries(service.environment));
@@ -1107,14 +1080,6 @@ for (const [serviceName, service] of Object.entries(services)) {
     tokenConverterViolations.push(`${serviceName} must receive only its own COURSEFLOW_STS_CLIENT_SECRET`);
   } else if (expectedSecret && actualSecret !== expectedSecret) {
     tokenConverterViolations.push(`${serviceName} COURSEFLOW_STS_CLIENT_SECRET does not match converter client secret map`);
-  }
-}
-
-const identityService = services["identity-service"];
-if (identityService) {
-  const profiles = Array.isArray(identityService.profiles) ? identityService.profiles : [];
-  if (!profiles.includes("legacy-identity")) {
-    legacyIdentityViolations.push("identity-service must be behind the legacy-identity profile in prod");
   }
 }
 
@@ -1153,16 +1118,9 @@ if (tokenConverterViolations.length > 0) {
   }
 }
 
-if (legacyIdentityViolations.length > 0) {
-  console.error("Unsafe prod legacy identity-service configuration:");
-  for (const violation of legacyIdentityViolations) {
-    console.error(`  - ${violation}`);
-  }
-}
-
 if (publishedPortViolations.length > 0 || secretViolations.length > 0 ||
     keycloakViolations.length > 0 || internalJwtViolations.length > 0 ||
-    tokenConverterViolations.length > 0 || legacyIdentityViolations.length > 0) {
+    tokenConverterViolations.length > 0) {
   process.exit(1);
 }
 EOF_NODE

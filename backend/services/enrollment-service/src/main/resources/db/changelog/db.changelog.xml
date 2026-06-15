@@ -15,4 +15,8 @@
     <include file="db/changelog/changes/003-promotion-application-reversed-status.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/004-checkout-attempts.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/005-promotion-application-retry-schedule.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/006-paid-checkout-remediation.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/007-order-payment-reference-guards.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/008-remediation-open-case-dedupe.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/009-remediation-ops-filter-indexes.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

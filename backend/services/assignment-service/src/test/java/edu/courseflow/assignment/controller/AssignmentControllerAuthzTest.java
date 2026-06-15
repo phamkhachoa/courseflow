@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import edu.courseflow.assignment.dto.AssignmentDtos.AssignmentDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.CreateAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.GradeSubmissionRequestDto;
+import edu.courseflow.assignment.dto.AssignmentDtos.GradingQueueItemDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmitAssignmentRequestDto;
 import edu.courseflow.assignment.dto.AssignmentDtos.SubmissionDto;
 import edu.courseflow.assignment.service.AssignmentService;
@@ -92,6 +93,31 @@ class AssignmentControllerAuthzTest {
 
         verify(courseAccess).requireCourseStaffAccess(instructor, COURSE_ID);
         verify(assignments).listSubmissions(ASSIGNMENT_ID, "4");
+    }
+
+    @Test
+    void gradingQueueRequiresScopedCourseStaffAccess() {
+        CurrentUser instructor = instructor();
+        GradingQueueItemDto item = new GradingQueueItemDto(
+                SUBMISSION_ID.toString(),
+                ASSIGNMENT_ID.toString(),
+                "Capstone",
+                COURSE_ID.toString(),
+                "4",
+                1,
+                Instant.parse("2026-06-20T00:00:00Z"),
+                "SUBMITTED",
+                false,
+                0,
+                new BigDecimal("100"),
+                null,
+                0);
+        when(assignments.gradingQueue(COURSE_ID, ASSIGNMENT_ID, "SUBMITTED", 25)).thenReturn(List.of(item));
+
+        controller.gradingQueue(COURSE_ID, ASSIGNMENT_ID, "SUBMITTED", 25, instructor);
+
+        verify(courseAccess).requireCourseStaffAccess(instructor, COURSE_ID);
+        verify(assignments).gradingQueue(COURSE_ID, ASSIGNMENT_ID, "SUBMITTED", 25);
     }
 
     @Test

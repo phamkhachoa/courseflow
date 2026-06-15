@@ -10,9 +10,11 @@ import {
   Clock3,
   Coins,
   Gift,
-  History,
+  LifeBuoy,
+  ListChecks,
   RefreshCw,
   Sparkles,
+  Ticket,
   WalletCards
 } from "lucide-react";
 import { useLearnerSession } from "@/features/auth/useLearnerSession";
@@ -29,6 +31,13 @@ import {
   type LearnerCoupon,
   type LearnerCouponWallet
 } from "@/features/promotions/api";
+import {
+  buildLearnerIncentiveHub,
+  type IncentiveEligibilityGap,
+  type IncentivePendingBenefit,
+  type IncentiveSupportItem,
+  type IncentiveTimelineItem
+} from "./incentive-hub";
 import {
   Badge,
   Button,
@@ -65,7 +74,12 @@ const statusLabels: Record<string, string> = {
   PENDING: "Đang chờ",
   ISSUED: "Đã cấp",
   MANUAL_REQUIRED: "Cần xử lý",
-  FAILED: "Thất bại"
+  FAILED: "Thất bại",
+  AVAILABLE: "Dùng được",
+  UPCOMING: "Sắp mở",
+  VOID: "Đã hủy",
+  UNAVAILABLE: "Chưa khả dụng",
+  WARNING: "Cảnh báo"
 };
 
 const couponStatusLabels: Record<string, string> = {
@@ -145,6 +159,31 @@ function entryLabel(value?: string | null) {
   return entryLabels[value ?? ""] ?? value ?? "-";
 }
 
+function sourceLabel(value: string) {
+  const labels: Record<string, string> = {
+    COUPON: "Coupon",
+    LOYALTY: "Điểm",
+    REWARD: "Reward",
+    WALLET: "Ví"
+  };
+  return labels[value] ?? value;
+}
+
+function sourceTone(value: string): "neutral" | "brand" | "amber" | "sky" | "coral" {
+  switch (value) {
+    case "COUPON":
+      return "brand";
+    case "REWARD":
+      return "sky";
+    case "WALLET":
+      return "amber";
+    case "LOYALTY":
+      return "neutral";
+    default:
+      return "neutral";
+  }
+}
+
 function rewardTitle(redemption: LoyaltyRewardRedemption) {
   const snapshot = redemption.rewardSnapshot ?? {};
   const name = snapshot.name;
@@ -167,8 +206,14 @@ function ErrorPanel({ message }: { message: string }) {
 
 function WalletAccountCard({ account }: { account: LearnerLoyaltyWalletAccount }) {
   const balance = account.balance;
+  const tier = balance.tierProgress;
   const activeBuckets = account.buckets.filter((bucket) => bucket.status === "ACTIVE");
   const expiredBuckets = account.buckets.filter((bucket) => bucket.status === "EXPIRED");
+  const pointsToNext = tier?.pointsToNext ?? 0;
+  const nextRequirement = tier?.nextTierPointsRequired ?? 0;
+  const progressValue = nextRequirement > 0
+    ? Math.max(0, Math.min(100, ((nextRequirement - pointsToNext) / nextRequirement) * 100))
+    : 100;
 
   return (
     <Card className="space-y-5">
@@ -186,6 +231,32 @@ function WalletAccountCard({ account }: { account: LearnerLoyaltyWalletAccount }
           {statusLabel(balance.programStatus)}
         </Badge>
       </div>
+
+      {tier && (
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold uppercase text-ink-500">Tier hiện tại</p>
+              <p className="mt-1 text-lg font-bold text-ink-900">{tier.currentTierName}</p>
+            </div>
+            <Badge tone={tier.graceUntil ? "amber" : "sky"}>{tier.currentTierCode}</Badge>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full bg-brand-600" style={{ width: `${progressValue}%` }} />
+          </div>
+          <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-ink-500">
+            <span>{formatNumber(tier.qualificationPoints)} điểm trong window</span>
+            {tier.nextTierCode ? (
+              <span>{formatNumber(pointsToNext)} điểm tới {tier.nextTierCode}</span>
+            ) : (
+              <span>Top tier</span>
+            )}
+          </div>
+          {tier.graceUntil && (
+            <p className="mt-2 text-xs font-semibold text-amber-700">Grace đến {formatDate(tier.graceUntil)}</p>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -436,6 +507,168 @@ function CouponWalletPanel({
   );
 }
 
+function PendingBenefitsPanel({ items }: { items: IncentivePendingBenefit[] }) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title="Không có benefit pending"
+        description="Reward, coupon hoặc benefit đang chờ xử lý sẽ xuất hiện tại đây."
+      />
+    );
+  }
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-brand-600">Pending</p>
+          <h3 className="text-xl font-bold text-ink-900">Benefit đang chờ</h3>
+        </div>
+        <Clock3 className="size-6 text-accent-600" />
+      </div>
+      <div className="grid gap-3">
+        {items.map((item) => (
+          <div key={item.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="font-bold text-ink-900">{item.title}</p>
+                <p className="mt-1 text-sm leading-5 text-ink-500">{item.detail}</p>
+              </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Badge tone={sourceTone(item.source)}>{sourceLabel(item.source)}</Badge>
+                <Badge tone={item.status === "FAILED" ? "coral" : item.status === "MANUAL_REQUIRED" ? "amber" : "sky"}>
+                  {statusLabel(item.status)}
+                </Badge>
+              </div>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-ink-500">
+              Ref {item.ref}{item.dueAt ? ` · SLA ${formatDateTime(item.dueAt)}` : ""}
+            </p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function EligibilityGapPanel({ items }: { items: IncentiveEligibilityGap[] }) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title="Không có vướng mắc điều kiện"
+        description="Bạn đang đủ điều kiện với các reward/coupon đang mở cho tài khoản."
+      />
+    );
+  }
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-brand-600">Eligibility</p>
+          <h3 className="text-xl font-bold text-ink-900">Lý do chưa đủ điều kiện</h3>
+        </div>
+        <ListChecks className="size-6 text-brand-600" />
+      </div>
+      <div className="grid gap-3">
+        {items.map((item) => (
+          <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="font-bold text-ink-900">{item.title}</p>
+                <p className="mt-1 text-sm leading-5 text-ink-500">{item.reasons.join(", ")}</p>
+              </div>
+              <Badge tone={sourceTone(item.source)}>{sourceLabel(item.source)}</Badge>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+              {typeof item.missingPoints === "number" && item.missingPoints > 0 ? (
+                <span className="font-semibold text-accent-700">Thiếu {formatNumber(item.missingPoints)} điểm</span>
+              ) : (
+                <span className="font-semibold text-ink-500">Cần kiểm tra điều kiện</span>
+              )}
+              <span className="font-bold text-brand-700">{item.actionLabel}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function SupportCasesPanel({ items }: { items: IncentiveSupportItem[] }) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title="Không có support case"
+        description="Các reward/coupon cần support hoặc cảnh báo ví sẽ được ghim tại đây."
+      />
+    );
+  }
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-brand-600">Support</p>
+          <h3 className="text-xl font-bold text-ink-900">Case cần theo dõi</h3>
+        </div>
+        <LifeBuoy className="size-6 text-coral-600" />
+      </div>
+      <div className="grid gap-3">
+        {items.map((item) => (
+          <div key={item.id} className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="font-bold text-ink-900">{item.title}</p>
+                <p className="mt-1 text-sm leading-5 text-ink-500">{item.detail}</p>
+              </div>
+              <Badge tone={item.severity === "critical" ? "coral" : "amber"}>{statusLabel(item.status)}</Badge>
+            </div>
+            <p className="mt-3 text-xs font-semibold text-ink-500">
+              Case ref {item.caseRef}{item.dueAt ? ` · SLA ${formatDateTime(item.dueAt)}` : ""}
+            </p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function ActivityTimelinePanel({ items }: { items: IncentiveTimelineItem[] }) {
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        title="Chưa có lịch sử ưu đãi"
+        description="Coupon, điểm và reward gần đây sẽ được gom vào timeline này."
+      />
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <div className="divide-y divide-slate-100">
+        {items.map((item) => (
+          <div key={item.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto]">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={sourceTone(item.source)}>{sourceLabel(item.source)}</Badge>
+                <Badge tone={item.status === "FAILED" || item.status === "VOID" ? "coral" : "neutral"}>
+                  {statusLabel(item.status) || item.status}
+                </Badge>
+              </div>
+              <p className="mt-2 font-bold text-ink-900">{item.title}</p>
+              <p className="mt-1 text-xs text-ink-500">
+                {item.detail ? `${item.detail} · ` : ""}{formatDateTime(item.occurredAt)}
+              </p>
+            </div>
+            {typeof item.pointsDelta === "number" && (
+              <p className={cn("text-lg font-bold", item.pointsDelta >= 0 ? "text-signal-600" : "text-coral-600")}>
+                {signedPoints(item.pointsDelta)}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function LoyaltyWalletView() {
   const { session } = useLearnerSession();
   const queryClient = useQueryClient();
@@ -475,6 +708,9 @@ export function LoyaltyWalletView() {
   });
 
   const wallet = walletQuery.data;
+  const couponWallet = couponWalletQuery.data;
+  const hub = useMemo(() => buildLearnerIncentiveHub(wallet, couponWallet), [wallet, couponWallet]);
+  const hasWalletAccounts = Boolean(wallet?.accounts.length);
   const recentEntries = useMemo(
     () => wallet?.accounts.flatMap((account) => account.recentEntries).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) ?? [],
     [wallet]
@@ -483,31 +719,31 @@ export function LoyaltyWalletView() {
   if (!session) {
     return (
       <EmptyState
-        title="Đăng nhập để xem ví điểm"
-        description="Ví điểm được gắn với tài khoản học tập của bạn."
+        title="Đăng nhập để xem ưu đãi"
+        description="Điểm, coupon, reward và benefit pending được gắn với tài khoản học tập của bạn."
         action={<LinkButton href="/login">Đăng nhập</LinkButton>}
       />
     );
   }
 
-  if (walletQuery.isLoading) {
+  if (walletQuery.isLoading && couponWalletQuery.isLoading) {
     return (
       <Card className="grid min-h-[360px] place-items-center text-center">
         <RefreshCw className="size-10 animate-spin text-brand-600" />
-        <p className="mt-4 font-bold text-ink-900">Đang tải ví điểm</p>
+        <p className="mt-4 font-bold text-ink-900">Đang tải hub ưu đãi</p>
       </Card>
     );
   }
 
-  if (walletQuery.isError) {
-    return <ErrorPanel message={walletQuery.error instanceof Error ? walletQuery.error.message : "Không tải được ví điểm"} />;
+  if (walletQuery.isError && couponWalletQuery.isError) {
+    return <ErrorPanel message={walletQuery.error instanceof Error ? walletQuery.error.message : "Không tải được hub ưu đãi"} />;
   }
 
-  if (!wallet || wallet.accounts.length === 0) {
+  if (!hasWalletAccounts && !couponWalletQuery.isLoading && (!couponWallet || couponWallet.items.length === 0)) {
     return (
       <EmptyState
-        title="Chưa có ví điểm"
-        description="Khi bạn nhận điểm từ khóa học, ví điểm và reward khả dụng sẽ xuất hiện tại đây."
+        title="Chưa có ưu đãi"
+        description="Khi bạn nhận điểm, coupon, reward hoặc benefit pending, hub ưu đãi sẽ xuất hiện tại đây."
         action={<LinkButton href="/search" variant="secondary">Tìm khóa học</LinkButton>}
       />
     );
@@ -515,13 +751,27 @@ export function LoyaltyWalletView() {
 
   return (
     <div className="space-y-7">
-      {wallet.warnings.length > 0 && (
+      {walletQuery.isError && (
+        <Card className="border-accent-100 bg-accent-50/50">
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-1 size-5 shrink-0 text-accent-600" />
+            <div>
+              <p className="font-bold text-ink-900">Chưa tải được ví điểm</p>
+              <p className="mt-1 text-sm leading-6 text-ink-500">
+                {walletQuery.error instanceof Error ? walletQuery.error.message : "Bạn vẫn có thể xem coupon nếu dữ liệu coupon đã tải được."}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {(wallet?.warnings.length ?? 0) > 0 && (
         <Card className="border-accent-100 bg-accent-50/50">
           <div className="flex gap-3">
             <AlertTriangle className="mt-1 size-5 shrink-0 text-accent-600" />
             <div>
               <p className="font-bold text-ink-900">Ví có cảnh báo</p>
-              <p className="mt-1 text-sm leading-6 text-ink-500">{wallet.warnings.join(", ")}</p>
+              <p className="mt-1 text-sm leading-6 text-ink-500">{wallet?.warnings.join(", ")}</p>
             </div>
           </div>
         </Card>
@@ -532,32 +782,38 @@ export function LoyaltyWalletView() {
       <section className="grid gap-3 md:grid-cols-4">
         <MetricCard
           label="Điểm khả dụng"
-          value={formatNumber(wallet.totals.activePoints)}
+          value={formatNumber(hub.summary.activePoints)}
           tone="brand"
-          stateLabel={`${wallet.totals.activeAccountCount} ví active`}
+          stateLabel={`${wallet?.totals.activeAccountCount ?? 0} ví active`}
           icon={<Coins className="size-5" />}
         />
         <MetricCard
-          label="Sắp hết hạn"
-          value={formatNumber(wallet.totals.expiringSoonPoints)}
+          label="Coupon dùng được"
+          value={formatNumber(hub.summary.availableCoupons)}
           tone="amber"
-          stateLabel={formatDate(wallet.totals.nextExpiryAt)}
-          icon={<Clock3 className="size-5" />}
+          stateLabel={`${hub.summary.expiringSoonCoupons} sắp hết hạn`}
+          icon={<Ticket className="size-5" />}
         />
         <MetricCard
           label="Reward khả dụng"
-          value={String(wallet.availableRewards.filter((reward) => reward.eligible).length)}
+          value={String(hub.summary.eligibleRewards)}
           tone="sky"
-          stateLabel={`${wallet.availableRewards.length} reward`}
+          stateLabel={`${hub.summary.ineligibleRewards} chưa đủ điều kiện`}
           icon={<Gift className="size-5" />}
         />
         <MetricCard
-          label="Lịch sử đổi"
-          value={String(wallet.recentRedemptions.length)}
+          label="Benefit pending"
+          value={String(hub.summary.pendingBenefits)}
           tone="coral"
-          stateLabel="Gần đây"
-          icon={<History className="size-5" />}
+          stateLabel={`${hub.summary.supportRefs} support refs`}
+          icon={<Clock3 className="size-5" />}
         />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <PendingBenefitsPanel items={hub.pendingBenefits} />
+        <EligibilityGapPanel items={hub.eligibilityGaps} />
+        <SupportCasesPanel items={hub.supportItems} />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -567,29 +823,44 @@ export function LoyaltyWalletView() {
             title="Balance và expiry"
             description="Điểm khả dụng, bucket hết hạn và giao dịch gần đây theo từng chương trình."
           />
-          <div className="grid gap-4">
-            {wallet.accounts.map((account) => (
-              <WalletAccountCard key={account.balance.accountId} account={account} />
-            ))}
-          </div>
+          {hasWalletAccounts && wallet ? (
+            <div className="grid gap-4">
+              {wallet.accounts.map((account) => (
+                <WalletAccountCard key={account.balance.accountId} account={account} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="Chưa có ví điểm"
+              description="Điểm sẽ xuất hiện sau khi bạn hoàn tất hoạt động đủ điều kiện hoặc promotion earn được commit."
+              action={<LinkButton href="/search" variant="secondary">Tìm khóa học tích điểm</LinkButton>}
+            />
+          )}
 
           <SectionHeader eyebrow="Ledger" title="Giao dịch gần đây" />
           <LedgerList entries={recentEntries} />
+
+          <SectionHeader eyebrow="Timeline" title="Lịch sử ưu đãi" />
+          <ActivityTimelinePanel items={hub.activity} />
         </div>
 
         <aside className="space-y-6">
           <Card className="bg-ink-900 text-white">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-signal-200">Wallet health</p>
-                <h3 className="mt-2 text-2xl font-bold">{formatNumber(wallet.totals.ledgerBalance)} ledger points</h3>
+                <p className="text-sm font-bold text-signal-200">Incentive health</p>
+                <h3 className="mt-2 text-2xl font-bold">
+                  {formatNumber(wallet?.totals.ledgerBalance ?? 0)} ledger points
+                </h3>
               </div>
               <WalletCards className="size-8 text-signal-200" />
             </div>
             <p className="mt-3 text-sm leading-6 text-white/70">
-              {wallet.totals.expiredPoints > 0
+              {wallet && wallet.totals.expiredPoints > 0
                 ? `${formatNumber(wallet.totals.expiredPoints)} điểm đã hết hạn trong ví.`
-                : "Không có điểm hết hạn đang chờ xử lý."}
+                : hub.summary.pendingBenefits > 0
+                  ? `${hub.summary.pendingBenefits} benefit đang chờ hoàn tất.`
+                  : "Không có benefit pending đang chờ xử lý."}
             </p>
             <Button asChild variant="inverse" className="mt-5 w-full">
               <Link href="/search">
@@ -607,7 +878,7 @@ export function LoyaltyWalletView() {
           />
 
           <SectionHeader eyebrow="Rewards" title="Đổi thưởng" />
-          {wallet.availableRewards.length > 0 ? (
+          {wallet && wallet.availableRewards.length > 0 ? (
             <div className="grid gap-4">
               {wallet.availableRewards.map((reward) => (
                 <RewardCard
@@ -629,7 +900,7 @@ export function LoyaltyWalletView() {
 
       <section>
         <SectionHeader eyebrow="Redemptions" title="Lịch sử đổi thưởng" className="mb-4" />
-        <RedemptionList redemptions={wallet.recentRedemptions} />
+        <RedemptionList redemptions={wallet?.recentRedemptions ?? []} />
       </section>
 
       {redeemMutation.isSuccess && (

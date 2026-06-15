@@ -72,6 +72,31 @@ public interface IncentiveReservationRepository extends JpaRepository<IncentiveR
             """, nativeQuery = true)
     double oldestExpiredReservedAgeSeconds();
 
+    long countByTenantIdAndApplicationIdAndProfileIdAndReservedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            String profileId,
+            Instant since);
+
+    long countByTenantIdAndApplicationIdAndProfileIdAndStatusAndReservedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            String profileId,
+            String status,
+            Instant since);
+
+    long countByTenantIdAndApplicationIdAndCouponIdInAndReservedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            List<UUID> couponIds,
+            Instant since);
+
+    long countByTenantIdAndApplicationIdAndExternalReferenceAndReservedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            String externalReference,
+            Instant since);
+
     @Query(value = """
             select count(*) filter (
                        where status in ('EXPIRED', 'CANCELLED')

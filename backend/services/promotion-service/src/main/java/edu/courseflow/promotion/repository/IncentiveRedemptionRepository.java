@@ -1,8 +1,9 @@
 package edu.courseflow.promotion.repository;
 
 import edu.courseflow.promotion.model.IncentiveRedemption;
-import java.util.Optional;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,31 @@ import org.springframework.data.repository.query.Param;
 
 public interface IncentiveRedemptionRepository extends JpaRepository<IncentiveRedemption, UUID> {
     Optional<IncentiveRedemption> findByReservationId(UUID reservationId);
+
+    long countByTenantIdAndApplicationIdAndProfileIdAndRedeemedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            String profileId,
+            Instant since);
+
+    long countByTenantIdAndApplicationIdAndProfileIdAndStatusAndReversedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            String profileId,
+            String status,
+            Instant since);
+
+    long countByTenantIdAndApplicationIdAndCouponIdInAndRedeemedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            List<UUID> couponIds,
+            Instant since);
+
+    long countByTenantIdAndApplicationIdAndExternalReferenceAndRedeemedAtGreaterThanEqual(
+            String tenantId,
+            String applicationId,
+            String externalReference,
+            Instant since);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""

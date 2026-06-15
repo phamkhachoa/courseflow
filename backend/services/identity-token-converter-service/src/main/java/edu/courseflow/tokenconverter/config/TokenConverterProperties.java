@@ -44,9 +44,6 @@ public class TokenConverterProperties {
             + "internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,"
             + "internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire";
 
-    private final ExternalTokenMode externalTokenMode;
-    private final String externalJwtSecret;
-    private final String externalJwtIssuer;
     private final String externalOidcIssuer;
     private final String externalJwkSetUri;
     private final Set<String> externalAudiences;
@@ -67,10 +64,6 @@ public class TokenConverterProperties {
 
     @Autowired
     public TokenConverterProperties(
-            @Value("${courseflow.security.external-token.mode:${EXTERNAL_TOKEN_MODE:oidc}}")
-            String externalTokenMode,
-            @Value("${courseflow.security.external-jwt.secret:}") String externalJwtSecret,
-            @Value("${courseflow.security.external-jwt.issuer:courseflow-identity}") String externalJwtIssuer,
             @Value("${courseflow.security.external-token.issuer:${KEYCLOAK_ISSUER_URI:}}")
             String externalOidcIssuer,
             @Value("${courseflow.security.external-token.jwk-set-uri:${KEYCLOAK_JWK_SET_URI:}}")
@@ -102,14 +95,7 @@ public class TokenConverterProperties {
             String serviceClientScopes,
             @Value("${courseflow.security.internal-jwt.ttl-seconds:180}") long ttlSeconds,
             @Value("${courseflow.security.internal-jwt.clock-skew-seconds:30}") long clockSkewSeconds) {
-        this.externalTokenMode = parseExternalMode(externalTokenMode);
-        this.externalJwtSecret = this.externalTokenMode == ExternalTokenMode.LEGACY
-                ? validateSecret(externalJwtSecret, "COURSEFLOW_JWT_SECRET")
-                : trimToDefault(externalJwtSecret, "");
-        this.externalJwtIssuer = trimToDefault(externalJwtIssuer, "courseflow-identity");
-        this.externalOidcIssuer = this.externalTokenMode == ExternalTokenMode.OIDC
-                ? requireNonBlank(externalOidcIssuer, "KEYCLOAK_ISSUER_URI")
-                : trimToDefault(externalOidcIssuer, this.externalJwtIssuer);
+        this.externalOidcIssuer = requireNonBlank(externalOidcIssuer, "KEYCLOAK_ISSUER_URI");
         this.externalJwkSetUri = trimToDefault(externalJwkSetUri, defaultKeycloakJwkSetUri(this.externalOidcIssuer));
         this.externalAudiences = parseAudiences(externalAudiences, "courseflow-api");
         this.internalJwtAlgorithm = parseInternalAlgorithm(internalJwtAlgorithm);
@@ -133,132 +119,6 @@ public class TokenConverterProperties {
         validateOidcStsPolicy();
         this.ttlSeconds = Math.max(30, Math.min(ttlSeconds, 900));
         this.clockSkewSeconds = Math.max(0, Math.min(clockSkewSeconds, 120));
-    }
-
-    public TokenConverterProperties(String externalTokenMode,
-            String externalJwtSecret,
-            String externalJwtIssuer,
-            String externalOidcIssuer,
-            String externalJwkSetUri,
-            String externalAudiences,
-            String internalJwtAlgorithm,
-            String internalJwtSecret,
-            String internalJwtPrivateKey,
-            String internalJwtIssuer,
-            String defaultAudience,
-            String allowedAudiences,
-            long ttlSeconds,
-            long clockSkewSeconds) {
-        this(externalTokenMode,
-                externalJwtSecret,
-                externalJwtIssuer,
-                externalOidcIssuer,
-                externalJwkSetUri,
-                externalAudiences,
-                internalJwtAlgorithm,
-                internalJwtSecret,
-                internalJwtPrivateKey,
-                "",
-                internalJwtIssuer,
-                defaultAudience,
-                allowedAudiences,
-                "",
-                "",
-                DEFAULT_STS_ALLOWED_CLIENTS,
-                DEFAULT_STS_ALLOWED_SERVICE_SCOPES,
-                "",
-                ttlSeconds,
-                clockSkewSeconds);
-    }
-
-    public TokenConverterProperties(String externalTokenMode,
-            String externalJwtSecret,
-            String externalJwtIssuer,
-            String externalOidcIssuer,
-            String externalJwkSetUri,
-            String externalAudiences,
-            String internalJwtAlgorithm,
-            String internalJwtSecret,
-            String internalJwtPrivateKey,
-            String internalJwtPublicKey,
-            String internalJwtIssuer,
-            String defaultAudience,
-            String allowedAudiences,
-            String stsClientSecret,
-            String allowedServiceClients,
-            String allowedServiceScopes,
-            long ttlSeconds,
-            long clockSkewSeconds) {
-        this(externalTokenMode,
-                externalJwtSecret,
-                externalJwtIssuer,
-                externalOidcIssuer,
-                externalJwkSetUri,
-                externalAudiences,
-                internalJwtAlgorithm,
-                internalJwtSecret,
-                internalJwtPrivateKey,
-                internalJwtPublicKey,
-                internalJwtIssuer,
-                defaultAudience,
-                allowedAudiences,
-                stsClientSecret,
-                "",
-                allowedServiceClients,
-                allowedServiceScopes,
-                "",
-                ttlSeconds,
-                clockSkewSeconds);
-    }
-
-    public TokenConverterProperties(String externalTokenMode,
-            String externalJwtSecret,
-            String externalJwtIssuer,
-            String externalOidcIssuer,
-            String externalJwkSetUri,
-            String externalAudiences,
-            String internalJwtSecret,
-            String internalJwtIssuer,
-            String defaultAudience,
-            String allowedAudiences,
-            long ttlSeconds,
-            long clockSkewSeconds) {
-        this(externalTokenMode,
-                externalJwtSecret,
-                externalJwtIssuer,
-                externalOidcIssuer,
-                externalJwkSetUri,
-                externalAudiences,
-                "HS256",
-                internalJwtSecret,
-                "",
-                "",
-                internalJwtIssuer,
-                defaultAudience,
-                allowedAudiences,
-                "",
-                "",
-                DEFAULT_STS_ALLOWED_CLIENTS,
-                DEFAULT_STS_ALLOWED_SERVICE_SCOPES,
-                "",
-                ttlSeconds,
-                clockSkewSeconds);
-    }
-
-    public boolean legacyExternalTokenMode() {
-        return externalTokenMode == ExternalTokenMode.LEGACY;
-    }
-
-    public boolean oidcExternalTokenMode() {
-        return externalTokenMode == ExternalTokenMode.OIDC;
-    }
-
-    public SecretKey externalJwtKey() {
-        return Keys.hmacShaKeyFor(externalJwtSecret.getBytes(StandardCharsets.UTF_8));
-    }
-
-    public String externalJwtIssuer() {
-        return externalJwtIssuer;
     }
 
     public String externalOidcIssuer() {
@@ -465,24 +325,21 @@ public class TokenConverterProperties {
     }
 
     private void validateOidcStsPolicy() {
-        if (externalTokenMode != ExternalTokenMode.OIDC) {
-            return;
-        }
         if (serviceClientSecrets.isEmpty()) {
             throw new IllegalStateException(
-                    "COURSEFLOW_STS_CLIENT_SECRETS is required when EXTERNAL_TOKEN_MODE=oidc");
+                    "COURSEFLOW_STS_CLIENT_SECRETS is required");
         }
         if (serviceClientScopes.isEmpty()) {
             throw new IllegalStateException(
-                    "COURSEFLOW_STS_CLIENT_SCOPES is required when EXTERNAL_TOKEN_MODE=oidc");
+                    "COURSEFLOW_STS_CLIENT_SCOPES is required");
         }
         if (allowedServiceClients.contains("*")) {
             throw new IllegalStateException(
-                    "COURSEFLOW_STS_ALLOWED_CLIENTS must not contain wildcard '*' when EXTERNAL_TOKEN_MODE=oidc");
+                    "COURSEFLOW_STS_ALLOWED_CLIENTS must not contain wildcard '*'");
         }
         if (allowedServiceScopes.contains("*")) {
             throw new IllegalStateException(
-                    "COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES must not contain wildcard '*' when EXTERNAL_TOKEN_MODE=oidc");
+                    "COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES must not contain wildcard '*'");
         }
         Set<String> missingScopes = new LinkedHashSet<>(serviceClientSecrets.keySet());
         missingScopes.removeAll(serviceClientScopes.keySet());
@@ -514,17 +371,6 @@ public class TokenConverterProperties {
         return expected != null && actual != null
                 && MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
                         actual.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private ExternalTokenMode parseExternalMode(String raw) {
-        if ("legacy".equalsIgnoreCase(raw == null ? "" : raw.trim())) {
-            return ExternalTokenMode.LEGACY;
-        }
-        if (raw == null || raw.isBlank()
-                || "oidc".equalsIgnoreCase(raw.trim()) || "keycloak".equalsIgnoreCase(raw.trim())) {
-            return ExternalTokenMode.OIDC;
-        }
-        throw new IllegalStateException("Unsupported external token mode: " + raw);
     }
 
     private InternalJwtAlgorithm parseInternalAlgorithm(String raw) {
@@ -583,11 +429,6 @@ public class TokenConverterProperties {
         }
         String normalized = issuer.endsWith("/") ? issuer.substring(0, issuer.length() - 1) : issuer;
         return normalized + "/protocol/openid-connect/certs";
-    }
-
-    private enum ExternalTokenMode {
-        LEGACY,
-        OIDC
     }
 
     private enum InternalJwtAlgorithm {

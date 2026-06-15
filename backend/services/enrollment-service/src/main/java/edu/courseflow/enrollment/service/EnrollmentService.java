@@ -13,35 +13,62 @@ import edu.courseflow.enrollment.dto.EnrollmentDtos.BatchEnrollResultDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.ChangeStatusRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.CourseAccessDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentBenefitReconciliationEntryDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentBenefitReconciliationQueryResponseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentCheckoutResponseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentOrderDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentPromotionApplicationDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentPromotionApplicationStateDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentRemediationCaseActionDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentRemediationCaseDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.EnrollmentStatsDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.LearnerCouponWalletDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.PaymentStatusUpdateRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionApplicationActionRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionEffectDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionPreviewDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.PromotionPreviewRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RemediationCaseActionRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RemediationCaseAssignRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RefundDropPolicyActionDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RefundDropPolicyEvaluateRequestDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RefundDropPolicyEvaluationResponseDto;
+import edu.courseflow.enrollment.dto.EnrollmentDtos.RefundDropPolicyFactsDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.SetCapacityRequestDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistEntryDto;
 import edu.courseflow.enrollment.dto.EnrollmentDtos.WaitlistRequestDto;
 import edu.courseflow.enrollment.exception.ForbiddenException;
 import edu.courseflow.enrollment.model.EnrollmentCheckoutAttempt;
+import edu.courseflow.enrollment.model.EnrollmentOrder;
 import edu.courseflow.enrollment.model.EnrollmentPromotionApplication;
+import edu.courseflow.enrollment.model.EnrollmentRemediationCase;
+import edu.courseflow.enrollment.model.EnrollmentRemediationCaseAction;
 import edu.courseflow.enrollment.repository.EnrollmentRepository;
 import edu.courseflow.enrollment.repository.EnrollmentCheckoutAttemptJpaRepository;
+import edu.courseflow.enrollment.repository.EnrollmentOrderJpaRepository;
 import edu.courseflow.enrollment.repository.EnrollmentPromotionApplicationJpaRepository;
+import edu.courseflow.enrollment.repository.EnrollmentRemediationCaseActionJpaRepository;
+import edu.courseflow.enrollment.repository.EnrollmentRemediationCaseJpaRepository;
+import edu.courseflow.enrollment.repository.EnrollmentJpaRepository.EnrollmentBenefitReconciliationRow;
+import edu.courseflow.enrollment.service.CoursePricingClient.CoursePricingSnapshot;
+import edu.courseflow.enrollment.service.CoursePricingClient.CoursePricingUnavailableException;
 import edu.courseflow.enrollment.service.PromotionEnrollmentClient.CancelResult;
 import edu.courseflow.enrollment.service.PromotionEnrollmentClient.CommitResult;
 import edu.courseflow.enrollment.service.PromotionEnrollmentClient.PromotionUnavailableException;
 import edu.courseflow.enrollment.service.PromotionEnrollmentClient.ReservationResult;
 import edu.courseflow.enrollment.service.PromotionEnrollmentClient.ReverseResult;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -49,6 +76,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,13 +86,15 @@ public class EnrollmentService {
     /**
      * Allowed enrollment status transitions.
      * <ul>
-     *   <li>ACTIVE    -> DROPPED, COMPLETED</li>
-     *   <li>DROPPED   -> ACTIVE (re-enroll)</li>
+     *   <li>PENDING_PAYMENT -> ACTIVE, DROPPED</li>
+     *   <li>ACTIVE          -> DROPPED, COMPLETED</li>
+     *   <li>DROPPED         -> ACTIVE (re-enroll)</li>
      *   <li>COMPLETED -> (terminal: no transitions)</li>
      * </ul>
      * A no-op transition to the same status is rejected as a bad request.
      */
     private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
+            "PENDING_PAYMENT", Set.of("ACTIVE", "DROPPED"),
             "ACTIVE", Set.of("DROPPED", "COMPLETED"),
             "DROPPED", Set.of("ACTIVE"),
             "COMPLETED", Set.of());
@@ -72,16 +102,29 @@ public class EnrollmentService {
     };
     private static final TypeReference<List<PromotionEffectDto>> PROMOTION_EFFECT_LIST = new TypeReference<>() {
     };
+    private static final TypeReference<Map<String, Object>> OBJECT_MAP = new TypeReference<>() {
+    };
+    private static final BigDecimal ZERO_MONEY = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private static final String DEFAULT_REMEDIATION_ASSIGNEE = "enrollment-ops";
+    private static final Duration REMEDIATION_SLA = Duration.ofHours(24);
+    private static final Duration RESERVED_REMEDIATION_AGE = Duration.ofHours(24);
+    private static final Duration BENEFIT_RECONCILIATION_STALE_AGE = Duration.ofMinutes(30);
+    private static final int DEFAULT_RECONCILIATION_LIMIT = 50;
+    private static final int MAX_RECONCILIATION_LIMIT = 200;
 
     private final EnrollmentRepository enrollments;
     private final EnrollmentCheckoutAttemptJpaRepository checkoutAttempts;
     private final EnrollmentPromotionApplicationJpaRepository promotionApplications;
+    private final EnrollmentOrderJpaRepository orders;
+    private final EnrollmentRemediationCaseJpaRepository remediationCases;
+    private final EnrollmentRemediationCaseActionJpaRepository remediationActions;
     private final ObjectMapper objectMapper;
     private final CourseAccessClient courseAccess;
     private final PromotionEnrollmentClient promotions;
+    private final CoursePricingClient coursePricing;
 
     public EnrollmentService(EnrollmentRepository enrollments, ObjectMapper objectMapper, CourseAccessClient courseAccess) {
-        this(enrollments, null, null, objectMapper, courseAccess, null);
+        this(enrollments, null, null, null, null, null, objectMapper, courseAccess, null, null);
     }
 
     public EnrollmentService(EnrollmentRepository enrollments,
@@ -89,22 +132,30 @@ public class EnrollmentService {
                              ObjectMapper objectMapper,
                              CourseAccessClient courseAccess,
                              PromotionEnrollmentClient promotions) {
-        this(enrollments, null, promotionApplications, objectMapper, courseAccess, promotions);
+        this(enrollments, null, promotionApplications, null, null, null, objectMapper, courseAccess, promotions, null);
     }
 
     @Autowired
     public EnrollmentService(EnrollmentRepository enrollments,
                              EnrollmentCheckoutAttemptJpaRepository checkoutAttempts,
                              EnrollmentPromotionApplicationJpaRepository promotionApplications,
+                             EnrollmentOrderJpaRepository orders,
+                             EnrollmentRemediationCaseJpaRepository remediationCases,
+                             EnrollmentRemediationCaseActionJpaRepository remediationActions,
                              ObjectMapper objectMapper,
                              CourseAccessClient courseAccess,
-                             PromotionEnrollmentClient promotions) {
+                             PromotionEnrollmentClient promotions,
+                             CoursePricingClient coursePricing) {
         this.enrollments = enrollments;
         this.checkoutAttempts = checkoutAttempts;
         this.promotionApplications = promotionApplications;
+        this.orders = orders;
+        this.remediationCases = remediationCases;
+        this.remediationActions = remediationActions;
         this.objectMapper = objectMapper;
         this.courseAccess = courseAccess;
         this.promotions = promotions;
+        this.coursePricing = coursePricing;
     }
 
     public List<EnrollmentDto> list(Optional<UUID> courseId, Optional<String> studentId, CurrentUser user) {
@@ -122,6 +173,178 @@ public class EnrollmentService {
             throw new ForbiddenException("Students may only read their own enrollment");
         }
         return enrollments.list(courseId.orElse(null), caller);
+    }
+
+    @Transactional(readOnly = true)
+    public EnrollmentBenefitReconciliationQueryResponseDto benefitReconciliation(
+            Optional<UUID> enrollmentId,
+            Optional<UUID> courseId,
+            Optional<String> studentId,
+            Optional<String> status,
+            Optional<Boolean> includeMatched,
+            Optional<Integer> limit,
+            CurrentUser user) {
+        requireBenefitReconciliationAccess(courseId, user);
+        String normalizedStudentId = studentId.map(this::normalizeText).orElse(null);
+        String normalizedStatus = status.map(this::normalizeReconciliationStatus).orElse(null);
+        int pageSize = Math.max(1, Math.min(limit.orElse(DEFAULT_RECONCILIATION_LIMIT), MAX_RECONCILIATION_LIMIT));
+        int fetchSize = Math.min(1000, pageSize * 5 + 1);
+        Instant staleCutoff = Instant.now().minus(BENEFIT_RECONCILIATION_STALE_AGE);
+        boolean showMatched = includeMatched.orElse(false) || "MATCHED".equals(normalizedStatus);
+        List<EnrollmentBenefitReconciliationEntryDto> items = enrollments
+                .benefitReconciliationRows(enrollmentId.orElse(null), courseId.orElse(null), normalizedStudentId, fetchSize)
+                .stream()
+                .map(row -> reconciliationEntry(row, benefitFinding(row, staleCutoff)))
+                .filter(entry -> normalizedStatus == null || normalizedStatus.equals(entry.reconciliationStatus()))
+                .filter(entry -> showMatched || !"MATCHED".equals(entry.reconciliationStatus()))
+                .limit(pageSize + 1L)
+                .toList();
+        boolean hasMore = items.size() > pageSize;
+        return new EnrollmentBenefitReconciliationQueryResponseDto(
+                items.stream().limit(pageSize).toList(),
+                pageSize,
+                hasMore,
+                Instant.now());
+    }
+
+    @Transactional(readOnly = true)
+    public RefundDropPolicyEvaluationResponseDto evaluateRefundDropPolicy(
+            RefundDropPolicyEvaluateRequestDto request,
+            CurrentUser user) {
+        UUID enrollmentId = parseUuid(request.enrollmentId(), "enrollmentId");
+        EnrollmentDto enrollment = enrollments.findById(enrollmentId)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment not found: " + enrollmentId));
+        UUID courseId = parseUuid(enrollment.courseId(), "courseId");
+        requireBenefitReconciliationAccess(Optional.of(courseId), user);
+
+        EnrollmentOrder order = orders == null
+                ? null
+                : orders.findByEnrollmentId(enrollmentId).orElse(null);
+        EnrollmentPromotionApplication application = promotionApplications == null
+                ? null
+                : promotionApplications.findByEnrollmentId(enrollmentId).orElse(null);
+
+        Instant generatedAt = Instant.now();
+        Instant requestedAt = request.requestedAt() == null ? generatedAt : request.requestedAt();
+        int refundWindowDays = refundWindowDays(request.refundWindowDays());
+        Instant paidAt = request.paidAt() != null
+                ? request.paidAt()
+                : order == null ? null : order.getPaidAt();
+        Instant refundWindowEndsAt = paidAt == null
+                ? null
+                : paidAt.plus(Duration.ofDays(refundWindowDays));
+        boolean withinRefundWindow = refundWindowEndsAt != null && !requestedAt.isAfter(refundWindowEndsAt);
+
+        String paymentStatus = upper(firstText(
+                request.paymentStatus(),
+                order == null ? null : order.getStatus()));
+        BigDecimal paidAmount = money(request.paidAmount() != null
+                ? request.paidAmount()
+                : order == null ? null : order.getAmount());
+        String currency = upper(firstText(request.currency(), order == null ? null : order.getCurrency(), "USD"));
+        String promotionStatus = upper(firstText(
+                request.promotionStatus(),
+                application == null ? null : application.getStatus(),
+                "SKIPPED"));
+        String reservationId = firstText(
+                request.reservationId(),
+                application == null || application.getReservationId() == null
+                        ? null
+                        : application.getReservationId().toString());
+        String redemptionId = firstText(
+                request.redemptionId(),
+                application == null || application.getRedemptionId() == null
+                        ? null
+                        : application.getRedemptionId().toString());
+        long loyaltyPointsEarned = nonNegative(request.loyaltyPointsEarned());
+        long loyaltyPointsReversed = nonNegative(request.loyaltyPointsReversed());
+        long loyaltyPointsOutstanding = Math.max(0, loyaltyPointsEarned - loyaltyPointsReversed);
+        String loyaltyEarnEntryId = firstText(request.loyaltyEarnEntryId());
+        String rewardStatus = upper(firstText(request.rewardStatus()));
+        String rewardRedemptionId = firstText(request.rewardRedemptionId());
+        String rewardFulfillmentStatus = upper(firstText(request.rewardFulfillmentStatus()));
+        Boolean rewardFulfilled = request.rewardFulfilled();
+        if (rewardFulfilled == null && rewardFulfillmentStatus != null) {
+            rewardFulfilled = "ISSUED".equals(rewardFulfillmentStatus) || "FULFILLED".equals(rewardFulfillmentStatus);
+        }
+
+        RefundDropPolicyFactsDto facts = new RefundDropPolicyFactsDto(
+                enrollment.status(),
+                enrollment.enrolledAt(),
+                enrollment.droppedAt(),
+                enrollment.completedAt(),
+                enrollment.dropReason(),
+                order == null ? null : order.getId().toString(),
+                paymentStatus,
+                paidAmount,
+                currency,
+                paidAt,
+                refundWindowDays,
+                refundWindowEndsAt,
+                withinRefundWindow,
+                application == null ? null : application.getId().toString(),
+                promotionStatus,
+                reservationId,
+                redemptionId,
+                loyaltyPointsEarned,
+                loyaltyPointsReversed,
+                loyaltyPointsOutstanding,
+                loyaltyEarnEntryId,
+                rewardStatus,
+                rewardRedemptionId,
+                rewardFulfillmentStatus,
+                rewardFulfilled);
+
+        List<RefundDropPolicyActionDto> actions = new ArrayList<>();
+        actions.add(dropPolicyAction(enrollment, request.reason()));
+        actions.add(paymentRefundPolicyAction(enrollment, facts));
+        actions.add(promotionPolicyAction(enrollment, facts));
+        actions.add(pointsClawbackPolicyAction(enrollment, facts));
+        actions.add(rewardReversalPolicyAction(enrollment, facts));
+
+        LinkedHashSet<String> reasonCodes = new LinkedHashSet<>();
+        for (RefundDropPolicyActionDto action : actions) {
+            reasonCodes.addAll(action.reasonCodes());
+        }
+        boolean manualReviewRequired = actions.stream()
+                .anyMatch(action -> Set.of("MANUAL_REVIEW", "BLOCKED").contains(action.decision()));
+        boolean refundEligible = actions.stream()
+                .anyMatch(action -> "REFUND_PAYMENT".equals(action.action())
+                        && "REQUIRED".equals(action.decision()));
+        boolean dropAllowed = actions.stream()
+                .filter(action -> "DROP_ENROLLMENT".equals(action.action()))
+                .anyMatch(action -> Set.of("REQUIRED", "ALREADY_DONE").contains(action.decision()));
+        String severity = maxSeverity(actions);
+        String matrixStatus = manualReviewRequired
+                ? "MANUAL_REVIEW"
+                : actions.stream().anyMatch(RefundDropPolicyActionDto::required)
+                        ? "ACTION_REQUIRED"
+                        : "NO_ACTION";
+
+        Map<String, Object> auditPreview = evidence(
+                "enrollmentId", enrollment.id(),
+                "studentId", enrollment.studentId(),
+                "courseId", enrollment.courseId(),
+                "matrixStatus", matrixStatus,
+                "severity", severity,
+                "reason", normalizeText(request.reason()),
+                "reasonCodes", List.copyOf(reasonCodes),
+                "evidence", request.evidence() == null ? Map.of() : request.evidence());
+        return new RefundDropPolicyEvaluationResponseDto(
+                enrollment.id(),
+                enrollment.studentId(),
+                enrollment.courseId(),
+                matrixStatus,
+                severity,
+                dropAllowed,
+                refundEligible,
+                manualReviewRequired,
+                List.copyOf(reasonCodes),
+                facts,
+                List.copyOf(actions),
+                auditPreview,
+                generatedAt);
     }
 
     public List<EnrollmentDto> learnerMemberships(String studentId) {
@@ -166,18 +389,19 @@ public class EnrollmentService {
         String studentId = resolveTargetStudent(request.studentId(), user, courseId);
         String couponCode = normalizeCoupon(request.couponCode());
         String couponId = normalizeText(request.couponId());
+        boolean hasPromotionSelector = couponCode != null || couponId != null;
         CheckoutAttemptClaim attemptClaim = claimCheckoutAttempt(request, courseId, studentId, couponCode, couponId);
         if (attemptClaim.replay() != null) {
             return attemptClaim.replay();
         }
+        PromotionPreviewDto quote = checkoutQuote(request, courseId, studentId, couponCode, couponId);
+        boolean paymentRequired = isPaymentRequired(quote.finalAmount());
         EnrollmentCheckoutAttempt attempt = attemptClaim.attempt();
         ReservationResult reservation = ReservationResult.skipped(couponCode, couponId);
-        boolean hasPromotionSelector = couponCode != null || couponId != null;
         if (hasPromotionSelector && promotions == null) {
             throw new ConflictException("Promotion service is required when a coupon is supplied");
         } else if (hasPromotionSelector) {
             try {
-                validatePromotionPreview(request, courseId, studentId, couponCode, couponId);
                 reservation = promotions.reserve(courseId, studentId, couponCode, couponId, reserveKey(request));
                 if (!reservation.reserved()) {
                     throw new BadRequestException("Coupon is not applicable: "
@@ -189,20 +413,33 @@ public class EnrollmentService {
             }
         }
         try {
-            EnrollmentDto enrollment = createEnrollment(request, user);
+            EnrollmentDto enrollment = paymentRequired
+                    ? createPendingPaymentEnrollment(request, user, quote)
+                    : createEnrollment(request, user, true);
             markAttemptEnrollmentCreated(attempt, enrollment);
-            EnrollmentPromotionApplicationDto promotion = promotionApplication(
-                    couponCode,
-                    couponId,
-                    reservation,
-                    enrollment,
-                    false,
-                    request.idempotencyKey(),
-                    attempt);
+            EnrollmentPromotionApplicationDto promotion = paymentRequired
+                    ? reservePromotionApplicationForPaidCheckout(
+                            couponCode,
+                            couponId,
+                            reservation,
+                            enrollment,
+                            request.idempotencyKey())
+                    : promotionApplication(
+                            couponCode,
+                            couponId,
+                            reservation,
+                            enrollment,
+                            false,
+                            request.idempotencyKey(),
+                            attempt);
+            EnrollmentOrder order = paymentRequired
+                    ? createEnrollmentOrder(enrollment, attempt, quote, request)
+                    : null;
             EnrollmentCheckoutResponseDto response = new EnrollmentCheckoutResponseDto(
                     enrollment,
                     promotion,
-                    attempt == null ? null : attempt.getId().toString());
+                    attempt == null ? null : attempt.getId().toString(),
+                    order == null ? null : enrollmentOrderDto(order));
             finishCheckoutAttempt(attempt, response);
             return response;
         } catch (RuntimeException ex) {
@@ -291,6 +528,11 @@ public class EnrollmentService {
             return;
         }
         EnrollmentPromotionApplicationDto promotion = response.promotion();
+        if (response.order() != null && "PAYMENT_PENDING".equals(response.order().status())) {
+            attempt.finish("PAYMENT_PENDING", toJson(response), null);
+            checkoutAttempts.save(attempt);
+            return;
+        }
         String attemptStatus = checkoutAttemptStatus(promotion == null ? "SKIPPED" : promotion.status());
         String responseJson = toJson(response);
         if ("COMMIT_FAILED".equals(attemptStatus)) {
@@ -335,7 +577,59 @@ public class EnrollmentService {
         checkoutAttempts.save(attempt);
     }
 
-    private void validatePromotionPreview(
+    private PromotionPreviewDto checkoutQuote(
+            EnrollRequestDto request,
+            UUID courseId,
+            String studentId,
+            String couponCode,
+            String couponId) {
+        if (couponCode != null || couponId != null) {
+            if (promotions == null) {
+                throw new ConflictException("Promotion service is required when a coupon is supplied");
+            }
+            return validatePromotionPreview(request, courseId, studentId, couponCode, couponId);
+        }
+        CoursePricingSnapshot pricing = authoritativePricing(courseId);
+        BigDecimal amount = money(pricing.listPrice());
+        return new PromotionPreviewDto(
+                "price-" + sha256Hex(String.join("|",
+                        courseId.toString(),
+                        amount.toPlainString(),
+                        pricing.currency(),
+                        pricing.priceSource(),
+                        pricing.priceStatus())).substring(0, 24),
+                courseId.toString(),
+                null,
+                null,
+                "PREVIEWED",
+                true,
+                List.of(),
+                "Course price quoted for enrollment checkout",
+                amount,
+                ZERO_MONEY,
+                amount,
+                pricing.currency(),
+                pricing.priceSource(),
+                List.of(),
+                false);
+    }
+
+    private CoursePricingSnapshot authoritativePricing(UUID courseId) {
+        if (coursePricing == null) {
+            throw new ConflictException("Course pricing is required for enrollment checkout");
+        }
+        try {
+            CoursePricingSnapshot snapshot = coursePricing.pricing(courseId.toString());
+            if (snapshot == null || snapshot.listPrice() == null || snapshot.currency() == null) {
+                throw new ConflictException("Course pricing is not configured");
+            }
+            return snapshot;
+        } catch (CoursePricingUnavailableException ex) {
+            throw new ConflictException("Course pricing is unavailable; retry checkout later");
+        }
+    }
+
+    private PromotionPreviewDto validatePromotionPreview(
             EnrollRequestDto request,
             UUID courseId,
             String studentId,
@@ -355,16 +649,38 @@ public class EnrollmentService {
         if (!expectedPreviewId.equals(preview.previewId())) {
             throw new ConflictException("Promotion preview is stale; refresh the coupon quote before checkout");
         }
+        return preview;
+    }
+
+    private boolean isPaymentRequired(BigDecimal finalAmount) {
+        return money(finalAmount).compareTo(ZERO_MONEY) > 0;
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
     }
 
     private EnrollmentDto createEnrollment(EnrollRequestDto request, CurrentUser user) {
+        return createEnrollment(request, user, false);
+    }
+
+    private EnrollmentDto createEnrollment(
+            EnrollRequestDto request,
+            CurrentUser user,
+            boolean checkoutBoundarySatisfied) {
         UUID courseId = parseUuid(request.courseId(), "courseId");
         courseAccess.requirePublishedCourse(courseId);
         String studentId = resolveTargetStudent(request.studentId(), user, courseId);
+        if (!checkoutBoundarySatisfied) {
+            assertDirectEnrollmentAllowedWithoutOrder(courseId);
+        }
 
         enrollments.find(studentId, courseId).ifPresent(existing -> {
             if ("ACTIVE".equals(existing.status())) {
                 throw new ConflictException("Student already actively enrolled");
+            }
+            if ("PENDING_PAYMENT".equals(existing.status())) {
+                throw new ConflictException("Student already has a pending payment enrollment");
             }
             if ("COMPLETED".equals(existing.status())) {
                 throw new ConflictException("Enrollment already completed; cannot re-enroll");
@@ -383,6 +699,74 @@ public class EnrollmentService {
                 "enrolledAt", dto.enrolledAt().toString()
         )));
         return dto;
+    }
+
+    private void assertDirectEnrollmentAllowedWithoutOrder(UUID courseId) {
+        if (coursePricing == null) {
+            if (orders != null) {
+                throw new ConflictException("Course pricing is required before direct enrollment can bypass checkout");
+            }
+            return;
+        }
+        CoursePricingSnapshot pricing = authoritativePricing(courseId);
+        if (money(pricing.listPrice()).compareTo(ZERO_MONEY) > 0) {
+            throw new ConflictException("Paid courses must be enrolled through checkout with a valid order/payment");
+        }
+    }
+
+    private EnrollmentDto createPendingPaymentEnrollment(
+            EnrollRequestDto request,
+            CurrentUser user,
+            PromotionPreviewDto quote) {
+        if (orders == null) {
+            throw new ConflictException("Enrollment order store is required for paid checkout");
+        }
+        UUID courseId = parseUuid(request.courseId(), "courseId");
+        courseAccess.requirePublishedCourse(courseId);
+        String studentId = resolveTargetStudent(request.studentId(), user, courseId);
+
+        enrollments.find(studentId, courseId).ifPresent(existing -> {
+            if ("ACTIVE".equals(existing.status())) {
+                throw new ConflictException("Student already actively enrolled");
+            }
+            if ("PENDING_PAYMENT".equals(existing.status())) {
+                throw new ConflictException("Student already has a pending payment enrollment");
+            }
+            if ("COMPLETED".equals(existing.status())) {
+                throw new ConflictException("Enrollment already completed; cannot re-enroll");
+            }
+        });
+
+        enforceCapacity(courseId);
+        return enrollments.enrollPendingPayment(
+                studentId,
+                courseId,
+                String.valueOf(user.id()),
+                "Paid checkout requires payment before activation; amount "
+                        + money(quote.finalAmount()).toPlainString() + " " + quote.currency());
+    }
+
+    private void assertPaymentSatisfiedForActivation(UUID enrollmentId, UUID courseId) {
+        if (orders != null) {
+            Optional<EnrollmentOrder> order = orders.findByEnrollmentId(enrollmentId);
+            if (order.isPresent()) {
+                EnrollmentOrder found = order.get();
+                if (found.getAmount().compareTo(ZERO_MONEY) > 0 && !"PAID".equals(found.getStatus())) {
+                    throw new ConflictException("Paid enrollment cannot become ACTIVE until payment is PAID");
+                }
+                return;
+            }
+        }
+        if (coursePricing == null) {
+            if (orders != null) {
+                throw new ConflictException("Course pricing is required to activate an enrollment without a paid order");
+            }
+            return;
+        }
+        CoursePricingSnapshot pricing = authoritativePricing(courseId);
+        if (money(pricing.listPrice()).compareTo(ZERO_MONEY) > 0) {
+            throw new ConflictException("Paid course activation requires an enrollment order with PAID status");
+        }
     }
 
     private EnrollmentPromotionApplicationDto promotionApplication(String couponCode,
@@ -485,6 +869,97 @@ public class EnrollmentService {
         }
     }
 
+    private EnrollmentPromotionApplicationDto reservePromotionApplicationForPaidCheckout(
+            String couponCode,
+            String couponId,
+            ReservationResult reservation,
+            EnrollmentDto enrollment,
+            String idempotencyKey) {
+        if (couponCode == null && couponId == null) {
+            return new EnrollmentPromotionApplicationDto(
+                    "SKIPPED",
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of("COUPON_NOT_SUPPLIED"),
+                    "Paid checkout has no coupon to reserve",
+                    List.of());
+        }
+        if (reservation.reservationId() == null) {
+            return new EnrollmentPromotionApplicationDto(
+                    "SKIPPED",
+                    null,
+                    null,
+                    couponCode,
+                    couponId,
+                    reservation.reasonCodes(),
+                    "Paid checkout continued without applying the coupon",
+                    reservation.effects());
+        }
+        String resolvedCouponId = reservation.couponId() == null ? couponId : reservation.couponId();
+        savePromotionApplication(
+                enrollment,
+                "RESERVED",
+                couponCode,
+                resolvedCouponId,
+                reservation.reservationId(),
+                null,
+                idempotencyKey,
+                reservation.reasonCodes(),
+                reservation.effects(),
+                "Coupon reserved; commit is deferred until payment succeeds");
+        return new EnrollmentPromotionApplicationDto(
+                "RESERVED",
+                reservation.reservationId().toString(),
+                null,
+                couponCode,
+                resolvedCouponId,
+                reservation.reasonCodes(),
+                "Coupon reserved; commit is deferred until payment succeeds",
+                reservation.effects());
+    }
+
+    private EnrollmentOrder createEnrollmentOrder(
+            EnrollmentDto enrollment,
+            EnrollmentCheckoutAttempt attempt,
+            PromotionPreviewDto quote,
+            EnrollRequestDto request) {
+        if (orders == null) {
+            throw new ConflictException("Enrollment order store is required for paid checkout");
+        }
+        EnrollmentOrder order = new EnrollmentOrder(
+                UUID.fromString(enrollment.id()),
+                attempt == null ? null : attempt.getId(),
+                enrollment.studentId(),
+                UUID.fromString(enrollment.courseId()),
+                money(quote.finalAmount()),
+                quote.currency(),
+                normalizeText(request.idempotencyKey()));
+        return orders.save(order);
+    }
+
+    private EnrollmentOrderDto enrollmentOrderDto(EnrollmentOrder order) {
+        if (order == null) {
+            return null;
+        }
+        return new EnrollmentOrderDto(
+                order.getId().toString(),
+                order.getEnrollmentId().toString(),
+                order.getCheckoutAttemptId() == null ? null : order.getCheckoutAttemptId().toString(),
+                order.getStudentId(),
+                order.getCourseId().toString(),
+                order.getStatus(),
+                order.getAmount(),
+                order.getCurrency(),
+                order.getPaymentProvider(),
+                order.getPaymentReference(),
+                order.getFailureReason(),
+                order.getPaidAt(),
+                order.getCreatedAt(),
+                order.getUpdatedAt());
+    }
+
     private void savePromotionApplication(EnrollmentDto enrollment,
                                           String status,
                                           String couponCode,
@@ -523,6 +998,16 @@ public class EnrollmentService {
             application.scheduleRetry(message, nextPromotionApplicationRetryAt(application));
         }
         promotionApplications.save(application);
+        if (Set.of("COMMIT_FAILED", "MANUAL_REVIEW").contains(status)) {
+            ensureRemediationCaseForPromotion(
+                    application,
+                    firstReasonCode(reasonCodes, status),
+                    "HIGH",
+                    message,
+                    "system",
+                    null,
+                    true);
+        }
     }
 
     private void updatePromotionApplication(EnrollmentDto enrollment,
@@ -548,6 +1033,16 @@ public class EnrollmentService {
             application.scheduleRetry(message, nextPromotionApplicationRetryAt(application));
         }
         promotionApplications.save(application);
+        if (Set.of("COMMIT_FAILED", "MANUAL_REVIEW").contains(status)) {
+            ensureRemediationCaseForPromotion(
+                    application,
+                    firstReasonCode(reasonCodes, status),
+                    "HIGH",
+                    message,
+                    "system",
+                    null,
+                    true);
+        }
     }
 
     public EnrollmentPromotionApplicationStateDto promotionApplication(UUID enrollmentId, CurrentUser user) {
@@ -612,6 +1107,12 @@ public class EnrollmentService {
         if (!Set.of("COMMIT_FAILED", "RESERVED").contains(application.getStatus())) {
             throw new ConflictException("Only RESERVED or COMMIT_FAILED coupon applications can be retried");
         }
+        recordRetryHistory(
+                application,
+                "RETRY_ATTEMPTED",
+                actorId(user),
+                actionReason(request, "Operator requested coupon commit retry"),
+                request == null ? null : request.correlationId());
         retryPromotionCommitFailure(application, actionReason(request, "Operator requested coupon commit retry"));
         return promotionApplicationState(application);
     }
@@ -649,6 +1150,14 @@ public class EnrollmentService {
                     application.getEffectsJson(),
                     "Coupon reservation cannot be cancelled because reservation id is missing");
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "RESERVATION_ID_MISSING",
+                    "HIGH",
+                    application.getMessage(),
+                    actorId(user),
+                    request == null ? null : request.correlationId(),
+                    true);
             if (enrollment != null) {
                 syncCheckoutAttempt(enrollment, application);
             }
@@ -662,6 +1171,11 @@ public class EnrollmentService {
                             ? "Coupon reservation cancelled by operator"
                             : "Coupon reservation cancel request completed without confirmed cancellation");
             promotionApplications.save(application);
+            resolveRemediationCaseForPromotion(
+                    application,
+                    actorId(user),
+                    application.getMessage(),
+                    request == null ? null : request.correlationId());
             if (enrollment != null) {
                 syncCheckoutAttempt(enrollment, application);
             }
@@ -676,11 +1190,807 @@ public class EnrollmentService {
                     retryMessage);
             application.recordOperatorBlockingError(retryMessage);
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "PROMOTION_CANCEL_UNAVAILABLE",
+                    "HIGH",
+                    retryMessage,
+                    actorId(user),
+                    request == null ? null : request.correlationId(),
+                    true);
             if (enrollment != null) {
                 syncCheckoutAttempt(enrollment, application);
             }
             return promotionApplicationState(application);
         }
+    }
+
+    @Transactional
+    public EnrollmentCheckoutResponseDto recordOrderPayment(
+            UUID orderId,
+            PaymentStatusUpdateRequestDto request,
+            CurrentUser user) {
+        if (orders == null) {
+            throw new edu.courseflow.commonlibrary.exception.NotFoundException(
+                    "Enrollment order store is not configured");
+        }
+        requireCheckoutOperator(user);
+        EnrollmentOrder order = orders.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment order not found: " + orderId));
+        String status = normalizePaymentStatus(request.paymentStatus());
+        if ("PAID".equals(order.getStatus())) {
+            Optional<String> conflict = paidOrderReplayConflict(order, status, request);
+            if (conflict.isPresent()) {
+                ensureRemediationCaseForOrder(
+                        order,
+                        "PAYMENT_REPLAY_CONFLICT",
+                        "HIGH",
+                        conflict.get(),
+                        actorId(user),
+                        request.correlationId());
+                syncCheckoutAttemptForOrder(order);
+            }
+            return checkoutResponseForOrder(order);
+        }
+        if ("PAID".equals(status)) {
+            Optional<String> mismatch = paymentMismatch(order, request);
+            if (mismatch.isPresent()) {
+                order.markManualReview(mismatch.get());
+                orders.save(order);
+                ensureRemediationCaseForOrder(
+                        order,
+                        "PAYMENT_MISMATCH",
+                        "HIGH",
+                        mismatch.get(),
+                        actorId(user),
+                        request.correlationId());
+                syncCheckoutAttemptForOrder(order);
+                return checkoutResponseForOrder(order);
+            }
+            Optional<String> duplicateReference = duplicatePaymentReferenceConflict(order, request);
+            if (duplicateReference.isPresent()) {
+                order.markManualReview(duplicateReference.get());
+                orders.save(order);
+                ensureRemediationCaseForOrder(
+                        order,
+                        "PAYMENT_REFERENCE_CONFLICT",
+                        "HIGH",
+                        duplicateReference.get(),
+                        actorId(user),
+                        request.correlationId());
+                syncCheckoutAttemptForOrder(order);
+                return checkoutResponseForOrder(order);
+            }
+            order.markPaid(request.paymentProvider(), request.paymentReference());
+            orders.save(order);
+            EnrollmentDto enrollment = activatePaidEnrollment(order, user, request);
+            if ("PAID".equals(order.getStatus()) && Set.of("ACTIVE", "COMPLETED").contains(enrollment.status())) {
+                commitPromotionAfterPaymentSuccess(enrollment, order, user, request);
+                resolveRemediationCaseForOrder(
+                        order,
+                        actorId(user),
+                        "Payment event accepted and enrollment boundary satisfied",
+                        request.correlationId());
+            }
+            syncCheckoutAttemptForOrder(order);
+            return checkoutResponseForOrder(order);
+        }
+        order.markFailed(status, actionNote(request.note(), "Payment did not complete"));
+        orders.save(order);
+        EnrollmentDto enrollment = closePendingEnrollmentAfterPaymentFailure(order, user, request);
+        cancelPromotionReservationAfterPaymentFailure(enrollment, order, request);
+        syncCheckoutAttemptForOrder(order);
+        return checkoutResponseForOrder(order);
+    }
+
+    private EnrollmentDto activatePaidEnrollment(
+            EnrollmentOrder order,
+            CurrentUser user,
+            PaymentStatusUpdateRequestDto request) {
+        EnrollmentDto enrollment = enrollments.findById(order.getEnrollmentId())
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment not found: " + order.getEnrollmentId()));
+        if ("ACTIVE".equals(enrollment.status()) || "COMPLETED".equals(enrollment.status())) {
+            return enrollment;
+        }
+        if (!"PENDING_PAYMENT".equals(enrollment.status())) {
+            order.markManualReview("Payment succeeded for enrollment status " + enrollment.status());
+            orders.save(order);
+            ensureRemediationCaseForOrder(
+                    order,
+                    "PAYMENT_STATUS_NOT_ACTIVATABLE",
+                    "HIGH",
+                    "Payment succeeded but enrollment is " + enrollment.status(),
+                    actorId(user),
+                    request.correlationId());
+            return enrollment;
+        }
+        EnrollmentDto updated = enrollments.changeStatus(
+                order.getEnrollmentId(),
+                actorId(user),
+                "ACTIVE",
+                actionNote(request.note(), "Payment succeeded for order " + order.getId()));
+        enrollments.outbox(order.getEnrollmentId(), "enrollment", "enrollment.created", toJson(Map.of(
+                "eventId", UUID.randomUUID().toString(),
+                "enrollmentId", updated.id(),
+                "studentId", updated.studentId(),
+                "courseId", updated.courseId(),
+                "orderId", order.getId().toString(),
+                "paymentReference", order.getPaymentReference() == null ? "" : order.getPaymentReference(),
+                "enrolledAt", updated.enrolledAt().toString())));
+        return updated;
+    }
+
+    private void commitPromotionAfterPaymentSuccess(
+            EnrollmentDto enrollment,
+            EnrollmentOrder order,
+            CurrentUser user,
+            PaymentStatusUpdateRequestDto request) {
+        if (promotionApplications == null) {
+            return;
+        }
+        EnrollmentPromotionApplication application = promotionApplications
+                .findByEnrollmentId(UUID.fromString(enrollment.id()))
+                .orElse(null);
+        if (application == null || !Set.of("RESERVED", "COMMIT_FAILED").contains(application.getStatus())) {
+            return;
+        }
+        if (promotions == null) {
+            application.update(
+                    "MANUAL_REVIEW",
+                    application.getRedemptionId(),
+                    toJson(List.of("PROMOTION_SERVICE_NOT_CONFIGURED")),
+                    application.getEffectsJson(),
+                    "Payment succeeded, but promotion service is not configured for commit");
+            promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "PROMOTION_SERVICE_NOT_CONFIGURED",
+                    "HIGH",
+                    application.getMessage(),
+                    actorId(user),
+                    request.correlationId(),
+                    true);
+            return;
+        }
+        retryPromotionCommitFailure(application, "Payment succeeded for order " + order.getId());
+    }
+
+    private EnrollmentDto closePendingEnrollmentAfterPaymentFailure(
+            EnrollmentOrder order,
+            CurrentUser user,
+            PaymentStatusUpdateRequestDto request) {
+        EnrollmentDto enrollment = enrollments.findById(order.getEnrollmentId()).orElse(null);
+        if (enrollment == null || !"PENDING_PAYMENT".equals(enrollment.status())) {
+            return enrollment;
+        }
+        return enrollments.changeStatus(
+                order.getEnrollmentId(),
+                actorId(user),
+                "DROPPED",
+                actionNote(request.note(), "Payment failed for order " + order.getId()));
+    }
+
+    private void cancelPromotionReservationAfterPaymentFailure(
+            EnrollmentDto enrollment,
+            EnrollmentOrder order,
+            PaymentStatusUpdateRequestDto request) {
+        if (enrollment == null || promotionApplications == null) {
+            return;
+        }
+        EnrollmentPromotionApplication application = promotionApplications
+                .findByEnrollmentId(UUID.fromString(enrollment.id()))
+                .orElse(null);
+        if (application == null || !Set.of("RESERVED", "COMMIT_FAILED").contains(application.getStatus())) {
+            return;
+        }
+        boolean cancelled = cancelReservedPromotionAfterDrop(
+                enrollment,
+                application,
+                actionNote(request.note(), "Payment failed for order " + order.getId()),
+                false);
+        if (!cancelled) {
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "PROMOTION_CANCEL_AFTER_PAYMENT_FAILURE_FAILED",
+                    "HIGH",
+                    "Payment failed, but coupon reservation could not be cancelled",
+                    "system",
+                    request.correlationId(),
+                    true);
+        }
+    }
+
+    public List<EnrollmentRemediationCaseDto> remediationCaseQueue(
+            Optional<String> status,
+            Optional<UUID> courseId,
+            Optional<UUID> enrollmentId,
+            Optional<UUID> promotionApplicationId,
+            Optional<UUID> orderId,
+            Optional<String> studentId,
+            Optional<UUID> couponId,
+            Optional<UUID> redemptionId,
+            Optional<String> correlationId,
+            Optional<String> assigneeId,
+            Optional<Integer> limit,
+            CurrentUser user) {
+        if (remediationCases == null) {
+            throw new edu.courseflow.commonlibrary.exception.NotFoundException(
+                    "Enrollment remediation cases are not configured");
+        }
+        requireInstructorOrAdmin(user);
+        if (courseId.isEmpty() && !isPlatformAdmin(user)) {
+            throw new ForbiddenException("Staff remediation queue reads must be scoped to a course");
+        }
+        courseId.ifPresent(id -> {
+            if (!isPlatformAdmin(user)) {
+                courseAccess.requireCourseStaffAccess(user, id);
+            }
+        });
+        String normalizedStatus = status.map(this::normalizeRemediationStatus).orElse(null);
+        String normalizedStudentId = studentId.map(this::normalizeText).orElse(null);
+        String normalizedCorrelationId = correlationId.map(this::normalizeText).orElse(null);
+        int pageSize = Math.max(1, Math.min(limit.orElse(50), 200));
+        return remediationCases.findOperationsQueue(
+                        normalizedStatus,
+                        courseId.orElse(null),
+                        enrollmentId.orElse(null),
+                        promotionApplicationId.orElse(null),
+                        orderId.orElse(null),
+                        normalizedStudentId,
+                        couponId.orElse(null),
+                        redemptionId.orElse(null),
+                        normalizedCorrelationId,
+                        assigneeId.map(this::normalizeText).orElse(null),
+                        PageRequest.of(0, pageSize))
+                .stream()
+                .map(this::remediationCaseDto)
+                .toList();
+    }
+
+    public EnrollmentRemediationCaseDto remediationCase(UUID caseId, CurrentUser user) {
+        if (remediationCases == null) {
+            throw new edu.courseflow.commonlibrary.exception.NotFoundException(
+                    "Enrollment remediation cases are not configured");
+        }
+        EnrollmentRemediationCase remediationCase = remediationCases.findById(caseId)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment remediation case not found: " + caseId));
+        requireRemediationCaseOperator(remediationCase, user);
+        return remediationCaseDto(remediationCase);
+    }
+
+    @Transactional
+    public EnrollmentRemediationCaseDto assignRemediationCase(
+            UUID caseId,
+            RemediationCaseAssignRequestDto request,
+            CurrentUser user) {
+        if (remediationCases == null) {
+            throw new edu.courseflow.commonlibrary.exception.NotFoundException(
+                    "Enrollment remediation cases are not configured");
+        }
+        EnrollmentRemediationCase remediationCase = remediationCases.findByIdForUpdate(caseId)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment remediation case not found: " + caseId));
+        requireRemediationCaseOperator(remediationCase, user);
+        String fromStatus = remediationCase.getStatus();
+        remediationCase.assign(request.assigneeId().trim(), actionNote(request.note(), "Case assigned"));
+        remediationCases.save(remediationCase);
+        recordCaseAction(
+                remediationCase,
+                "ASSIGNED",
+                actorId(user),
+                actionNote(request.note(), "Assigned to " + request.assigneeId().trim()),
+                fromStatus,
+                remediationCase.getStatus(),
+                Map.of("assigneeId", request.assigneeId().trim(),
+                        "correlationId", normalizeText(request.correlationId()) == null ? "" : request.correlationId().trim()));
+        return remediationCaseDto(remediationCase);
+    }
+
+    @Transactional
+    public EnrollmentRemediationCaseDto addRemediationCaseNote(
+            UUID caseId,
+            RemediationCaseActionRequestDto request,
+            CurrentUser user) {
+        if (remediationCases == null) {
+            throw new edu.courseflow.commonlibrary.exception.NotFoundException(
+                    "Enrollment remediation cases are not configured");
+        }
+        EnrollmentRemediationCase remediationCase = remediationCases.findByIdForUpdate(caseId)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment remediation case not found: " + caseId));
+        requireRemediationCaseOperator(remediationCase, user);
+        String note = actionNote(request == null ? null : request.note(), "Operator added a note");
+        remediationCase.updateNote(note);
+        remediationCases.save(remediationCase);
+        recordCaseAction(
+                remediationCase,
+                "NOTE_ADDED",
+                actorId(user),
+                note,
+                remediationCase.getStatus(),
+                remediationCase.getStatus(),
+                Map.of("correlationId", request == null || normalizeText(request.correlationId()) == null
+                        ? ""
+                        : request.correlationId().trim()));
+        return remediationCaseDto(remediationCase);
+    }
+
+    @Transactional
+    public EnrollmentRemediationCaseDto resolveRemediationCase(
+            UUID caseId,
+            RemediationCaseActionRequestDto request,
+            CurrentUser user) {
+        if (remediationCases == null) {
+            throw new edu.courseflow.commonlibrary.exception.NotFoundException(
+                    "Enrollment remediation cases are not configured");
+        }
+        EnrollmentRemediationCase remediationCase = remediationCases.findByIdForUpdate(caseId)
+                .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                        "Enrollment remediation case not found: " + caseId));
+        requireRemediationCaseOperator(remediationCase, user);
+        String fromStatus = remediationCase.getStatus();
+        String note = actionNote(request == null ? null : request.note(), "Case resolved");
+        remediationCase.resolve(note);
+        remediationCases.save(remediationCase);
+        recordCaseAction(
+                remediationCase,
+                "RESOLVED",
+                actorId(user),
+                note,
+                fromStatus,
+                remediationCase.getStatus(),
+                Map.of("correlationId", request == null || normalizeText(request.correlationId()) == null
+                        ? ""
+                        : request.correlationId().trim()));
+        return remediationCaseDto(remediationCase);
+    }
+
+    @Transactional
+    public int openReservedPromotionRemediationCases(int limit) {
+        if (promotionApplications == null || remediationCases == null || remediationActions == null) {
+            return 0;
+        }
+        int batchSize = Math.max(1, Math.min(limit, 100));
+        Instant cutoff = Instant.now().minus(RESERVED_REMEDIATION_AGE);
+        List<EnrollmentPromotionApplication> reserved = promotionApplications.lockReservedOlderThan(
+                cutoff,
+                PageRequest.of(0, batchSize));
+        int opened = 0;
+        for (EnrollmentPromotionApplication application : reserved) {
+            EnrollmentRemediationCase remediationCase = ensureRemediationCaseForPromotion(
+                    application,
+                    "RESERVED_OVERDUE",
+                    "MEDIUM",
+                    "Coupon reservation has remained RESERVED past the remediation SLA",
+                    "system",
+                    null,
+                    true);
+            if (remediationCase != null) {
+                opened++;
+            }
+        }
+        return opened;
+    }
+
+    private EnrollmentRemediationCase ensureRemediationCaseForPromotion(
+            EnrollmentPromotionApplication application,
+            String reasonCode,
+            String severity,
+            String note,
+            String actorId,
+            String correlationId,
+            boolean retryRelevant) {
+        if (remediationCases == null || remediationActions == null || application == null) {
+            return null;
+        }
+        Optional<EnrollmentRemediationCase> existing = remediationCases
+                .findFirstByPromotionApplicationIdAndStatusInOrderByCreatedAtDesc(
+                        application.getId(),
+                        List.of("OPEN", "IN_PROGRESS"));
+        if (existing.isPresent()) {
+            return updateExistingPromotionRemediationCase(
+                    existing.get(),
+                    application,
+                    reasonCode,
+                    note,
+                    actorId,
+                    correlationId,
+                    retryRelevant);
+        }
+        EnrollmentRemediationCase remediationCase = new EnrollmentRemediationCase(
+                "PROMOTION_CHECKOUT",
+                severity == null ? "HIGH" : severity,
+                application.getEnrollmentId(),
+                checkoutAttempts == null
+                        ? null
+                        : checkoutAttempts.findByEnrollmentId(application.getEnrollmentId())
+                                .map(EnrollmentCheckoutAttempt::getId)
+                                .orElse(null),
+                application.getId(),
+                orders == null
+                        ? null
+                        : orders.findByEnrollmentId(application.getEnrollmentId())
+                                .map(EnrollmentOrder::getId)
+                                .orElse(null),
+                application.getStudentId(),
+                application.getCourseId(),
+                DEFAULT_REMEDIATION_ASSIGNEE,
+                actionNote(note, "Promotion application requires support remediation"),
+                reasonCode,
+                Instant.now().plus(REMEDIATION_SLA));
+        EnrollmentRemediationCase saved = saveNewPromotionRemediationCase(remediationCase, application)
+                .orElseThrow(() -> new ConflictException(
+                        "Unable to create or locate enrollment promotion remediation case"));
+        if (!saved.getId().equals(remediationCase.getId())) {
+            return updateExistingPromotionRemediationCase(
+                    saved,
+                    application,
+                    reasonCode,
+                    note,
+                    actorId,
+                    correlationId,
+                    retryRelevant);
+        }
+        recordCaseAction(
+                saved,
+                "CASE_OPENED",
+                actorId == null ? "system" : actorId,
+                saved.getNote(),
+                null,
+                saved.getStatus(),
+                remediationPayload(reasonCode, application.getStatus(), correlationId));
+        if (retryRelevant) {
+            recordCaseAction(
+                    saved,
+                    "RETRY_STATE",
+                    actorId == null ? "system" : actorId,
+                    retryStateNote(application),
+                    saved.getStatus(),
+                    saved.getStatus(),
+                    remediationPayload(reasonCode, application.getStatus(), correlationId));
+        }
+        return saved;
+    }
+
+    private EnrollmentRemediationCase ensureRemediationCaseForOrder(
+            EnrollmentOrder order,
+            String reasonCode,
+            String severity,
+            String note,
+            String actorId,
+            String correlationId) {
+        if (remediationCases == null || remediationActions == null || order == null) {
+            return null;
+        }
+        Optional<EnrollmentRemediationCase> existing = remediationCases
+                .findFirstByOrderIdAndStatusInOrderByCreatedAtDesc(
+                        order.getId(),
+                        List.of("OPEN", "IN_PROGRESS"));
+        if (existing.isPresent()) {
+            return updateExistingOrderRemediationCase(
+                    existing.get(),
+                    order,
+                    reasonCode,
+                    note,
+                    actorId,
+                    correlationId);
+        }
+        EnrollmentRemediationCase remediationCase = new EnrollmentRemediationCase(
+                "ORDER_PAYMENT",
+                severity == null ? "HIGH" : severity,
+                order.getEnrollmentId(),
+                order.getCheckoutAttemptId(),
+                null,
+                order.getId(),
+                order.getStudentId(),
+                order.getCourseId(),
+                DEFAULT_REMEDIATION_ASSIGNEE,
+                actionNote(note, "Enrollment order requires payment remediation"),
+                reasonCode,
+                Instant.now().plus(REMEDIATION_SLA));
+        EnrollmentRemediationCase saved = saveNewOrderRemediationCase(remediationCase, order)
+                .orElseThrow(() -> new ConflictException("Unable to create or locate enrollment order remediation case"));
+        if (!saved.getId().equals(remediationCase.getId())) {
+            return updateExistingOrderRemediationCase(
+                    saved,
+                    order,
+                    reasonCode,
+                    note,
+                    actorId,
+                    correlationId);
+        }
+        recordCaseAction(
+                saved,
+                "CASE_OPENED",
+                actorId == null ? "system" : actorId,
+                saved.getNote(),
+                null,
+                saved.getStatus(),
+                Map.of("reasonCode", reasonCode,
+                        "orderStatus", order.getStatus(),
+                        "correlationId", correlationId == null ? "" : correlationId));
+        recordCaseAction(
+                saved,
+                "RETRY_STATE",
+                actorId == null ? "system" : actorId,
+                "Payment remediation is waiting for a corrected payment event",
+                saved.getStatus(),
+                saved.getStatus(),
+                Map.of("reasonCode", reasonCode,
+                        "orderStatus", order.getStatus(),
+                        "correlationId", correlationId == null ? "" : correlationId));
+        return saved;
+    }
+
+    private EnrollmentRemediationCase updateExistingPromotionRemediationCase(
+            EnrollmentRemediationCase remediationCase,
+            EnrollmentPromotionApplication application,
+            String reasonCode,
+            String note,
+            String actorId,
+            String correlationId,
+            boolean retryRelevant) {
+        remediationCase.updateNote(actionNote(note, remediationCase.getNote()));
+        remediationCases.save(remediationCase);
+        recordCaseAction(
+                remediationCase,
+                "CASE_UPDATED",
+                actorId == null ? "system" : actorId,
+                actionNote(note, "Promotion application still needs remediation"),
+                remediationCase.getStatus(),
+                remediationCase.getStatus(),
+                remediationPayload(reasonCode, application.getStatus(), correlationId));
+        if (retryRelevant) {
+            recordCaseAction(
+                    remediationCase,
+                    "RETRY_STATE",
+                    actorId == null ? "system" : actorId,
+                    retryStateNote(application),
+                    remediationCase.getStatus(),
+                    remediationCase.getStatus(),
+                    remediationPayload(reasonCode, application.getStatus(), correlationId));
+        }
+        return remediationCase;
+    }
+
+    private EnrollmentRemediationCase updateExistingOrderRemediationCase(
+            EnrollmentRemediationCase remediationCase,
+            EnrollmentOrder order,
+            String reasonCode,
+            String note,
+            String actorId,
+            String correlationId) {
+        remediationCase.updateNote(actionNote(note, remediationCase.getNote()));
+        remediationCases.save(remediationCase);
+        recordCaseAction(
+                remediationCase,
+                "CASE_UPDATED",
+                actorId == null ? "system" : actorId,
+                actionNote(note, "Enrollment order still needs remediation"),
+                remediationCase.getStatus(),
+                remediationCase.getStatus(),
+                Map.of("reasonCode", reasonCode,
+                        "orderStatus", order.getStatus(),
+                        "correlationId", correlationId == null ? "" : correlationId));
+        return remediationCase;
+    }
+
+    private Optional<EnrollmentRemediationCase> saveNewPromotionRemediationCase(
+            EnrollmentRemediationCase remediationCase,
+            EnrollmentPromotionApplication application) {
+        try {
+            return Optional.of(remediationCases.saveAndFlush(remediationCase));
+        } catch (DataIntegrityViolationException ex) {
+            return remediationCases.findFirstByPromotionApplicationIdAndStatusInOrderByCreatedAtDesc(
+                    application.getId(),
+                    List.of("OPEN", "IN_PROGRESS"));
+        }
+    }
+
+    private Optional<EnrollmentRemediationCase> saveNewOrderRemediationCase(
+            EnrollmentRemediationCase remediationCase,
+            EnrollmentOrder order) {
+        try {
+            return Optional.of(remediationCases.saveAndFlush(remediationCase));
+        } catch (DataIntegrityViolationException ex) {
+            return remediationCases.findFirstByOrderIdAndStatusInOrderByCreatedAtDesc(
+                    order.getId(),
+                    List.of("OPEN", "IN_PROGRESS"));
+        }
+    }
+
+    private void resolveRemediationCaseForPromotion(
+            EnrollmentPromotionApplication application,
+            String actorId,
+            String note,
+            String correlationId) {
+        if (remediationCases == null || remediationActions == null || application == null) {
+            return;
+        }
+        remediationCases.findFirstByPromotionApplicationIdAndStatusInOrderByCreatedAtDesc(
+                        application.getId(),
+                        List.of("OPEN", "IN_PROGRESS"))
+                .ifPresent(remediationCase -> {
+                    String fromStatus = remediationCase.getStatus();
+                    remediationCase.resolve(actionNote(note, "Promotion remediation resolved"));
+                    remediationCases.save(remediationCase);
+                    recordCaseAction(
+                            remediationCase,
+                            "AUTO_RESOLVED",
+                            actorId == null ? "system" : actorId,
+                            remediationCase.getNote(),
+                            fromStatus,
+                            remediationCase.getStatus(),
+                            remediationPayload(remediationCase.getReasonCode(), application.getStatus(), correlationId));
+                });
+    }
+
+    private void resolveRemediationCaseForOrder(
+            EnrollmentOrder order,
+            String actorId,
+            String note,
+            String correlationId) {
+        if (remediationCases == null || remediationActions == null || order == null) {
+            return;
+        }
+        remediationCases.findFirstByOrderIdAndStatusInOrderByCreatedAtDesc(
+                        order.getId(),
+                        List.of("OPEN", "IN_PROGRESS"))
+                .ifPresent(remediationCase -> {
+                    String fromStatus = remediationCase.getStatus();
+                    remediationCase.resolve(actionNote(note, "Order remediation resolved"));
+                    remediationCases.save(remediationCase);
+                    recordCaseAction(
+                            remediationCase,
+                            "AUTO_RESOLVED",
+                            actorId == null ? "system" : actorId,
+                            remediationCase.getNote(),
+                            fromStatus,
+                            remediationCase.getStatus(),
+                            Map.of("reasonCode", remediationCase.getReasonCode(),
+                                    "orderStatus", order.getStatus(),
+                                    "correlationId", correlationId == null ? "" : correlationId));
+                });
+    }
+
+    private void recordRetryHistory(
+            EnrollmentPromotionApplication application,
+            String action,
+            String actorId,
+            String note,
+            String correlationId) {
+        if (remediationCases == null || remediationActions == null || application == null) {
+            return;
+        }
+        EnrollmentRemediationCase remediationCase = remediationCases
+                .findFirstByPromotionApplicationIdAndStatusInOrderByCreatedAtDesc(
+                        application.getId(),
+                        List.of("OPEN", "IN_PROGRESS"))
+                .orElse(null);
+        if (remediationCase == null) {
+            return;
+        }
+        recordCaseAction(
+                remediationCase,
+                action,
+                actorId == null ? "system" : actorId,
+                note,
+                remediationCase.getStatus(),
+                remediationCase.getStatus(),
+                remediationPayload(application.getStatus(), application.getStatus(), correlationId));
+    }
+
+    private void recordCaseAction(
+            EnrollmentRemediationCase remediationCase,
+            String action,
+            String actorId,
+            String note,
+            String fromStatus,
+            String toStatus,
+            Map<String, Object> payload) {
+        if (remediationActions == null || remediationCase == null) {
+            return;
+        }
+        String effectiveActorId = actorId == null ? "system" : actorId;
+        String payloadJson = toJson(payload == null ? Map.of() : payload);
+        remediationActions.save(new EnrollmentRemediationCaseAction(
+                remediationCase.getId(),
+                action,
+                effectiveActorId,
+                note,
+                fromStatus,
+                toStatus,
+                payloadJson));
+        recordRemediationAudit(remediationCase, action, effectiveActorId, note, fromStatus, toStatus, payloadJson);
+    }
+
+    private void recordRemediationAudit(
+            EnrollmentRemediationCase remediationCase,
+            String action,
+            String actorId,
+            String note,
+            String fromStatus,
+            String toStatus,
+            String payloadJson) {
+        if (remediationCase.getEnrollmentId() == null) {
+            return;
+        }
+        Map<String, Object> auditPayload = evidence(
+                "caseId", remediationCase.getId().toString(),
+                "caseType", remediationCase.getCaseType(),
+                "caseAction", action,
+                "fromCaseStatus", fromStatus,
+                "toCaseStatus", toStatus,
+                "reasonCode", remediationCase.getReasonCode(),
+                "note", note,
+                "payload", readMap(payloadJson));
+        enrollments.recordAudit(
+                remediationCase.getEnrollmentId(),
+                actorId,
+                remediationAuditAction(action),
+                null,
+                null,
+                toJson(auditPayload));
+    }
+
+    private String remediationAuditAction(String action) {
+        String normalized = upper(action);
+        String candidate = "REMEDIATION_"
+                + (normalized == null ? "ACTION" : normalized.replaceAll("[^A-Z0-9_]", "_"));
+        return candidate.length() <= 60 ? candidate : candidate.substring(0, 60);
+    }
+
+    private EnrollmentRemediationCaseDto remediationCaseDto(EnrollmentRemediationCase remediationCase) {
+        List<EnrollmentRemediationCaseActionDto> actions = remediationActions == null
+                ? List.of()
+                : remediationActions.findByCaseIdOrderByCreatedAtAsc(remediationCase.getId()).stream()
+                        .map(this::remediationActionDto)
+                        .toList();
+        Instant now = Instant.now();
+        Instant ageEnd = remediationCase.getClosedAt() == null ? now : remediationCase.getClosedAt();
+        long slaAgeMinutes = Math.max(0, Duration.between(remediationCase.getCreatedAt(), ageEnd).toMinutes());
+        boolean slaBreached = remediationCase.getClosedAt() == null
+                ? now.isAfter(remediationCase.getSlaDueAt())
+                : remediationCase.getClosedAt().isAfter(remediationCase.getSlaDueAt());
+        return new EnrollmentRemediationCaseDto(
+                remediationCase.getId().toString(),
+                remediationCase.getCaseType(),
+                remediationCase.getStatus(),
+                remediationCase.getSeverity(),
+                remediationCase.getEnrollmentId() == null ? null : remediationCase.getEnrollmentId().toString(),
+                remediationCase.getCheckoutAttemptId() == null ? null : remediationCase.getCheckoutAttemptId().toString(),
+                remediationCase.getPromotionApplicationId() == null ? null : remediationCase.getPromotionApplicationId().toString(),
+                remediationCase.getOrderId() == null ? null : remediationCase.getOrderId().toString(),
+                remediationCase.getStudentId(),
+                remediationCase.getCourseId().toString(),
+                remediationCase.getAssigneeId(),
+                remediationCase.getNote(),
+                remediationCase.getReasonCode(),
+                remediationCase.getSlaDueAt(),
+                slaAgeMinutes,
+                slaBreached,
+                remediationCase.getCreatedAt(),
+                remediationCase.getUpdatedAt(),
+                remediationCase.getClosedAt(),
+                actions,
+                actions.stream()
+                        .filter(action -> action.action() != null && action.action().startsWith("RETRY_"))
+                        .toList());
+    }
+
+    private EnrollmentRemediationCaseActionDto remediationActionDto(EnrollmentRemediationCaseAction action) {
+        return new EnrollmentRemediationCaseActionDto(
+                action.getId().toString(),
+                action.getAction(),
+                action.getActorId(),
+                action.getNote(),
+                action.getFromStatus(),
+                action.getToStatus(),
+                readMap(action.getPayloadJson()),
+                action.getCreatedAt());
     }
 
     private EnrollmentPromotionApplicationStateDto promotionApplicationState(
@@ -762,6 +2072,7 @@ public class EnrollmentService {
         if ("ACTIVE".equals(newStatus)) {
             UUID courseId = parseUuid(existing.courseId(), "courseId");
             courseAccess.requirePublishedCourse(courseId);
+            assertPaymentSatisfiedForActivation(id, courseId);
             enforceCapacity(courseId);
         }
 
@@ -825,6 +2136,14 @@ public class EnrollmentService {
                     application.getEffectsJson(),
                     "Coupon application is marked applied without a redemption id");
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "REDEMPTION_ID_MISSING",
+                    "HIGH",
+                    application.getMessage(),
+                    "system",
+                    null,
+                    true);
             throw new ConflictException("Promotion application needs manual review before dropping");
         }
         if (promotions == null) {
@@ -862,6 +2181,14 @@ public class EnrollmentService {
                     application.getEffectsJson(),
                     "Coupon reservation cannot be closed because reservation id is missing");
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "RESERVATION_ID_MISSING",
+                    "HIGH",
+                    application.getMessage(),
+                    "system",
+                    null,
+                    true);
             syncCheckoutAttempt(enrollment, application);
             return true;
         }
@@ -881,6 +2208,11 @@ public class EnrollmentService {
                     toJson(reasonsOr(cancelled.reasonCodes(), "CANCELLED")),
                     "Coupon reservation closed after enrollment drop");
             promotionApplications.save(application);
+            resolveRemediationCaseForPromotion(
+                    application,
+                    "system",
+                    "Coupon reservation closed after enrollment drop",
+                    null);
             syncCheckoutAttempt(enrollment, application);
             return true;
         } catch (PromotionUnavailableException ex) {
@@ -897,6 +2229,14 @@ public class EnrollmentService {
                     retryMessage);
             application.recordOperatorBlockingError(retryMessage);
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "PROMOTION_CANCEL_UNAVAILABLE",
+                    "HIGH",
+                    retryMessage,
+                    "system",
+                    null,
+                    true);
             syncCheckoutAttempt(enrollment, application);
             return false;
         }
@@ -914,6 +2254,12 @@ public class EnrollmentService {
                 PageRequest.of(0, batchSize));
         int resolved = 0;
         for (EnrollmentPromotionApplication application : applications) {
+            recordRetryHistory(
+                    application,
+                    "RETRY_ATTEMPTED",
+                    "system",
+                    "Scheduled promotion commit retry",
+                    null);
             if (retryPromotionCommitFailure(application, "Scheduled promotion commit retry")) {
                 resolved++;
             }
@@ -931,6 +2277,20 @@ public class EnrollmentService {
                     application.getEffectsJson(),
                     "Promotion commit cannot be retried because enrollment is missing");
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "ENROLLMENT_NOT_FOUND",
+                    "HIGH",
+                    application.getMessage(),
+                    "system",
+                    null,
+                    true);
+            recordRetryHistory(
+                    application,
+                    "RETRY_FAILED",
+                    "system",
+                    application.getMessage(),
+                    null);
             return true;
         }
         if (application.getReservationId() == null) {
@@ -941,6 +2301,20 @@ public class EnrollmentService {
                     application.getEffectsJson(),
                     "Promotion commit cannot be retried because reservation id is missing");
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "RESERVATION_ID_MISSING",
+                    "HIGH",
+                    application.getMessage(),
+                    "system",
+                    null,
+                    true);
+            recordRetryHistory(
+                    application,
+                    "RETRY_FAILED",
+                    "system",
+                    application.getMessage(),
+                    null);
             syncCheckoutAttempt(enrollment, application);
             return true;
         }
@@ -959,6 +2333,20 @@ public class EnrollmentService {
                     application.getEffectsJson(),
                     "Promotion commit cannot be retried for enrollment status " + enrollment.status());
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "ENROLLMENT_STATUS_NOT_COMMITTABLE",
+                    "HIGH",
+                    application.getMessage(),
+                    "system",
+                    null,
+                    true);
+            recordRetryHistory(
+                    application,
+                    "RETRY_FAILED",
+                    "system",
+                    application.getMessage(),
+                    null);
             syncCheckoutAttempt(enrollment, application);
             return true;
         }
@@ -977,6 +2365,17 @@ public class EnrollmentService {
                         toJson(reasonsOr(commit.reasonCodes(), "COMMITTED")),
                         toJson(effects),
                         "Coupon applied after promotion commit retry");
+                recordRetryHistory(
+                        application,
+                        "RETRY_SUCCEEDED",
+                        "system",
+                        "Coupon applied after promotion commit retry",
+                        null);
+                resolveRemediationCaseForPromotion(
+                        application,
+                        "system",
+                        "Coupon applied after promotion commit retry",
+                        null);
             } else {
                 application.update(
                         "MANUAL_REVIEW",
@@ -984,6 +2383,20 @@ public class EnrollmentService {
                         toJson(reasonsOr(commit.reasonCodes(), "PROMOTION_COMMIT_REJECTED")),
                         toJson(effects),
                         "Coupon reservation could not be committed after retry");
+                ensureRemediationCaseForPromotion(
+                        application,
+                        firstReasonCode(commit.reasonCodes(), "PROMOTION_COMMIT_REJECTED"),
+                        "HIGH",
+                        application.getMessage(),
+                        "system",
+                        null,
+                        true);
+                recordRetryHistory(
+                        application,
+                        "RETRY_FAILED",
+                        "system",
+                        application.getMessage(),
+                        null);
             }
             promotionApplications.save(application);
             syncCheckoutAttempt(enrollment, application);
@@ -998,6 +2411,20 @@ public class EnrollmentService {
                     retryMessage);
             application.scheduleRetry(retryMessage, nextPromotionApplicationRetryAt(application));
             promotionApplications.save(application);
+            ensureRemediationCaseForPromotion(
+                    application,
+                    "PROMOTION_COMMIT_UNAVAILABLE",
+                    "HIGH",
+                    retryMessage,
+                    "system",
+                    null,
+                    true);
+            recordRetryHistory(
+                    application,
+                    "RETRY_SCHEDULED",
+                    "system",
+                    retryMessage,
+                    null);
             syncCheckoutAttempt(enrollment, application);
             return false;
         }
@@ -1009,12 +2436,18 @@ public class EnrollmentService {
         }
         checkoutAttempts.findByEnrollmentId(application.getEnrollmentId()).ifPresent(attempt -> {
             EnrollmentPromotionApplicationDto promotion = promotionApplicationDto(application);
+            EnrollmentOrder order = orders == null
+                    ? null
+                    : orders.findByEnrollmentId(application.getEnrollmentId()).orElse(null);
             EnrollmentCheckoutResponseDto response = new EnrollmentCheckoutResponseDto(
                     enrollment,
                     promotion,
-                    attempt.getId().toString());
+                    attempt.getId().toString(),
+                    enrollmentOrderDto(order));
             String responseJson = toJson(response);
-            String attemptStatus = checkoutAttemptStatus(application.getStatus());
+            String attemptStatus = order == null
+                    ? checkoutAttemptStatus(application.getStatus())
+                    : checkoutAttemptStatusForOrder(order, promotion);
             if ("COMMIT_FAILED".equals(attemptStatus)) {
                 Instant nextRetryAt = application.getNextRetryAt() == null
                         ? nextPromotionCommitRetryAt(attempt)
@@ -1041,6 +2474,13 @@ public class EnrollmentService {
 
     private List<String> reasonsOr(List<String> reasonCodes, String fallback) {
         return reasonCodes == null || reasonCodes.isEmpty() ? List.of(fallback) : reasonCodes;
+    }
+
+    private String firstReasonCode(List<String> reasonCodes, String fallback) {
+        if (reasonCodes == null || reasonCodes.isEmpty() || normalizeText(reasonCodes.getFirst()) == null) {
+            return fallback;
+        }
+        return reasonCodes.getFirst().trim();
     }
 
     /**
@@ -1099,6 +2539,46 @@ public class EnrollmentService {
                         "Enrollment not found: " + id));
         requireSelfOrCourseStaff(enrollment, user);
         return enrollments.auditLog(id);
+    }
+
+    public List<AuditLogEntryDto> auditLog(
+            Optional<UUID> enrollmentId,
+            Optional<UUID> courseId,
+            Optional<String> studentId,
+            Optional<String> correlationId,
+            Optional<Integer> limit,
+            CurrentUser user) {
+        UUID scopedEnrollmentId = enrollmentId.orElse(null);
+        UUID scopedCourseId = courseId.orElse(null);
+        String normalizedStudentId = studentId.map(this::normalizeText).orElse(null);
+        String normalizedCorrelationId = correlationId.map(this::normalizeText).orElse(null);
+        if (scopedEnrollmentId == null
+                && scopedCourseId == null
+                && normalizedStudentId == null
+                && normalizedCorrelationId == null) {
+            throw new BadRequestException("Enrollment audit query requires enrollment, course, learner or correlation filter");
+        }
+        if (scopedEnrollmentId != null) {
+            EnrollmentDto enrollment = enrollments.findById(scopedEnrollmentId)
+                    .orElseThrow(() -> new edu.courseflow.commonlibrary.exception.NotFoundException(
+                            "Enrollment not found: " + scopedEnrollmentId));
+            UUID enrollmentCourseId = parseUuid(enrollment.courseId(), "courseId");
+            if (scopedCourseId != null && !scopedCourseId.equals(enrollmentCourseId)) {
+                throw new BadRequestException("courseId does not match enrollment");
+            }
+            scopedCourseId = enrollmentCourseId;
+            if (normalizedStudentId != null && !normalizedStudentId.equals(enrollment.studentId())) {
+                throw new BadRequestException("studentId does not match enrollment");
+            }
+        }
+        requireBenefitReconciliationAccess(Optional.ofNullable(scopedCourseId), user);
+        int pageSize = Math.max(1, Math.min(limit.orElse(50), 200));
+        return enrollments.auditLog(
+                scopedEnrollmentId,
+                scopedCourseId,
+                normalizedStudentId,
+                normalizedCorrelationId,
+                pageSize);
     }
 
     public List<WaitlistEntryDto> listWaitlist(UUID courseId) {
@@ -1166,8 +2646,8 @@ public class EnrollmentService {
         if (capacity.isEmpty()) {
             return; // unlimited
         }
-        int active = enrollments.countActive(courseId);
-        if (active >= capacity.get()) {
+        int occupied = enrollments.countOccupiedSeats(courseId);
+        if (occupied >= capacity.get()) {
             throw new ConflictException("Course is full (capacity " + capacity.get() + ")");
         }
     }
@@ -1177,7 +2657,7 @@ public class EnrollmentService {
         if (capacity.isEmpty()) {
             return false; // unlimited is never full
         }
-        return enrollments.countActive(courseId) >= capacity.get();
+        return enrollments.countOccupiedSeats(courseId) >= capacity.get();
     }
 
     /**
@@ -1283,6 +2763,40 @@ public class EnrollmentService {
         }
     }
 
+    private void requireRemediationCaseOperator(EnrollmentRemediationCase remediationCase, CurrentUser user) {
+        requireAuthenticated(user);
+        if (isService(user)) {
+            return;
+        }
+        if (!isStaff(user)) {
+            throw new ForbiddenException("Requires INSTRUCTOR, ADMIN, or service role");
+        }
+        if (!isPlatformAdmin(user)) {
+            courseAccess.requireCourseStaffAccess(user, remediationCase.getCourseId());
+        }
+    }
+
+    private void requireBenefitReconciliationAccess(Optional<UUID> courseId, CurrentUser user) {
+        requireAuthenticated(user);
+        if (isService(user) || isPlatformAdmin(user)) {
+            return;
+        }
+        if (!isStaff(user)) {
+            throw new ForbiddenException("Requires INSTRUCTOR, ADMIN, or service role");
+        }
+        UUID scopedCourse = courseId.orElseThrow(() ->
+                new ForbiddenException("Staff benefit reconciliation reads must be scoped to a course"));
+        courseAccess.requireCourseStaffAccess(user, scopedCourse);
+    }
+
+    private void requireCheckoutOperator(CurrentUser user) {
+        requireAuthenticated(user);
+        if (isService(user)) {
+            return;
+        }
+        throw new ForbiddenException("Requires checkout or payment service role");
+    }
+
     private void requireAuthenticated(CurrentUser user) {
         if (user == null || user.id() == null) {
             throw new ForbiddenException("Authentication required");
@@ -1312,6 +2826,704 @@ public class EnrollmentService {
         return request.reason().trim();
     }
 
+    private String actionNote(String note, String fallback) {
+        String normalized = normalizeText(note);
+        return normalized == null ? fallback : normalized;
+    }
+
+    private String actorId(CurrentUser user) {
+        return callerId(user);
+    }
+
+    private String normalizePaymentStatus(String value) {
+        String status = normalizeText(value);
+        if (status == null) {
+            throw new BadRequestException("paymentStatus is required");
+        }
+        String normalized = status.toUpperCase();
+        if ("FAILED".equals(normalized)) {
+            return "PAYMENT_FAILED";
+        }
+        if (Set.of("PAID", "PAYMENT_FAILED", "EXPIRED").contains(normalized)) {
+            return normalized;
+        }
+        throw new BadRequestException("Invalid paymentStatus: " + value);
+    }
+
+    private Optional<String> paymentMismatch(EnrollmentOrder order, PaymentStatusUpdateRequestDto request) {
+        if (request.paidAmount() == null) {
+            return Optional.of("paidAmount is required to mark an enrollment order PAID");
+        }
+        if (normalizeText(request.currency()) == null) {
+            return Optional.of("currency is required to mark an enrollment order PAID");
+        }
+        if (normalizeText(request.paymentProvider()) == null) {
+            return Optional.of("paymentProvider is required to mark an enrollment order PAID");
+        }
+        if (normalizeText(request.paymentReference()) == null) {
+            return Optional.of("paymentReference is required to mark an enrollment order PAID");
+        }
+        BigDecimal paidAmount = money(request.paidAmount());
+        if (paidAmount.compareTo(order.getAmount()) != 0) {
+            return Optional.of("Payment amount mismatch: expected "
+                    + order.getAmount().toPlainString() + " but received " + paidAmount.toPlainString());
+        }
+        if (!order.getCurrency().equalsIgnoreCase(request.currency().trim())) {
+            return Optional.of("Payment currency mismatch: expected "
+                    + order.getCurrency() + " but received " + request.currency().trim().toUpperCase());
+        }
+        return Optional.empty();
+    }
+
+    private Optional<String> paidOrderReplayConflict(
+            EnrollmentOrder order,
+            String incomingStatus,
+            PaymentStatusUpdateRequestDto request) {
+        if (!"PAID".equals(incomingStatus)) {
+            return Optional.of("Paid enrollment order received contradictory payment status " + incomingStatus);
+        }
+        Optional<String> mismatch = paymentMismatch(order, request);
+        if (mismatch.isPresent()) {
+            return mismatch;
+        }
+        String incomingProvider = normalizeText(request.paymentProvider());
+        if (order.getPaymentProvider() != null && !order.getPaymentProvider().equalsIgnoreCase(incomingProvider)) {
+            return Optional.of("Payment provider mismatch for paid order replay: expected "
+                    + order.getPaymentProvider() + " but received " + incomingProvider);
+        }
+        String incomingReference = normalizeText(request.paymentReference());
+        if (order.getPaymentReference() != null && !order.getPaymentReference().equals(incomingReference)) {
+            return Optional.of("Payment reference mismatch for paid order replay");
+        }
+        return Optional.empty();
+    }
+
+    private Optional<String> duplicatePaymentReferenceConflict(
+            EnrollmentOrder order,
+            PaymentStatusUpdateRequestDto request) {
+        String incomingProvider = normalizeText(request.paymentProvider());
+        String incomingReference = normalizeText(request.paymentReference());
+        if (incomingProvider == null || incomingReference == null) {
+            return Optional.empty();
+        }
+        return orders.findByPaymentReferenceForUpdate(incomingProvider, incomingReference)
+                .stream()
+                .filter(existing -> !existing.getId().equals(order.getId()))
+                .findFirst()
+                .map(existing -> "Payment reference already belongs to enrollment order " + existing.getId());
+    }
+
+    private EnrollmentCheckoutResponseDto checkoutResponseForOrder(EnrollmentOrder order) {
+        EnrollmentDto enrollment = enrollments.findById(order.getEnrollmentId()).orElse(null);
+        EnrollmentPromotionApplicationDto promotion = promotionDtoForEnrollment(order.getEnrollmentId());
+        String attemptId = checkoutAttemptId(order);
+        return new EnrollmentCheckoutResponseDto(
+                enrollment,
+                promotion,
+                attemptId,
+                enrollmentOrderDto(order));
+    }
+
+    private String checkoutAttemptId(EnrollmentOrder order) {
+        if (order.getCheckoutAttemptId() != null) {
+            return order.getCheckoutAttemptId().toString();
+        }
+        if (checkoutAttempts == null) {
+            return null;
+        }
+        return checkoutAttempts.findByEnrollmentId(order.getEnrollmentId())
+                .map(attempt -> attempt.getId().toString())
+                .orElse(null);
+    }
+
+    private EnrollmentPromotionApplicationDto promotionDtoForEnrollment(UUID enrollmentId) {
+        if (promotionApplications == null || enrollmentId == null) {
+            return new EnrollmentPromotionApplicationDto(
+                    "SKIPPED",
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of("COUPON_NOT_SUPPLIED"),
+                    "Enrollment has no coupon application",
+                    List.of());
+        }
+        return promotionApplications.findByEnrollmentId(enrollmentId)
+                .map(this::promotionApplicationDto)
+                .orElseGet(() -> new EnrollmentPromotionApplicationDto(
+                        "SKIPPED",
+                        null,
+                        null,
+                        null,
+                        null,
+                        List.of("COUPON_NOT_SUPPLIED"),
+                        "Enrollment has no coupon application",
+                        List.of()));
+    }
+
+    private void syncCheckoutAttemptForOrder(EnrollmentOrder order) {
+        if (checkoutAttempts == null || order == null) {
+            return;
+        }
+        Optional<EnrollmentCheckoutAttempt> found = order.getCheckoutAttemptId() == null
+                ? checkoutAttempts.findByEnrollmentId(order.getEnrollmentId())
+                : checkoutAttempts.findById(order.getCheckoutAttemptId());
+        found.ifPresent(attempt -> {
+            EnrollmentCheckoutResponseDto response = checkoutResponseForOrder(order);
+            String responseJson = toJson(response);
+            EnrollmentPromotionApplicationDto promotion = response.promotion();
+            String attemptStatus = checkoutAttemptStatusForOrder(order, promotion);
+            if ("COMMIT_FAILED".equals(attemptStatus)) {
+                Instant nextRetryAt = promotionApplications == null
+                        ? nextPromotionCommitRetryAt(attempt)
+                        : promotionApplications.findByEnrollmentId(order.getEnrollmentId())
+                                .map(EnrollmentPromotionApplication::getNextRetryAt)
+                                .orElse(nextPromotionCommitRetryAt(attempt));
+                attempt.retryFailed(
+                        promotion == null ? "Promotion commit is pending retry" : promotion.message(),
+                        nextRetryAt == null ? nextPromotionCommitRetryAt(attempt) : nextRetryAt,
+                        responseJson);
+            } else {
+                UUID redemptionId = promotionApplications == null
+                        ? null
+                        : promotionApplications.findByEnrollmentId(order.getEnrollmentId())
+                                .map(EnrollmentPromotionApplication::getRedemptionId)
+                                .orElse(null);
+                attempt.finish(attemptStatus, responseJson, redemptionId);
+            }
+            checkoutAttempts.save(attempt);
+        });
+    }
+
+    private String checkoutAttemptStatusForOrder(
+            EnrollmentOrder order,
+            EnrollmentPromotionApplicationDto promotion) {
+        return switch (order.getStatus()) {
+            case "PAYMENT_PENDING" -> "PAYMENT_PENDING";
+            case "PAYMENT_FAILED", "EXPIRED" -> "FAILED";
+            case "MANUAL_REVIEW" -> "MANUAL_REVIEW";
+            case "PAID" -> checkoutAttemptStatus(promotion == null ? "SKIPPED" : promotion.status());
+            default -> "MANUAL_REVIEW";
+        };
+    }
+
+    private Map<String, Object> remediationPayload(
+            String reasonCode,
+            String subjectStatus,
+            String correlationId) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("reasonCode", reasonCode == null ? "" : reasonCode);
+        payload.put("subjectStatus", subjectStatus == null ? "" : subjectStatus);
+        payload.put("correlationId", correlationId == null ? "" : correlationId);
+        return payload;
+    }
+
+    private String retryStateNote(EnrollmentPromotionApplication application) {
+        if ("COMMIT_FAILED".equals(application.getStatus())) {
+            return "Next promotion commit retry is scheduled at "
+                    + (application.getNextRetryAt() == null ? "unscheduled" : application.getNextRetryAt());
+        }
+        if ("RESERVED".equals(application.getStatus())) {
+            return "Coupon reservation is waiting for payment success or operator action before commit retry";
+        }
+        return "Promotion application is not currently retryable";
+    }
+
+    private RefundDropPolicyActionDto dropPolicyAction(EnrollmentDto enrollment, String reason) {
+        String enrollmentStatus = upper(enrollment.status());
+        if ("COMPLETED".equals(enrollmentStatus)) {
+            return policyAction(
+                    "ENROLLMENT",
+                    "DROP_ENROLLMENT",
+                    "MANUAL_REVIEW",
+                    "HIGH",
+                    false,
+                    true,
+                    true,
+                    "/internal/enrollments/" + enrollment.id() + "/status",
+                    policyKey(enrollment.id(), "drop"),
+                    List.of("COURSE_COMPLETED", "COMPLETED_ENROLLMENT_DROP_REQUIRES_REVIEW"),
+                    evidence("enrollmentStatus", enrollment.status(), "completedAt", enrollment.completedAt()));
+        }
+        if ("DROPPED".equals(enrollmentStatus)) {
+            return policyAction(
+                    "ENROLLMENT",
+                    "DROP_ENROLLMENT",
+                    "ALREADY_DONE",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "/internal/enrollments/" + enrollment.id() + "/status",
+                    policyKey(enrollment.id(), "drop"),
+                    List.of("ENROLLMENT_ALREADY_DROPPED"),
+                    evidence("droppedAt", enrollment.droppedAt(), "dropReason", enrollment.dropReason()));
+        }
+        if (Set.of("ACTIVE", "PENDING_PAYMENT").contains(enrollmentStatus)) {
+            return policyAction(
+                    "ENROLLMENT",
+                    "DROP_ENROLLMENT",
+                    "REQUIRED",
+                    "MEDIUM",
+                    true,
+                    false,
+                    false,
+                    "/internal/enrollments/" + enrollment.id() + "/status",
+                    policyKey(enrollment.id(), "drop"),
+                    List.of("DROP_ALLOWED", reason == null || reason.isBlank() ? "OPERATOR_REASON_RECOMMENDED" : "OPERATOR_REASON_SUPPLIED"),
+                    evidence("targetStatus", "DROPPED", "reason", normalizeText(reason)));
+        }
+        return policyAction(
+                "ENROLLMENT",
+                "DROP_ENROLLMENT",
+                "MANUAL_REVIEW",
+                "HIGH",
+                false,
+                true,
+                true,
+                "/internal/enrollments/" + enrollment.id() + "/status",
+                policyKey(enrollment.id(), "drop"),
+                List.of("UNKNOWN_ENROLLMENT_STATUS"),
+                evidence("enrollmentStatus", enrollment.status()));
+    }
+
+    private RefundDropPolicyActionDto paymentRefundPolicyAction(
+            EnrollmentDto enrollment,
+            RefundDropPolicyFactsDto facts) {
+        String paymentStatus = upper(facts.paymentStatus());
+        if (Set.of("PAYMENT_PENDING", "PAYMENT_FAILED", "FAILED", "EXPIRED", "CANCELLED").contains(paymentStatus)) {
+            return policyAction(
+                    "PAYMENT",
+                    "REFUND_PAYMENT",
+                    "NOT_REQUIRED",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "payment-provider://refunds",
+                    policyKey(enrollment.id(), "refund-payment"),
+                    List.of("PAYMENT_NOT_SETTLED"),
+                    evidence("orderId", facts.orderId(), "paymentStatus", paymentStatus));
+        }
+        if (facts.orderId() == null || facts.paidAmount().compareTo(ZERO_MONEY) <= 0 || paymentStatus == null) {
+            return policyAction(
+                    "PAYMENT",
+                    "REFUND_PAYMENT",
+                    "NOT_REQUIRED",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "payment-provider://refunds",
+                    policyKey(enrollment.id(), "refund-payment"),
+                    List.of("NO_SETTLED_PAYMENT"),
+                    evidence("orderId", facts.orderId(), "paymentStatus", paymentStatus, "paidAmount", facts.paidAmount()));
+        }
+        if ("PAID".equals(paymentStatus)) {
+            if ("COMPLETED".equals(upper(facts.enrollmentStatus()))) {
+                return policyAction(
+                        "PAYMENT",
+                        "REFUND_PAYMENT",
+                        "MANUAL_REVIEW",
+                        "CRITICAL",
+                        false,
+                        true,
+                        true,
+                        "payment-provider://refunds",
+                        policyKey(enrollment.id(), "refund-payment"),
+                        List.of("COURSE_COMPLETED", "REFUND_REQUIRES_FINANCE_APPROVAL"),
+                        evidence("orderId", facts.orderId(), "paidAt", facts.paidAt()));
+            }
+            if (facts.withinRefundWindow()) {
+                return policyAction(
+                        "PAYMENT",
+                        "REFUND_PAYMENT",
+                        "REQUIRED",
+                        "HIGH",
+                        true,
+                        true,
+                        true,
+                        "payment-provider://refunds",
+                        policyKey(enrollment.id(), "refund-payment"),
+                        List.of("REFUND_WINDOW_OPEN", "PAYMENT_REFUND_REQUIRED"),
+                        evidence(
+                                "orderId", facts.orderId(),
+                                "amount", facts.paidAmount(),
+                                "currency", facts.currency(),
+                                "refundWindowEndsAt", facts.refundWindowEndsAt()));
+            }
+            return policyAction(
+                    "PAYMENT",
+                    "REFUND_PAYMENT",
+                    "MANUAL_REVIEW",
+                    "HIGH",
+                    false,
+                    true,
+                    true,
+                    "payment-provider://refunds",
+                    policyKey(enrollment.id(), "refund-payment"),
+                    List.of("REFUND_WINDOW_CLOSED", "REFUND_REQUIRES_FINANCE_APPROVAL"),
+                    evidence("orderId", facts.orderId(), "refundWindowEndsAt", facts.refundWindowEndsAt()));
+        }
+        return policyAction(
+                "PAYMENT",
+                "REFUND_PAYMENT",
+                "MANUAL_REVIEW",
+                "HIGH",
+                false,
+                true,
+                true,
+                "payment-provider://refunds",
+                policyKey(enrollment.id(), "refund-payment"),
+                List.of("PAYMENT_STATUS_REQUIRES_REVIEW"),
+                evidence("orderId", facts.orderId(), "paymentStatus", paymentStatus));
+    }
+
+    private RefundDropPolicyActionDto promotionPolicyAction(
+            EnrollmentDto enrollment,
+            RefundDropPolicyFactsDto facts) {
+        String promotionStatus = upper(facts.promotionStatus());
+        if (promotionStatus == null || Set.of("SKIPPED", "UNAVAILABLE").contains(promotionStatus)) {
+            return policyAction(
+                    "PROMOTION",
+                    "CLOSE_PROMOTION_BENEFIT",
+                    "NOT_REQUIRED",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "/internal/incentives/redemptions/{redemptionId}/reverse",
+                    policyKey(enrollment.id(), "promotion-close"),
+                    List.of("NO_PROMOTION_BENEFIT"),
+                    evidence("promotionStatus", promotionStatus));
+        }
+        if (Set.of("REVERSED", "CANCELLED").contains(promotionStatus)) {
+            return policyAction(
+                    "PROMOTION",
+                    "CLOSE_PROMOTION_BENEFIT",
+                    "ALREADY_DONE",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "/internal/incentives/redemptions/{redemptionId}/reverse",
+                    policyKey(enrollment.id(), "promotion-close"),
+                    List.of("PROMOTION_ALREADY_CLOSED"),
+                    evidence("promotionStatus", promotionStatus, "redemptionId", facts.redemptionId()));
+        }
+        if (Set.of("RESERVED", "COMMIT_FAILED").contains(promotionStatus)) {
+            if (facts.reservationId() == null) {
+                return policyAction(
+                        "PROMOTION",
+                        "CANCEL_PROMOTION_RESERVATION",
+                        "MANUAL_REVIEW",
+                        "HIGH",
+                        false,
+                        true,
+                        true,
+                        "/internal/incentives/reservations/{reservationId}/cancel",
+                        policyKey(enrollment.id(), "promotion-cancel"),
+                        List.of("RESERVATION_ID_MISSING", "PROMOTION_RESERVATION_REQUIRES_REMEDIATION"),
+                        evidence("promotionStatus", promotionStatus));
+            }
+            return policyAction(
+                    "PROMOTION",
+                    "CANCEL_PROMOTION_RESERVATION",
+                    "REQUIRED",
+                    "HIGH",
+                    true,
+                    true,
+                    false,
+                    "/internal/incentives/reservations/" + facts.reservationId() + "/cancel",
+                    policyKey(enrollment.id(), "promotion-cancel"),
+                    List.of("PROMOTION_RESERVATION_CANCEL_REQUIRED"),
+                    evidence("promotionStatus", promotionStatus, "reservationId", facts.reservationId()));
+        }
+        if ("APPLIED".equals(promotionStatus)) {
+            if (facts.redemptionId() == null) {
+                return policyAction(
+                        "PROMOTION",
+                        "REVERSE_PROMOTION_REDEMPTION",
+                        "MANUAL_REVIEW",
+                        "CRITICAL",
+                        false,
+                        true,
+                        true,
+                        "/internal/incentives/redemptions/{redemptionId}/reverse",
+                        policyKey(enrollment.id(), "promotion-reverse"),
+                        List.of("REDEMPTION_ID_MISSING", "PROMOTION_REVERSE_REQUIRES_REMEDIATION"),
+                        evidence("promotionStatus", promotionStatus));
+            }
+            return policyAction(
+                    "PROMOTION",
+                    "REVERSE_PROMOTION_REDEMPTION",
+                    "REQUIRED",
+                    "CRITICAL",
+                    true,
+                    true,
+                    true,
+                    "/internal/incentives/redemptions/" + facts.redemptionId() + "/reverse",
+                    policyKey(enrollment.id(), "promotion-reverse"),
+                    List.of("PROMOTION_REDEMPTION_REVERSE_REQUIRED"),
+                    evidence("promotionStatus", promotionStatus, "redemptionId", facts.redemptionId()));
+        }
+        return policyAction(
+                "PROMOTION",
+                "CLOSE_PROMOTION_BENEFIT",
+                "MANUAL_REVIEW",
+                "HIGH",
+                false,
+                true,
+                true,
+                "/internal/enrollments/remediation-cases",
+                policyKey(enrollment.id(), "promotion-review"),
+                List.of("PROMOTION_STATUS_REQUIRES_REVIEW"),
+                evidence("promotionStatus", promotionStatus));
+    }
+
+    private RefundDropPolicyActionDto pointsClawbackPolicyAction(
+            EnrollmentDto enrollment,
+            RefundDropPolicyFactsDto facts) {
+        if (facts.loyaltyPointsEarned() <= 0) {
+            return policyAction(
+                    "LOYALTY",
+                    "CLAWBACK_LOYALTY_POINTS",
+                    "NOT_REQUIRED",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "/internal/loyalty/points/{entryId}:reverse",
+                    policyKey(enrollment.id(), "points-clawback"),
+                    List.of("NO_LOYALTY_POINTS_EARNED"),
+                    evidence("loyaltyPointsEarned", facts.loyaltyPointsEarned()));
+        }
+        if (facts.loyaltyPointsOutstanding() <= 0) {
+            return policyAction(
+                    "LOYALTY",
+                    "CLAWBACK_LOYALTY_POINTS",
+                    "ALREADY_DONE",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "/internal/loyalty/points/{entryId}:reverse",
+                    policyKey(enrollment.id(), "points-clawback"),
+                    List.of("LOYALTY_POINTS_ALREADY_REVERSED"),
+                    evidence(
+                            "loyaltyPointsEarned", facts.loyaltyPointsEarned(),
+                            "loyaltyPointsReversed", facts.loyaltyPointsReversed()));
+        }
+        if (facts.loyaltyEarnEntryId() == null) {
+            return policyAction(
+                    "LOYALTY",
+                    "CLAWBACK_LOYALTY_POINTS",
+                    "MANUAL_REVIEW",
+                    "HIGH",
+                    false,
+                    true,
+                    true,
+                    "/internal/loyalty/reconciliation/entries",
+                    policyKey(enrollment.id(), "points-clawback"),
+                    List.of("LOYALTY_EARN_ENTRY_REQUIRED", "POINT_CLAWBACK_REQUIRES_RECONCILIATION"),
+                    evidence("loyaltyPointsOutstanding", facts.loyaltyPointsOutstanding()));
+        }
+        return policyAction(
+                "LOYALTY",
+                "CLAWBACK_LOYALTY_POINTS",
+                "REQUIRED",
+                "HIGH",
+                true,
+                true,
+                true,
+                "/internal/loyalty/points/" + facts.loyaltyEarnEntryId() + ":reverse",
+                policyKey(enrollment.id(), "points-clawback"),
+                List.of("LOYALTY_POINTS_CLAWBACK_REQUIRED"),
+                evidence(
+                        "loyaltyEarnEntryId", facts.loyaltyEarnEntryId(),
+                        "loyaltyPointsOutstanding", facts.loyaltyPointsOutstanding()));
+    }
+
+    private RefundDropPolicyActionDto rewardReversalPolicyAction(
+            EnrollmentDto enrollment,
+            RefundDropPolicyFactsDto facts) {
+        String rewardStatus = upper(firstText(facts.rewardStatus(), facts.rewardFulfillmentStatus()));
+        if (rewardStatus == null && facts.rewardRedemptionId() == null) {
+            return policyAction(
+                    "LOYALTY",
+                    "REVERSE_REWARD_REDEMPTION",
+                    "NOT_REQUIRED",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "/internal/loyalty/reward-redemptions/{redemptionId}:reverse",
+                    policyKey(enrollment.id(), "reward-reverse"),
+                    List.of("NO_REWARD_REDEMPTION_FACTS"),
+                    evidence());
+        }
+        if (Set.of("REVERSED", "CANCELLED").contains(rewardStatus)) {
+            return policyAction(
+                    "LOYALTY",
+                    "REVERSE_REWARD_REDEMPTION",
+                    "ALREADY_DONE",
+                    "LOW",
+                    false,
+                    false,
+                    false,
+                    "/internal/loyalty/reward-redemptions/{redemptionId}:reverse",
+                    policyKey(enrollment.id(), "reward-reverse"),
+                    List.of("REWARD_REDEMPTION_ALREADY_REVERSED"),
+                    evidence("rewardStatus", rewardStatus, "rewardRedemptionId", facts.rewardRedemptionId()));
+        }
+        if ("FAILED".equals(rewardStatus)) {
+            return policyAction(
+                    "LOYALTY",
+                    "REVERSE_REWARD_REDEMPTION",
+                    "NOT_REQUIRED",
+                    "MEDIUM",
+                    false,
+                    false,
+                    false,
+                    "/internal/loyalty/reward-redemptions/{redemptionId}:reverse",
+                    policyKey(enrollment.id(), "reward-reverse"),
+                    List.of("REWARD_FULFILLMENT_FAILED"),
+                    evidence("rewardStatus", rewardStatus, "rewardRedemptionId", facts.rewardRedemptionId()));
+        }
+        boolean reversalCandidate = Boolean.TRUE.equals(facts.rewardFulfilled())
+                || Set.of("COMMITTED", "PENDING", "ISSUED", "MANUAL_REQUIRED", "FULFILLED").contains(rewardStatus)
+                || facts.rewardRedemptionId() != null;
+        if (reversalCandidate && facts.rewardRedemptionId() == null) {
+            return policyAction(
+                    "LOYALTY",
+                    "REVERSE_REWARD_REDEMPTION",
+                    "MANUAL_REVIEW",
+                    "HIGH",
+                    false,
+                    true,
+                    true,
+                    "/internal/loyalty/reward-redemptions",
+                    policyKey(enrollment.id(), "reward-reverse"),
+                    List.of("REWARD_REDEMPTION_ID_REQUIRED", "REWARD_REVERSAL_REQUIRES_RECONCILIATION"),
+                    evidence("rewardStatus", rewardStatus, "rewardFulfillmentStatus", facts.rewardFulfillmentStatus()));
+        }
+        if (reversalCandidate) {
+            return policyAction(
+                    "LOYALTY",
+                    "REVERSE_REWARD_REDEMPTION",
+                    "REQUIRED",
+                    "HIGH",
+                    true,
+                    true,
+                    true,
+                    "/internal/loyalty/reward-redemptions/" + facts.rewardRedemptionId() + ":reverse",
+                    policyKey(enrollment.id(), "reward-reverse"),
+                    List.of("REWARD_REDEMPTION_REVERSE_REQUIRED"),
+                    evidence(
+                            "rewardStatus", rewardStatus,
+                            "rewardFulfillmentStatus", facts.rewardFulfillmentStatus(),
+                            "rewardRedemptionId", facts.rewardRedemptionId()));
+        }
+        return policyAction(
+                "LOYALTY",
+                "REVERSE_REWARD_REDEMPTION",
+                "MANUAL_REVIEW",
+                "MEDIUM",
+                false,
+                true,
+                true,
+                "/internal/loyalty/reward-redemptions",
+                policyKey(enrollment.id(), "reward-reverse"),
+                List.of("REWARD_STATUS_REQUIRES_REVIEW"),
+                evidence("rewardStatus", rewardStatus));
+    }
+
+    private RefundDropPolicyActionDto policyAction(
+            String domain,
+            String action,
+            String decision,
+            String severity,
+            boolean required,
+            boolean blocking,
+            boolean makerCheckerRequired,
+            String endpoint,
+            String idempotencyKey,
+            List<String> reasonCodes,
+            Map<String, Object> evidence) {
+        return new RefundDropPolicyActionDto(
+                domain,
+                action,
+                decision,
+                severity,
+                required,
+                blocking,
+                makerCheckerRequired,
+                endpoint,
+                idempotencyKey,
+                reasonCodes == null ? List.of() : reasonCodes,
+                evidence == null ? Map.of() : evidence);
+    }
+
+    private String policyKey(String enrollmentId, String action) {
+        return "refund-drop-" + action + "-" + enrollmentId;
+    }
+
+    private Map<String, Object> evidence(Object... pairs) {
+        Map<String, Object> evidence = new HashMap<>();
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            Object key = pairs[i];
+            Object value = pairs[i + 1];
+            if (key != null && value != null) {
+                evidence.put(String.valueOf(key), value);
+            }
+        }
+        return evidence;
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            String normalized = normalizeText(value);
+            if (normalized != null) {
+                return normalized;
+            }
+        }
+        return null;
+    }
+
+    private long nonNegative(Long value) {
+        if (value == null) {
+            return 0L;
+        }
+        if (value < 0) {
+            throw new BadRequestException("Loyalty point facts must be non-negative");
+        }
+        return value;
+    }
+
+    private int refundWindowDays(Integer value) {
+        int days = value == null ? 14 : value;
+        if (days < 0 || days > 365) {
+            throw new BadRequestException("refundWindowDays must be between 0 and 365");
+        }
+        return days;
+    }
+
+    private String maxSeverity(List<RefundDropPolicyActionDto> actions) {
+        return actions.stream()
+                .map(RefundDropPolicyActionDto::severity)
+                .max((left, right) -> Integer.compare(severityRank(left), severityRank(right)))
+                .orElse("LOW");
+    }
+
+    private int severityRank(String value) {
+        return switch (upper(value)) {
+            case "CRITICAL" -> 4;
+            case "HIGH" -> 3;
+            case "MEDIUM" -> 2;
+            default -> 1;
+        };
+    }
+
     private String normalizeStatus(String value) {
         String status = normalizeText(value);
         if (status == null) {
@@ -1329,6 +3541,191 @@ public class EnrollmentService {
                 "MANUAL_REVIEW");
         if (!allowed.contains(normalized)) {
             throw new BadRequestException("Invalid promotion application status: " + value);
+        }
+        return normalized;
+    }
+
+    private String normalizeReconciliationStatus(String value) {
+        String status = normalizeText(value);
+        if (status == null) {
+            return null;
+        }
+        String normalized = status.toUpperCase();
+        Set<String> allowed = Set.of(
+                "MATCHED",
+                "ACTIVE_WITH_UNPAID_ORDER",
+                "DROPPED_PROMOTION_NOT_REVERSED",
+                "DROPPED_PROMOTION_HOLD_OPEN",
+                "PAYMENT_FAILED_PROMOTION_OPEN",
+                "PAID_ORDER_NOT_ACTIVE",
+                "COMMIT_FAILED_WITH_PAID_ORDER",
+                "PROMOTION_COMMIT_FAILED",
+                "PROMOTION_MANUAL_REVIEW",
+                "PROMOTION_RESERVED_STALE",
+                "PAYMENT_PENDING_STALE",
+                "PROMOTION_APPLIED_MISSING_REDEMPTION");
+        if (!allowed.contains(normalized)) {
+            throw new BadRequestException("Invalid enrollment benefit reconciliation status: " + value);
+        }
+        return normalized;
+    }
+
+    private EnrollmentBenefitReconciliationEntryDto reconciliationEntry(
+            EnrollmentBenefitReconciliationRow row,
+            BenefitFinding finding) {
+        return new EnrollmentBenefitReconciliationEntryDto(
+                reconciliationKey(row),
+                finding.status(),
+                finding.reasonCodes(),
+                finding.severity(),
+                uuidString(row.getEnrollmentId()),
+                row.getStudentId(),
+                uuidString(row.getCourseId()),
+                row.getEnrollmentStatus(),
+                row.getEnrolledAt(),
+                row.getDroppedAt(),
+                row.getDropReason(),
+                uuidString(row.getOrderId()),
+                row.getOrderStatus(),
+                row.getOrderAmount(),
+                row.getOrderCurrency(),
+                row.getPaidAt(),
+                row.getOrderCreatedAt(),
+                row.getOrderUpdatedAt(),
+                uuidString(row.getPromotionApplicationId()),
+                row.getPromotionStatus(),
+                uuidString(row.getReservationId()),
+                uuidString(row.getRedemptionId()),
+                row.getPromotionRetryCount() == null ? 0 : row.getPromotionRetryCount(),
+                row.getPromotionNextRetryAt(),
+                row.getPromotionLastRetryError(),
+                row.getPromotionUpdatedAt());
+    }
+
+    private BenefitFinding benefitFinding(EnrollmentBenefitReconciliationRow row, Instant staleCutoff) {
+        String enrollmentStatus = upper(row.getEnrollmentStatus());
+        String orderStatus = upper(row.getOrderStatus());
+        String promotionStatus = upper(row.getPromotionStatus());
+        if (isActiveLike(enrollmentStatus)
+                && row.getOrderId() != null
+                && !"PAID".equals(orderStatus)) {
+            return finding(
+                    "ACTIVE_WITH_UNPAID_ORDER",
+                    "CRITICAL",
+                    "Enrollment is active/completed but its paid order is not PAID");
+        }
+        if ("DROPPED".equals(enrollmentStatus) && promotionNeedsClosure(promotionStatus)) {
+            if ("APPLIED".equals(promotionStatus)) {
+                return finding(
+                        "DROPPED_PROMOTION_NOT_REVERSED",
+                        "CRITICAL",
+                        "Enrollment is dropped but committed promotion redemption is not reversed");
+            }
+            return finding(
+                    "DROPPED_PROMOTION_HOLD_OPEN",
+                    "HIGH",
+                    "Enrollment is dropped but promotion reservation/application is still open");
+        }
+        if (paymentFailed(orderStatus) && promotionNeedsClosure(promotionStatus)) {
+            return finding(
+                    "PAYMENT_FAILED_PROMOTION_OPEN",
+                    "HIGH",
+                    "Payment failed or needs review but promotion reservation/application is still open");
+        }
+        if ("PAID".equals(orderStatus) && "PENDING_PAYMENT".equals(enrollmentStatus)) {
+            return finding(
+                    "PAID_ORDER_NOT_ACTIVE",
+                    "HIGH",
+                    "Order is PAID but enrollment has not been activated");
+        }
+        if ("APPLIED".equals(promotionStatus) && row.getRedemptionId() == null) {
+            return finding(
+                    "PROMOTION_APPLIED_MISSING_REDEMPTION",
+                    "HIGH",
+                    "Promotion application is APPLIED but redemptionId is missing");
+        }
+        if ("COMMIT_FAILED".equals(promotionStatus) && "PAID".equals(orderStatus)) {
+            return finding(
+                    "COMMIT_FAILED_WITH_PAID_ORDER",
+                    "HIGH",
+                    "Paid checkout succeeded but promotion commit is still failed");
+        }
+        if ("COMMIT_FAILED".equals(promotionStatus)) {
+            return finding(
+                    "PROMOTION_COMMIT_FAILED",
+                    "HIGH",
+                    "Promotion commit failed and needs retry or manual remediation");
+        }
+        if ("MANUAL_REVIEW".equals(promotionStatus)) {
+            return finding(
+                    "PROMOTION_MANUAL_REVIEW",
+                    "HIGH",
+                    "Promotion application is in manual review");
+        }
+        if ("RESERVED".equals(promotionStatus) && olderThan(row.getPromotionUpdatedAt(), staleCutoff)) {
+            return finding(
+                    "PROMOTION_RESERVED_STALE",
+                    "MEDIUM",
+                    "Promotion reservation is still RESERVED past the operating window");
+        }
+        if ("PAYMENT_PENDING".equals(orderStatus) && olderThan(row.getOrderCreatedAt(), staleCutoff)) {
+            return finding(
+                    "PAYMENT_PENDING_STALE",
+                    "MEDIUM",
+                    "Enrollment order is PAYMENT_PENDING past the operating window");
+        }
+        return new BenefitFinding("MATCHED", List.of(), "LOW");
+    }
+
+    private BenefitFinding finding(String status, String severity, String reason) {
+        return new BenefitFinding(status, List.of(status, reason), severity);
+    }
+
+    private String reconciliationKey(EnrollmentBenefitReconciliationRow row) {
+        String promotion = row.getPromotionApplicationId() == null
+                ? "no-promotion"
+                : row.getPromotionApplicationId().toString();
+        String order = row.getOrderId() == null ? "no-order" : row.getOrderId().toString();
+        return row.getEnrollmentId() + ":" + order + ":" + promotion;
+    }
+
+    private boolean isActiveLike(String enrollmentStatus) {
+        return "ACTIVE".equals(enrollmentStatus) || "COMPLETED".equals(enrollmentStatus);
+    }
+
+    private boolean paymentFailed(String orderStatus) {
+        return orderStatus != null && Set.of("PAYMENT_FAILED", "FAILED", "CANCELLED", "EXPIRED", "MANUAL_REVIEW")
+                .contains(orderStatus);
+    }
+
+    private boolean promotionNeedsClosure(String promotionStatus) {
+        return promotionStatus != null
+                && !Set.of("REVERSED", "CANCELLED", "SKIPPED", "UNAVAILABLE").contains(promotionStatus);
+    }
+
+    private boolean olderThan(Instant value, Instant cutoff) {
+        return value != null && value.isBefore(cutoff);
+    }
+
+    private String upper(String value) {
+        return value == null ? null : value.trim().toUpperCase();
+    }
+
+    private String uuidString(UUID value) {
+        return value == null ? null : value.toString();
+    }
+
+    private record BenefitFinding(String status, List<String> reasonCodes, String severity) {
+    }
+
+    private String normalizeRemediationStatus(String value) {
+        String status = normalizeText(value);
+        if (status == null) {
+            return null;
+        }
+        String normalized = status.toUpperCase();
+        if (!Set.of("OPEN", "IN_PROGRESS", "RESOLVED").contains(normalized)) {
+            throw new BadRequestException("Invalid remediation case status: " + value);
         }
         return normalized;
     }
@@ -1383,6 +3780,10 @@ public class EnrollmentService {
         return user != null && user.hasRole("ADMIN");
     }
 
+    private boolean isService(CurrentUser user) {
+        return user != null && user.hasAnyRole("SERVICE", "CHECKOUT_SERVICE");
+    }
+
     private String sha256Hex(String value) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -1420,6 +3821,18 @@ public class EnrollmentService {
             return result == null ? List.of() : result;
         } catch (JsonProcessingException ex) {
             return List.of();
+        }
+    }
+
+    private Map<String, Object> readMap(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> result = objectMapper.readValue(json, OBJECT_MAP);
+            return result == null ? Map.of() : result;
+        } catch (JsonProcessingException ex) {
+            return Map.of();
         }
     }
 

@@ -35,7 +35,6 @@ class AccessControlServiceJpaSmokeTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.liquibase.contexts", () -> "prod");
-        registry.add("courseflow.access-control.allow-legacy-bootstrap", () -> "true");
         registry.add("courseflow.security.internal-jwt.secret",
                 () -> "test-internal-jwt-secret-32-byte-value-001");
     }

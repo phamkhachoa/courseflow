@@ -66,8 +66,10 @@ import {
   createModuleItem,
   duplicateModule,
   duplicateModuleItem,
+  getCourseReviewChecklist,
   getCourseVersionDiff,
   getCourseDraft,
+  getCourseDraftPreview,
   listCourseReviewHistory,
   listCourseVersions,
   publishCourse,
@@ -77,9 +79,11 @@ import {
   updateCurriculum,
   updateModule,
   updateModuleItem,
+  type CourseReviewChecklistItem,
   type CourseVersion,
   type CourseVersionDiff,
   type CourseReviewAudit,
+  type CourseDraftPreview,
   type CourseModule,
   type CourseModuleItem
 } from "../api";
@@ -114,12 +118,11 @@ type UploadFiles = {
   documentFiles: File[];
 };
 
-const LEARNER_WEB_URL = (import.meta.env.VITE_LEARNER_WEB_URL ?? "http://localhost:3000").replace(/\/$/, "");
-const REVIEW_CHECKLIST = [
-  { id: "content-ready", label: "Nội dung không còn blocker" },
-  { id: "dependency-ready", label: "Media, quiz và assignment đã sẵn sàng" },
-  { id: "learner-preview-checked", label: "Learner preview đã được kiểm tra" },
-  { id: "publish-risk-reviewed", label: "Rủi ro publish đã được rà soát" }
+const FALLBACK_REVIEW_CHECKLIST: CourseReviewChecklistItem[] = [
+  { id: "content-ready", label: "Nội dung không còn blocker", required: true },
+  { id: "dependency-ready", label: "Media, quiz và assignment đã sẵn sàng", required: true },
+  { id: "learner-preview-checked", label: "Learner preview đã được kiểm tra", required: true },
+  { id: "publish-risk-reviewed", label: "Rủi ro publish đã được rà soát", required: true }
 ];
 
 const createEmptyItem = (): ItemForm => ({
@@ -216,8 +219,15 @@ function reviewActionLabel(value: string) {
   return labels[value] ?? value;
 }
 
-function reviewChecklistLabel(id: string) {
-  return REVIEW_CHECKLIST.find((item) => item.id === id)?.label ?? id;
+function reviewChecklistLabel(id: string, checklist: CourseReviewChecklistItem[]) {
+  return checklist.find((item) => item.id === id)?.label ?? id;
+}
+
+function displayReviewChecklistItems(items: CourseReviewChecklistItem[]) {
+  return items.map((item) => ({
+    ...item,
+    label: FALLBACK_REVIEW_CHECKLIST.find((fallback) => fallback.id === item.id)?.label ?? item.label
+  }));
 }
 
 function diffChangeLabel(value: string) {
@@ -302,10 +312,6 @@ function formatMinutes(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest ? `${hours}h ${rest}p` : `${hours}h`;
-}
-
-function learnerPreviewUrl(slug: string) {
-  return `${LEARNER_WEB_URL}/courses/${slug}/modules`;
 }
 
 function issueTone(issues: ContentIssue[]) {
@@ -601,11 +607,19 @@ function ReadinessGate({
 
 function PublishConfidencePanel({
   summary,
-  previewUrl
+  preview,
+  previewLoading,
+  previewError
 }: {
   summary: CourseWorkspaceSummary;
-  previewUrl: string;
+  preview?: CourseDraftPreview;
+  previewLoading: boolean;
+  previewError: boolean;
 }) {
+  const previewIssueCount = preview?.issues?.length ?? 0;
+  const previewReady = preview?.readinessStatus === "READY_FOR_REVIEW";
+  const nextAction = preview?.nextAction ?? preview?.firstRequiredItem;
+
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50/80 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -622,15 +636,12 @@ function PublishConfidencePanel({
         <div className="flex items-end justify-between gap-3">
           <span className="text-3xl font-bold text-slate-950">{summary.publishConfidence.score}%</span>
           <a
-            href={previewUrl}
-            target="_blank"
-            rel="noreferrer"
+            href="#draft-learner-preview"
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700"
-            title="Mở learner preview"
+            title="Xem draft learner preview"
           >
             <Eye size={16} />
-            Preview
-            <ExternalLink size={14} />
+            Draft preview
           </a>
         </div>
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
@@ -645,6 +656,62 @@ function PublishConfidencePanel({
             style={{ width: `${summary.publishConfidence.score}%` }}
           />
         </div>
+      </div>
+      <div id="draft-learner-preview" className="mt-4 border-t border-slate-200 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+            <Eye size={16} className="text-brand-700" />
+            Draft learner preview
+          </div>
+          {previewLoading ? (
+            <Badge tone="warning" label="Đang tải" />
+          ) : previewError ? (
+            <Badge tone="danger" label="Không tải được" />
+          ) : (
+            <Badge
+              tone={previewReady ? "success" : "danger"}
+              label={previewReady ? "Ready" : `${previewIssueCount} issue`}
+            />
+          )}
+        </div>
+        {previewLoading ? (
+          <p className="mt-3 text-sm text-slate-500">Đang tạo preview từ draft hiện tại.</p>
+        ) : previewError ? (
+          <p className="mt-3 text-sm text-red-700">Không tải được draft preview từ authoring service.</p>
+        ) : preview ? (
+          <div className="mt-3 space-y-3">
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>
+                <p className="font-semibold text-slate-500">Module</p>
+                <p className="mt-1 text-sm font-bold text-slate-950">{preview.moduleCount}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-500">Item</p>
+                <p className="mt-1 text-sm font-bold text-slate-950">{preview.itemCount}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-500">Thời lượng</p>
+                <p className="mt-1 text-sm font-bold text-slate-950">{formatMinutes(preview.totalEstimatedMinutes)}</p>
+              </div>
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Next action</p>
+              {nextAction ? (
+                <>
+                  <p className="mt-1 truncate text-sm font-bold text-slate-950">{nextAction.title}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{nextAction.moduleTitle} · {contentTypeLabel(nextAction.itemType)}</p>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-slate-500">Chưa có required item để learner bắt đầu.</p>
+              )}
+            </div>
+            {preview.issues?.length > 0 && (
+              <p className="text-sm leading-6 text-red-700">{preview.issues[0]}</p>
+            )}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-slate-500">Chưa có preview từ authoring service.</p>
+        )}
       </div>
     </div>
   );
@@ -693,6 +760,7 @@ function ReviewOperationsPanel({
   reviewState,
   reviewNote,
   reviewChecklist,
+  checklistItems,
   history,
   historyLoading,
   historyError,
@@ -700,6 +768,7 @@ function ReviewOperationsPanel({
   canApprove,
   canApproveDecision,
   canRejectDecision,
+  learnerPreviewGateReady,
   approvePending,
   rejectPending,
   approveTitle,
@@ -712,6 +781,7 @@ function ReviewOperationsPanel({
   reviewState: string;
   reviewNote: string;
   reviewChecklist: Record<string, boolean>;
+  checklistItems: CourseReviewChecklistItem[];
   history?: CourseReviewAudit[];
   historyLoading: boolean;
   historyError: boolean;
@@ -719,6 +789,7 @@ function ReviewOperationsPanel({
   canApprove: boolean;
   canApproveDecision: boolean;
   canRejectDecision: boolean;
+  learnerPreviewGateReady: boolean;
   approvePending: boolean;
   rejectPending: boolean;
   approveTitle: string;
@@ -755,25 +826,33 @@ function ReviewOperationsPanel({
           </Notice>
 
           <div className="space-y-2">
-            {REVIEW_CHECKLIST.map((item) => (
-              <label
-                key={item.id}
-                className={
-                  canApprove
-                    ? "flex items-start gap-3 rounded-md border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700"
-                    : "flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-400"
-                }
-              >
-                <input
-                  type="checkbox"
-                  checked={Boolean(reviewChecklist[item.id])}
-                  disabled={!canApprove}
-                  onChange={(event) => onChecklistChange(item.id, event.target.checked)}
-                  className="mt-1"
-                />
-                <span>{item.label}</span>
-              </label>
-            ))}
+            {checklistItems.map((item) => {
+              const lockedByPreview = item.id === "learner-preview-checked" && !learnerPreviewGateReady;
+              const disabled = !canApprove || lockedByPreview;
+              return (
+                <label
+                  key={item.id}
+                  className={
+                    disabled
+                      ? "flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-400"
+                      : "flex items-start gap-3 rounded-md border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700"
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(reviewChecklist[item.id]) && !lockedByPreview}
+                    disabled={disabled}
+                    onChange={(event) => onChecklistChange(item.id, event.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    {item.label}
+                    {item.required && <span className="ml-1 text-xs text-slate-400">Bắt buộc</span>}
+                    {lockedByPreview && <span className="mt-1 block text-xs text-slate-400">Tải draft preview trước</span>}
+                  </span>
+                </label>
+              );
+            })}
           </div>
 
           <FormField
@@ -847,7 +926,7 @@ function ReviewOperationsPanel({
                       {(entry.checklist?.length ?? 0) > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {entry.checklist?.map((item) => (
-                            <Badge key={item} value="READY" label={reviewChecklistLabel(item)} />
+                            <Badge key={item} value="READY" label={reviewChecklistLabel(item, checklistItems)} />
                           ))}
                         </div>
                       )}
@@ -1163,6 +1242,13 @@ export function CourseDraftPage() {
     queryFn: () => getCourseDraft(courseId),
     enabled: Boolean(courseId)
   });
+  const draftPreview = useQuery({
+    queryKey: queryKeys.authoring.preview(courseId),
+    queryFn: () => getCourseDraftPreview(courseId),
+    enabled: Boolean(courseId),
+    retry: 1,
+    staleTime: 30_000
+  });
 
   const versions = useQuery({
     queryKey: queryKeys.authoring.versions(courseId),
@@ -1183,6 +1269,12 @@ export function CourseDraftPage() {
     queryFn: () => listCourseReviewHistory(courseId),
     enabled: Boolean(courseId)
   });
+  const reviewChecklistPolicy = useQuery({
+    queryKey: ["authoring", "review-checklist"] as const,
+    queryFn: getCourseReviewChecklist,
+    retry: 1,
+    staleTime: 300_000
+  });
   const quizzes = useQuery({
     queryKey: queryKeys.quizzes.list(courseId),
     queryFn: () => listCourseQuizzes(courseId),
@@ -1197,6 +1289,9 @@ export function CourseDraftPage() {
     retry: 1,
     staleTime: 60_000
   });
+  const reviewChecklistItems = reviewChecklistPolicy.data?.length
+    ? displayReviewChecklistItems(reviewChecklistPolicy.data)
+    : FALLBACK_REVIEW_CHECKLIST;
 
   const [moduleForm, setModuleForm] = useState({ title: "", description: "" });
   const [itemForms, setItemForms] = useState<Record<string, ItemForm>>({});
@@ -1211,6 +1306,7 @@ export function CourseDraftPage() {
 
   function invalidateDraft() {
     qc.invalidateQueries({ queryKey: queryKeys.authoring.draft(courseId) });
+    qc.invalidateQueries({ queryKey: queryKeys.authoring.preview(courseId) });
   }
 
   function invalidateLifecycle() {
@@ -1324,7 +1420,7 @@ export function CourseDraftPage() {
   const approveReview = useMutation({
     mutationFn: () => approveCourseReview(courseId, {
       note: reviewNote.trim() || undefined,
-      checklist: REVIEW_CHECKLIST.filter((item) => reviewChecklist[item.id]).map((item) => item.id)
+      checklist: reviewChecklistItems.filter((item) => reviewChecklist[item.id]).map((item) => item.id)
     }),
     onSuccess: () => {
       setReviewNote("");
@@ -1336,7 +1432,7 @@ export function CourseDraftPage() {
   const rejectReview = useMutation({
     mutationFn: () => rejectCourseReview(courseId, {
       note: reviewNote.trim(),
-      checklist: REVIEW_CHECKLIST.filter((item) => reviewChecklist[item.id]).map((item) => item.id)
+      checklist: reviewChecklistItems.filter((item) => reviewChecklist[item.id]).map((item) => item.id)
     }),
     onSuccess: () => {
       setReviewNote("");
@@ -1467,7 +1563,10 @@ export function CourseDraftPage() {
   const reorderDisabled = !courseCanAuthor || reorderCurriculumMutation.isPending;
   const canSubmitReview = courseCanAuthor && reviewState === "DRAFT" && contentReady;
   const canApprove = reviewState === "IN_REVIEW";
-  const reviewChecklistComplete = REVIEW_CHECKLIST.every((item) => reviewChecklist[item.id]);
+  const learnerPreviewGateReady = draftPreview.isSuccess && !draftPreview.isFetching && Boolean(draftPreview.data);
+  const reviewChecklistComplete = reviewChecklistItems
+    .filter((item) => item.required)
+    .every((item) => Boolean(reviewChecklist[item.id]) && (item.id !== "learner-preview-checked" || learnerPreviewGateReady));
   const reviewNoteReady = reviewNote.trim().length > 0;
   const canApproveDecision = canApprove && reviewChecklistComplete;
   const canRejectDecision = canApprove && reviewNoteReady;
@@ -1477,6 +1576,8 @@ export function CourseDraftPage() {
     : "Cần course chưa archived, review DRAFT và không còn blocker nội dung";
   const approveTitle = !canApprove
     ? "Chỉ duyệt khi course đang IN_REVIEW"
+    : !learnerPreviewGateReady
+      ? "Tải draft learner preview trước khi duyệt"
     : reviewChecklistComplete
       ? "Sẵn sàng duyệt"
       : "Hoàn tất reviewer checklist trước khi duyệt";
@@ -1499,8 +1600,6 @@ export function CourseDraftPage() {
     assignmentLoading: assignments.isLoading,
     assignmentError: assignments.isError
   });
-  const previewUrl = learnerPreviewUrl(d.slug);
-
   return (
     <div>
       <Link to=".." className="mb-4 inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-brand-700">
@@ -1560,7 +1659,12 @@ export function CourseDraftPage() {
           actions={<Badge value={d.status} label={d.status} />}
         />
         <div className="grid gap-4 p-5 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <PublishConfidencePanel summary={workspaceSummary} previewUrl={previewUrl} />
+          <PublishConfidencePanel
+            summary={workspaceSummary}
+            preview={draftPreview.data}
+            previewLoading={draftPreview.isLoading}
+            previewError={draftPreview.isError}
+          />
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
@@ -1580,6 +1684,7 @@ export function CourseDraftPage() {
         reviewState={reviewState}
         reviewNote={reviewNote}
         reviewChecklist={reviewChecklist}
+        checklistItems={reviewChecklistItems}
         history={reviewHistory.data}
         historyLoading={reviewHistory.isLoading}
         historyError={reviewHistory.isError}
@@ -1587,6 +1692,7 @@ export function CourseDraftPage() {
         canApprove={canApprove}
         canApproveDecision={canApproveDecision}
         canRejectDecision={canRejectDecision}
+        learnerPreviewGateReady={learnerPreviewGateReady}
         approvePending={approveReview.isPending}
         rejectPending={rejectReview.isPending}
         approveTitle={approveTitle}

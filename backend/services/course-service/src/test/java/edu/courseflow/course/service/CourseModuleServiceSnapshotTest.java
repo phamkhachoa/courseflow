@@ -28,13 +28,16 @@ import edu.courseflow.course.dto.CourseProgressDto;
 import edu.courseflow.course.dto.LearningDtos.CertificateEligibilityDto;
 import edu.courseflow.course.dto.LearningDtos.CertificateMissingRequirementDto;
 import edu.courseflow.course.dto.LearningDtos.LearnerCoursePlayerDto;
+import edu.courseflow.course.dto.LearningDtos.LearnerLearningPathDto;
 import edu.courseflow.course.dto.LearningDtos.LearningAccessCheckDto;
 import edu.courseflow.course.dto.LearningDtos.LearningAccessCheckRequestDto;
 import edu.courseflow.course.dto.LearningDtos.LearningSourceStatusDto;
 import edu.courseflow.course.service.LearningSourceStatusClient.SourceKey;
 import edu.courseflow.course.mapper.CourseMapper;
+import edu.courseflow.course.model.Course;
 import edu.courseflow.course.model.CourseVersion;
 import edu.courseflow.course.repository.CourseModuleJpaRepository;
+import edu.courseflow.course.repository.CourseJpaRepository;
 import edu.courseflow.course.repository.CourseVersionJpaRepository;
 import edu.courseflow.course.repository.LearnerItemProgressJpaRepository;
 import edu.courseflow.course.repository.LearnerModuleProgressJpaRepository;
@@ -44,6 +47,7 @@ import edu.courseflow.course.repository.OutboxEventJpaRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +83,8 @@ class CourseModuleServiceSnapshotTest {
     @Mock
     private ModuleItemJpaRepository items;
     @Mock
+    private CourseJpaRepository courses;
+    @Mock
     private CourseVersionJpaRepository versions;
     @Mock
     private ModulePrerequisiteJpaRepository prerequisites;
@@ -109,6 +115,7 @@ class CourseModuleServiceSnapshotTest {
         service = new CourseModuleService(
                 modules,
                 items,
+                courses,
                 versions,
                 prerequisites,
                 progressRepository,
@@ -122,6 +129,7 @@ class CourseModuleServiceSnapshotTest {
                 restClientBuilder,
                 "http://media.test",
                 internalJwt());
+        lenient().when(courses.findById(COURSE_ID)).thenReturn(Optional.of(publishedCourse()));
         lenient().when(certificateEligibilityClient.loadEligibility(eq(COURSE_ID), eq(LEARNER)))
                 .thenReturn(certificateNotEligible());
     }
@@ -156,6 +164,24 @@ class CourseModuleServiceSnapshotTest {
     }
 
     @Test
+    void listModulesReadsExplicitPublishedVersionPointerInsteadOfLatestPublishedSnapshot() throws Exception {
+        Course course = publishedCourse();
+        course.publishVersion(1);
+        doNothing().when(courseAccess).requireCourseAccess(LEARNER, COURSE_ID);
+        when(courses.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(versions.findByCourseIdAndVersionNo(COURSE_ID, 1)).thenReturn(Optional.of(publishedVersion(
+                1,
+                "Stable live lesson",
+                SNAPSHOT_ITEM_ID)));
+
+        List<CourseModuleDto> result = service.listModules(COURSE_ID, LEARNER);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().items().getFirst().title()).isEqualTo("Stable live lesson");
+        verifyNoInteractions(modules, items);
+    }
+
+    @Test
     void progressCountsOnlyItemsFrozenInPublishedSnapshot() throws Exception {
         doNothing().when(courseAccess).requireCourseAccess(LEARNER, COURSE_ID);
         when(versions.findByCourseIdAndStateOrderByVersionNoDesc(COURSE_ID, "PUBLISHED"))
@@ -169,6 +195,25 @@ class CourseModuleServiceSnapshotTest {
         assertThat(progress.totalRequiredItems()).isEqualTo(1);
         assertThat(progress.missingRequirements()).extracting(CourseProgressDto.MissingRequirementDto::itemId)
                 .containsExactly(SNAPSHOT_ITEM_ID.toString());
+        verifyNoInteractions(modules, items);
+    }
+
+    @Test
+    void playerAndProgressExposePublishedVersionNumber() throws Exception {
+        Course course = publishedCourse();
+        course.publishVersion(7);
+        doNothing().when(courseAccess).requireCourseAccess(LEARNER, COURSE_ID);
+        when(courses.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(versions.findByCourseIdAndVersionNo(COURSE_ID, 7))
+                .thenReturn(Optional.of(publishedVersion(7, "Pinned lesson", SNAPSHOT_ITEM_ID)));
+        when(itemProgressRepository.findByCourseIdAndStudentId(COURSE_ID, "4")).thenReturn(List.of());
+
+        LearnerCoursePlayerDto player = service.player(COURSE_ID, LEARNER);
+        CourseProgressDto progress = service.progress(COURSE_ID, LEARNER);
+
+        assertThat(player.publishedVersionNo()).isEqualTo(7);
+        assertThat(player.progress().publishedVersionNo()).isEqualTo(7);
+        assertThat(progress.publishedVersionNo()).isEqualTo(7);
         verifyNoInteractions(modules, items);
     }
 
@@ -203,6 +248,42 @@ class CourseModuleServiceSnapshotTest {
         assertThat(player.certificateEligibility().missingRequirements())
                 .extracting(CertificateMissingRequirementDto::label)
                 .contains("Read architecture overview");
+        verifyNoInteractions(modules, items);
+    }
+
+    @Test
+    void learningPathProjectsPublishedSnapshotWithCohortContextAndLocks() throws Exception {
+        doNothing().when(courseAccess).requireCourseAccess(LEARNER, COURSE_ID);
+        when(versions.findByCourseIdAndStateOrderByVersionNoDesc(COURSE_ID, "PUBLISHED"))
+                .thenReturn(List.of(publishedVersionWithPrerequisiteChain()));
+        when(itemProgressRepository.findByCourseIdAndStudentId(COURSE_ID, "4")).thenReturn(List.of());
+
+        LearnerLearningPathDto path = service.learningPath(COURSE_ID, LEARNER, "cohort-2026-a", "section-01");
+
+        assertThat(path.courseId()).isEqualTo(COURSE_ID.toString());
+        assertThat(path.publishedVersionNo()).isEqualTo(3);
+        assertThat(path.studentId()).isEqualTo("4");
+        assertThat(path.cohortId()).isEqualTo("cohort-2026-a");
+        assertThat(path.sectionId()).isEqualTo("section-01");
+        assertThat(path.progress().totalRequiredItems()).isEqualTo(2);
+        assertThat(path.nextAction().itemId()).isEqualTo(SNAPSHOT_ITEM_ID.toString());
+        assertThat(path.modules()).hasSize(2);
+        assertThat(path.modules().getFirst().items())
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.itemId()).isEqualTo(SNAPSHOT_ITEM_ID.toString());
+                    assertThat(item.progressStatus()).isEqualTo("NOT_STARTED");
+                    assertThat(item.sourceStatus()).isEqualTo("READY");
+                });
+        assertThat(path.modules().getLast()).satisfies(module -> {
+            assertThat(module.locked()).isTrue();
+            assertThat(module.lockedReasonCode()).isEqualTo("PREREQUISITE_MODULE_INCOMPLETE");
+            assertThat(module.unmetPrerequisites()).extracting("moduleId").containsExactly(MODULE_ID.toString());
+            assertThat(module.items()).singleElement().satisfies(item -> {
+                assertThat(item.locked()).isTrue();
+                assertThat(item.lockedReasonCode()).isEqualTo("PREREQUISITE_MODULE_INCOMPLETE");
+            });
+        });
         verifyNoInteractions(modules, items);
     }
 
@@ -413,6 +494,20 @@ class CourseModuleServiceSnapshotTest {
                 "course-service"));
     }
 
+    private static Course publishedCourse() {
+        Course course = new Course(
+                COURSE_ID,
+                "SE401",
+                "Production Architecture",
+                "production-architecture",
+                "Production readiness",
+                UUID.fromString("20000000-0000-0000-0000-000000000001"),
+                "2",
+                "ADVANCED");
+        course.setStatus("PUBLISHED");
+        return course;
+    }
+
     @Test
     void learnerCannotDownloadDocumentMediaFromLockedModule() throws Exception {
         doNothing().when(courseAccess).requireCourseAccess(LEARNER, COURSE_ID);
@@ -490,7 +585,11 @@ class CourseModuleServiceSnapshotTest {
     }
 
     private CourseVersion publishedVersionWithOneItem() throws JsonProcessingException {
-        CourseVersion version = new CourseVersion(UUID.randomUUID(), COURSE_ID, 3, "DRAFT", "2", "approved");
+        return publishedVersion(3, "Read architecture overview", SNAPSHOT_ITEM_ID);
+    }
+
+    private CourseVersion publishedVersion(int versionNo, String itemTitle, UUID itemId) throws JsonProcessingException {
+        CourseVersion version = new CourseVersion(UUID.randomUUID(), COURSE_ID, versionNo, "DRAFT", "2", "approved");
         version.publish(objectMapper.writeValueAsString(List.of(new ModuleOutlineDto(
                 MODULE_ID.toString(),
                 "Module 1 - Architecture foundation",
@@ -498,10 +597,10 @@ class CourseModuleServiceSnapshotTest {
                 1,
                 "PUBLISHED",
                 List.of(new ItemOutlineDto(
-                        SNAPSHOT_ITEM_ID.toString(),
+                        itemId.toString(),
                         "LESSON",
                         "30000000-0000-0000-0000-000000000101",
-                        "Read architecture overview",
+                        itemTitle,
                         "Review architecture guide.",
                         null,
                         List.of(),

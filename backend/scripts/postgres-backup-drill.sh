@@ -7,7 +7,6 @@ DEFAULT_BACKUP_DIR="backups/postgres/$(date -u +%Y%m%dT%H%M%SZ)"
 RESTORE_TEMP_DB=""
 
 DATABASES=(
-  cf_identity
   cf_organization
   cf_course
   cf_enrollment
