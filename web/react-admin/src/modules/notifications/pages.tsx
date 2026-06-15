@@ -44,6 +44,7 @@ function notificationRead(notification: { read?: boolean; readAt?: string }) {
 function deliveryStatusLabel(status?: string) {
   const labels: Record<string, string> = {
     PENDING: "Chờ gửi",
+    DISPATCHING: "Đang gửi",
     DELIVERED: "Đã gửi",
     FAILED: "Lỗi gửi"
   };

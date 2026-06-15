@@ -30,6 +30,7 @@ scrape_configs:
           - media-service:8080
           - search-service:8080
           - analytics-service:8080
+          - recommendation-ml-service:8080
           - gradebook-service:8080
           - quiz-service:8080
           - certificate-service:8080

@@ -1,6 +1,5 @@
 package edu.courseflow.notification.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,26 +18,24 @@ class NotificationDeliveryRetrySchedulerTest {
     @Mock
     private NotificationRepository notifications;
 
-    private NotificationDeliveryService delivery;
+    @Mock
+    private NotificationDeliveryDispatcher dispatcher;
+
     private NotificationDeliveryRetryScheduler scheduler;
 
     @BeforeEach
     void setUp() {
-        delivery = new NotificationDeliveryService(ignored -> {
-        });
-        scheduler = new NotificationDeliveryRetryScheduler(notifications, delivery, 5, 10);
+        scheduler = new NotificationDeliveryRetryScheduler(notifications, dispatcher, 5, 10);
     }
 
     @Test
-    void retryFailedDeliveriesRedeliversAndPersistsRows() {
+    void retryFailedDeliveriesSchedulesDispatchForRows() {
         Notification notification = new Notification("4", "ANNOUNCEMENT", "Welcome", "Body");
         notification.markDeliveryFailed("temporary outage");
         when(notifications.lockFailedForRetry(5, 10)).thenReturn(List.of(notification));
 
         scheduler.retryFailedDeliveries();
 
-        assertThat(notification.getDeliveryStatus()).isEqualTo("DELIVERED");
-        assertThat(notification.getDeliveryAttempts()).isEqualTo(1);
-        verify(notifications).saveEntity(notification);
+        verify(dispatcher).dispatch(notification);
     }
 }

@@ -46,7 +46,18 @@ public interface AnalyticsMapper {
 
     RecommendationDto toDto(CourseRecommendation row);
 
-    RelatedCourseDto toDto(RelatedCourse row);
+    default RelatedCourseDto toDto(RelatedCourse row) {
+        return new RelatedCourseDto(
+                row.getCourseId().toString(),
+                row.getRelatedCourseId().toString(),
+                row.getScore().doubleValue(),
+                row.getSource(),
+                row.getReason(),
+                row.getReasonCode(),
+                "COURSE_DETAIL",
+                row.getModelVersion(),
+                row.getGeneratedAt());
+    }
 
     default int daysSince(Instant now, Instant lastActivity) {
         Instant baseline = lastActivity == null ? now.minus(999, ChronoUnit.DAYS) : lastActivity;

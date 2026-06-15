@@ -80,6 +80,12 @@ public class Notification {
         this.lastDeliveryAttemptAt = Instant.now();
     }
 
+    public void markDeliveryInProgress() {
+        markDeliveryAttempt();
+        this.deliveryStatus = "DISPATCHING";
+        this.deliveryError = null;
+    }
+
     public void markDelivered() {
         this.deliveryStatus = "DELIVERED";
         this.deliveredAt = Instant.now();

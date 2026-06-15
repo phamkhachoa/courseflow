@@ -41,7 +41,8 @@ Clients (Next.js, React admin, Flutter) call the gateway directly. Next.js serve
 Course authoring submit-review and publish gates require purchasable pricing (`ACTIVE` or `FREE`)
 because learner checkout builds promotion facts from `GET /internal/courses/{id}/pricing`.
 | Search | `GET /api/v1/search/courses?q=`, `POST /api/admin/v1/search/courses` |
-| Analytics | `GET /api/admin/v1/analytics/courses/{id}/metrics`, `GET /api/admin/v1/analytics/courses/{id}/at-risk`, `GET /api/admin/v1/analytics/marketing/funnel`, `POST /api/admin/v1/analytics/warehouse/exports`, `GET /api/v1/analytics/students/{id}/recommendations` |
+| Analytics | `GET /api/admin/v1/analytics/courses/{id}/metrics`, `GET /api/admin/v1/analytics/courses/{id}/at-risk`, `GET /api/admin/v1/analytics/marketing/funnel`, `POST /api/admin/v1/analytics/warehouse/exports`, `POST /api/admin/v1/analytics/recommendations/batch/related-course-pairs`, `POST /api/admin/v1/analytics/recommendations/batch/related-course-pairs/async`, `POST /api/admin/v1/analytics/recommendations/batch/related-course-pairs/async/{trainingRunId}/materialize`, `GET /api/v1/courses/{id}/related`, `GET /api/v1/analytics/students/{id}/recommendations` |
+| Recommendation ML | `POST /api/admin/v1/recommendation-ml/related-courses:train`, `POST /api/admin/v1/recommendation-ml/related-courses:enqueue`, `GET /api/admin/v1/recommendation-ml/training-runs/{trainingRunId}`, `GET /api/admin/v1/recommendation-ml/models/active`, `POST /api/admin/v1/recommendation-ml/models/{modelVersion}:request-activation`, `POST /api/admin/v1/recommendation-ml/models/activation-requests/{approvalId}:approve`, `GET /api/admin/v1/recommendation-ml/courses/{id}/related` |
 | Gradebook | `GET /api/v1/gradebook/courses/{courseId}/students/{studentId}`, `GET /api/admin/v1/gradebook/courses/{courseId}/grade-publish-audit`, `POST /api/admin/v1/gradebook/entries` |
 | Quiz | `GET /api/v1/quizzes/{quizId}`, `POST /api/v1/quizzes/{quizId}/attempts`, `POST /api/admin/v1/quizzes/attempts/{attemptId}/answers/{questionId}/grade` |
 | Certificate | `GET /api/v1/certificates/verify/{code}`, `GET /api/admin/v1/certificates/eligibility?courseId=&studentId=`, `POST /api/admin/v1/certificates/issue`, `POST /api/admin/v1/certificates/{id}/revoke` |
@@ -74,6 +75,36 @@ with `internal:authz:assert-topology`; never forward client-supplied ancestor pa
 `POST /internal/analytics/marketing/funnel/events` is not a client API. Trusted services may use it
 to feed shadow funnel read-model events when their internal JWT carries
 `internal:analytics:funnel-write`; writes are idempotent by event id.
+
+`recommendation-ml-service` is an internal/admin Python ML boundary for recommendation only. Trusted
+batch callers must use `internal:recommendation-ml:train`; inference callers must use
+`internal:recommendation-ml:infer`; model/training operations such as cancel, requeue, audit reads
+and activation approval require `internal:recommendation-ml:ops` or a verified platform-admin user
+token. Training requests send hashed principals plus course
+interactions, not raw learner profile data. The Python project owns recommendation training runs,
+model versioning, Alembic migrations, quality counters and reason-coded related-course scores. The
+service fails closed when internal JWT issuer, audience and verifier material are not configured. For
+production, callers should prefer async training: analytics submits `related-courses:enqueue`, an ML
+worker claims `QUEUED` jobs, stale `RUNNING` jobs are requeued or failed by lease recovery, and
+analytics tracks completed runs in `recommendation_ml_training_jobs`. The scheduled materializer claims
+tracker rows through a DB-backed lease before projecting completed `ACTIVE` runs into its learner read
+model. A run that produces recommendations but misses activation quality thresholds
+ends as `QUALITY_GATE_FAILED` and leaves the previous active model/read model untouched. In
+production, passing runs become `PENDING_ACTIVATION` candidates until a separate ops checker approves
+activation; only then does analytics project the ML read model. Rejected candidates become
+`ACTIVATION_REJECTED` and never replace the current learner read model. ML ops can
+list training runs/model versions, request prior-model reactivation with mandatory reason/evidence,
+and audit all model activations through `recommendation_model_ops_audit`. Prior-model reactivation
+uses maker-checker approval: each model can have only one pending activation request, the requester
+cannot approve/reject their own request, and direct activation is disabled. Operators can also
+cancel/requeue
+eligible async training runs with mandatory reason/evidence; those changes are recorded in
+`recommendation_training_ops_audit`. The service also exposes `/actuator/prometheus` metrics for
+training run status counts, stale worker leases, queue/running age, active-model freshness, migration
+readiness and metrics refresh failures. The sync
+`related-courses:train` endpoint remains for backward-compatible internal callers.
+Learner traffic still reads related courses through `analytics-service`, which filters unpublished
+related courses and falls back to behavioral recommendations if ML is unavailable.
 
 ## Response Rules
 

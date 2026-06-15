@@ -12,4 +12,10 @@
 
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/002-marketing-funnel-metrics.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/003-recommendation-platform.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004-recommendation-ml-training-jobs.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/005-recommendation-ml-quality-gate-status.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/006-recommendation-ml-materialization-lease.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/007-recommendation-ml-cancelled-status.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/008-recommendation-ml-pending-activation-status.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

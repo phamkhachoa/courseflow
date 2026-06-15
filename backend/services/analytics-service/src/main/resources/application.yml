@@ -31,6 +31,19 @@ courseflow:
   entitlement:
     enrollment-service-url: ${ENROLLMENT_SERVICE_URL:http://enrollment-service:8080}
     course-service-url: ${COURSE_SERVICE_URL:http://course-service:8080}
+  analytics:
+    recommendation-ml:
+      enabled: ${RECOMMENDATION_ML_ENABLED:true}
+      service-url: ${RECOMMENDATION_ML_SERVICE_URL:http://recommendation-ml-service:8080}
+      timeout-ms: ${RECOMMENDATION_ML_TIMEOUT_MS:2500}
+      max-training-events: ${RECOMMENDATION_ML_MAX_TRAINING_EVENTS:250000}
+      materialization:
+        enabled: ${RECOMMENDATION_ML_MATERIALIZATION_ENABLED:true}
+        fixed-delay-ms: ${RECOMMENDATION_ML_MATERIALIZATION_FIXED_DELAY_MS:30000}
+        min-check-interval-ms: ${RECOMMENDATION_ML_MATERIALIZATION_MIN_CHECK_INTERVAL_MS:30000}
+        batch-size: ${RECOMMENDATION_ML_MATERIALIZATION_BATCH_SIZE:25}
+        worker-id: ${RECOMMENDATION_ML_MATERIALIZATION_WORKER_ID:analytics-service}
+        lock-lease-ms: ${RECOMMENDATION_ML_MATERIALIZATION_LOCK_LEASE_MS:300000}
 management:
   endpoints:
     web:

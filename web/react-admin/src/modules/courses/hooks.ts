@@ -4,12 +4,16 @@ import {
   addCourseMaterial,
   archiveCourse,
   createCourse,
+  createManualRelatedCourse,
+  deleteManualRelatedCourse,
   fallbackCourses,
   getCourse,
+  listManualRelatedCourses,
   listCourses,
-  publishCourse
+  publishCourse,
+  updateManualRelatedCourse
 } from "./api";
-import type { AddCourseMaterialInput } from "./api";
+import type { AddCourseMaterialInput, UpsertManualRelatedCourseInput } from "./api";
 import type { CreateCourseInput } from "./types";
 
 export function useCourses(status?: string) {
@@ -47,6 +51,36 @@ export function useCourseLifecycle(courseId: string) {
     archive: useMutation({ mutationFn: () => archiveCourse(courseId), onSuccess: invalidate }),
     addMaterial: useMutation({
       mutationFn: (input: AddCourseMaterialInput) => addCourseMaterial(courseId, input),
+      onSuccess: invalidate
+    })
+  };
+}
+
+export function useManualRelatedCourses(courseId: string) {
+  return useQuery({
+    queryKey: queryKeys.courses.related(courseId),
+    queryFn: () => listManualRelatedCourses(courseId),
+    enabled: Boolean(courseId),
+    retry: 1
+  });
+}
+
+export function useManualRelatedCourseMutations(courseId: string) {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: queryKeys.courses.related(courseId) });
+
+  return {
+    create: useMutation({
+      mutationFn: (input: UpsertManualRelatedCourseInput) => createManualRelatedCourse(courseId, input),
+      onSuccess: invalidate
+    }),
+    update: useMutation({
+      mutationFn: ({ relatedCourseId, input }: { relatedCourseId: string; input: UpsertManualRelatedCourseInput }) =>
+        updateManualRelatedCourse(courseId, relatedCourseId, input),
+      onSuccess: invalidate
+    }),
+    remove: useMutation({
+      mutationFn: (relatedCourseId: string) => deleteManualRelatedCourse(courseId, relatedCourseId),
       onSuccess: invalidate
     })
   };

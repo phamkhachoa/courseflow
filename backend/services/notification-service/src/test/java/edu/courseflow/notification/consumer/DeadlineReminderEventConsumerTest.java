@@ -10,10 +10,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.notification.dto.NotificationDtos.NotificationDto;
 import edu.courseflow.notification.model.Notification;
 import edu.courseflow.notification.model.ProcessedEvent;
-import edu.courseflow.notification.push.NotificationStreamRegistry;
 import edu.courseflow.notification.repository.NotificationRepository;
 import edu.courseflow.notification.repository.ProcessedEventRepository;
-import edu.courseflow.notification.service.NotificationDeliveryService;
+import edu.courseflow.notification.service.NotificationDeliveryDispatcher;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,9 +29,7 @@ class DeadlineReminderEventConsumerTest {
     @Mock
     private NotificationRepository notifications;
     @Mock
-    private NotificationStreamRegistry pushRegistry;
-    @Mock
-    private NotificationDeliveryService delivery;
+    private NotificationDeliveryDispatcher dispatcher;
 
     private DeadlineReminderEventConsumer consumer;
 
@@ -42,8 +39,7 @@ class DeadlineReminderEventConsumerTest {
                 processedEvents,
                 new ObjectMapper().findAndRegisterModules(),
                 notifications,
-                pushRegistry,
-                delivery);
+                dispatcher);
     }
 
     @Test
@@ -59,7 +55,7 @@ class DeadlineReminderEventConsumerTest {
         when(notifications.channelEnabled("4", "DEADLINE_REMINDER")).thenReturn(true);
         when(notifications.insertEntity(eq("4"), eq("DEADLINE_REMINDER"), eq("Sắp đến hạn nộp bài"), any()))
                 .thenReturn(notification);
-        when(notifications.toDto(notification)).thenReturn(dto);
+        when(dispatcher.dispatch(notification)).thenReturn(dto);
 
         consumer.onDeadlineReminderDue("""
                 {
@@ -73,8 +69,7 @@ class DeadlineReminderEventConsumerTest {
                 }
                 """);
 
-        verify(delivery).deliver(notification);
-        verify(pushRegistry).push("4", dto);
+        verify(dispatcher).dispatch(notification);
     }
 
     @Test
@@ -92,6 +87,6 @@ class DeadlineReminderEventConsumerTest {
                 """);
 
         verify(notifications, never()).insertEntity(any(), any(), any(), any());
-        verify(delivery, never()).deliver(any());
+        verify(dispatcher, never()).dispatch(any());
     }
 }

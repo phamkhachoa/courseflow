@@ -16,16 +16,18 @@ x-service-env: &service-env
   COURSEFLOW_INTERNAL_JWT_JWKS_URI: ${COURSEFLOW_INTERNAL_JWT_JWKS_URI:-}
   COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS: ${COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS:-300}
   COURSEFLOW_INTERNAL_JWT_AUDIENCE: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:-courseflow-services}
+  COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS: ${COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS:-900}
   COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE: ${COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE:-local}
   COURSEFLOW_STS_CLIENT_SECRET: ${COURSEFLOW_STS_CLIENT_SECRET:-local-courseflow-sts-client-secret-change-me-32}
-  COURSEFLOW_STS_CLIENT_SECRETS: ${COURSEFLOW_STS_CLIENT_SECRETS:-api-gateway=local-courseflow-sts-client-secret-change-me-32;access-control-service=local-courseflow-sts-client-secret-change-me-32;user-management-service=local-courseflow-sts-client-secret-change-me-32;organization-service=local-courseflow-sts-client-secret-change-me-32;course-service=local-courseflow-sts-client-secret-change-me-32;enrollment-service=local-courseflow-sts-client-secret-change-me-32;assignment-service=local-courseflow-sts-client-secret-change-me-32;deadline-service=local-courseflow-sts-client-secret-change-me-32;announcement-service=local-courseflow-sts-client-secret-change-me-32;portfolio-service=local-courseflow-sts-client-secret-change-me-32;discussion-service=local-courseflow-sts-client-secret-change-me-32;notification-service=local-courseflow-sts-client-secret-change-me-32;chat-service=local-courseflow-sts-client-secret-change-me-32;media-service=local-courseflow-sts-client-secret-change-me-32;search-service=local-courseflow-sts-client-secret-change-me-32;analytics-service=local-courseflow-sts-client-secret-change-me-32;gradebook-service=local-courseflow-sts-client-secret-change-me-32;quiz-service=local-courseflow-sts-client-secret-change-me-32;certificate-service=local-courseflow-sts-client-secret-change-me-32;peer-review-service=local-courseflow-sts-client-secret-change-me-32;live-session-service=local-courseflow-sts-client-secret-change-me-32;review-service=local-courseflow-sts-client-secret-change-me-32;checkout-service=local-courseflow-sts-client-secret-change-me-32;promotion-service=local-courseflow-sts-client-secret-change-me-32;loyalty-service=local-courseflow-sts-client-secret-change-me-32;outbox-relay=local-courseflow-sts-client-secret-change-me-32}
-  COURSEFLOW_STS_ALLOWED_CLIENTS: ${COURSEFLOW_STS_ALLOWED_CLIENTS:-api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,checkout-service,promotion-service,loyalty-service,outbox-relay}
-  COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES: ${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice,internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire}
-  COURSEFLOW_STS_CLIENT_SCOPES: ${COURSEFLOW_STS_CLIENT_SCOPES:-api-gateway=internal:service,internal:token-exchange;access-control-service=internal:service;user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;enrollment-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse;assignment-service=internal:service;deadline-service=internal:service;announcement-service=internal:service;portfolio-service=internal:service;discussion-service=internal:service;notification-service=internal:service;chat-service=internal:service,internal:token-exchange;media-service=internal:service;search-service=internal:service;analytics-service=internal:service;gradebook-service=internal:service;quiz-service=internal:service;certificate-service=internal:service;peer-review-service=internal:service;live-session-service=internal:service;review-service=internal:service;checkout-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:read;promotion-service=internal:service,internal:promotion:admin,internal:loyalty:earn,internal:loyalty:reverse;loyalty-service=internal:service,internal:loyalty:admin,internal:loyalty:read;outbox-relay=internal:service}
+  COURSEFLOW_STS_CLIENT_SECRETS: ${COURSEFLOW_STS_CLIENT_SECRETS:-api-gateway=local-courseflow-sts-client-secret-change-me-32;access-control-service=local-courseflow-sts-client-secret-change-me-32;user-management-service=local-courseflow-sts-client-secret-change-me-32;organization-service=local-courseflow-sts-client-secret-change-me-32;course-service=local-courseflow-sts-client-secret-change-me-32;enrollment-service=local-courseflow-sts-client-secret-change-me-32;assignment-service=local-courseflow-sts-client-secret-change-me-32;deadline-service=local-courseflow-sts-client-secret-change-me-32;announcement-service=local-courseflow-sts-client-secret-change-me-32;portfolio-service=local-courseflow-sts-client-secret-change-me-32;discussion-service=local-courseflow-sts-client-secret-change-me-32;notification-service=local-courseflow-sts-client-secret-change-me-32;chat-service=local-courseflow-sts-client-secret-change-me-32;media-service=local-courseflow-sts-client-secret-change-me-32;search-service=local-courseflow-sts-client-secret-change-me-32;analytics-service=local-courseflow-sts-client-secret-change-me-32;recommendation-ml-service=local-courseflow-sts-client-secret-change-me-32;gradebook-service=local-courseflow-sts-client-secret-change-me-32;quiz-service=local-courseflow-sts-client-secret-change-me-32;certificate-service=local-courseflow-sts-client-secret-change-me-32;peer-review-service=local-courseflow-sts-client-secret-change-me-32;live-session-service=local-courseflow-sts-client-secret-change-me-32;review-service=local-courseflow-sts-client-secret-change-me-32;checkout-service=local-courseflow-sts-client-secret-change-me-32;promotion-service=local-courseflow-sts-client-secret-change-me-32;loyalty-service=local-courseflow-sts-client-secret-change-me-32;outbox-relay=local-courseflow-sts-client-secret-change-me-32}
+  COURSEFLOW_STS_ALLOWED_CLIENTS: ${COURSEFLOW_STS_ALLOWED_CLIENTS:-api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,recommendation-ml-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,checkout-service,promotion-service,loyalty-service,outbox-relay}
+  COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES: ${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice,internal:analytics:funnel-write,internal:analytics:export-read,internal:analytics:event-write,internal:analytics:model-write,internal:recommendation-ml:train,internal:recommendation-ml:infer,internal:recommendation-ml:ops,internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire}
+  COURSEFLOW_STS_CLIENT_SCOPES: ${COURSEFLOW_STS_CLIENT_SCOPES:-api-gateway=internal:service,internal:token-exchange;access-control-service=internal:service;user-management-service=internal:identity:provision,internal:authz:check,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read;organization-service=internal:service,internal:authz:check,internal:authz:assert-topology;course-service=internal:service,internal:user,internal:authz:check,internal:authz:assert-topology;enrollment-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse;assignment-service=internal:service;deadline-service=internal:service;announcement-service=internal:service;portfolio-service=internal:service;discussion-service=internal:service;notification-service=internal:service;chat-service=internal:service,internal:token-exchange;media-service=internal:service;search-service=internal:service;analytics-service=internal:service,internal:recommendation-ml:train,internal:recommendation-ml:infer;recommendation-ml-service=internal:service;gradebook-service=internal:service;quiz-service=internal:service;certificate-service=internal:service;peer-review-service=internal:service;live-session-service=internal:service;review-service=internal:service;checkout-service=internal:service,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:read;promotion-service=internal:service,internal:promotion:admin,internal:loyalty:earn,internal:loyalty:reverse;loyalty-service=internal:service,internal:loyalty:admin,internal:loyalty:read;outbox-relay=internal:service}
   TOKEN_CONVERTER_URI: ${TOKEN_CONVERTER_URI:-http://identity-token-converter-service:8080}
   EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-http://localhost:3000/verify-email}
   COURSEFLOW_ENTITLEMENT_ENROLLMENT_SERVICE_URL: http://enrollment-service:8080
   COURSEFLOW_ENTITLEMENT_COURSE_SERVICE_URL: http://course-service:8080
+  RECOMMENDATION_ML_SERVICE_URI: ${RECOMMENDATION_ML_SERVICE_URI:-http://recommendation-ml-service:8080}
   ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8080
   USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8080
   KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:18080/realms/courseflow}
@@ -74,6 +76,7 @@ x-service-env: &service-env
   NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/cf_notification
   MEDIA_DB_URL: jdbc:postgresql://postgres:5432/cf_media
   ANALYTICS_DB_URL: jdbc:postgresql://postgres:5432/cf_analytics
+  RECOMMENDATION_ML_DB_URL: jdbc:postgresql://postgres:5432/cf_recommendation_ml
   GRADEBOOK_DB_URL: jdbc:postgresql://postgres:5432/cf_gradebook
   QUIZ_DB_URL: jdbc:postgresql://postgres:5432/cf_quiz
   CERTIFICATE_DB_URL: jdbc:postgresql://postgres:5432/cf_certificate
@@ -107,6 +110,8 @@ x-service-env: &service-env
   MEDIA_DB_PASSWORD: courseflow
   ANALYTICS_DB_USERNAME: courseflow
   ANALYTICS_DB_PASSWORD: courseflow
+  RECOMMENDATION_ML_DB_USERNAME: courseflow
+  RECOMMENDATION_ML_DB_PASSWORD: courseflow
   GRADEBOOK_DB_USERNAME: courseflow
   GRADEBOOK_DB_PASSWORD: courseflow
   QUIZ_DB_USERNAME: courseflow
@@ -288,6 +293,30 @@ services:
       <<: *build-common
       args:
         MODULE: services/analytics-service
+
+  recommendation-ml-service:
+    <<: *service-common
+    environment:
+      <<: *service-env
+      RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET: ${RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET:-courseflow-local-recommendation-ml-principal-hash-secret-change-me-32}
+      RECOMMENDATION_ML_RUN_MIGRATIONS: ${RECOMMENDATION_ML_RUN_MIGRATIONS:-true}
+    build:
+      context: ../..
+      dockerfile: services/recommendation-ml-service/Dockerfile
+
+  recommendation-ml-worker:
+    <<: *service-common
+    profiles:
+      - ml-worker
+    expose: []
+    environment:
+      <<: *service-env
+      RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET: ${RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET:-courseflow-local-recommendation-ml-principal-hash-secret-change-me-32}
+      RECOMMENDATION_ML_RUN_MIGRATIONS: "false"
+    build:
+      context: ../..
+      dockerfile: services/recommendation-ml-service/Dockerfile
+    command: ["courseflow-ml", "worker", "--worker-id", "recommendation-ml-worker"]
 
   gradebook-service:
     <<: *service-common

@@ -1,263 +1,196 @@
 # CourseFlow LMS
 
-CourseFlow is a production-minded learning management system for course discovery, authoring,
-enrollment, learning delivery, assessment, grading, certificates, realtime collaboration and analytics.
-The system is organized as independent business services with clear data ownership and event-driven
-read models.
+CourseFlow là hệ thống Learning Management System hướng production cho đào tạo online và vận hành học tập doanh nghiệp. Dự án bao gồm trải nghiệm learner, backoffice admin/instructor/support, mobile app, cùng backend microservices tách boundary rõ ràng cho course, enrollment, assessment, certificate, analytics, notification, incentive và identity/authorization.
 
-## Product Surface
+Mục tiêu của CourseFlow không chỉ là CRUD khóa học. Hệ thống được thiết kế để vận hành được vòng đời đầy đủ: tạo khóa học, review, publish, learner học nội dung, làm quiz/assignment, chấm điểm, cấp chứng chỉ, gửi thông báo, phân tích tiến độ, vận hành ưu đãi và xử lý các ca lỗi cần audit/recovery.
+
+> Trạng thái hiện tại: hệ thống đã có nhiều capability lõi và có thể demo/hardening theo luồng nghiệp vụ chính. Chưa nên gọi production-ready enterprise nếu chưa hoàn tất các P0 gate ở phần [Production Readiness](#production-readiness).
+
+## Mục Tiêu Sản Phẩm
+
+| Nhóm | Mục tiêu |
+|---|---|
+| Learner | Tìm khóa học, đăng ký, học theo module, theo dõi tiến độ, nhận gợi ý khóa học, làm bài, xem điểm/chứng chỉ và lịch sử benefit |
+| Instructor | Soạn course, quản lý curriculum, review readiness, theo dõi học viên, chấm điểm, phản hồi và vận hành lớp học |
+| Admin/Ops | Quản lý user, role, course lifecycle, enrollment, notification, incentive, audit, reconciliation và remediation |
+| Platform | Tách service ownership, event-driven integration, internal JWT, observability, DLT/outbox governance và khả năng mở rộng |
+
+## Source Map
 
 ```text
 courseflow/
-  backend/           Spring Boot microservices, gateway, workers and local infrastructure
+  backend/                 Spring Boot services, gateway, workers, infra, docs
+    common-library/        Shared response/error/correlation/security utilities
+    event-contracts/       Immutable event records shared across services
+    services/              Business microservices
+    infra/                 Local Docker Compose, Keycloak realm, observability
+    docs/                  Backend architecture, API, incentive, operation docs
   web/
-    next-learning/   Learner/public web app, SEO-friendly course pages, realtime search
-    react-admin/     Backoffice/admin console for operations and content management
-  app/               Flutter learner mobile app
-  docs/              Product and architecture notes
+    next-learning/         Learner/public web app using Next.js
+    react-admin/           Backoffice/admin console using React + Vite
+  app/                     Flutter learner mobile app
+  docs/                    Cross-cutting engineering and review notes
 ```
+
+## Product Surfaces
 
 | Surface | Primary users | Main jobs |
 |---|---|---|
-| Learner web | Students, public visitors | Discover courses, watch lessons, track progress, take quizzes, view certificates |
-| Admin web | Admins, instructors, operators | Author courses, manage enrollment, grade work, moderate discussions, inspect analytics |
-| Mobile app | Students | Learn on the go, receive notifications, submit work, review progress |
-| Backend APIs | Web/mobile clients, internal services | Auth, catalog, enrollment, media, search, analytics, grading, certification |
+| Learner Web | Public visitors, students | Course discovery, course detail, learning runtime, next action, related courses, reviews, progress |
+| Admin Web | Admin, instructor, operator, support | Course authoring, publish governance, grading, learner success, notification, incentive ops |
+| Mobile App | Students | Learning on the go, notification, progress and lightweight learner workflows |
+| Backend APIs | Web/mobile/internal services | Identity propagation, domain workflows, reporting, events, audit and operational controls |
+
+## Capability Overview
+
+### Core LMS
+
+- Course catalog, module/item authoring, material metadata and learner-facing course pages.
+- Publish governance with draft/review/published state, immutable published curriculum snapshot and rollback/versioning direction.
+- Enrollment, roster, waitlist/capacity decision boundary and learner progress.
+- Learner Course Player and Next Action BFF direction for “học tiếp gì bây giờ”.
+- Assignment, quiz, gradebook, peer review and certificate services for assessment lifecycle.
+- Live session, discussion, announcement, deadline, portfolio and review domains for learning operations.
+
+### Identity, Access And User Boundary
+
+CourseFlow target architecture uses:
+
+- Keycloak for enterprise IAM: login, SSO, MFA, password/session policy, federation and external access tokens.
+- `identity-token-converter-service` for exchanging verified Keycloak tokens into short-lived CourseFlow internal JWTs.
+- `access-control-service` for CourseFlow authorization: roles, permissions, scoped grants, product user status and authorization audit.
+- `user-management-service` for profile/directory data: display name, avatar, bio, locale/timezone, profile visibility and admin user lifecycle facade.
+
+The old custom password/JWT identity boundary is no longer the target architecture. If any `identity-service` style dependency still exists, treat it as legacy/compatibility debt and remove it only after a dependency audit confirms no active route, client or migration still depends on it.
+
+### Enrollment, Commerce And Incentives
+
+- Enrollment owns learner/course enrollment state and should not become the payment source of truth.
+- Paid checkout/order boundary is required before production for any `finalAmount > 0`: order/payment must be authoritative, and promotion commit should happen only after payment success.
+- Promotion service covers campaign/version/publish/rollback, coupon catalog/import, evaluate/reserve/commit/reverse runtime and audit/outbox.
+- Loyalty service covers account/ledger/reward/tier skeleton, approval, benefit lifecycle direction and reconciliation hooks.
+- Incentive production operation still needs unified support console, remediation, reconciliation, maker-checker and DLT governance before enterprise launch.
+
+### Analytics And Recommendations
+
+- `analytics-service` owns reporting read models, learner tracking ingestion, manual curated related courses and the learner-facing related-course read model.
+- `recommendation-ml-service` is a standalone Python ML project for the related-course recommendation use case. It owns recommendation training pipelines, model registry, active model version, implicit collaborative filtering scores and internal inference endpoints.
+- Related course recommendation now runs in two layers: analytics sends bounded, hashed training interactions to the Python ML service; ML trains/version-activates an item-item implicit collaborative filtering model; analytics materializes `source=ML` rows for learner display.
+- Recommendation ML training accepts only `ENROLLMENT`, `CLICK` and `IMPRESSION` interaction event types; input is canonicalized before queue persistence so unsupported training data fails fast.
+- If ML is disabled, unavailable or returns insufficient data, analytics falls back to the deterministic behavioral/co-enrollment heuristic so learner course pages do not go empty.
+- Every generated recommendation carries source, reason code, model version, score and generated time. Public related-course output still filters to published courses only.
+
+### Operations, Audit And Recovery
+
+- Transactional outbox and Kafka are used for business-event integration.
+- Debezium CDC is used where a projection should follow source tables, such as course search sync.
+- DLT/outbox governance is a production gate: payload hash, topic/offset, retry count, error class, idempotent replay/discard and audit must be visible to operators.
+- High-risk operations such as reverse redemption, reward override, large adjustment, expiry execution and DLT replay/discard need reason, evidence, threshold policy and maker-checker.
+
+## Backend Architecture
+
+CourseFlow backend is a set of Spring Boot services with explicit data ownership. Services should not share LMS business rules through common modules. Shared modules stay narrow:
+
+| Module | Allowed responsibility |
+|---|---|
+| `common-library` | Response wrapper, error model, correlation id, service-info, narrow security helpers |
+| `event-contracts` | Immutable event records only |
+
+Current service map:
+
+| Domain | Services |
+|---|---|
+| Platform/security | `api-gateway`, `discovery-service`, `identity-token-converter-service`, `access-control-service`, `user-management-service` |
+| Course/runtime | `course-service`, `enrollment-service`, `organization-service`, `media-service`, `search-service` |
+| Assessment | `assignment-service`, `quiz-service`, `gradebook-service`, `certificate-service`, `peer-review-service` |
+| Engagement | `announcement-service`, `deadline-service`, `discussion-service`, `chat-service`, `notification-service`, `live-session-service`, `review-service`, `portfolio-service` |
+| Analytics/incentive | `analytics-service`, `recommendation-ml-service`, `promotion-service`, `loyalty-service`, `outbox-relay` |
+
+Standard service package shape:
+
+```text
+edu.courseflow.<service>/
+  config/          Framework config, security, clients, messaging
+  controller/      REST API boundary
+  service/         Use cases and transaction scripts
+  repository/      Persistence ports/adapters
+  model/           Entities/documents/domain models
+  dto/             Request/response DTOs
+```
+
+## Runtime Architecture
+
+```mermaid
+flowchart LR
+  Browser["Web/Mobile Client"] --> Gateway["api-gateway"]
+  Gateway --> Keycloak["Keycloak"]
+  Gateway --> Converter["identity-token-converter-service"]
+  Converter --> Access["access-control-service"]
+  Gateway --> Domain["Domain service"]
+  Domain --> Authz["access-control-service /internal/authz/check"]
+  Domain --> Store["Owned database"]
+  Domain --> Outbox["outbox_events"]
+  Outbox --> Relay["outbox-relay"]
+  Relay --> Kafka["Kafka"]
+  Kafka --> Consumers["Search / Analytics / Notification / Gradebook / Certificate"]
+  Store --> Debezium["Debezium CDC"]
+  Debezium --> Kafka
+```
+
+Important rules:
+
+- `api-gateway` is the only client entrypoint and strips client-supplied identity headers.
+- Domain services trust propagated identity only when a valid short-lived internal JWT is present.
+- Each service owns its database/schema and exposes contracts through API/events, not direct table access.
+- Search and analytics are read-model boundaries; source-of-truth data remains in the owning service.
+- Gateway stays thin: routing, auth, CORS/rate limit, correlation id and header hardening.
+
+## API Route Convention
+
+| Gateway path | Audience |
+|---|---|
+| `/api/v1/**` | Learner/public API; public GET where explicitly allowed, otherwise JWT |
+| `/api/admin/v1/**` | Admin/backoffice API; operator role required before routing |
+| `/internal/**` | Service-to-service only; internal JWT/scope required |
+| `/ws/**` | Realtime/WebSocket endpoints |
+
+Service-internal controllers may use `/public/**`, `/internal/**`, `/backoffice/**` or service-specific paths, but gateway-facing API should keep the audience-first convention.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Web learner | Next.js, React, TypeScript, TanStack Query, Tailwind CSS |
-| Web admin | React, Vite, TypeScript, TanStack Query, Tailwind CSS, lucide-react |
+| Learner web | Next.js 15, React 19, TypeScript, TanStack Query, Tailwind CSS |
+| Admin web | React 19, Vite, TypeScript, TanStack Query, Tailwind CSS, lucide-react |
 | Mobile | Flutter |
-| API and services | Java 21, Spring Boot 3, Spring Cloud Gateway |
-| Identity and authorization | Keycloak OAuth2/OIDC IAM, CourseFlow access-control, internal JWT/JWKS |
-| Data stores | PostgreSQL per service, MongoDB for document/chat style domains, Redis |
+| Backend | Java 21, Spring Boot 3, Spring Cloud Gateway |
+| Identity/Auth | Keycloak OAuth2/OIDC, internal JWT/JWKS, CourseFlow access-control |
+| Data | PostgreSQL per service, MongoDB for document/chat-style domains, Redis |
 | Search | Elasticsearch, Spring Data Elasticsearch |
-| Event backbone | Kafka, transactional outbox for business events, Debezium CDC for search projections, Kafka Connect |
-| Object storage | MinIO/S3-compatible storage |
-| Local platform | Docker Compose, Liquibase migrations |
-
-## System Architecture
-
-```mermaid
-flowchart TB
-  classDef client fill:#eef6ff,stroke:#2563eb,color:#0f172a
-  classDef edge fill:#f8fafc,stroke:#64748b,color:#0f172a
-  classDef svc fill:#ecfdf5,stroke:#059669,color:#052e16
-  classDef data fill:#fff7ed,stroke:#ea580c,color:#431407
-  classDef stream fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
-
-  subgraph Clients["Client Experiences"]
-    Next["Learner Web\nNext.js"]
-    Admin["Admin Web\nReact/Vite"]
-    Mobile["Mobile App\nFlutter"]
-  end
-
-  Gateway["API Gateway\nOIDC verify, CORS, Routing, Header Hardening"]
-
-  subgraph Services["Business Services"]
-    Keycloak["Keycloak\nIAM/IdP"]
-    TokenConverter["identity-token-converter-service\nKeycloak token -> internal JWT"]
-    AccessControl["access-control-service\nCourseFlow roles, permissions, audit"]
-    UserManagement["user-management-service\nProfiles, avatars, directory"]
-    Org["organization-service\nDepartments, terms, sections"]
-    Course["course-service\nCatalog, modules, authoring"]
-    Enrollment["enrollment-service\nRoster, waitlist, capacity"]
-    Assignment["assignment-service\nAssignments, submissions"]
-    Quiz["quiz-service\nQuestion bank, attempts"]
-    Gradebook["gradebook-service\nGrades, weights, overrides"]
-    Media["media-service\nUploads, video metadata"]
-    Notification["notification-service\nInbox, realtime push"]
-    Discussion["discussion-service\nThreads, comments, moderation"]
-    Certificate["certificate-service\nIssue and verify certificates"]
-    Search["search-service\nCourse discovery read model"]
-    Analytics["analytics-service\nReports, risk signals, recommendations"]
-  end
-
-  subgraph Stores["Owned Data Stores"]
-    Pg["PostgreSQL\none DB per service"]
-    Mongo["MongoDB\nportfolio/chat documents"]
-    Es["Elasticsearch\ncourseflow-course-search"]
-    Minio["MinIO/S3\nmedia and attachments"]
-    Redis["Redis\ncache/pubsub-ready"]
-  end
-
-  subgraph Events["Event Backbone"]
-    Kafka["Kafka"]
-    Connect["Kafka Connect"]
-    Debezium["Debezium CDC"]
-  end
-
-  Next --> Gateway
-  Admin --> Gateway
-  Mobile --> Gateway
-  Gateway --> Keycloak
-  Gateway --> TokenConverter
-  TokenConverter --> AccessControl
-  Gateway --> UserManagement
-  Gateway --> AccessControl
-  Gateway --> Org
-  Gateway --> Course
-  Gateway --> Enrollment
-  Gateway --> Assignment
-  Gateway --> Quiz
-  Gateway --> Gradebook
-  Gateway --> Media
-  Gateway --> Notification
-  Gateway --> Discussion
-  Gateway --> Certificate
-  Gateway --> Search
-  Gateway --> Analytics
-
-  Keycloak --> Pg
-  TokenConverter --> AccessControl
-  AccessControl --> Pg
-  UserManagement --> Pg
-  Org --> Pg
-  Course --> Pg
-  Enrollment --> Pg
-  Assignment --> Pg
-  Quiz --> Pg
-  Gradebook --> Pg
-  Certificate --> Pg
-  Analytics --> Pg
-  Media --> Minio
-  Discussion --> Mongo
-  Search --> Es
-  Notification --> Redis
-
-  Course --> Pg
-  Pg --> Debezium
-  Debezium --> Connect
-  Connect --> Kafka
-  Kafka --> Search
-  Kafka --> Analytics
-  Kafka --> Notification
-  Kafka --> Gradebook
-  Kafka --> Certificate
-
-  class Next,Admin,Mobile client
-  class Gateway edge
-  class Identity,Org,Course,Enrollment,Assignment,Quiz,Gradebook,Media,Notification,Discussion,Certificate,Search,Analytics svc
-  class Pg,Mongo,Es,Minio,Redis data
-  class Kafka,Connect,Debezium stream
-```
-
-## Course Search Sync
-
-Course search is an eventually consistent read model. The source of truth stays in `course-service`.
-Elasticsearch sync is table CDC: Debezium captures changes from `cf_course.public.courses` and emits a
-standard CDC envelope to Kafka. Business event flows still use `outbox_events`; the search projection
-does not depend on outbox rows.
-
-```mermaid
-sequenceDiagram
-  autonumber
-  participant Instructor as Instructor/Admin
-  participant Course as course-service
-  participant DB as cf_course.public.courses
-  participant Debezium as Debezium PostgreSQL Connector
-  participant Kafka as Kafka
-  participant Search as search-service
-  participant ES as Elasticsearch
-  participant Learner as Learner Web
-
-  Instructor->>Course: Publish or archive course
-  Course->>DB: Insert/update/delete course row
-  Debezium->>DB: Capture table change via logical replication
-  Debezium->>Kafka: Emit topic courseflow.course.public.courses
-  Kafka->>Search: Deliver CDC envelope at-least-once
-  Search->>ES: Upsert or delete course document
-  Search->>ES: Save processed event marker
-  Learner->>Search: Search, suggest, recommendations
-  Search->>ES: Query title and summary with PUBLISHED filter
-```
-
-Important properties:
-
-- `course-service` owns catalog data; `search-service` owns Elasticsearch documents.
-- Debezium reads the `courses` table directly for ES projection sync.
-- `search-service` treats events idempotently using the `courseflow-search-processed-events` index.
-- `outbox-relay` remains available for business topics such as `course.published`.
-
-## Bounded Contexts
-
-```mermaid
-flowchart LR
-  classDef core fill:#ecfdf5,stroke:#059669,color:#052e16
-  classDef learning fill:#eef6ff,stroke:#2563eb,color:#0f172a
-  classDef assessment fill:#fff7ed,stroke:#ea580c,color:#431407
-  classDef engagement fill:#f5f3ff,stroke:#7c3aed,color:#2e1065
-
-  Keycloak["Keycloak\nIAM/IdP"]:::core
-  AccessControl["Access Control\nProduct authorization"]:::core
-  UserManagement["User Management\nProfile directory"]:::core
-  Organization["Organization\nDepartments, terms"]:::core
-  Course["Course\nCatalog, modules, authoring"]:::learning
-  Enrollment["Enrollment\nRoster, capacity"]:::learning
-  Media["Media\nFiles, video assets"]:::learning
-  Assignment["Assignment\nSubmissions, rubric"]:::assessment
-  Quiz["Quiz\nAttempts, auto-grading"]:::assessment
-  Gradebook["Gradebook\nWeighted final grades"]:::assessment
-  Certificate["Certificate\nIssue, verify"]:::assessment
-  Discussion["Discussion\nThreads, moderation"]:::engagement
-  Notification["Notification\nInbox, WebSocket"]:::engagement
-  Analytics["Analytics\nReports, risk, recommendations"]:::engagement
-  Search["Search\nElasticsearch projections"]:::engagement
-
-  Keycloak --> AccessControl
-  AccessControl --> UserManagement
-  UserManagement --> Organization
-  Organization --> Course
-  Course --> Enrollment
-  Course --> Media
-  Course --> Search
-  Enrollment --> Analytics
-  Assignment --> Gradebook
-  Quiz --> Gradebook
-  Gradebook --> Certificate
-  Course --> Discussion
-  Discussion --> Notification
-  Assignment --> Notification
-  Gradebook --> Analytics
-  Quiz --> Analytics
-```
-
-## Runtime Request Flow
-
-```mermaid
-flowchart LR
-  Browser["Browser or Mobile"] --> Gateway["api-gateway"]
-  Gateway -->|"Verify Keycloak token\nExchange to internal JWT\nStrip X-User-* input headers"| Claims["Verified identity headers"]
-  Claims --> Service["Domain service"]
-  Service -->|"Local role check or\n/internal/authz/check"| AccessControl["access-control-service"]
-  Service --> Store["Owned database"]
-  Service --> Outbox["outbox_events\nbusiness events"]
-  Outbox --> Kafka["Kafka via outbox-relay"]
-  Store --> Debezium["Debezium CDC\nsearch projections"]
-  Debezium --> Kafka
-```
+| Events | Kafka, transactional outbox, Debezium CDC, Kafka Connect |
+| Storage | MinIO/S3-compatible object storage |
+| Migration/Local infra | Liquibase, Docker Compose |
 
 ## Local Development
 
-Start infrastructure only from `backend/`:
+Start local infrastructure from `backend/`:
 
 ```bash
+cd backend
 docker compose -f infra/docker/docker-compose.yml up -d
 ```
 
 Start the full backend cluster:
 
 ```bash
+cd backend
 docker compose \
   -f infra/docker/docker-compose.yml \
   -f infra/docker/docker-compose.services.yml \
   up --build
 ```
 
-Run web apps separately:
+Run learner web:
 
 ```bash
 cd web/next-learning
@@ -265,6 +198,8 @@ COURSEFLOW_API_URL=http://localhost:28080/api \
 NEXT_PUBLIC_API_URL=http://localhost:28080/api \
 npm run dev
 ```
+
+Run admin web:
 
 ```bash
 cd web/react-admin
@@ -278,34 +213,94 @@ Default local URLs:
 | Learner web | `http://localhost:3000` |
 | Admin web | `http://localhost:5173` |
 | API gateway | `http://localhost:28080/api` |
+| Keycloak | `http://localhost:18080` |
 | Kafka Connect | `http://localhost:18083` |
 | Elasticsearch | `http://localhost:9200` |
 | MinIO console | `http://localhost:9001` |
-| Keycloak | `http://localhost:18080` |
 
-Check Debezium connector:
+Check course-search Debezium connector:
 
 ```bash
 curl http://localhost:18083/connectors/courseflow-course-search-cdc/status
 ```
 
-## Production Readiness Direction
+## Verification
 
-The architecture is designed for production hardening, but local Compose is not production deployment.
-Before a public/paid launch, CourseFlow needs:
+Backend:
 
-- Managed PostgreSQL/Kafka/Elasticsearch/Object Storage or hardened equivalents.
-- TLS, WAF/rate limiting, service network policy, internal JWT attestation, secret
-  management and rotation.
-- Centralized logs, metrics, distributed tracing, SLOs, alerting and runbooks.
-- CI/CD with unit, integration, contract, e2e, load and security tests.
-- Backup/restore drills, migration rollback strategy and feature flags.
-- Accessibility audit, enterprise SSO, SCORM/xAPI/LTI support and advanced reporting exports.
+```bash
+cd backend
+mvn test
+```
 
-## References
+Targeted service gates:
 
-- Backend architecture: `backend/docs/architecture/backend-architecture.md`
-- Backend local infra: `backend/infra/docker/README.md`
-- Local cluster guide: `backend/infra/docker/LOCAL_CLUSTER.md`
-- Product hardening sprint: `backend/docs/operations/product-hardening-sprint.md`
-- API overview: `backend/docs/api/courseflow-api.md`
+```bash
+cd backend
+mvn -pl services/analytics-service -am test
+mvn -pl services/access-control-service,services/user-management-service,services/notification-service -am test
+mvn -pl services/outbox-relay -am test
+```
+
+Learner web:
+
+```bash
+cd web/next-learning
+npm run lint
+npm test
+npm run build
+```
+
+Admin web:
+
+```bash
+cd web/react-admin
+npm run lint
+npm test
+npm run build
+```
+
+Product hardening and smoke scripts are documented in [`backend/docs/operations/product-hardening-sprint.md`](backend/docs/operations/product-hardening-sprint.md).
+
+## Production Readiness
+
+CourseFlow should not be treated as enterprise production-ready until these P0 gates are complete and verified:
+
+| P0 gate | Required outcome |
+|---|---|
+| Production Security Gate | Service-to-service JWT, access-control model, user-management boundary and old identity mechanism fully retired |
+| Core LMS Authoring | Course Builder, module/item CRUD, readiness checks and preview are operator-ready |
+| Publish Governance | Review audit, checklist, diff, rollback and immutable snapshot guarantee |
+| Learner Runtime | Course Player and Learner Next Action BFF are stable for paid/public learning |
+| Paid Checkout / Order Boundary | Paid enrollment requires valid order/payment source of truth before activation |
+| Incentive Ops | Unified support console for enrollment, promotion, coupon, loyalty, outbox/DLT and audit lookup |
+| Remediation Workflow | `COMMIT_FAILED`, `MANUAL_REVIEW`, expired `RESERVED` and similar cases have assignee, notes, actions, retries, SLA age and audit |
+| Financial / Benefit Reconciliation | Detect and resolve drift across promotion, loyalty, enrollment, reward and points ledger |
+| Maker-checker | High-risk operations require reason, evidence, thresholds and separate approver |
+| Outbox/DLT Governance | Unified DLT queue with idempotent replay/discard, payload hash, retry metadata and audit |
+
+P1 after P0:
+
+- Reward fulfillment lifecycle with provider adapter, webhook callback, retry/backoff, SLA and learner-visible status.
+- Loyalty tiers with qualification window, downgrade/grace policy, audit and learner tier progress.
+- Coupon distribution lifecycle with cohort/section/course/segment targeting, preview, approval, notification and revoke.
+- Learner Incentive Hub for coupon, points, reward, pending benefit, history, eligibility reason and support case.
+- Promotion simulation before publish.
+- Refund/drop policy matrix for discount reverse, points clawback and reward reversal.
+- Learner Success + Assessment Ops: at-risk dashboard, grading queue, certificate eligibility and grade publish audit.
+
+P2 after core stability:
+
+- Advanced stacking policy, marketing funnel analytics, fraud scoring, warehouse/export expansion, A/B incentive testing, realtime SSE, cohort/learning path expansion and enterprise component kit.
+
+## Key Documents
+
+- Backend architecture: [`backend/docs/architecture/backend-architecture.md`](backend/docs/architecture/backend-architecture.md)
+- Keycloak enterprise adoption: [`backend/docs/architecture/keycloak-enterprise-adoption.md`](backend/docs/architecture/keycloak-enterprise-adoption.md)
+- Incentive platform design: [`backend/docs/architecture/incentive-platform-design.md`](backend/docs/architecture/incentive-platform-design.md)
+- Loyalty bounded context ADR: [`backend/docs/architecture/loyalty-bounded-context-adr.md`](backend/docs/architecture/loyalty-bounded-context-adr.md)
+- API overview: [`backend/docs/api/courseflow-api.md`](backend/docs/api/courseflow-api.md)
+- Product hardening sprint: [`backend/docs/operations/product-hardening-sprint.md`](backend/docs/operations/product-hardening-sprint.md)
+- Engineering conventions: [`docs/engineering-conventions.md`](docs/engineering-conventions.md)
+- Architecture review backlog: [`docs/architecture-review-backlog.md`](docs/architecture-review-backlog.md)
+- Open-source research notes: [`docs/open-source-research.md`](docs/open-source-research.md)

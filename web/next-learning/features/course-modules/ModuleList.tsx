@@ -30,7 +30,7 @@ import { CourseChatPanel } from "@/features/chat/CourseChatPanel";
 import { CourseQAPanel } from "@/features/discussions/CourseQAPanel";
 import { EnrollmentCta } from "@/features/enrollments/EnrollmentCta";
 import { CourseQuizList } from "@/features/quiz-attempts/CourseQuizList";
-import { useCourseModules, useCoursePlayer, useCourseProgress, useMarkItemProgress, useMarkProgress } from "@/features/course-modules/hooks";
+import { useCoursePlayer, useMarkItemProgress, useMarkProgress } from "@/features/course-modules/hooks";
 import { clientFetch, learnerSession, type StoredSession } from "@/shared/api/client";
 import { Badge, Button, Card, EmptyState, ProgressBar, TextInput, cn } from "@/shared/ui";
 import type {
@@ -947,13 +947,10 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
   const [sessionReady, setSessionReady] = useState(false);
   const modulesEnabled = Boolean(session?.accessToken);
   const playerQuery = useCoursePlayer(courseId, modulesEnabled);
-  const fallbackEnabled = modulesEnabled && playerQuery.isError;
-  const { data, isLoading, isError } = useCourseModules(courseId, fallbackEnabled);
-  const { data: fallbackProgress } = useCourseProgress(courseId, fallbackEnabled);
   const mark = useMarkProgress(courseId);
   const markItem = useMarkItemProgress(courseId);
-  const progress = playerQuery.data?.progress ?? fallbackProgress;
-  const modules = useMemo(() => normalizeModules(playerQuery.data?.modules ?? data), [data, playerQuery.data?.modules]);
+  const progress = playerQuery.data?.progress;
+  const modules = useMemo(() => normalizeModules(playerQuery.data?.modules), [playerQuery.data?.modules]);
   const lessons = useMemo(() => flattenLessons(modules), [modules]);
   const itemProgressById = useMemo(
     () => new Map((progress?.items ?? []).map((itemProgress) => [itemProgress.itemId, itemProgress])),
@@ -1206,16 +1203,19 @@ export function ModuleList({ courseId, courseSlug }: { courseId: string; courseS
       </Card>
     );
   }
-  if (playerQuery.isLoading || (fallbackEnabled && isLoading)) return <p className="text-ink-500">Đang tải chương học...</p>;
-  if (playerQuery.isError && isError)
+  if (playerQuery.isLoading) return <p className="text-ink-500">Đang tải chương học...</p>;
+  if (playerQuery.isError)
     return (
       <Card>
-        <p className="text-sm font-bold text-red-600">Không tải được chương học.</p>
+        <p className="text-sm font-bold text-red-600">Không tải được phòng học.</p>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500">
-          Bạn cần đăng nhập và tham gia khóa học trước khi mở nội dung.
-          Sau khi ghi danh, hệ thống sẽ mở chương, video, bài tập và tiến độ học.
+          Bạn cần đăng nhập và tham gia khóa học trước khi mở nội dung. Nếu đã ghi danh, hãy thử tải lại phòng học.
         </p>
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button variant="secondary" onClick={() => void playerQuery.refetch()}>
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Thử lại
+          </Button>
           <EnrollmentCta courseId={courseId} courseSlug={courseSlug} />
         </div>
       </Card>

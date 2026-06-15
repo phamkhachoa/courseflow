@@ -118,7 +118,10 @@ public class ReportingController {
     @GetMapping("/public/courses/{courseId}/related")
     public List<RelatedCourseDto> related(@PathVariable UUID courseId,
                                           @RequestParam(defaultValue = "6") int limit) {
-        return reporting.relatedCourses(courseId, limit);
+        courseAccess.requirePublishedCourse(courseId);
+        return reporting.relatedCourses(courseId, limit).stream()
+                .filter(this::isPublishedRelatedCourse)
+                .toList();
     }
 
     private String callerId(CurrentUser user) {
@@ -126,6 +129,15 @@ public class ReportingController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authentication required");
         }
         return String.valueOf(user.id());
+    }
+
+    private boolean isPublishedRelatedCourse(RelatedCourseDto relatedCourse) {
+        try {
+            courseAccess.requirePublishedCourse(UUID.fromString(relatedCourse.relatedCourseId()));
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
     }
 
     private void requireOrgDashboardAccess(CurrentUser user, String orgId) {

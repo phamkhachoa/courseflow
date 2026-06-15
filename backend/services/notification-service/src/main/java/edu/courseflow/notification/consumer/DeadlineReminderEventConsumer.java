@@ -2,12 +2,10 @@ package edu.courseflow.notification.consumer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.courseflow.notification.dto.NotificationDtos.NotificationDto;
 import edu.courseflow.notification.model.ProcessedEvent;
-import edu.courseflow.notification.push.NotificationStreamRegistry;
 import edu.courseflow.notification.repository.NotificationRepository;
 import edu.courseflow.notification.repository.ProcessedEventRepository;
-import edu.courseflow.notification.service.NotificationDeliveryService;
+import edu.courseflow.notification.service.NotificationDeliveryDispatcher;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,19 +24,16 @@ public class DeadlineReminderEventConsumer {
     private final ProcessedEventRepository processedEvents;
     private final ObjectMapper objectMapper;
     private final NotificationRepository notifications;
-    private final NotificationStreamRegistry pushRegistry;
-    private final NotificationDeliveryService delivery;
+    private final NotificationDeliveryDispatcher dispatcher;
 
     public DeadlineReminderEventConsumer(ProcessedEventRepository processedEvents,
                                          ObjectMapper objectMapper,
                                          NotificationRepository notifications,
-                                         NotificationStreamRegistry pushRegistry,
-                                         NotificationDeliveryService delivery) {
+                                         NotificationDeliveryDispatcher dispatcher) {
         this.processedEvents = processedEvents;
         this.objectMapper = objectMapper;
         this.notifications = notifications;
-        this.pushRegistry = pushRegistry;
-        this.delivery = delivery;
+        this.dispatcher = dispatcher;
     }
 
     @KafkaListener(topics = "deadline.reminder.due", groupId = "notification-service")
@@ -82,9 +77,7 @@ public class DeadlineReminderEventConsumer {
         String title = "Sắp đến hạn nộp bài";
         String body = body(assignmentId, dueAt);
         var notification = notifications.insertEntity(studentId, CHANNEL, title, body);
-        delivery.deliver(notification);
-        NotificationDto created = notifications.toDto(notification);
-        pushRegistry.push(studentId, created);
+        dispatcher.dispatch(notification);
     }
 
     private static String body(String assignmentId, String dueAt) {

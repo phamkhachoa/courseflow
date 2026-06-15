@@ -59,7 +59,7 @@ sts_clients=(
   api-gateway access-control-service user-management-service organization-service
   course-service enrollment-service assignment-service deadline-service announcement-service
   portfolio-service discussion-service notification-service chat-service media-service
-  search-service analytics-service gradebook-service quiz-service certificate-service
+  search-service analytics-service recommendation-ml-service gradebook-service quiz-service certificate-service
   peer-review-service live-session-service review-service outbox-relay
 )
 for client in "${sts_clients[@]}"; do
@@ -85,6 +85,18 @@ KEYCLOAK_ISSUER_URI="https://auth.example.com/realms/courseflow" \
 KEYCLOAK_JWK_SET_URI="https://auth.example.com/realms/courseflow/protocol/openid-connect/certs" \
 KEYCLOAK_AUDIENCE="courseflow-api" \
   scripts/validate-prod-profile.sh --compose
+```
+
+For Recommendation ML releases, run Alembic through the dedicated one-shot migration profile before
+starting or rolling the API/worker containers:
+
+```bash
+docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.services.yml \
+  -f infra/docker/docker-compose.prod.yml \
+  --profile migration \
+  run --rm recommendation-ml-migrator
 ```
 
 Render or start the prod-shaped backend cluster from `backend/`:
@@ -208,11 +220,17 @@ Restore-check one dump into a temporary database:
 
 ```bash
 scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
+scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_recommendation_ml
 ```
 
 For promotion retention approvals, use the generated
 `backups/postgres/<timestamp>/restore-check-cf_promotion.json` as the source for the restore-drill
 registration fields, including `artifactHash` and `checkedAt`.
+
+For Recommendation ML releases, retain
+`backups/postgres/<timestamp>/restore-check-cf_recommendation_ml.json`. Its restore probe verifies
+the restored database can be opened and that the expected ML Alembic revision plus core ML tables are
+present.
 
 ## Trust boundary
 
@@ -223,7 +241,12 @@ reject `/internal/**` requests and propagated identity headers unless that inter
 with the configured internal JWT verifier. Local/dev defaults use HS256 with
 `COURSEFLOW_INTERNAL_JWT_SECRET`; the prod profile requires RS256, keeps
 `COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY` only on `identity-token-converter-service`, and has domain
-services verify with `COURSEFLOW_INTERNAL_JWT_JWKS_URI`. In the prod profile, domain service clients
+services verify with `COURSEFLOW_INTERNAL_JWT_JWKS_URI`. That JWKS URI must be an HTTP(S) URL and
+must not point to localhost, loopback, `0.0.0.0`, `::1`, or `host.docker.internal`; internal Docker
+service DNS such as `http://identity-token-converter-service:8080/oauth/jwks` is valid for the prod
+Compose profile. Internal JWT lifetime policy is bounded by
+`COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS` and must stay between 30 and 900 seconds. In the prod profile,
+domain service clients
 use `InternalJwtService` from `common-library` to request service/user tokens from
 `identity-token-converter-service` with their own per-client `COURSEFLOW_STS_*_SECRET`; the converter
 keeps the central `COURSEFLOW_STS_CLIENT_SECRETS` and `COURSEFLOW_STS_CLIENT_SCOPES` policy maps and

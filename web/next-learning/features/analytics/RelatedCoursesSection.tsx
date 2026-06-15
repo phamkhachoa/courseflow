@@ -1,39 +1,25 @@
-import Link from "next/link";
-import { Badge, Card } from "@/shared/ui";
 import { getRelatedCourses } from "./api";
+import { RelatedCoursesClient } from "./RelatedCoursesClient";
 
 export async function RelatedCoursesSection({ courseId }: { courseId: string }) {
-  let courses;
+  let recommendations;
   try {
-    courses = await getRelatedCourses(courseId);
+    recommendations = await getRelatedCourses(courseId);
   } catch {
     return null;
   }
 
-  if (!courses || courses.length === 0) return null;
-
-  const visibleCourses = courses.filter((course) => course.slug && course.title);
-  if (visibleCourses.length === 0) return null;
+  if (!recommendations || recommendations.length === 0) return null;
 
   return (
     <section className="mt-10">
-      <h2 className="mb-4 text-xl font-semibold text-slate-800">Khóa học liên quan</h2>
-      <div className="flex flex-wrap gap-4">
-        {visibleCourses.map((course, index) => (
-          <Link key={course.slug ?? `${course.code}-${index}`} href={`/courses/${course.slug}`} className="block w-72">
-            <Card className="h-full transition hover:shadow-md">
-              <p className="text-xs font-bold text-brand-600">{course.code}</p>
-              <h3 className="mt-1 font-semibold text-slate-800">{course.title}</h3>
-              {course.level && (
-                <div className="mt-2">
-                  <Badge>{course.level}</Badge>
-                </div>
-              )}
-              <p className="mt-2 text-sm text-slate-500 line-clamp-3">{course.summary}</p>
-            </Card>
-          </Link>
-        ))}
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-brand-600">Gợi ý tiếp theo</p>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-ink-900">Khóa học liên quan</h2>
+        </div>
       </div>
+      <RelatedCoursesClient recommendations={recommendations} />
     </section>
   );
 }

@@ -3,12 +3,10 @@ package edu.courseflow.notification.consumer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.courseflow.notification.client.EnrollmentRosterClient;
-import edu.courseflow.notification.dto.NotificationDtos.NotificationDto;
 import edu.courseflow.notification.model.ProcessedEvent;
-import edu.courseflow.notification.push.NotificationStreamRegistry;
 import edu.courseflow.notification.repository.NotificationRepository;
 import edu.courseflow.notification.repository.ProcessedEventRepository;
-import edu.courseflow.notification.service.NotificationDeliveryService;
+import edu.courseflow.notification.service.NotificationDeliveryDispatcher;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -47,20 +45,17 @@ public class AnnouncementEventConsumer {
     private final ObjectMapper objectMapper;
     private final EnrollmentRosterClient roster;
     private final NotificationRepository notifications;
-    private final NotificationStreamRegistry pushRegistry;
-    private final NotificationDeliveryService delivery;
+    private final NotificationDeliveryDispatcher dispatcher;
 
     public AnnouncementEventConsumer(ProcessedEventRepository processedEvents, ObjectMapper objectMapper,
                                      EnrollmentRosterClient roster,
                                      NotificationRepository notifications,
-                                     NotificationStreamRegistry pushRegistry,
-                                     NotificationDeliveryService delivery) {
+                                     NotificationDeliveryDispatcher dispatcher) {
         this.processedEvents = processedEvents;
         this.objectMapper = objectMapper;
         this.roster = roster;
         this.notifications = notifications;
-        this.pushRegistry = pushRegistry;
-        this.delivery = delivery;
+        this.dispatcher = dispatcher;
     }
 
     @KafkaListener(topics = "announcement.published", groupId = "notification-service")
@@ -120,12 +115,8 @@ public class AnnouncementEventConsumer {
                 continue;
             }
             var notification = notifications.insertEntity(userId, CHANNEL, title, body);
-            delivery.deliver(notification);
-            NotificationDto created = notifications.toDto(notification);
             fannedOut++;
-            // Best-effort realtime push to the user's open streams; the persisted row is the source of
-            // truth, so a push failure (no active emitter, client gone) never affects the transaction.
-            pushRegistry.push(userId, created);
+            dispatcher.dispatch(notification);
         }
         log.debug("notification: fanned out announcement {} to {} of {} recipient(s) (rest opted out)",
                 eventId, fannedOut, recipients.size());

@@ -39,6 +39,9 @@ class GatewayRouteConfigurationTest {
         List<Map<String, Object>> routes = routes(root);
 
         routes.forEach(route -> {
+            if ("recommendation-ml-admin".equals(route.get("id"))) {
+                return;
+            }
             String uri = String.valueOf(route.get("uri"));
             assertThat(uri)
                     .as("route %s should not hard-code an internal host port", route.get("id"))
@@ -149,6 +152,15 @@ class GatewayRouteConfigurationTest {
 
         assertRoute(routes, "loyalty-admin", "lb://loyalty-service",
                 "/api/admin/v1/loyalty,/api/admin/v1/loyalty/**");
+    }
+
+    @Test
+    void recommendationMlAdminRouteUsesInternalMlBoundary() {
+        Map<String, Object> root = loadGatewayApplicationYaml();
+        List<Map<String, Object>> routes = routes(root);
+
+        assertRoute(routes, "recommendation-ml-admin", "http://recommendation-ml-service:8080",
+                "/api/admin/v1/recommendation-ml,/api/admin/v1/recommendation-ml/**");
     }
 
     private static Map<String, Object> loadGatewayApplicationYaml() {

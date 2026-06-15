@@ -20,6 +20,11 @@ public final class InternalScopes {
     public static final String BACKOFFICE = "internal:backoffice";
     public static final String ANALYTICS_FUNNEL_WRITE = "internal:analytics:funnel-write";
     public static final String ANALYTICS_EXPORT_READ = "internal:analytics:export-read";
+    public static final String ANALYTICS_EVENT_WRITE = "internal:analytics:event-write";
+    public static final String ANALYTICS_MODEL_WRITE = "internal:analytics:model-write";
+    public static final String RECOMMENDATION_ML_TRAIN = "internal:recommendation-ml:train";
+    public static final String RECOMMENDATION_ML_INFER = "internal:recommendation-ml:infer";
+    public static final String RECOMMENDATION_ML_OPS = "internal:recommendation-ml:ops";
     public static final String PROMOTION_ADMIN = "internal:promotion:admin";
     public static final String PROMOTION_EVALUATE = "internal:promotion:evaluate";
     public static final String PROMOTION_RESERVE = "internal:promotion:reserve";

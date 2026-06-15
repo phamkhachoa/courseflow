@@ -118,7 +118,7 @@ sts_clients=(
   api-gateway access-control-service user-management-service organization-service
   course-service enrollment-service assignment-service deadline-service announcement-service
   portfolio-service discussion-service notification-service chat-service media-service
-  search-service analytics-service gradebook-service quiz-service certificate-service
+  search-service analytics-service recommendation-ml-service gradebook-service quiz-service certificate-service
   peer-review-service live-session-service review-service outbox-relay
 )
 for client in "${sts_clients[@]}"; do
@@ -225,11 +225,16 @@ Validate a dump by restoring it into a temporary local database:
 
 ```bash
 scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
+scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_recommendation_ml
 ```
 
 The restore check writes `restore-check-cf_promotion.json` in the backup directory. For promotion
 retention testing, register the restore drill from that file instead of typing the artifact hash by
 hand.
+
+The Recommendation ML restore check writes `restore-check-cf_recommendation_ml.json` and also probes
+the restored Alembic revision plus core ML tables. Keep that evidence with any release that changes
+ML migrations, model registry storage, or activation approval storage.
 
 ## Trust Boundary
 

@@ -324,6 +324,108 @@ groups:
           summary: "Promotion reversal failures are elevated"
           description: "More than 5% of promotion reversal operations are failing or conflicting."
 
+  - name: courseflow-recommendation-ml-sre
+    rules:
+      - alert: RecommendationMlNoActiveModel
+        expr: courseflow_recommendation_ml_active_model_present == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recommendation ML has no active model"
+          description: "Related-course inference cannot serve ML results because no active model is registered. Review training runs and model activation audit."
+
+      - alert: RecommendationMlActiveModelStale
+        expr: courseflow_recommendation_ml_active_model_stale == 1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recommendation ML active model is stale"
+          description: "The active recommendation model is older than the configured stale threshold. Review event ingestion, training schedule, and quality gates."
+
+      - alert: RecommendationMlConsumerFallbackElevated
+        expr: sum(rate(courseflow_analytics_recommendation_ml_client_requests_total{result="fallback"}[15m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Analytics is falling back from Recommendation ML"
+          description: "Analytics-service is receiving Recommendation ML fallback outcomes. Check the reason tag, ML service readiness, model activation state, and training queue health."
+
+      - alert: RecommendationMlHttp5xxDetected
+        expr: sum(increase(courseflow_recommendation_ml_http_requests_total{status_class="5xx"}[10m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recommendation ML API is returning 5xx responses"
+          description: "Recommendation ML returned at least one 5xx response in the last 10 minutes. Check route, service logs, DB connectivity, and model registry state."
+
+      - alert: RecommendationMlHighLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(courseflow_recommendation_ml_http_request_duration_seconds_bucket[10m])) by (le)
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recommendation ML API latency is high"
+          description: "Recommendation ML p95 request latency is above two seconds. Check worker/API CPU, database locks, and slow inference queries."
+
+      - alert: RecommendationMlActivationApprovalPendingTooLong
+        expr: courseflow_recommendation_ml_oldest_pending_activation_approval_age_seconds > 86400
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recommendation ML model candidate is waiting for activation approval"
+          description: "At least one trained Recommendation ML activation approval has been pending for more than 24 hours. Review model activation requests and approval audit."
+
+      - alert: RecommendationMlTrainingQueueBacklogHigh
+        expr: |
+          courseflow_recommendation_ml_training_runs_by_status{status="queued"} > 100
+          or
+          courseflow_recommendation_ml_training_oldest_queued_age_seconds > 900
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recommendation ML training queue backlog is high"
+          description: "Training jobs are queueing for too long or exceeding the backlog threshold. Check worker capacity and database locks."
+
+      - alert: RecommendationMlTrainingJobsStuck
+        expr: |
+          courseflow_recommendation_ml_training_stale_running_runs > 0
+          or
+          courseflow_recommendation_ml_training_oldest_running_age_seconds > 3600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recommendation ML training jobs appear stuck"
+          description: "A running training job has exceeded its worker lease or running-age threshold. Inspect worker logs before cancelling or requeueing."
+
+      - alert: RecommendationMlMigrationNotReady
+        expr: courseflow_recommendation_ml_migration_ready == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Recommendation ML database migration is not ready"
+          description: "The service expected migration revision does not match the database revision. Block rollout until migrations are applied or the service revision is corrected."
+
+      - alert: RecommendationMlMetricsRefreshFailing
+        expr: increase(courseflow_recommendation_ml_metrics_refresh_total{result="error"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Recommendation ML metrics refresh is failing"
+          description: "Prometheus can scrape the service, but DB-backed operational gauges failed to refresh. Check database connectivity and migration state."
+
   - name: courseflow-security-sre
     rules:
       - alert: TokenConverterFailuresDetected

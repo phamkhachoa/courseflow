@@ -122,6 +122,21 @@ check_not_local_url() {
   esac
 }
 
+check_http_url_not_local() {
+  local name="$1"
+  local value="${!name-}"
+  case "$value" in
+    http://localhost*|https://localhost*|http://127.*|https://127.*|http://0.0.0.0*|https://0.0.0.0*|http://[[]::1[]]*|https://[[]::1[]]*|http://host.docker.internal*|https://host.docker.internal*)
+      fail "$name must not point at a local host in the prod profile"
+      ;;
+    http://*|https://*)
+      ;;
+    *)
+      fail "$name must be an HTTP(S) URL in the prod profile"
+      ;;
+  esac
+}
+
 check_liquibase_contexts() {
   local contexts="${SPRING_LIQUIBASE_CONTEXTS:-prod}"
   local normalized
@@ -156,7 +171,7 @@ check_gateway_identity_routes() {
 }
 
 check_sts_allowed_clients() {
-  local default_clients="api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,promotion-service,loyalty-service,outbox-relay"
+  local default_clients="api-gateway,access-control-service,user-management-service,organization-service,course-service,enrollment-service,assignment-service,deadline-service,announcement-service,portfolio-service,discussion-service,notification-service,chat-service,media-service,search-service,analytics-service,recommendation-ml-service,gradebook-service,quiz-service,certificate-service,peer-review-service,live-session-service,review-service,promotion-service,loyalty-service,outbox-relay"
   local clients="${COURSEFLOW_STS_ALLOWED_CLIENTS:-$default_clients}"
   local normalized
   normalized="$(printf '%s' "$clients" | tr '[:space:]' ',' | tr -s ',')"
@@ -171,8 +186,8 @@ check_sts_allowed_clients() {
   local required
   for required in api-gateway access-control-service user-management-service organization-service course-service \
     enrollment-service assignment-service deadline-service announcement-service portfolio-service discussion-service \
-    notification-service chat-service media-service search-service analytics-service gradebook-service quiz-service \
-    certificate-service peer-review-service live-session-service review-service promotion-service \
+    notification-service chat-service media-service search-service analytics-service recommendation-ml-service \
+    gradebook-service quiz-service certificate-service peer-review-service live-session-service review-service promotion-service \
     loyalty-service outbox-relay; do
     case ",$normalized," in
       *,"$required",*)
@@ -185,7 +200,7 @@ check_sts_allowed_clients() {
 }
 
 check_sts_allowed_service_scopes() {
-  local default_scopes="internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice,internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire"
+  local default_scopes="internal:service,internal:token-exchange,internal:user,internal:identity:resolve,internal:identity:provision,internal:authz:check,internal:authz:assert-topology,internal:user-directory:read,internal:user-directory:write,internal:role-assignment:read,internal:role-assignment:write,internal:role-management:read,internal:role-management:write,internal:profile:read,internal:profile:write,internal:backoffice,internal:analytics:funnel-write,internal:analytics:export-read,internal:analytics:event-write,internal:analytics:model-write,internal:recommendation-ml:train,internal:recommendation-ml:infer,internal:recommendation-ml:ops,internal:promotion:admin,internal:promotion:evaluate,internal:promotion:reserve,internal:promotion:commit,internal:promotion:cancel,internal:promotion:reverse,internal:loyalty:admin,internal:loyalty:read,internal:loyalty:earn,internal:loyalty:burn,internal:loyalty:reverse,internal:loyalty:adjust,internal:loyalty:expire"
   local scopes="${COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES:-$default_scopes}"
   local normalized
   normalized="$(printf '%s' "$scopes" | tr '[:space:]' ',' | tr -s ',')"
@@ -202,6 +217,9 @@ check_sts_allowed_service_scopes() {
     internal:authz:check internal:authz:assert-topology internal:user-directory:read internal:user-directory:write \
     internal:role-assignment:read internal:role-assignment:write internal:role-management:read \
     internal:role-management:write internal:profile:read internal:profile:write internal:backoffice \
+    internal:analytics:funnel-write internal:analytics:export-read internal:analytics:event-write \
+    internal:analytics:model-write internal:recommendation-ml:train internal:recommendation-ml:infer \
+    internal:recommendation-ml:ops \
     internal:promotion:admin internal:promotion:evaluate internal:promotion:reserve internal:promotion:commit \
     internal:promotion:cancel internal:promotion:reverse internal:loyalty:admin internal:loyalty:read \
     internal:loyalty:earn internal:loyalty:burn internal:loyalty:reverse internal:loyalty:adjust \
@@ -237,6 +255,7 @@ const requiredClients = [
   "media-service",
   "search-service",
   "analytics-service",
+  "recommendation-ml-service",
   "gradebook-service",
   "quiz-service",
   "certificate-service",
@@ -265,6 +284,12 @@ const promotionRuntimeScopes = new Set([
   "internal:promotion:reverse"
 ]);
 const promotionRuntimeClients = new Set(["enrollment-service"]);
+const recommendationMlScopes = new Set([
+  "internal:recommendation-ml:train",
+  "internal:recommendation-ml:infer"
+]);
+const recommendationMlOpsScope = "internal:recommendation-ml:ops";
+const recommendationMlClient = "analytics-service";
 const loyaltyAdminScope = "internal:loyalty:admin";
 const loyaltyServiceScopes = new Set([
   "internal:loyalty:admin",
@@ -292,7 +317,8 @@ const defaultClientScopes =
   + "chat-service=internal:service,internal:token-exchange;"
   + "media-service=internal:service;"
   + "search-service=internal:service;"
-  + "analytics-service=internal:service;"
+  + "analytics-service=internal:service,internal:recommendation-ml:train,internal:recommendation-ml:infer;"
+  + "recommendation-ml-service=internal:service;"
   + "gradebook-service=internal:service;"
   + "quiz-service=internal:service;"
   + "certificate-service=internal:service;"
@@ -423,6 +449,12 @@ for (const [client, clientScopes] of scopes) {
     if (promotionRuntimeScopes.has(scope) && !promotionRuntimeClients.has(client)) {
       violations.push(`${client} must not be granted promotion runtime operation scope ${scope} by default`);
     }
+    if (recommendationMlScopes.has(scope) && client !== recommendationMlClient) {
+      violations.push(`${client} must not be granted recommendation ML scope ${scope} by default`);
+    }
+    if (scope === recommendationMlOpsScope) {
+      violations.push(`${client} must not be granted recommendation ML ops scope ${scope} by default`);
+    }
     if (scope === promotionAdminScope && client !== "promotion-service") {
       violations.push(`${client} must not be granted promotion admin scope ${scope} by default`);
     }
@@ -477,6 +509,12 @@ for (const client of promotionRuntimeClients) {
     if (!clientScopes.has(scope)) {
       violations.push(`${client} must be granted ${scope}`);
     }
+  }
+}
+const analyticsScopes = new Set(scopes.get(recommendationMlClient) ?? []);
+for (const scope of recommendationMlScopes) {
+  if (!analyticsScopes.has(scope)) {
+    violations.push(`${recommendationMlClient} must be granted ${scope}`);
   }
 }
 const promotionScopes = new Set(scopes.get("promotion-service") ?? []);
@@ -550,6 +588,18 @@ if [ "${COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE}" != "jwks" ]; then
   fail "COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE must be jwks in the prod profile"
 fi
 check_value COURSEFLOW_INTERNAL_JWT_JWKS_URI
+check_http_url_not_local COURSEFLOW_INTERNAL_JWT_JWKS_URI
+check_positive_int COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS 900
+if [ "${COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS:-900}" -lt 30 ] \
+  || [ "${COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS:-900}" -gt 900 ]; then
+  fail "COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS must be between 30 and 900 seconds"
+fi
+check_secret RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET 32 \
+  courseflow-local-recommendation-ml-principal-hash-secret-change-me-32 \
+  courseflow-local-internal-jwt-secret-change-me-32 \
+  courseflow \
+  password \
+  admin
 check_sts_allowed_clients
 check_sts_allowed_service_scopes
 check_sts_client_policy
@@ -699,6 +749,8 @@ if [ "$validate_compose" -eq 1 ]; then
   trap 'rm -f "$config_json"' EXIT
 
   compose_args=(
+    --profile ml-worker
+    --profile migration
     -f "$docker_dir/docker-compose.yml"
     -f "$docker_dir/docker-compose.services.yml"
   )
@@ -720,7 +772,9 @@ if [ "$validate_compose" -eq 1 ]; then
     allowed_ports="$allowed_ports,prometheus,grafana"
   fi
 
-  ALLOWED_PORT_SERVICES="$allowed_ports" node - "$config_json" <<'EOF_NODE'
+  ALLOWED_PORT_SERVICES="$allowed_ports" \
+  RECOMMENDATION_ML_DOCKERFILE="$backend_dir/services/recommendation-ml-service/Dockerfile" \
+    node - "$config_json" <<'EOF_NODE'
 const fs = require("fs");
 
 const configPath = process.argv[2];
@@ -744,6 +798,7 @@ const secretViolations = [];
 const keycloakViolations = [];
 const internalJwtViolations = [];
 const tokenConverterViolations = [];
+const recommendationMlViolations = [];
 const requiredClients = [
   "api-gateway",
   "access-control-service",
@@ -761,6 +816,7 @@ const requiredClients = [
   "media-service",
   "search-service",
   "analytics-service",
+  "recommendation-ml-service",
   "gradebook-service",
   "quiz-service",
   "certificate-service",
@@ -780,6 +836,12 @@ const promotionRuntimeScopes = new Set([
   "internal:promotion:reverse"
 ]);
 const promotionRuntimeClients = new Set(["enrollment-service"]);
+const recommendationMlScopes = new Set([
+  "internal:recommendation-ml:train",
+  "internal:recommendation-ml:infer"
+]);
+const recommendationMlOpsScope = "internal:recommendation-ml:ops";
+const recommendationMlClient = "analytics-service";
 const loyaltyAdminScope = "internal:loyalty:admin";
 const loyaltyServiceScopes = new Set([
   "internal:loyalty:admin",
@@ -814,6 +876,45 @@ function pairMap(raw, valueParser = (value) => value) {
   return map;
 }
 
+function internalJwksUriViolation(serviceName, rawUri) {
+  let parsed;
+  try {
+    parsed = new URL(rawUri);
+  } catch {
+    return `${serviceName} COURSEFLOW_INTERNAL_JWT_JWKS_URI must be an HTTP(S) URL`;
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return `${serviceName} COURSEFLOW_INTERNAL_JWT_JWKS_URI must be an HTTP(S) URL`;
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host === "::1" ||
+    host === "[::1]" ||
+    host === "host.docker.internal"
+  ) {
+    return `${serviceName} COURSEFLOW_INTERNAL_JWT_JWKS_URI must not point at a local host`;
+  }
+  return "";
+}
+
+function internalJwtMaxTtlViolation(serviceName, rawValue) {
+  const value = String(rawValue ?? "").trim();
+  if (!value) {
+    return `${serviceName} must set COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS`;
+  }
+  if (!/^[1-9][0-9]*$/.test(value)) {
+    return `${serviceName} COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS must be a positive integer`;
+  }
+  const seconds = Number(value);
+  if (seconds < 30 || seconds > 900) {
+    return `${serviceName} COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS must be between 30 and 900 seconds`;
+  }
+  return "";
+}
+
 for (const [serviceName, service] of Object.entries(services)) {
   const ports = Array.isArray(service.ports) ? service.ports : [];
   if (ports.length > 0 && !allowedPortServices.has(serviceName)) {
@@ -831,6 +932,8 @@ for (const [serviceName, service] of Object.entries(services)) {
     (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE") ?? "").trim().toLowerCase();
   const internalJwtJwksUri = (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_JWKS_URI") ?? "").trim();
   const internalJwtPrivateKey = (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_PRIVATE_KEY") ?? "").trim();
+  const internalJwtMaxTtlSeconds =
+    (serviceEnv.get("COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS") ?? "").trim();
   const serviceTokenMode = (serviceEnv.get("COURSEFLOW_INTERNAL_SERVICE_TOKEN_MODE") ?? "").trim().toLowerCase();
   const tokenConverterUri = (serviceEnv.get("TOKEN_CONVERTER_URI") ?? "").trim();
   const isTokenConverter = serviceName === "identity-token-converter-service";
@@ -849,7 +952,16 @@ for (const [serviceName, service] of Object.entries(services)) {
       }
       if (!internalJwtJwksUri) {
         internalJwtViolations.push(`${serviceName} must set COURSEFLOW_INTERNAL_JWT_JWKS_URI`);
+      } else {
+        const violation = internalJwksUriViolation(serviceName, internalJwtJwksUri);
+        if (violation) {
+          internalJwtViolations.push(violation);
+        }
       }
+    }
+    const ttlViolation = internalJwtMaxTtlViolation(serviceName, internalJwtMaxTtlSeconds);
+    if (ttlViolation) {
+      internalJwtViolations.push(ttlViolation);
     }
   }
 
@@ -946,6 +1058,9 @@ if (!tokenConverter) {
     "internal:profile:read",
     "internal:profile:write",
     "internal:backoffice",
+    "internal:recommendation-ml:train",
+    "internal:recommendation-ml:infer",
+    "internal:recommendation-ml:ops",
     "internal:promotion:admin",
     "internal:promotion:evaluate",
     "internal:promotion:reserve",
@@ -1007,6 +1122,16 @@ if (!tokenConverter) {
           `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include promotion runtime operation scope ${scope}`
         );
       }
+      if (recommendationMlScopes.has(scope) && client !== recommendationMlClient) {
+        tokenConverterViolations.push(
+          `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include recommendation ML scope ${scope}`
+        );
+      }
+      if (scope === recommendationMlOpsScope) {
+        tokenConverterViolations.push(
+          `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include recommendation ML ops scope ${scope}`
+        );
+      }
       if (scope === promotionAdminScope && client !== "promotion-service") {
         tokenConverterViolations.push(
           `COURSEFLOW_STS_CLIENT_SCOPES[${client}] must not include promotion admin scope ${scope}`
@@ -1047,6 +1172,12 @@ if (!tokenConverter) {
       }
     }
   }
+  const analyticsScopes = new Set(tokenConverterClientScopes.get(recommendationMlClient) ?? []);
+  for (const scope of recommendationMlScopes) {
+    if (!analyticsScopes.has(scope)) {
+      tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SCOPES[${recommendationMlClient}] must include ${scope}`);
+    }
+  }
   const promotionScopes = new Set(tokenConverterClientScopes.get("promotion-service") ?? []);
   if (!promotionScopes.has(promotionAdminScope)) {
     tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SCOPES[promotion-service] must include ${promotionAdminScope}`);
@@ -1062,6 +1193,113 @@ if (!tokenConverter) {
     if (!loyaltyScopes.has(scope)) {
       tokenConverterViolations.push(`COURSEFLOW_STS_CLIENT_SCOPES[loyalty-service] must include ${scope}`);
     }
+  }
+}
+
+function commandText(service) {
+  return Array.isArray(service?.command) ? service.command.join(" ") : String(service?.command ?? "");
+}
+
+function serviceProfiles(service) {
+  return Array.isArray(service?.profiles) ? service.profiles.map((profile) => String(profile)) : [];
+}
+
+function assertRecommendationMlService(name, expectedMigrationFlag) {
+  const service = services[name];
+  if (!service) {
+    recommendationMlViolations.push(`${name} service is missing`);
+    return;
+  }
+  const serviceEnv = new Map(envEntries(service.environment));
+  const runMigrations = (serviceEnv.get("RECOMMENDATION_ML_RUN_MIGRATIONS") ?? "").trim().toLowerCase();
+  const docsEnabled = (serviceEnv.get("RECOMMENDATION_ML_DOCS_ENABLED") ?? "false").trim().toLowerCase();
+  const activeModelRequired = (
+    serviceEnv.get("RECOMMENDATION_ML_REQUIRE_ACTIVE_MODEL_READY") ?? "false"
+  ).trim().toLowerCase();
+  const autoActivateModels = (
+    serviceEnv.get("RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS") ?? "true"
+  ).trim().toLowerCase();
+  const syncTrainingEnabled = (
+    serviceEnv.get("RECOMMENDATION_ML_SYNC_TRAINING_ENABLED") ?? "true"
+  ).trim().toLowerCase();
+  const retentionDaysRaw = (
+    serviceEnv.get("RECOMMENDATION_ML_TRAINING_PAYLOAD_RETENTION_DAYS") ?? ""
+  ).trim();
+  const retentionDays = Number(retentionDaysRaw);
+  const scrubIntervalRaw = (
+    serviceEnv.get("RECOMMENDATION_ML_PAYLOAD_SCRUB_INTERVAL_SECONDS") ?? ""
+  ).trim();
+  const scrubIntervalSeconds = Number(scrubIntervalRaw);
+  if (runMigrations !== expectedMigrationFlag) {
+    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_RUN_MIGRATIONS=${expectedMigrationFlag}`);
+  }
+  if (docsEnabled !== "false") {
+    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_DOCS_ENABLED=false in prod`);
+  }
+  if (activeModelRequired !== "true") {
+    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_REQUIRE_ACTIVE_MODEL_READY=true in prod`);
+  }
+  if (autoActivateModels !== "false") {
+    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS=false in prod`);
+  }
+  if (syncTrainingEnabled !== "false") {
+    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_SYNC_TRAINING_ENABLED=false in prod`);
+  }
+  if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 30) {
+    recommendationMlViolations.push(
+      `${name} must set RECOMMENDATION_ML_TRAINING_PAYLOAD_RETENTION_DAYS between 1 and 30 in prod`
+    );
+  }
+  if (
+    !Number.isInteger(scrubIntervalSeconds)
+    || scrubIntervalSeconds < 300
+    || scrubIntervalSeconds > 86400
+  ) {
+    recommendationMlViolations.push(
+      `${name} must set RECOMMENDATION_ML_PAYLOAD_SCRUB_INTERVAL_SECONDS between 300 and 86400 in prod`
+    );
+  }
+}
+
+assertRecommendationMlService("recommendation-ml-service", "false");
+assertRecommendationMlService("recommendation-ml-worker", "false");
+assertRecommendationMlService("recommendation-ml-migrator", "false");
+
+const recommendationMlWorker = services["recommendation-ml-worker"];
+if (recommendationMlWorker && !/\bcourseflow-ml\s+worker\b/.test(commandText(recommendationMlWorker))) {
+  recommendationMlViolations.push("recommendation-ml-worker must run courseflow-ml worker");
+}
+
+const recommendationMlMigrator = services["recommendation-ml-migrator"];
+if (!recommendationMlMigrator) {
+  recommendationMlViolations.push("recommendation-ml-migrator service is missing");
+} else {
+  const profiles = serviceProfiles(recommendationMlMigrator);
+  if (!profiles.includes("migration")) {
+    recommendationMlViolations.push("recommendation-ml-migrator must be isolated behind the migration profile");
+  }
+  if (!/\balembic\s+upgrade\s+head\b/.test(commandText(recommendationMlMigrator))) {
+    recommendationMlViolations.push("recommendation-ml-migrator must run alembic upgrade head");
+  }
+  const ports = Array.isArray(recommendationMlMigrator.ports) ? recommendationMlMigrator.ports : [];
+  if (ports.length > 0) {
+    recommendationMlViolations.push("recommendation-ml-migrator must not publish ports");
+  }
+}
+
+const recommendationMlDockerfilePath = process.env.RECOMMENDATION_ML_DOCKERFILE;
+if (!recommendationMlDockerfilePath || !fs.existsSync(recommendationMlDockerfilePath)) {
+  recommendationMlViolations.push("recommendation-ml-service Dockerfile is missing");
+} else {
+  const dockerfile = fs.readFileSync(recommendationMlDockerfilePath, "utf8");
+  if (!/USER\s+courseflow\b/.test(dockerfile)) {
+    recommendationMlViolations.push("recommendation-ml-service Dockerfile must run as non-root courseflow user");
+  }
+  if (!/HEALTHCHECK[\s\S]*\/health/.test(dockerfile)) {
+    recommendationMlViolations.push("recommendation-ml-service Dockerfile healthcheck must use /health liveness");
+  }
+  if (/HEALTHCHECK[\s\S]*\/actuator\/health/.test(dockerfile)) {
+    recommendationMlViolations.push("recommendation-ml-service Dockerfile healthcheck must not use readiness /actuator/health");
   }
 }
 
@@ -1118,9 +1356,16 @@ if (tokenConverterViolations.length > 0) {
   }
 }
 
+if (recommendationMlViolations.length > 0) {
+  console.error("Unsafe prod Recommendation ML configuration:");
+  for (const violation of recommendationMlViolations) {
+    console.error(`  - ${violation}`);
+  }
+}
+
 if (publishedPortViolations.length > 0 || secretViolations.length > 0 ||
     keycloakViolations.length > 0 || internalJwtViolations.length > 0 ||
-    tokenConverterViolations.length > 0) {
+    tokenConverterViolations.length > 0 || recommendationMlViolations.length > 0) {
   process.exit(1);
 }
 EOF_NODE

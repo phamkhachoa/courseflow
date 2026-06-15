@@ -9,6 +9,38 @@ export type AddCourseMaterialInput = {
   position?: number;
 };
 
+export type RelatedCourseSource = "MANUAL" | "CURATED" | "ANALYTICS" | "SEARCH" | "ENROLLMENT" | "POPULARITY";
+export type RelatedCourseStatus = "ACTIVE" | "DISABLED";
+
+export type RelatedCourseSummary = Pick<Course, "id" | "code" | "title" | "slug" | "summary" | "level" | "status">;
+
+export type ManualRelatedCourse = {
+  id?: string;
+  courseId: string;
+  relatedCourseId: string;
+  source?: RelatedCourseSource | string;
+  placement?: string;
+  reason?: string;
+  score?: number;
+  weight?: number;
+  position?: number;
+  status?: RelatedCourseStatus | string;
+  relatedCourse?: RelatedCourseSummary | null;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type UpsertManualRelatedCourseInput = {
+  relatedCourseId: string;
+  placement?: string;
+  reason?: string;
+  weight?: number;
+  position?: number;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+};
+
 export async function listCourses(status?: string): Promise<Course[]> {
   const { data } = await apiClient.get("/admin/v1/courses", {
     params: status ? { status } : undefined
@@ -40,6 +72,32 @@ export async function addCourseMaterial(
 ): Promise<CourseMaterial> {
   const { data } = await apiClient.post(`/admin/v1/courses/${courseId}/materials`, input);
   return unwrap<CourseMaterial>(data);
+}
+
+export async function listManualRelatedCourses(courseId: string): Promise<ManualRelatedCourse[]> {
+  const { data } = await apiClient.get(`/admin/v1/analytics/courses/${courseId}/manual-related`);
+  return unwrapList<ManualRelatedCourse>(data);
+}
+
+export async function createManualRelatedCourse(
+  courseId: string,
+  input: UpsertManualRelatedCourseInput
+): Promise<ManualRelatedCourse> {
+  const { data } = await apiClient.post(`/admin/v1/analytics/courses/${courseId}/manual-related`, input);
+  return unwrap<ManualRelatedCourse>(data);
+}
+
+export async function updateManualRelatedCourse(
+  courseId: string,
+  relatedCourseId: string,
+  input: UpsertManualRelatedCourseInput
+): Promise<ManualRelatedCourse> {
+  const { data } = await apiClient.put(`/admin/v1/analytics/courses/${courseId}/manual-related/${relatedCourseId}`, input);
+  return unwrap<ManualRelatedCourse>(data);
+}
+
+export async function deleteManualRelatedCourse(courseId: string, relatedCourseId: string): Promise<void> {
+  await apiClient.delete(`/admin/v1/analytics/courses/${courseId}/manual-related/${relatedCourseId}`);
 }
 
 export async function publishCourse(courseId: string): Promise<Course> {

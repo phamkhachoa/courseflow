@@ -38,6 +38,10 @@ public class ReportingService {
 
     private static final int DEFAULT_MARKETING_FUNNEL_LIMIT = 500;
     private static final int MAX_MARKETING_FUNNEL_LIMIT = 5_000;
+    private static final int DEFAULT_RECOMMENDATION_LIMIT = 10;
+    private static final int MAX_RECOMMENDATION_LIMIT = 50;
+    private static final int DEFAULT_RELATED_LIMIT = 6;
+    private static final int MAX_RELATED_LIMIT = 12;
     private static final long MAX_MARKETING_FUNNEL_EVENT_COUNT = 100_000;
     private static final Pattern SAFE_DIMENSION = Pattern.compile("[A-Za-z0-9._:-]{1,120}");
     private static final List<String> STANDARD_FUNNEL_STAGES = List.of(
@@ -68,11 +72,14 @@ public class ReportingService {
     }
 
     public List<RecommendationDto> recommendations(String studentId, int limit) {
-        return reporting.recommendations(studentId, limit <= 0 ? 10 : limit);
+        return reporting.recommendations(studentId, normalizeBoundedLimit(
+                limit,
+                DEFAULT_RECOMMENDATION_LIMIT,
+                MAX_RECOMMENDATION_LIMIT));
     }
 
     public List<RelatedCourseDto> relatedCourses(UUID courseId, int limit) {
-        return reporting.relatedCourses(courseId, limit <= 0 ? 6 : limit);
+        return reporting.relatedCourses(courseId, normalizeBoundedLimit(limit, DEFAULT_RELATED_LIMIT, MAX_RELATED_LIMIT));
     }
 
     public MarketingFunnelDto marketingFunnel(String tenantId,
@@ -265,6 +272,10 @@ public class ReportingService {
                 stage,
                 bucketDate.toString(),
                 String.valueOf(eventCount));
+        return sha256(canonical);
+    }
+
+    private static String sha256(String canonical) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return "sha256:" + HexFormat.of().formatHex(digest.digest(canonical.getBytes(StandardCharsets.UTF_8)));
@@ -295,6 +306,13 @@ public class ReportingService {
             return DEFAULT_MARKETING_FUNNEL_LIMIT;
         }
         return Math.min(limit, MAX_MARKETING_FUNNEL_LIMIT);
+    }
+
+    private static int normalizeBoundedLimit(int limit, int defaultLimit, int maxLimit) {
+        if (limit <= 0) {
+            return defaultLimit;
+        }
+        return Math.min(limit, maxLimit);
     }
 
     private static String required(String value, String field) {

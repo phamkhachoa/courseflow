@@ -288,6 +288,152 @@ class TrustedGatewayHeaderFilterTest {
     }
 
     @Test
+    void rejectsAnalyticsRecommendationEventWhenServiceOnlyHasGenericScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/recommendations/events");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsAnalyticsRecommendationEventWithEventWriteScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/recommendations/events");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.ANALYTICS_EVENT_WRITE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsAnalyticsRecommendationModelBatchWhenServiceOnlyHasGenericScope()
+            throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/recommendations/batch/related-course-pairs/active-model/materialize");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsAnalyticsRecommendationModelBatchWithModelWriteScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/analytics/recommendations/batch/related-course-pairs/active-model/materialize");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.ANALYTICS_MODEL_WRITE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsRecommendationMlTrainingWhenServiceOnlyHasGenericScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/recommendation-ml/related-courses:train");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.SERVICE));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsRecommendationMlTrainingWithTrainScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "POST",
+                "/internal/recommendation-ml/related-courses:train");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.RECOMMENDATION_ML_TRAIN));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void rejectsRecommendationMlOpsRouteWithTrainScopeOnly() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/internal/recommendation-ml/models");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.RECOMMENDATION_ML_TRAIN));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsRecommendationMlOpsRouteWithOpsScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/internal/recommendation-ml/models");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.RECOMMENDATION_ML_OPS));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
+    void allowsRecommendationMlInferenceWithInferScope() throws ServletException, IOException {
+        TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "GET",
+                "/internal/recommendation-ml/models/active");
+        request.addHeader(GatewayHeaders.INTERNAL_AUTHORIZATION, "Bearer " + serviceInternalToken(
+                InternalScopes.RECOMMENDATION_ML_INFER));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isSameAs(request);
+    }
+
+    @Test
     void rejectsPromotionReservationCommitWithReserveScopeOnly() throws ServletException, IOException {
         TrustedGatewayHeaderFilter filter = filter(INTERNAL_SECRET);
         MockHttpServletRequest request = new MockHttpServletRequest(

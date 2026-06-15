@@ -16,7 +16,10 @@ public interface NotificationJpaRepository extends JpaRepository<Notification, U
     @Query(value = """
             SELECT *
               FROM notifications
-             WHERE delivery_status = 'FAILED'
+             WHERE (delivery_status = 'FAILED'
+                OR (delivery_status = 'DISPATCHING'
+                    AND (last_delivery_attempt_at IS NULL
+                         OR last_delivery_attempt_at < CURRENT_TIMESTAMP - INTERVAL '5 minutes')))
                AND delivery_attempts < :maxAttempts
              ORDER BY created_at ASC
              LIMIT :limit

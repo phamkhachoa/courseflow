@@ -187,6 +187,12 @@ spring:
             - Path=/api/admin/v1/analytics,/api/admin/v1/analytics/**
           filters:
             - RewritePath=/api/admin/v1/(?<segment>.*), /internal/$\{segment}
+        - id: recommendation-ml-admin
+          uri: ${RECOMMENDATION_ML_SERVICE_URI:http://recommendation-ml-service:8080}
+          predicates:
+            - Path=/api/admin/v1/recommendation-ml,/api/admin/v1/recommendation-ml/**
+          filters:
+            - RewritePath=/api/admin/v1/(?<segment>recommendation-ml.*), /internal/$\{segment}
         - id: gradebook-admin
           uri: ${GRADEBOOK_SERVICE_URI:lb://gradebook-service}
           predicates:

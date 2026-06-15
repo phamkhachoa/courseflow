@@ -25,7 +25,8 @@ This follows the same architectural lesson from YAS: independent business servic
 | notification-service | inbox, delivery preference, WebSocket/SSE push, event dedup | source business event decisions |
 | media-service | file metadata, upload policy, signed URLs, video assets, transcode jobs, HLS/DASH renditions, captions/transcripts, per-user video progress | course/assignment business rules |
 | search-service | Elasticsearch course/content search documents | source-of-truth course data |
-| analytics-service | reporting read models, progress metrics, risk signals, completion/time-spent reports, course recommendation and marketing funnel read models | source-of-truth submissions/grades, marketing attribution source events |
+| analytics-service | reporting read models, progress metrics, risk signals, completion/time-spent reports, recommendation tracking ingestion, manual curated related courses, learner-facing related-course read model and marketing funnel read models | source-of-truth submissions/grades, marketing attribution source events, ML model registry/training/inference |
+| recommendation-ml-service | standalone Python ML project for the related-course recommendation use case: training pipelines, model registry, implicit collaborative filtering, versioned related-course scores and internal inference endpoints | learner-facing read model, manual curation, tracking ingestion, course publication truth, other ML use cases |
 | gradebook-service | grade categories, grade items, weighted final grades, overrides, rubric audit | quiz attempts, assignment submissions, certificates |
 | quiz-service | question banks, quiz definition, attempts, answer snapshots, auto-grading | final course grade |
 | certificate-service | certificate issue/revoke/reissue, verification code, public verification audit | grade calculation |
@@ -38,6 +39,49 @@ Analytics marketing funnel support is a read-model boundary. Admins read aggrega
 `POST /internal/analytics/marketing/funnel/events` with an idempotent event id. The ingestion API
 accepts only the fixed stage taxonomy and bounded non-PII dimension codes; client-facing tracking and
 full attribution remain outside analytics-service.
+
+Course recommendation ML is a separate Python service boundary. `analytics-service` collects bounded
+recommendation events and manual related-course overrides; it sends hashed learner/session
+interactions to `recommendation-ml-service` over internal JWT with
+`internal:recommendation-ml:train`. Production training should use the async queue:
+`analytics-service` submits `related-courses:enqueue`, a Python worker claims `QUEUED` jobs with DB
+row locks, stale `RUNNING` jobs are requeued or failed by lease recovery, and analytics tracks each
+training run in `recommendation_ml_training_jobs` before a scheduled materializer claims work with a
+DB-backed lease and projects approved `ACTIVE` runs into its learner read model with `source=ML`.
+Stale materialization leases become claimable again after the configured lock lease. Trained models
+must pass activation quality gates for event count, principal count, course count, generated pair
+count and quality score;
+`QUALITY_GATE_FAILED` runs are terminal and do not replace the active model. In production,
+`RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS=false` makes passing training runs create a
+`CANDIDATE` model and `PENDING_ACTIVATION` run; a separate ops checker must approve activation before
+the model becomes `ACTIVE`; rejected candidates become `REJECTED`/`ACTIVATION_REJECTED` without
+touching the active learner read model. A partial unique index allows only one pending activation
+approval per model version. The sync
+`related-courses:train` path remains only as a
+backward-compatible internal contract. This service is intentionally scoped to recommendation, not a
+generic ML monolith. It is outside the Maven reactor so a dedicated ML team can work in Python with
+FastAPI, Alembic migrations, model code and training utilities. It trains versioned
+`IMPLICIT_ITEM_CF_V1` model candidates, stores scores in `cf_recommendation_ml`, and exposes internal inference
+with `internal:recommendation-ml:infer`. Operators use `internal:recommendation-ml:ops` or a
+verified platform-admin user token to list training runs and model versions, request reactivation of
+a prior model with reason/evidence, approve it through maker-checker with a different operator,
+cancel or requeue eligible async training runs, and review model and training operation audit rows.
+Direct prior-model activation is disabled. The service exposes DB-backed Prometheus gauges for training
+status counts, stale running jobs, queue age, pending activation approval count/age, active-model
+freshness, migration readiness, metrics refresh failures, and bounded HTTP request/latency SLIs by
+FastAPI route template. `analytics-service` also emits
+`courseflow_analytics_recommendation_ml_client_requests_total{operation,result,reason}` so SRE can
+see whether production traffic is using ML, waiting on async runs, or falling back with a bounded
+reason code. The shared alert rules cover no-active-model, stale-model, consumer-fallback,
+HTTP 5xx/latency, stuck-training, queue-backlog, migration-mismatch and metrics-refresh-failure cases. If training is disabled,
+unavailable or insufficient,
+analytics falls back to the deterministic behavioral/co-enrollment read model. The ML service must
+not read or write `cf_analytics` directly. Non-recommendation ML use cases should be implemented as
+sibling Python services when they have different source data, prediction consumers, ownership,
+latency/SLA, risk profile, audit needs or release cadence.
+
+See [ML Service Boundary Strategy](ml-service-boundary-strategy.md) for the SA decision on when to
+create a new ML service versus extending the recommendation model stack.
 
 Analytics warehouse export is a bounded artifact boundary, not ad hoc table dumping. Platform admins
 or trusted export services with `internal:analytics:export-read` call
@@ -281,6 +325,8 @@ Each service owns its database:
 
 ```text
 cf_organization
+cf_access_control
+cf_user_management
 cf_course
 cf_enrollment
 cf_assignment
@@ -290,13 +336,18 @@ cf_discussion
 cf_notification
 cf_media
 cf_analytics
+cf_recommendation_ml
 cf_gradebook
 cf_quiz
 cf_certificate
 cf_peer_review
 cf_live_session
 cf_review
+cf_promotion
+cf_loyalty
+cf_outbox
 MongoDB: cf_portfolio
+MongoDB: cf_chat
 Elasticsearch: courseflow-course-search, courseflow-content-search
 ```
 

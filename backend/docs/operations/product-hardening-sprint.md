@@ -70,6 +70,10 @@ cd backend
 mvn -pl services/access-control-service,services/user-management-service,services/notification-service -am test
 mvn -pl services/analytics-service -am test
 mvn -pl services/outbox-relay -am test
+cd services/recommendation-ml-service
+python -m pytest
+python -m ruff check src tests
+python -m mypy src tests
 ```
 
 Admin frontend build gate:
@@ -123,6 +127,9 @@ does not require a bearer token, profile summary batch remains protected, and a 
 with forged `X-User-*` headers is rejected. Do not use password grant for production smoke; the
 script only supports it when `COURSEFLOW_SECURITY_SMOKE_ALLOW_PASSWORD_GRANT=true` is explicitly set
 for local/demo realms.
+Production JWKS configuration must use an HTTP(S) URL that is not localhost, loopback, `0.0.0.0`,
+`::1`, or `host.docker.internal`; Docker service DNS for the token converter is acceptable inside the
+prod Compose network.
 
 Promotion runtime smoke gate against the local Docker cluster:
 
@@ -325,12 +332,269 @@ PostgreSQL backup/restore drill:
 cd backend
 scripts/postgres-backup-drill.sh backup
 scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
+scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_recommendation_ml
 ```
 
 The restore-check writes `backups/postgres/<timestamp>/restore-check-cf_promotion.json` after a
 successful `pg_restore` probe. Register promotion retention restore drills from that evidence file's
 `restoreDrillRef`, `databaseName`, `backupPath`, `artifactHash`, `status`, and `checkedAt` values,
 not from manually typed hashes.
+For Recommendation ML releases, retain
+`backups/postgres/<timestamp>/restore-check-cf_recommendation_ml.json`; its probe also checks the
+restored Alembic revision and core ML tables.
+
+Before rolling Recommendation ML API or worker containers in a production-shaped Compose release, run
+the dedicated Alembic migration job:
+
+```bash
+cd backend
+docker compose \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.services.yml \
+  -f infra/docker/docker-compose.prod.yml \
+  --profile migration \
+  run --rm recommendation-ml-migrator
+```
+
+The production profile keeps `RECOMMENDATION_ML_DOCS_ENABLED=false`; API docs/OpenAPI may only be
+enabled in controlled non-production environments.
+It also keeps `RECOMMENDATION_ML_REQUIRE_ACTIVE_MODEL_READY=true`, so production readiness returns
+`503` until a current active model exists, and
+`RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS=false`, so new trained models stay
+`PENDING_ACTIVATION`/`CANDIDATE` until a different ops checker approves them. Rejected candidates
+close as `REJECTED`/`ACTIVATION_REJECTED` with audit and do not affect the active read model.
+Only one pending activation request is allowed per model version.
+Recommendation ML training/model ops audit evidence must be secret-safe and bounded before
+persistence; raw auth-looking fields or values are rejected instead of being truncated into partial
+JSON audit records. Composite maker-checker model activation audit evidence must remain parseable
+even when it embeds bounded request and review evidence.
+Queued Recommendation ML training payloads must store learner principals as HMAC-SHA256 hashes using
+a dedicated `RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET`; raw `principalId` values and JWT signing
+secrets must not be used for persisted ML training payload identity.
+Recommendation ML model version identifiers must be URL/audit safe: at most 80 characters, start
+with a letter or digit, and contain only letters, digits, `.`, `_`, `:`, or `-`.
+Recommendation ML ops list status filters must be strict per domain; typo/unknown training-run,
+model-version, or activation-request statuses must return `400` rather than an empty list.
+Recommendation ML training input must reject unsupported event types before queue persistence; only
+`ENROLLMENT`, `CLICK`, and `IMPRESSION` are accepted and stored canonically.
+Production also sets `RECOMMENDATION_ML_SYNC_TRAINING_ENABLED=false`; training must be submitted
+through the queued endpoint and executed by the worker, while the synchronous training endpoint is
+reserved for local/demo compatibility.
+The readiness endpoint exposes `activationGovernance`; production-like readiness is `DOWN` if active
+models are required but trained models would still auto-activate.
+The Docker image healthcheck must stay on `/health` liveness, not `/actuator/health` readiness, so
+the container is not restarted simply because production readiness is correctly blocking traffic
+until an active model exists.
+
+Recommendation ML ops smoke gate against staging/pre-production:
+
+```bash
+cd backend
+scripts/recommendation-ml-local-http-smoke.sh
+
+RECOMMENDATION_ML_SMOKE_URL=https://recommendation-ml.<env>.courseflow.internal \
+RECOMMENDATION_ML_SMOKE_ENVIRONMENT=staging \
+RECOMMENDATION_ML_SMOKE_REQUIRE_HTTPS_URLS=true \
+RECOMMENDATION_ML_SMOKE_REJECT_LOCAL_URLS=true \
+RECOMMENDATION_ML_SMOKE_ANALYTICS_URL=https://analytics.<env>.courseflow.internal \
+RECOMMENDATION_ML_SMOKE_PROMETHEUS_URL=https://prometheus.<env>.courseflow.internal \
+RECOMMENDATION_ML_SMOKE_REQUIRED_TARGETS='recommendation-ml|courseflow-services|recommendation-ml-service:8080,analytics|courseflow-services|analytics-service:8080' \
+RECOMMENDATION_ML_SMOKE_TRAIN_TOKEN='<sts-issued-train-token>' \
+RECOMMENDATION_ML_SMOKE_INFER_TOKEN='<sts-issued-infer-token>' \
+RECOMMENDATION_ML_SMOKE_OPS_TOKEN='<sts-issued-ops-token>' \
+RECOMMENDATION_ML_SMOKE_OPS_CHECKER_TOKEN='<sts-issued-ops-token-for-different-actor>' \
+RECOMMENDATION_ML_SMOKE_ANALYTICS_MODEL_TOKEN='<sts-issued-analytics-model-write-token>' \
+RECOMMENDATION_ML_SMOKE_REQUIRE_PREMINTED_TOKENS=true \
+RECOMMENDATION_ML_SMOKE_MAX_QUEUED_AGE_SECONDS=900 \
+RECOMMENDATION_ML_SMOKE_MAX_RUNNING_AGE_SECONDS=3600 \
+RECOMMENDATION_ML_SMOKE_MAX_PENDING_ACTIVATION_APPROVAL_AGE_SECONDS=86400 \
+RECOMMENDATION_ML_SMOKE_MAX_TOKEN_TTL_SECONDS=900 \
+RECOMMENDATION_ML_SMOKE_ANALYTICS_CLIENT_METRIC_WINDOW=30m \
+RECOMMENDATION_ML_SMOKE_ANALYTICS_CLIENT_METRIC_REQUIRED=true \
+RECOMMENDATION_ML_SMOKE_CI_PROVIDER=github_actions \
+RECOMMENDATION_ML_SMOKE_REPOSITORY='<org>/<repo>' \
+RECOMMENDATION_ML_SMOKE_COMMIT_SHA='<40-char-git-sha>' \
+RECOMMENDATION_ML_SMOKE_REF='<release-branch-or-tag>' \
+RECOMMENDATION_ML_SMOKE_WORKFLOW='Product Hardening Gates' \
+RECOMMENDATION_ML_SMOKE_JOB=recommendation-ml-ops-smoke \
+RECOMMENDATION_ML_SMOKE_RUN_ID='<github-run-id>' \
+RECOMMENDATION_ML_SMOKE_RUN_ATTEMPT='<github-run-attempt>' \
+RECOMMENDATION_ML_SMOKE_ACTOR='<github-actor>' \
+RECOMMENDATION_ML_SMOKE_RUN_URL='<github-run-url>' \
+RECOMMENDATION_ML_SMOKE_EVIDENCE_FILE=recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke-evidence.json \
+node scripts/recommendation-ml-ops-smoke.mjs
+node scripts/recommendation-ml-evidence-verify.mjs \
+  recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke-evidence.json \
+  --mode=staging \
+  --expected-environment="$RECOMMENDATION_ML_SMOKE_ENVIRONMENT" \
+  --expected-service-url="$RECOMMENDATION_ML_SMOKE_URL" \
+  --expected-analytics-url="$RECOMMENDATION_ML_SMOKE_ANALYTICS_URL" \
+  --expected-prometheus-url="$RECOMMENDATION_ML_SMOKE_PROMETHEUS_URL" \
+  --expected-prometheus-targets="$RECOMMENDATION_ML_SMOKE_REQUIRED_TARGETS" \
+  --expected-required-alerts="$RECOMMENDATION_ML_SMOKE_REQUIRED_ALERTS" \
+  --expected-max-queued-age-seconds="$RECOMMENDATION_ML_SMOKE_MAX_QUEUED_AGE_SECONDS" \
+  --expected-max-running-age-seconds="$RECOMMENDATION_ML_SMOKE_MAX_RUNNING_AGE_SECONDS" \
+  --expected-max-pending-activation-approval-age-seconds="$RECOMMENDATION_ML_SMOKE_MAX_PENDING_ACTIVATION_APPROVAL_AGE_SECONDS" \
+  --expected-max-token-ttl-seconds="$RECOMMENDATION_ML_SMOKE_MAX_TOKEN_TTL_SECONDS" \
+  --expected-analytics-metric-window="$RECOMMENDATION_ML_SMOKE_ANALYTICS_CLIENT_METRIC_WINDOW" \
+  --max-age-hours=24 \
+  --max-future-skew-minutes=10 \
+  --expected-repository="$RECOMMENDATION_ML_SMOKE_REPOSITORY" \
+  --expected-commit-sha="$RECOMMENDATION_ML_SMOKE_COMMIT_SHA" \
+  --expected-ref="$RECOMMENDATION_ML_SMOKE_REF" \
+  --expected-workflow="$RECOMMENDATION_ML_SMOKE_WORKFLOW" \
+  --expected-job="$RECOMMENDATION_ML_SMOKE_JOB" \
+  --expected-run-id="$RECOMMENDATION_ML_SMOKE_RUN_ID" \
+  --expected-run-attempt="$RECOMMENDATION_ML_SMOKE_RUN_ATTEMPT" \
+  --expected-actor="$RECOMMENDATION_ML_SMOKE_ACTOR" \
+  --expected-run-url="$RECOMMENDATION_ML_SMOKE_RUN_URL"
+node scripts/recommendation-ml-evidence-manifest.mjs \
+  --output=recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke-manifest.json \
+  --checksum-output=recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke-manifest.json.sha256 \
+  recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke-evidence.json \
+  recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke.log
+node scripts/recommendation-ml-evidence-manifest.mjs \
+  --verify=recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke-manifest.json \
+  --checksum=recommendation-ml-smoke-artifacts/recommendation-ml-ops-smoke-manifest.json.sha256
+```
+
+The local wrapper is a pre-staging HTTP gate: it starts disposable Postgres, applies Alembic
+migrations, seeds an active model, boots the FastAPI app and worker with production-like activation
+governance, proves synchronous training is disabled, executes queued training through the worker, and
+runs the maker-checker mutation smoke. It does not replace the staging/pre-production smoke because
+it cannot prove real Prometheus scrape targets or deployed STS/token wiring. Set `PYTHON`
+to force the interpreter; otherwise the wrapper chooses `python3.12`, `python3.11`, `python3`, or
+`python`. The product-hardening workflow runs this wrapper after the Python unit/lint/type and
+Postgres integration gates. It also builds the Recommendation ML Docker image, validates the image
+contract for non-root runtime, liveness healthcheck, exposed port and gated migration command, runs
+the built image against disposable Postgres to prove Docker liveness remains healthy while readiness
+is `503` without an active model, then uploads `backend/recommendation-ml-smoke-artifacts` with
+image-contract evidence, image-runtime evidence, local HTTP smoke evidence JSON and Uvicorn log.
+
+Use explicit short-lived `RECOMMENDATION_ML_SMOKE_TRAIN_TOKEN`,
+`RECOMMENDATION_ML_SMOKE_INFER_TOKEN`, `RECOMMENDATION_ML_SMOKE_OPS_TOKEN` and
+`RECOMMENDATION_ML_SMOKE_OPS_CHECKER_TOKEN`, plus
+`RECOMMENDATION_ML_SMOKE_ANALYTICS_MODEL_TOKEN` with `internal:analytics:model-write`, from STS for
+staging/pre-production signoff. Local HS256 smoke tokens are acceptable only for local/demo wrappers;
+they are not production release evidence.
+Staging smoke also requires `RECOMMENDATION_ML_SMOKE_REQUIRE_HTTPS_URLS=true` and
+`RECOMMENDATION_ML_SMOKE_REJECT_LOCAL_URLS=true`; the verifier rejects release evidence whose
+Recommendation ML, analytics, or Prometheus URL is not HTTPS or points to localhost/loopback.
+The smoke decodes JWT claims without storing token values and fails staging signoff unless each
+train/infer/ops/checker/analytics token is an unexpired `token_use=internal`, `actor_type=service`
+JWT containing `iat`, `exp`, the expected scope and a TTL no greater than
+`RECOMMENDATION_ML_SMOKE_MAX_TOKEN_TTL_SECONDS` (default and maximum `900` seconds). The service also
+enforces the same max lifetime at runtime with `COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS`. It records
+only subject hashes and rejects staging evidence unless the ops maker token and ops checker token
+resolve to different service subjects.
+The smoke also requires `courseflow_recommendation_ml_internal_auth_rejections_total{reason="invalid_jwt"}`
+to increment after the invalid-JWT probe, so auth-boundary failures are visible outside HTTP 403
+status-class metrics.
+When a controlled negative token is available, set `RECOMMENDATION_ML_SMOKE_WILDCARD_TOKEN`; the
+smoke must prove a signed token with `scope="*"` is still rejected by Recommendation ML runtime
+scope checks.
+Staging release evidence must also include `RECOMMENDATION_ML_SMOKE_ENVIRONMENT` and
+`sourceProvenance` fields tying the artifact to a GitHub Actions workflow run, repository, ref,
+40-character commit SHA, run attempt and actor. The workflow fills these automatically; manual
+staging runs must provide the `RECOMMENDATION_ML_SMOKE_*` provenance variables shown above.
+The smoke requires an active model by default. It proves service health/readiness, Alembic readiness,
+DB-backed Prometheus metrics, invalid internal-JWT rejection, training/model/audit ops reads,
+active-model inference readiness, train/infer/ops least-privilege scope separation, disabled direct
+activation (`409`), disabled deployed docs/OpenAPI/Redoc, disabled synchronous training in
+production-like runs, required Prometheus targets, pending activation approval count/age metrics, and
+no firing critical Recommendation ML alerts. Set
+`RECOMMENDATION_ML_SMOKE_REQUIRE_ACTIVE_MODEL=false` only for a first empty-environment bootstrap; that
+run is not sufficient production release evidence.
+For staging/pre-production signoff, set `RECOMMENDATION_ML_SMOKE_MUTATION_FLOW_ENABLED=true` and
+provide `RECOMMENDATION_ML_SMOKE_OPS_CHECKER_TOKEN` for a different actor than
+`RECOMMENDATION_ML_SMOKE_OPS_TOKEN`; the smoke then enqueues a synthetic training job, waits for the
+worker to create a candidate, proves duplicate pending and maker-self-review rejection, and
+checker-rejects the candidate so the active model is not changed. The smoke first verifies readiness
+`activationGovernance=UP`, so mutation flow cannot run against an environment that would auto-activate
+trained models. The mutation flow also proves activation audit evidence rejects sensitive fields
+before any approval request is persisted, then scrapes
+Recommendation ML metrics while the synthetic approval is pending, proving pending approval count/age
+metrics observe the maker-checker queue. If the mutation
+flow fails after training the candidate or creating the activation request, the smoke attempts a
+best-effort checker rejection cleanup. The evidence JSON records the synthetic mutation `smokeRunId`,
+`trainingRunId`, `modelVersion`, `approvalId`, terminal status and cleanup result so SRE can trace
+or clean the exact candidate touched by the smoke.
+Prometheus evidence must include non-firing request SLI alerts backed by
+`courseflow_recommendation_ml_http_requests_total{method,route,status_class}` and
+`courseflow_recommendation_ml_http_request_duration_seconds_bucket{method,route,status_class,le}`.
+The smoke queries Prometheus `/api/v1/rules?type=alert` and release evidence is rejected unless
+every `RECOMMENDATION_ML_SMOKE_REQUIRED_ALERTS` rule is loaded and healthy; the default list covers
+no active model, stuck training, migration readiness, metrics refresh failure, and analytics
+consumer fallback.
+The smoke also calls `analytics-service` to materialize the active ML model into the learner-facing
+read model, then verifies
+`courseflow_analytics_recommendation_ml_client_requests_total{operation="active_model",result="available"}`
+in Prometheus and zero fallback increase for
+`courseflow_analytics_recommendation_ml_client_requests_total{result="fallback"}` within
+`RECOMMENDATION_ML_SMOKE_ANALYTICS_CLIENT_METRIC_WINDOW` (default `30m`). Fallback results must be
+explained by a controlled bootstrap, planned disablement, or an approved incident.
+
+The same gate is available from the `Product Hardening Gates` workflow with
+`run_recommendation_ml_ops_smoke=true`. Configure:
+
+- repository variables:
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_URL`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_ENVIRONMENT`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_REQUIRE_HTTPS_URLS=true`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_REJECT_LOCAL_URLS=true`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_ANALYTICS_URL`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_PROMETHEUS_URL`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_REQUIRED_TARGETS`;
+- optional repository variables:
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_MAX_QUEUED_AGE_SECONDS`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_MAX_RUNNING_AGE_SECONDS`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_MAX_PENDING_ACTIVATION_APPROVAL_AGE_SECONDS`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_MUTATION_FLOW_ENABLED=true`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_EXPECT_SYNC_TRAIN_DISABLED=true`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_REQUIRE_PREMINTED_TOKENS=true`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_MAX_TOKEN_TTL_SECONDS=900`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_MAX_EVIDENCE_AGE_HOURS=24`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_MAX_EVIDENCE_FUTURE_SKEW_MINUTES=10`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_ANALYTICS_CLIENT_METRIC_REQUIRED=true`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_ANALYTICS_CLIENT_METRIC_WINDOW=30m`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_CRITICAL_ALERTS`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_REQUIRED_ALERTS`;
+- repository secrets:
+  all of `COURSEFLOW_RECOMMENDATION_ML_SMOKE_TRAIN_TOKEN`,
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_INFER_TOKEN` and
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_OPS_TOKEN`, plus
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_OPS_CHECKER_TOKEN` for a different actor, and
+  `COURSEFLOW_RECOMMENDATION_ML_SMOKE_ANALYTICS_MODEL_TOKEN` with
+  `internal:analytics:model-write`.
+
+The workflow intentionally rejects `COURSEFLOW_RECOMMENDATION_ML_SMOKE_REQUIRE_ACTIVE_MODEL=false`,
+`COURSEFLOW_RECOMMENDATION_ML_SMOKE_MUTATION_FLOW_ENABLED=false`, and
+`COURSEFLOW_RECOMMENDATION_ML_SMOKE_EXPECT_SYNC_TRAIN_DISABLED=false`, and
+`COURSEFLOW_RECOMMENDATION_ML_SMOKE_REQUIRE_PREMINTED_TOKENS=false`, and
+`COURSEFLOW_RECOMMENDATION_ML_SMOKE_ANALYTICS_CLIENT_METRIC_REQUIRED=false`, and staging URL policy
+set to anything other than HTTPS/non-local. It also runs
+`scripts/recommendation-ml-evidence-verify.mjs --mode=staging`, which rejects release evidence unless
+the artifact proves pre-minted token usage, active model `trainingRunId`, Prometheus target health,
+loaded healthy Prometheus alert rules, non-firing critical alerts, analytics active-model
+materialization, analytics ML client metrics with zero fallback, and terminal maker-checker
+rejection of the synthetic candidate. The verifier also rejects staging evidence that lacks
+environment/source provenance for the GitHub Actions run and exact commit SHA, whose provenance does
+not match the expected release repository/commit/ref/workflow/job/run metadata, whose target
+environment or Recommendation ML/analytics/Prometheus endpoints do not match the release target, or
+whose Prometheus target/alert evidence does not match the expected monitoring policy, or that uses
+internal JWTs without the expected claims, scope and short TTL, or whose queued/running job,
+pending approval, token TTL, or analytics metric-window thresholds do not match the release policy,
+or that was run against local/non-TLS URLs.
+It also requires `checkedAt` to be a fresh UTC timestamp: no older than the configured evidence age
+window, and not beyond the configured future clock-skew allowance.
+Retain the uploaded `recommendation-ml-ops-staging-smoke-artifacts` artifact, especially
+`recommendation-ml-ops-smoke-evidence.json`, `recommendation-ml-ops-smoke.log`,
+`recommendation-ml-ops-smoke-manifest.json`, and
+`recommendation-ml-ops-smoke-manifest.json.sha256`, with the ML release record. The manifest records
+SHA-256 hashes, byte sizes, source provenance, target, threshold, monitoring and synthetic mutation
+summary without storing token values. The workflow verifies the manifest sidecar and every recorded
+file hash before upload, requires `evidenceFile` to match a hashed file entry, and reconciles the
+manifest summary with that referenced evidence JSON.
 
 Mobile static gate when Flutter is installed:
 
@@ -393,6 +657,8 @@ Then check:
 - Production STS service scopes are explicit; wildcard `COURSEFLOW_STS_ALLOWED_SERVICE_SCOPES=*`
   is rejected, and the list must include the endpoint-level scopes enforced by
   `TrustedGatewayHeaderFilter`, including the concrete `internal:promotion:<operation>` scopes.
+  Recommendation ML also rejects wildcard service-token scopes at runtime; each call must carry the
+  concrete `internal:recommendation-ml:train`, `infer`, or `ops` scope.
 - Promotion service-to-service calls are fail-closed twice: the common internal JWT filter rejects
   generic `internal:service` tokens for `/internal/incentives/**`, and promotion access checks
   require the matching `internal:promotion:<operation>` scope before honoring the client binding.
@@ -403,7 +669,8 @@ Then check:
   compensation.
 - Downstream services expose internal JWT rejection counters through
   `courseflow.internal_jwt.rejections` for `/internal/**`, `/backoffice/**` and identity-header
-  requests.
+  requests. Recommendation ML exposes the equivalent Python metric
+  `courseflow_recommendation_ml_internal_auth_rejections_total{reason}`.
 - Access-control exposes authorization decision counters through
   `courseflow.access_control.authz.checks` and persists denied decisions in
   `access_control_audit_logs`.
@@ -449,10 +716,11 @@ Then check:
   rollback.
 - Prometheus must expose `promotion_retention_execution_stale_in_progress`; alerts must fire for
   failed and stuck destructive retention execution attempts.
-- `scripts/postgres-backup-drill.sh` must include `cf_promotion`, and the operator must run a
-  restore-check against `cf_promotion` before the first production redaction execution. The
-  generated `restore-check-cf_promotion.json` evidence must be retained with the release record and
-  used as the source for restore-drill registration.
+- `scripts/postgres-backup-drill.sh` must include `cf_promotion` and `cf_recommendation_ml`. The
+  operator must run a restore-check against `cf_promotion` before the first production redaction
+  execution and against `cf_recommendation_ml` before ML migration/model-ops releases. The generated
+  restore-check evidence must be retained with the release record and used as the source for the
+  relevant approval or restore-drill registration.
 - Promotion application client bindings are fail-closed: a binding with `allowedOperations=[]` must
   reject every operation. Runtime/admin operation smoke should grant only the needed explicit
   operations, for example `admin`, `evaluate`, `reserve`, `commit`, `cancel`, or `reverse`.

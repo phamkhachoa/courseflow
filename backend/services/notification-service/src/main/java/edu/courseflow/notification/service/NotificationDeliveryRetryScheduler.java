@@ -19,17 +19,17 @@ public class NotificationDeliveryRetryScheduler {
     private static final Logger log = LoggerFactory.getLogger(NotificationDeliveryRetryScheduler.class);
 
     private final NotificationRepository notifications;
-    private final NotificationDeliveryService delivery;
+    private final NotificationDeliveryDispatcher dispatcher;
     private final int maxAttempts;
     private final int batchSize;
 
     public NotificationDeliveryRetryScheduler(
             NotificationRepository notifications,
-            NotificationDeliveryService delivery,
+            NotificationDeliveryDispatcher dispatcher,
             @Value("${courseflow.notification.delivery.retry.max-attempts:5}") int maxAttempts,
             @Value("${courseflow.notification.delivery.retry.batch-size:100}") int batchSize) {
         this.notifications = notifications;
-        this.delivery = delivery;
+        this.dispatcher = dispatcher;
         this.maxAttempts = Math.max(1, maxAttempts);
         this.batchSize = Math.max(1, batchSize);
     }
@@ -38,17 +38,11 @@ public class NotificationDeliveryRetryScheduler {
     @Transactional
     public void retryFailedDeliveries() {
         List<Notification> failed = notifications.lockFailedForRetry(maxAttempts, batchSize);
-        int redelivered = 0;
         for (Notification notification : failed) {
-            delivery.deliver(notification);
-            notifications.saveEntity(notification);
-            if ("DELIVERED".equals(notification.getDeliveryStatus())) {
-                redelivered++;
-            }
+            dispatcher.dispatch(notification);
         }
         if (!failed.isEmpty()) {
-            log.info("notification delivery retry processed {} failed notification(s), {} delivered",
-                    failed.size(), redelivered);
+            log.info("notification delivery retry scheduled {} failed notification(s)", failed.size());
         }
     }
 }

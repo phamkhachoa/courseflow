@@ -213,10 +213,36 @@ public class TrustedGatewayHeaderFilter extends OncePerRequestFilter {
         if (path.equals("/internal/analytics/warehouse/exports")) {
             return Set.of(InternalScopes.ANALYTICS_EXPORT_READ);
         }
+        if (path.equals("/internal/analytics/recommendations/events")) {
+            return Set.of(InternalScopes.ANALYTICS_EVENT_WRITE);
+        }
+        if (path.startsWith("/internal/analytics/recommendations/batch/")) {
+            return Set.of(InternalScopes.ANALYTICS_MODEL_WRITE);
+        }
+        if (path.startsWith("/internal/recommendation-ml/")) {
+            return recommendationMlScopes(path, method);
+        }
         if (path.startsWith("/internal/")) {
             return Set.of(InternalScopes.SERVICE);
         }
         return Set.of();
+    }
+
+    private Set<String> recommendationMlScopes(String path, String method) {
+        if (path.equals("/internal/recommendation-ml/related-courses:train")
+                || path.equals("/internal/recommendation-ml/related-courses:enqueue")) {
+            return Set.of(InternalScopes.RECOMMENDATION_ML_TRAIN);
+        }
+        if ("GET".equalsIgnoreCase(method)
+                && path.matches("^/internal/recommendation-ml/training-runs/[^/]+$")) {
+            return Set.of(InternalScopes.RECOMMENDATION_ML_TRAIN);
+        }
+        if ("GET".equalsIgnoreCase(method)
+                && (path.equals("/internal/recommendation-ml/models/active")
+                || path.matches("^/internal/recommendation-ml/courses/[^/]+/related$"))) {
+            return Set.of(InternalScopes.RECOMMENDATION_ML_INFER);
+        }
+        return Set.of(InternalScopes.RECOMMENDATION_ML_OPS);
     }
 
     private Set<String> loyaltyScopes(String path, String method) {

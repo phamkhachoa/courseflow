@@ -7,6 +7,8 @@ DEFAULT_BACKUP_DIR="backups/postgres/$(date -u +%Y%m%dT%H%M%SZ)"
 RESTORE_TEMP_DB=""
 
 DATABASES=(
+  cf_access_control
+  cf_user_management
   cf_organization
   cf_course
   cf_enrollment
@@ -17,6 +19,7 @@ DATABASES=(
   cf_notification
   cf_media
   cf_analytics
+  cf_recommendation_ml
   cf_gradebook
   cf_quiz
   cf_certificate
@@ -25,6 +28,7 @@ DATABASES=(
   cf_review
   cf_outbox
   cf_promotion
+  cf_loyalty
 )
 
 usage() {
@@ -39,10 +43,13 @@ Environment:
   RESTORE_DRILL_REF    Optional restore drill reference written to restore-check evidence
   RESTORE_DRILL_EVIDENCE_FILE
                       Optional restore-check evidence JSON path
+  RECOMMENDATION_ML_EXPECTED_MIGRATION_REVISION
+                      Expected ML Alembic revision for cf_recommendation_ml restore probes
 
 Examples:
   scripts/postgres-backup-drill.sh backup
   scripts/postgres-backup-drill.sh restore-check backups/postgres/20260612T120000Z cf_promotion
+  scripts/postgres-backup-drill.sh restore-check backups/postgres/20260612T120000Z cf_recommendation_ml
 USAGE
 }
 
@@ -109,6 +116,56 @@ EOF_MANIFEST
 
   echo "Backup complete: $backup_dir"
   echo "Run restore check: scripts/postgres-backup-drill.sh restore-check $backup_dir cf_promotion"
+  echo "Run ML restore check: scripts/postgres-backup-drill.sh restore-check $backup_dir cf_recommendation_ml"
+}
+
+restore_probe() {
+  local db="$1"
+  docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$RESTORE_TEMP_DB" -v ON_ERROR_STOP=1 \
+    -c "select current_database() as restored_database, now() as checked_at" >/dev/null
+
+  case "$db" in
+    cf_recommendation_ml)
+      local expected_revision
+      local escaped_revision
+      expected_revision="${RECOMMENDATION_ML_EXPECTED_MIGRATION_REVISION:-007_model_activation_governance}"
+      escaped_revision="${expected_revision//\'/\'\'}"
+      docker exec -i "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$RESTORE_TEMP_DB" -v ON_ERROR_STOP=1 <<SQL >/dev/null
+DO \$\$
+BEGIN
+  IF to_regclass('public.recommendation_training_runs') IS NULL THEN
+    RAISE EXCEPTION 'missing recommendation_training_runs table after restore';
+  END IF;
+  IF to_regclass('public.recommendation_model_versions') IS NULL THEN
+    RAISE EXCEPTION 'missing recommendation_model_versions table after restore';
+  END IF;
+  IF to_regclass('public.recommendation_model_activation_approvals') IS NULL THEN
+    RAISE EXCEPTION 'missing recommendation_model_activation_approvals table after restore';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.alembic_version
+    WHERE version_num = '$escaped_revision'
+  ) THEN
+    RAISE EXCEPTION 'cf_recommendation_ml Alembic revision mismatch: expected %', '$escaped_revision';
+  END IF;
+END;
+\$\$;
+SQL
+      ;;
+  esac
+}
+
+restore_probe_name() {
+  local db="$1"
+  case "$db" in
+    cf_recommendation_ml)
+      printf '%s' "recommendation_ml_schema_and_revision"
+      ;;
+    *)
+      printf '%s' "generic_restore_connection"
+      ;;
+  esac
 }
 
 restore_check() {
@@ -137,18 +194,19 @@ restore_check() {
   echo "Restoring $dump_file into $RESTORE_TEMP_DB"
   docker exec -i "$POSTGRES_CONTAINER" pg_restore -U "$POSTGRES_USER" -d "$RESTORE_TEMP_DB" --no-owner < "$dump_file"
 
-  docker exec "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$RESTORE_TEMP_DB" -v ON_ERROR_STOP=1 \
-    -c "select current_database() as restored_database, now() as checked_at" >/dev/null
+  restore_probe "$db"
 
   local checked_at
   local artifact_hash
   local restore_drill_ref
   local evidence_file
+  local restore_probe_label
   local temp_db
   checked_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   artifact_hash="sha256:$(sha256_hex "$dump_file")"
   restore_drill_ref="${RESTORE_DRILL_REF:-restore-drill-${db}-${suffix}}"
   evidence_file="${RESTORE_DRILL_EVIDENCE_FILE:-$backup_dir/restore-check-$db.json}"
+  restore_probe_label="$(restore_probe_name "$db")"
   temp_db="$RESTORE_TEMP_DB"
   mkdir -p "$(dirname "$evidence_file")"
   cat > "$evidence_file" <<EOF_EVIDENCE
@@ -160,6 +218,7 @@ restore_check() {
   "backupPath": "$(json_escape "$dump_file")",
   "artifactHash": "$(json_escape "$artifact_hash")",
   "status": "PASSED",
+  "restoreProbe": "$(json_escape "$restore_probe_label")",
   "checkedAt": "$(json_escape "$checked_at")",
   "postgresContainer": "$(json_escape "$POSTGRES_CONTAINER")",
   "postgresUser": "$(json_escape "$POSTGRES_USER")",

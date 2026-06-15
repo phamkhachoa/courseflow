@@ -13,7 +13,9 @@ public class NotificationDeliveryService {
     }
 
     public void deliver(Notification notification) {
-        notification.markDeliveryAttempt();
+        if (!"DISPATCHING".equals(notification.getDeliveryStatus())) {
+            notification.markDeliveryInProgress();
+        }
         try {
             deliveryPort.deliver(notification);
             notification.markDelivered();

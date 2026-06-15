@@ -6,7 +6,8 @@ export const queryKeys = {
   courses: {
     all: ["courses"] as const,
     list: (status?: string) => ["courses", "list", status ?? "all"] as const,
-    detail: (id: string) => ["courses", "detail", id] as const
+    detail: (id: string) => ["courses", "detail", id] as const,
+    related: (id: string) => ["courses", "related", id] as const
   },
   users: {
     all: ["users"] as const,

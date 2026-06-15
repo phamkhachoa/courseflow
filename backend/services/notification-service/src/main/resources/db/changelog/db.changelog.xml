@@ -13,4 +13,5 @@
     <include file="db/changelog/changes/001-init.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/002-delivery-status.sql" relativeToChangelogFile="false"/>
     <include file="db/changelog/changes/003-delivery-retry.sql" relativeToChangelogFile="false"/>
+    <include file="db/changelog/changes/004-delivery-dispatching-retry-index.sql" relativeToChangelogFile="false"/>
 </databaseChangeLog>

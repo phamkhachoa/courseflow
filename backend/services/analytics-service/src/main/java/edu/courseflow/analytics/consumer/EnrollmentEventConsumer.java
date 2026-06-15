@@ -7,6 +7,8 @@ import edu.courseflow.analytics.model.ProcessedEvent;
 import edu.courseflow.analytics.repository.AnalyticsRepository;
 import edu.courseflow.analytics.repository.ProcessedEventRepository;
 import edu.courseflow.analytics.repository.ReportingRepository;
+import edu.courseflow.analytics.service.RecommendationService;
+import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,12 +24,16 @@ public class EnrollmentEventConsumer {
 
     private final AnalyticsRepository analytics;
     private final ReportingRepository reporting;
+    private final RecommendationService recommendations;
     private final ProcessedEventRepository processedEvents;
     private final ObjectMapper objectMapper;
 
     public EnrollmentEventConsumer(AnalyticsRepository analytics, ReportingRepository reporting,
-                                    ProcessedEventRepository processedEvents, ObjectMapper objectMapper) {
+                                    RecommendationService recommendations,
+                                    ProcessedEventRepository processedEvents,
+                                    ObjectMapper objectMapper) {
         this.analytics = analytics; this.reporting = reporting;
+        this.recommendations = recommendations;
         this.processedEvents = processedEvents; this.objectMapper = objectMapper;
     }
 
@@ -62,6 +68,19 @@ public class EnrollmentEventConsumer {
         }
         analytics.update(new UpdateCourseMetricRequestDto(courseId, 1, 0, 0, null));
         reporting.upsertCompletionEnrolled(courseUuid);
+        recommendations.recordEnrollmentSignal(eventId, text(event, "studentId"), courseUuid, occurredAt(event));
+    }
+
+    private static Instant occurredAt(JsonNode event) {
+        String text = text(event, "occurredAt");
+        if (text == null) {
+            return Instant.now();
+        }
+        try {
+            return Instant.parse(text);
+        } catch (IllegalArgumentException ex) {
+            return Instant.now();
+        }
     }
 
     private static UUID eventId(JsonNode event, String payload) {

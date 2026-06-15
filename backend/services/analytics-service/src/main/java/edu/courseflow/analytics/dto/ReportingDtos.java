@@ -50,7 +50,13 @@ public final class ReportingDtos {
     public record RelatedCourseDto(
             String courseId,
             String relatedCourseId,
-            double score
+            double score,
+            String source,
+            String reason,
+            String reasonCode,
+            String placement,
+            String modelVersion,
+            Instant generatedAt
     ) {
     }
 
