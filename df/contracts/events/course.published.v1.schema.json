@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise.local/df/contracts/events/course.published.v1.schema.json",
+  "title": "Course Published Event Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "orgId",
+    "courseId",
+    "coursePublishedAt",
+    "publishingState"
+  ],
+  "properties": {
+    "orgId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "courseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "courseSlug": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "coursePublishedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publishingState": {
+      "type": "string",
+      "enum": ["PUBLISHED"]
+    },
+    "catalogVisibility": {
+      "type": ["string", "null"],
+      "enum": ["PUBLIC", "PRIVATE", "ORG_ONLY", null]
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "maxProperties": 30
+    }
+  }
+}

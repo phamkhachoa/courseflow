@@ -1,0 +1,196 @@
+contractVersion: 1
+dataProduct:
+  name: gold.quality_sla_daily
+  layer: GOLD
+  domain: enterprise-reporting
+  product: enterprise-data-foundation
+  domainOwner: enterprise-reporting-council
+  ownerTeam: data-platform
+  businessOwner: enterprise-data-platform-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Daily quality, freshness, release and SLA status for governed enterprise data products.
+  status: DRAFT
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: gold.data_product_inventory
+      type: control_tower_table
+      contractVersion: 1
+    - name: gold.contract_compliance_daily
+      type: control_tower_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: generated_at
+
+schema:
+  columns:
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: report_date
+      type: date
+      nullable: false
+      pii: false
+      description: Reporting date for quality status.
+    - name: data_product_name
+      type: string
+      nullable: false
+      pii: false
+      description: Governed data product name.
+    - name: layer
+      type: string
+      nullable: false
+      pii: false
+      description: Medallion layer.
+    - name: freshness_slo_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Contracted freshness SLO.
+    - name: observed_age_minutes
+      type: int
+      nullable: true
+      pii: false
+      description: Observed age from latest evidence when available.
+    - name: freshness_status
+      type: string
+      nullable: false
+      pii: false
+      description: Freshness status for the latest evidence.
+      allowedValues: [GREEN, AMBER, RED, UNKNOWN]
+    - name: ingestion_lag_minutes
+      type: int
+      nullable: true
+      pii: false
+      description: Latest ingestion lag in minutes when available.
+    - name: ingestion_lag_status
+      type: string
+      nullable: false
+      pii: false
+      description: Ingestion lag status.
+      allowedValues: [GREEN, AMBER, RED, UNKNOWN]
+    - name: quality_check_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of declared quality checks.
+    - name: quality_failed_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of failed quality gates or checks.
+    - name: quarantine_row_count
+      type: int
+      nullable: false
+      pii: false
+      description: Quarantine row count from upstream evidence when available.
+    - name: output_row_count
+      type: int
+      nullable: true
+      pii: false
+      description: Output row count from latest release or pipeline evidence.
+    - name: output_hash
+      type: string
+      nullable: true
+      pii: false
+      description: Output content hash from latest release or pipeline evidence.
+    - name: quality_profile_id
+      type: string
+      nullable: true
+      pii: false
+      description: Attached P0 quality profile when available.
+    - name: release_evidence_passed
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether latest release evidence passed.
+    - name: release_id
+      type: string
+      nullable: true
+      pii: false
+      description: Latest release id when attached.
+    - name: release_gate_status
+      type: string
+      nullable: false
+      pii: false
+      description: Aggregated release gate status.
+      allowedValues: [PASSED, FAILED, MISSING]
+    - name: runtime_lineage_present
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether runtime lineage evidence exists.
+    - name: sla_status
+      type: string
+      nullable: false
+      pii: false
+      description: SLA status for the data product.
+      allowedValues: [GREEN, AMBER, RED, UNKNOWN]
+    - name: incident_id
+      type: string
+      nullable: true
+      pii: false
+      description: Incident id opened for RED status when applicable.
+    - name: assignee
+      type: string
+      nullable: true
+      pii: false
+      description: Current operator or owner assigned to the breach.
+    - name: sla_age_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Age of the current SLA breach in minutes.
+    - name: generated_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the quality snapshot was generated.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: quality_product_not_null
+      type: not_null
+      column: data_product_name
+    - name: quality_key_unique
+      type: unique
+      columns: [org_id, report_date, data_product_name]
+    - name: sla_status_allowed
+      type: accepted_values
+      column: sla_status
+      values: [GREEN, AMBER, RED, UNKNOWN]
+    - name: release_gate_status_allowed
+      type: accepted_values
+      column: release_gate_status
+      values: [PASSED, FAILED, MISSING]
+    - name: quality_snapshot_freshness
+      type: freshness
+      column: generated_at
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: false
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: false
+  subjectKeys: []
+  erasureMode: NONE
+  legalHoldPolicy: none
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [BI, Compliance, OperationalService]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ComplianceConsumer, ExecutiveConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

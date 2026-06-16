@@ -1,0 +1,90 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+personas:
+  - id: DataPlatformOperator
+    name: Data Platform Operator
+    status: active
+    owner: data-platform-security
+    category: platform
+    description: Platform engineering persona responsible for operating ingestion, processing, serving and recovery workflows.
+    allowedLayers: [BRONZE, SILVER, GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    approvalRequired: true
+    defaultAccessModes: [read, operate]
+
+  - id: DomainDataOwner
+    name: Domain Data Owner
+    status: active
+    owner: data-governance-office
+    category: domain-owner
+    description: Accountable owner for domain data products, access decisions and stewardship outcomes.
+    allowedLayers: [BRONZE, SILVER, GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    approvalRequired: true
+    defaultAccessModes: [read, approve]
+
+  - id: ApprovedBIConsumer
+    name: Approved BI Consumer
+    status: active
+    owner: enterprise-reporting
+    category: consumer
+    description: Approved analytics consumer accessing governed Silver and Gold datasets through catalog-managed workflows.
+    allowedLayers: [SILVER, GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    approvalRequired: true
+    defaultAccessModes: [read]
+
+  - id: ApprovedMLConsumer
+    name: Approved ML Consumer
+    status: active
+    owner: ml-ai-platform
+    category: consumer
+    description: Approved ML feature, training or inference consumer accessing governed datasets through declared contracts.
+    allowedLayers: [SILVER, GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    approvalRequired: true
+    defaultAccessModes: [read]
+
+  - id: ComplianceConsumer
+    name: Compliance Consumer
+    status: active
+    owner: compliance-office
+    category: compliance
+    description: Compliance and audit persona requiring governed access to regulated reporting datasets.
+    allowedLayers: [SILVER, GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    approvalRequired: true
+    defaultAccessModes: [read, audit]
+
+  - id: ExecutiveConsumer
+    name: Executive Consumer
+    status: active
+    owner: enterprise-reporting
+    category: executive
+    description: Executive reporting persona consuming certified aggregate datasets and dashboards.
+    allowedLayers: [GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL]
+    approvalRequired: true
+    defaultAccessModes: [read]
+
+  - id: ProductAnalyst
+    name: Product Analyst
+    status: active
+    owner: product-analytics
+    category: consumer
+    description: Product analytics persona consuming curated product and behavior datasets with approved purpose.
+    allowedLayers: [SILVER, GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    approvalRequired: true
+    defaultAccessModes: [read]
+
+  - id: RiskOperator
+    name: Risk Operator
+    status: active
+    owner: risk-compliance
+    category: risk
+    description: Risk operations persona consuming governed risk and exception datasets for investigation workflows.
+    allowedLayers: [SILVER, GOLD]
+    allowedClassifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    approvalRequired: true
+    defaultAccessModes: [read, audit]

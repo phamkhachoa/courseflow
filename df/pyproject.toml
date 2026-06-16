@@ -1,0 +1,16 @@
+[project]
+name = "enterprise-df"
+version = "0.1.0"
+description = "Enterprise data platform contracts, validation tooling and local pipeline skeletons."
+requires-python = ">=3.11"
+dependencies = [
+  "cryptography>=42.0",
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+enterprise-df = "enterprise_df.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,63 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+policies:
+  - id: platform_engineer_only
+    name: Platform Engineer Only
+    policyVersion: 1
+    status: active
+    severity: P0
+    owner: data-platform-security
+    effectiveFrom: "2026-01-01"
+    description: Restricts raw or operational platform datasets to platform operators and domain data owners.
+    appliesTo:
+      layers:
+        - BRONZE
+      classifications:
+        - INTERNAL
+        - CONFIDENTIAL
+        - PII
+        - SENSITIVE
+    allowedPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+    requiredColumns: []
+    controls:
+      requireTenantIsolation: true
+      requireAuditLogging: true
+      denyDirectIdentifiers: true
+      requireConsumerContract: true
+      requirePiiTagging: true
+
+  - id: row_level_org_isolation
+    name: Row Level Organization Isolation
+    policyVersion: 1
+    status: active
+    severity: P0
+    owner: data-platform-security
+    effectiveFrom: "2026-01-01"
+    description: Enforces organization-scoped row-level isolation for governed Silver and Gold serving datasets.
+    appliesTo:
+      layers:
+        - SILVER
+        - GOLD
+      classifications:
+        - CONFIDENTIAL
+        - PII
+        - SENSITIVE
+    allowedPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+      - ProductAnalyst
+      - RiskOperator
+    requiredColumns:
+      - org_id
+    controls:
+      requireTenantIsolation: true
+      requireAuditLogging: true
+      denyDirectIdentifiers: true
+      requireConsumerContract: true
+      requirePiiTagging: true

@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise.local/df/contracts/events/finance.billing_transaction.settled.v1.schema.json",
+  "title": "Finance Billing Transaction Settled Event Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventType",
+    "orgId",
+    "accountId",
+    "customerIdHash",
+    "sourceProductId",
+    "billingTransactionId",
+    "invoiceId",
+    "paymentId",
+    "currency",
+    "grossAmountCents",
+    "discountAmountCents",
+    "taxAmountCents",
+    "refundAmountCents",
+    "netRevenueCents",
+    "recognizedRevenueCents",
+    "deferredRevenueCents",
+    "transactionStatus",
+    "revenueRecognitionStatus",
+    "accountingDate",
+    "settledAt",
+    "sourceSystemRecordIdHash"
+  ],
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "enum": ["BILLING_TRANSACTION_SETTLED"]
+    },
+    "orgId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "accountId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "customerIdHash": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "sourceProductId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "billingTransactionId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 120
+    },
+    "invoiceId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "paymentId": {
+      "type": ["string", "null"],
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "subscriptionId": {
+      "type": ["string", "null"],
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "contractId": {
+      "type": ["string", "null"],
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "orderId": {
+      "type": ["string", "null"],
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "productLine": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 80
+    },
+    "offeringId": {
+      "type": ["string", "null"],
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "skuId": {
+      "type": ["string", "null"],
+      "minLength": 3,
+      "maxLength": 120
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "grossAmountCents": {
+      "type": "integer"
+    },
+    "discountAmountCents": {
+      "type": "integer"
+    },
+    "taxAmountCents": {
+      "type": "integer"
+    },
+    "refundAmountCents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "netRevenueCents": {
+      "type": "integer"
+    },
+    "recognizedRevenueCents": {
+      "type": "integer"
+    },
+    "deferredRevenueCents": {
+      "type": "integer"
+    },
+    "transactionStatus": {
+      "type": "string",
+      "enum": ["SETTLED", "PENDING", "FAILED", "REFUNDED", "CHARGEBACK", "REVERSED"]
+    },
+    "revenueRecognitionStatus": {
+      "type": "string",
+      "enum": ["RECOGNIZED", "DEFERRED", "PARTIAL", "REVERSED", "PENDING"]
+    },
+    "billingPeriodStart": {
+      "type": ["string", "null"],
+      "format": "date"
+    },
+    "billingPeriodEnd": {
+      "type": ["string", "null"],
+      "format": "date"
+    },
+    "accountingDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "settledAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sourceSystemRecordIdHash": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "reasonCode": {
+      "type": ["string", "null"],
+      "maxLength": 120
+    },
+    "correlationTags": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "maxProperties": 30
+    }
+  }
+}

@@ -1,0 +1,40 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+owner: data-platform-team
+description: >
+  Source activation overlay for production-like and local readiness decisions. The static source
+  registry remains desired state; this ledger records evidence-backed runtime activation decisions.
+activations:
+  - activationId: activate-billing-platform-source-staging-20260118
+    sourceId: billing-platform-billing-transaction-settled-outbox
+    environment: staging
+    activationState: active
+    requestedBy: billing-platform-sa
+    approvedBy: data-platform-lead
+    changeRequestId: onboard_billing_platform_source_readiness
+    activatedAt: "2026-01-18T10:30:00Z"
+    expiresAt: "2026-07-18T10:30:00Z"
+    readinessId: 0c4d65d37a0a052748550f29e460e985351f2a0bf5fbcc99a3b9f0317d70cb7a
+    readinessReportUri: evidence://source-readiness/billing-platform/staging/source-readiness.json
+    readinessReportHash: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    evidenceBundleUri: evidence://source-readiness/billing-platform/staging/source-readiness-bundle.json
+    evidenceBundleHash: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    sourceRegistryHash: sha256:afd7e70b5dff7e68f583ad3f157a694dcabf98bea6bfaac7fce919fbe5675444
+    canonicalTopic: finance.billing_transaction.settled.v1
+    bronzeTarget: bronze.events_billing_transaction_settled
+    schemaSubject: finance.billing_transaction.settled.v1-value
+    mode: direct_canonical
+    gateBadges:
+      schema: passed
+      bronzeReplay: passed
+      offsetLedger: passed
+      bridge: not_required
+      privacyTenant: passed
+      catalogLineage: passed
+      changeControl: passed
+      runtimeSlo: pending_runtime
+    impactedUseCases:
+      - enterprise-revenue-intelligence
+      - finance-benefit-reconciliation
+      - enterprise-kpi-scorecard
+      - customer-account-health

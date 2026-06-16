@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CourseFlow · Enterprise Data Platform Blueprint</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --ink:#e8ecf3; --muted:#9aa4b2;
+    --line:#2a2f3a; --accent:#5b9dff; --accent2:#7c5cff; --green:#3ecf8e; --amber:#f5b454;
+    --red:#ff6b6b; --chip:#232834; --bronze:#cd7f4d; --silver:#aab4c2; --gold:#f5c451;
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;font-size:16px}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  header.hero{padding:64px 0 40px;border-bottom:1px solid var(--line);
+    background:radial-gradient(1200px 400px at 15% -10%,rgba(91,157,255,.18),transparent 60%),
+               radial-gradient(900px 360px at 90% 0%,rgba(124,92,255,.16),transparent 55%);}
+  .kicker{font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  h1{font-size:42px;line-height:1.12;margin:0 0 14px;font-weight:750;letter-spacing:-.02em}
+  h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:18px;max-width:820px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+  .chip{background:var(--chip);border:1px solid var(--line);color:var(--muted);padding:6px 12px;border-radius:999px;font-size:13px;font-family:var(--mono)}
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(15,17,21,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:12px 0}
+  nav.toc .wrap{display:flex;gap:6px;flex-wrap:wrap}
+  nav.toc a{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px;white-space:nowrap}
+  nav.toc a:hover{background:var(--panel2);color:var(--ink)}
+  section{padding:52px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:28px;margin:0 0 6px;letter-spacing:-.01em;font-weight:720}
+  h2 .num{font-family:var(--mono);color:var(--accent);font-size:18px;margin-right:12px}
+  .lead{color:var(--muted);font-size:17px;margin:0 0 28px;max-width:860px}
+  h3{font-size:20px;margin:34px 0 10px;font-weight:680}
+  h4{font-size:16px;margin:22px 0 8px;color:var(--ink);font-weight:650}
+  p{margin:0 0 14px}
+  .muted{color:var(--muted)}
+  code{font-family:var(--mono);background:var(--panel2);padding:2px 6px;border-radius:5px;font-size:.86em;color:#cfe0ff}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin:18px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  @media(max-width:900px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .card h4{margin-top:0}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:6px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+  .tag.good{background:rgba(62,207,142,.14);color:var(--green);border:1px solid rgba(62,207,142,.3)}
+  .tag.warn{background:rgba(245,180,84,.14);color:var(--amber);border:1px solid rgba(245,180,84,.3)}
+  .tag.risk{background:rgba(255,107,107,.14);color:var(--red);border:1px solid rgba(255,107,107,.3)}
+  .tag.info{background:rgba(91,157,255,.14);color:var(--accent);border:1px solid rgba(91,157,255,.3)}
+  .tag.have{background:rgba(124,92,255,.14);color:#b9a6ff;border:1px solid rgba(124,92,255,.3)}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+  tr:hover td{background:rgba(255,255,255,.015)}
+  .ascii{background:#0b0d12;border:1px solid var(--line);border-radius:12px;padding:20px;overflow:auto;font-family:var(--mono);font-size:12px;line-height:1.5;color:#bcc8da;white-space:pre;margin:18px 0}
+  pre{background:#0b0d12;border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow:auto;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:#d3def0;margin:16px 0}
+  pre .c{color:#6b7686}.pre .k{color:#7c9eff}.s{color:#7ee0b0}
+  .callout{border-left:3px solid var(--accent);background:var(--panel2);border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0}
+  .callout.warn{border-left-color:var(--amber)}
+  .callout.good{border-left-color:var(--green)}
+  .callout.key{border-left-color:var(--accent2);background:linear-gradient(90deg,rgba(124,92,255,.1),var(--panel2))}
+  ul,ol{margin:6px 0 16px;padding-left:22px}
+  li{margin:6px 0}
+  .layer{border-radius:12px;padding:16px 18px;margin:10px 0;border:1px solid var(--line)}
+  .layer h4{margin:0 0 6px;display:flex;align-items:center;gap:10px}
+  .layer .ico{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;background:var(--chip);color:var(--accent)}
+  .medallion{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+  @media(max-width:900px){.medallion{grid-template-columns:1fr}}
+  .med{border-radius:12px;padding:18px;border:1px solid var(--line)}
+  .med.b{border-top:3px solid var(--bronze)}
+  .med.s{border-top:3px solid var(--silver)}
+  .med.g{border-top:3px solid var(--gold)}
+  .med b.lbl{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+  .med.b b.lbl{color:var(--bronze)}.med.s b.lbl{color:var(--silver)}.med.g b.lbl{color:var(--gold)}
+  .pill{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:2px 8px}
+  .phase{display:flex;gap:16px;position:relative;padding-bottom:22px}
+  .phase:not(:last-child)::before{content:"";position:absolute;left:17px;top:38px;bottom:-4px;width:2px;background:var(--line)}
+  .phase .dot{flex:0 0 36px;height:36px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;z-index:1}
+  .phase .body{flex:1;padding-top:5px}
+  footer{padding:40px 0 80px;color:var(--muted);font-size:14px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:14px 0}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dotk{width:10px;height:10px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Solutions Architecture · Data Platform Blueprint</div>
+    <h1>Chuẩn Enterprise cho <span>Data Platform</span><br>của một hệ Backend microservices lớn</h1>
+    <p class="sub">Thiết kế tham chiếu (reference architecture) cho nền tảng dữ liệu của CourseFlow: ~28 microservices, mỗi service một database riêng, đã có Kafka + outbox-relay + Prometheus. Bao trùm ingestion → lakehouse → xử lý → phục vụ → quản trị → bảo mật → vận hành, kèm lộ trình áp dụng theo từng giai đoạn.</p>
+    <div class="meta-row">
+      <span class="chip">Lakehouse · Medallion</span>
+      <span class="chip">CDC + Streaming</span>
+      <span class="chip">Governance · Lineage · PII</span>
+      <span class="chip">Feature Store cho ML</span>
+      <span class="chip">DataOps · Observability</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#principles">Nguyên tắc</a>
+    <a href="#arch">1·Kiến trúc</a>
+    <a href="#sources">2·Sources</a>
+    <a href="#ingest">3·Ingestion</a>
+    <a href="#lake">4·Lakehouse</a>
+    <a href="#process">5·Processing</a>
+    <a href="#serve">6·Serving</a>
+    <a href="#orch">7·Orchestration</a>
+    <a href="#gov">8·Governance</a>
+    <a href="#sec">9·Security</a>
+    <a href="#quality">10·Quality</a>
+    <a href="#dataops">11·DataOps</a>
+    <a href="#stack">12·Tech stack</a>
+    <a href="#flow">13·Ví dụ luồng</a>
+    <a href="#roadmap">14·Lộ trình</a>
+    <a href="#anti">15·Anti-patterns</a>
+  </div>
+</nav>
+
+<!-- PRINCIPLES -->
+<section id="principles">
+  <div class="wrap">
+    <h2><span class="num">★</span>Triết lý &amp; nguyên tắc thiết kế</h2>
+    <p class="lead">Một data platform enterprise không phải “một cái database to”. Nó là một <b>hệ thống sản phẩm dữ liệu</b> có ranh giới, hợp đồng, chất lượng và quản trị. Mọi quyết định dưới đây xoay quanh 8 nguyên tắc.</p>
+    <div class="grid4">
+      <div class="card"><span class="tag info">P1</span><h4>Tách OLTP ⟂ OLAP</h4><p class="muted">Tuyệt đối không chạy phân tích/ML lên DB đang phục vụ người dùng. Dữ liệu được sao chép sang nền phân tích.</p></div>
+      <div class="card"><span class="tag info">P2</span><h4>Data contract</h4><p class="muted">Producer cam kết schema có version. Đổi schema phá vỡ contract bị chặn ở CI, không âm thầm làm hỏng downstream.</p></div>
+      <div class="card"><span class="tag info">P3</span><h4>Immutable + time-travel</h4><p class="muted">Dữ liệu thô là append-only, bất biến, chụp được theo mốc thời gian để tái lập (reproducibility).</p></div>
+      <div class="card"><span class="tag info">P4</span><h4>Domain ownership</h4><p class="muted">Mỗi domain sở hữu “data product” của mình (tư duy Data Mesh), platform cung cấp hạ tầng dùng chung.</p></div>
+      <div class="card"><span class="tag info">P5</span><h4>Governance-by-default</h4><p class="muted">Catalog, lineage, phân loại PII, retention là bắt buộc khi onboard dataset — không phải làm sau.</p></div>
+      <div class="card"><span class="tag info">P6</span><h4>Quality như code</h4><p class="muted">Kiểm thử dữ liệu (freshness, volume, schema, distribution) tự động trong pipeline, fail → chặn + cảnh báo.</p></div>
+      <div class="card"><span class="tag info">P7</span><h4>Idempotent &amp; exactly-once</h4><p class="muted">Mọi pipeline chạy lại an toàn; khử trùng lặp dựa trên khóa nghiệp vụ + offset.</p></div>
+      <div class="card"><span class="tag info">P8</span><h4>Cost &amp; FinOps</h4><p class="muted">Partition, tiered storage, autoscaling compute, tách storage/compute để chi phí co giãn theo nhu cầu.</p></div>
+    </div>
+    <div class="callout key">
+      <b>CourseFlow đang có sẵn nền rất tốt để xây platform này:</b> database-per-service ✔, <b>Kafka</b> ✔, <b>outbox-relay</b> (transactional outbox — chìa khóa để bắt sự kiện đáng tin cậy) ✔, Prometheus/Grafana ✔. Blueprint dưới đây tận dụng đúng những thứ này thay vì dựng lại từ đầu.
+    </div>
+  </div>
+</section>
+
+<!-- 1 ARCHITECTURE -->
+<section id="arch">
+  <div class="wrap">
+    <h2><span class="num">01</span>Kiến trúc tổng thể (6 lớp)</h2>
+    <p class="lead">Mô hình tham chiếu 6 lớp + 3 trục cắt ngang (orchestration, governance, observability). Đây là bộ xương chuẩn của hầu hết data platform hiện đại.</p>
+
+    <div class="ascii">
+ ┌─ SOURCES ──────────┐  ┌─ INGESTION ─────────┐  ┌─ STORAGE: LAKEHOUSE ──────────────────────┐  ┌─ SERVING ─────────┐  ┌─ CONSUMPTION ──┐
+ │ 28× service Postgres│  │ CDC (Debezium)      │  │  Object Storage (S3/GCS/MinIO)            │  │ Warehouse (OLAP)  │  │ BI dashboards   │
+ │  (OLTP, per-service)│─▶│  qua outbox-relay   │─▶│  + table format (Iceberg/Delta)           │─▶│  ClickHouse/      │─▶│ (Superset/      │
+ │ App clickstream     │  │ Kafka (event log)   │  │                                            │  │  BigQuery         │  │  Looker)        │
+ │  (impression/click) │─▶│  + Schema Registry  │  │  ┌────────┐  ┌────────┐  ┌────────────┐   │  ├───────────────────┤  ├─────────────────┤
+ │ External (SaaS,     │  │ Batch/ELT           │  │  │ BRONZE │─▶│ SILVER │─▶│   GOLD     │   │  │ Feature Store     │  │ ML training     │
+ │  payment, email)    │─▶│  (Airbyte/Fivetran) │  │  │ raw    │  │cleansed│  │ curated    │   │─▶│  (offline+online) │─▶│ (recommendation,│
+ └────────────────────┘  └─────────────────────┘  │  └────────┘  └────────┘  └────────────┘   │  ├───────────────────┤  │  risk, search)  │
+                                                    │         ▲ PROCESSING ▲                     │  │ Reverse ETL       │  ├─────────────────┤
+                                                    │   Spark / dbt (batch)                      │─▶│  → đẩy lại vào apps│─▶│ Data apps / API │
+                                                    │   Flink / Kafka Streams (stream)           │  └───────────────────┘  └─────────────────┘
+                                                    └────────────────────────────────────────────┘
+ ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+   ORCHESTRATION:  Airflow / Dagster (lịch hóa, phụ thuộc, retry, backfill)
+   GOVERNANCE:     Data Catalog + Lineage (DataHub) · Data Contracts · PII classification · Retention · Access control
+   OBSERVABILITY:  Data quality (Great Expectations/Soda) · Freshness/Volume/Schema SLO · Cost monitoring
+    </div>
+
+    <div class="grid3">
+      <div class="card"><span class="tag good">Lambda → Kappa</span><h4>Batch + Stream hợp nhất</h4><p class="muted">Bắt đầu kiểu <b>Lambda</b> (batch là chính, stream cho real-time). Lakehouse + Flink cho phép tiến tới <b>Kappa</b> (stream-first) khi cần độ trễ thấp, dùng chung một bộ logic.</p></div>
+      <div class="card"><span class="tag info">Centralized → Mesh</span><h4>Quản trị tập trung, sở hữu phân tán</h4><p class="muted">Platform team sở hữu hạ tầng &amp; chuẩn; mỗi domain (enrollment, gradebook…) sở hữu data product của mình. Tránh “data team là nút cổ chai”.</p></div>
+      <div class="card"><span class="tag info">Tách storage/compute</span><h4>Nền tảng co giãn</h4><p class="muted">Dữ liệu nằm trên object storage rẻ &amp; vô hạn; compute (Spark/warehouse) bật-tắt theo nhu cầu. Đây là khác biệt cốt lõi giữa lakehouse hiện đại và data warehouse cũ.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 SOURCES -->
+<section id="sources">
+  <div class="wrap">
+    <h2><span class="num">02</span>Lớp Sources — nguồn dữ liệu</h2>
+    <p class="lead">Phân loại nguồn để chọn đúng cách ingest. Mỗi loại có đặc tính độ trễ &amp; khối lượng khác nhau.</p>
+    <table>
+      <thead><tr><th>Loại nguồn</th><th>Ví dụ ở CourseFlow</th><th>Cách bắt dữ liệu</th><th>Độ trễ mục tiêu</th></tr></thead>
+      <tbody>
+        <tr><td><b>OLTP state</b> (trạng thái nghiệp vụ)</td><td>enrollment, gradebook, course, user-management… (Postgres mỗi service)</td><td><b>CDC</b> (change data capture) qua Debezium / hoặc outbox</td><td>giây → phút</td></tr>
+        <tr><td><b>Domain events</b> (sự kiện nghiệp vụ)</td><td><code>EnrollmentCompleted</code>, <code>QuizSubmitted</code> qua outbox-relay → Kafka</td><td><b>Event streaming</b> (đã có sẵn)</td><td>giây</td></tr>
+        <tr><td><b>Clickstream</b> (hành vi UI)</td><td>recommendation impression/click, page view, video progress</td><td>SDK/collector → Kafka</td><td>giây</td></tr>
+        <tr><td><b>External / SaaS</b></td><td>payment gateway, email/SMS, log nhà cung cấp</td><td><b>Batch ELT</b> (Airbyte/Fivetran) qua API</td><td>giờ → ngày</td></tr>
+      </tbody>
+    </table>
+    <div class="callout good">
+      <b>Tận dụng outbox-relay:</b> bạn đã có pattern <b>transactional outbox</b> — service ghi sự kiện vào bảng outbox trong cùng transaction nghiệp vụ, relay đẩy lên Kafka. Đây là cách <b>đáng tin cậy nhất</b> để phát sự kiện (không mất, không lệch với state). Platform nên coi outbox→Kafka là kênh ingest chính cho domain events, và dùng CDC cho các bảng trạng thái chưa có outbox.
+    </div>
+    <h3>CDC vs Outbox — chọn cái nào?</h3>
+    <div class="grid2">
+      <div class="card"><span class="tag have">Đã có</span><h4>Outbox (event-carried)</h4><p class="muted">Dùng khi cần <b>ngữ nghĩa nghiệp vụ rõ ràng</b> (“một enrollment đã hoàn tất”). Producer chủ động định nghĩa event. Sạch, có chủ đích.</p></div>
+      <div class="card"><span class="tag info">Bổ sung</span><h4>CDC (Debezium)</h4><p class="muted">Dùng để <b>nhân bản nguyên trạng bảng</b> mà không cần sửa code service. Lý tưởng cho onboard nhanh hàng loạt bảng vào Bronze. Bắt cả INSERT/UPDATE/DELETE.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 INGESTION -->
+<section id="ingest">
+  <div class="wrap">
+    <h2><span class="num">03</span>Lớp Ingestion — đưa dữ liệu vào</h2>
+    <p class="lead">Kafka là xương sống ingestion. Mọi sự kiện đi qua một <b>schema registry</b> để cưỡng chế data contract.</p>
+    <div class="grid3">
+      <div class="card"><span class="tag have">Đã có</span><h4>Kafka — event backbone</h4><p class="muted">Log bất biến, append-only, là <b>single source of truth</b> cho sự kiện. Một topic / loại sự kiện, partition theo khóa (vd <code>courseId</code>/<code>userId</code>) để giữ thứ tự.</p></div>
+      <div class="card"><span class="tag info">Cần thêm</span><h4>Schema Registry</h4><p class="muted">Avro/Protobuf + Confluent Schema Registry. Cưỡng chế <b>tương thích tiến/lùi</b>: producer không thể đẩy schema phá vỡ consumer. Đây là “hợp đồng được biên dịch”.</p></div>
+      <div class="card"><span class="tag info">Cần thêm</span><h4>Sink connectors</h4><p class="muted">Kafka Connect đổ topic xuống Bronze (object storage) tự động, đúng-một-lần, partition theo ngày. Không viết tay consumer cho mỗi topic.</p></div>
+    </div>
+    <h3>Quy ước bắt buộc cho mọi event</h3>
+    <pre><span class="c">// Envelope chuẩn cho mọi message trên Kafka (data contract tối thiểu)</span>
+{
+  "eventId":      "uuid",            <span class="c">// idempotency key</span>
+  "eventType":    "EnrollmentCompleted",
+  "schemaVersion":"v3",              <span class="c">// version hóa contract</span>
+  "occurredAt":   "2026-06-15T...Z", <span class="c">// event time (KHÔNG phải lúc xử lý)</span>
+  "producer":     "enrollment-service",
+  "partitionKey": "courseId|userId",
+  "piiLevel":     "pseudonymized",   <span class="c">// none | pseudonymized | sensitive</span>
+  "payload":      { ... }            <span class="c">// dữ liệu nghiệp vụ</span>
+}</pre>
+    <div class="callout warn">
+      <b>Hai cạm bẫy kinh điển ở ingestion:</b> (1) <b>event-time vs processing-time</b> — luôn xử lý theo <code>occurredAt</code>, không theo lúc nhận, nếu không số liệu theo ngày sẽ sai khi có trễ. (2) <b>late/out-of-order data</b> — thiết kế watermark &amp; cho phép cập nhật muộn (chính là lý do cần table format ACID ở Bronze/Silver).
+    </div>
+  </div>
+</section>
+
+<!-- 4 LAKEHOUSE -->
+<section id="lake">
+  <div class="wrap">
+    <h2><span class="num">04</span>Lớp Storage — Lakehouse &amp; kiến trúc Medallion</h2>
+    <p class="lead">Lưu trên <b>object storage</b> (rẻ, vô hạn) nhưng có <b>table format ACID</b> (Apache Iceberg / Delta Lake / Hudi) để được giao dịch, schema evolution và <b>time-travel</b> như database. Dữ liệu tinh luyện qua 3 tầng Medallion.</p>
+
+    <div class="medallion">
+      <div class="med b">
+        <b class="lbl">◆ Bronze · Raw</b>
+        <h4>Nguyên trạng, bất biến</h4>
+        <p class="muted">Bản sao y hệt nguồn (CDC/event), append-only, không sửa. Giữ cả bản ghi “xấu”. Partition theo <code>dt</code> (ngày). Là “bảo hiểm” — có thể dựng lại mọi thứ từ đây.</p>
+        <span class="pill">format: Iceberg/Delta</span> <span class="pill">retention: dài</span>
+      </div>
+      <div class="med s">
+        <b class="lbl">◆ Silver · Cleansed</b>
+        <h4>Đã làm sạch &amp; chuẩn hóa</h4>
+        <p class="muted">Khử trùng lặp, ép kiểu, chuẩn hóa, <b>hash/mask PII</b>, join nhẹ, áp data quality checks. Một “bảng sự thật” sạch cho mỗi thực thể (enrollment, learner_activity…).</p>
+        <span class="pill">deduped</span> <span class="pill">PII-handled</span> <span class="pill">validated</span>
+      </div>
+      <div class="med g">
+        <b class="lbl">◆ Gold · Curated</b>
+        <h4>Mart sẵn dùng cho nghiệp vụ</h4>
+        <p class="muted">Mô hình hóa theo mục đích: bảng tổng hợp cho BI, <b>training dataset</b> cho ML, KPI marts. Tối ưu đọc. Đây là thứ downstream được phép tiêu thụ.</p>
+        <span class="pill">BI marts</span> <span class="pill">ML datasets</span> <span class="pill">aggregations</span>
+      </div>
+    </div>
+
+    <div class="callout key">
+      <b>Vì sao Medallion quan trọng cho ML của bạn:</b> training dataset cho <code>recommendation-ml</code> trở thành một bảng <b>Gold</b> được phiên bản hóa (vd <code>gold.recsys_interactions</code> partition theo ngày). Train lại model bất kỳ lúc nào bằng cách trỏ vào <b>snapshot Gold tại một mốc thời gian</b> → đúng nguyên tắc reproducibility. Không còn cảnh nhồi 250k dòng qua HTTP body.
+    </div>
+
+    <h3>Vì sao cần table format (Iceberg/Delta) chứ không chỉ file Parquet?</h3>
+    <table>
+      <thead><tr><th>Khả năng</th><th>Parquet trần</th><th>Iceberg / Delta / Hudi</th></tr></thead>
+      <tbody>
+        <tr><td>Giao dịch ACID trên object storage</td><td>❌</td><td>✅</td></tr>
+        <tr><td>Schema evolution an toàn</td><td>❌ (vỡ khi đổi cột)</td><td>✅</td></tr>
+        <tr><td>Time-travel / query theo snapshot cũ</td><td>❌</td><td>✅</td></tr>
+        <tr><td>UPSERT / DELETE (vd GDPR xóa user)</td><td>❌ (phải ghi đè cả file)</td><td>✅ (merge-on-read)</td></tr>
+        <tr><td>Đọc đồng thời khi đang ghi</td><td>⚠️ race</td><td>✅ snapshot isolation</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 5 PROCESSING -->
+<section id="process">
+  <div class="wrap">
+    <h2><span class="num">05</span>Lớp Processing — biến đổi dữ liệu</h2>
+    <p class="lead">Hai chế độ, dùng chung định nghĩa nghiệp vụ càng nhiều càng tốt.</p>
+    <div class="grid2">
+      <div class="card"><span class="tag info">Batch</span><h4>Spark + dbt</h4><p class="muted"><b>Spark</b> cho biến đổi nặng Bronze→Silver (dedup, join lớn). <b>dbt</b> cho mô hình hóa Silver→Gold bằng SQL có version, test, lineage, tài liệu tự sinh. dbt là “chuẩn de-facto” cho transformation layer.</p></div>
+      <div class="card"><span class="tag info">Stream</span><h4>Flink / Kafka Streams</h4><p class="muted">Cho tính toán real-time: feature online (vd “số khóa user xem trong 1h”), phát hiện bất thường, cập nhật read model tức thời. Stateful, có windowing &amp; watermark cho dữ liệu trễ.</p></div>
+    </div>
+    <h3>Nguyên tắc transformation</h3>
+    <ul class="muted">
+      <li><b>ELT, không ETL</b>: nạp thô vào Bronze trước (Load), biến đổi sau (Transform) bằng compute của lakehouse — linh hoạt hơn và tái xử lý được.</li>
+      <li><b>Idempotent + backfill được</b>: mỗi job chạy lại cho cùng partition phải ra cùng kết quả; hỗ trợ chạy bù dữ liệu lịch sử.</li>
+      <li><b>Incremental</b>: chỉ xử lý phần mới (theo <code>dt</code>/offset), không quét lại toàn bộ — tiết kiệm chi phí (P8).</li>
+      <li><b>Transformation là code</b>: nằm trong git, review, test, CI/CD (xem mục DataOps).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 6 SERVING -->
+<section id="serve">
+  <div class="wrap">
+    <h2><span class="num">06</span>Lớp Serving — phục vụ tiêu thụ</h2>
+    <p class="lead">Cùng một dữ liệu Gold được phục vụ qua nhiều “cửa” khác nhau tùy người dùng.</p>
+    <div class="grid3">
+      <div class="card"><span class="tag info">Analytics / BI</span><h4>Warehouse OLAP</h4><p class="muted">ClickHouse / BigQuery / Snowflake để BI &amp; ad-hoc query nhanh trên Gold. Dashboards (Superset/Metabase/Looker) đọc từ đây — <b>không</b> đọc DB nghiệp vụ.</p></div>
+      <div class="card"><span class="tag info">Machine Learning</span><h4>Feature Store</h4><p class="muted"><b>Feast</b>: định nghĩa feature một lần, phục vụ <b>offline</b> (training, từ Gold) &amp; <b>online</b> (inference real-time, từ Redis) — diệt train/serve skew. Đây là cửa ML chuẩn.</p></div>
+      <div class="card"><span class="tag info">Operational</span><h4>Reverse ETL</h4><p class="muted">Đẩy insight đã tính (vd “learner có nguy cơ bỏ học”, “gợi ý khóa”) <b>ngược về</b> các service nghiệp vụ/CRM để dùng trong sản phẩm. Đây chính là cách <code>related_courses</code> read model được nuôi.</p></div>
+    </div>
+    <div class="callout good">
+      <b>recommendation-ml ăn khớp tại đây:</b> training đọc <code>gold.recsys_interactions</code> qua feature store (offline); kết quả model materialize về read model qua reverse ETL (đúng cái analytics-service đang làm). Khi cần cá nhân hóa real-time, feature online (Redis) cấp đặc trưng người dùng cho inference. Toàn bộ vòng đời ML nằm gọn trong platform thay vì chắp vá.
+    </div>
+  </div>
+</section>
+
+<!-- 7 ORCHESTRATION -->
+<section id="orch">
+  <div class="wrap">
+    <h2><span class="num">07</span>Trục Orchestration — điều phối</h2>
+    <p class="lead">Một orchestrator (Airflow hoặc Dagster) biến các bước rời rạc thành pipeline có phụ thuộc, lịch, retry, cảnh báo, backfill.</p>
+    <div class="grid2">
+      <div class="card"><h4>Airflow</h4><p class="muted">Phổ biến nhất, hệ sinh thái lớn, hợp khi đội đã quen. DAG bằng Python, scheduler mạnh.</p></div>
+      <div class="card"><h4>Dagster</h4><p class="muted">Hiện đại hơn, tư duy <b>asset-based</b> (điều phối theo “tài sản dữ liệu” chứ theo task), tích hợp lineage &amp; data quality sẵn. Hợp đội mới làm bài bản từ đầu.</p></div>
+    </div>
+    <p class="muted">Một DAG điển hình: <code>ingest Bronze</code> → <code>dq check</code> → <code>build Silver</code> → <code>dq check</code> → <code>build Gold marts</code> → <code>refresh feature store</code> → <code>trigger ML training</code> → <code>publish metrics</code>. Mỗi mũi tên là một phụ thuộc; lỗi ở giữa → dừng + alert + không publish dữ liệu bẩn.</p>
+  </div>
+</section>
+
+<!-- 8 GOVERNANCE -->
+<section id="gov">
+  <div class="wrap">
+    <h2><span class="num">08</span>Trục Governance — quản trị dữ liệu</h2>
+    <p class="lead">Đây là thứ phân biệt “một đống pipeline” với “một platform enterprise”. Không có governance, data lake biến thành <b>data swamp</b>.</p>
+    <div class="grid2">
+      <div class="card"><span class="tag info">Catalog + Lineage</span><h4>DataHub / OpenMetadata</h4><p class="muted">Mọi dataset được đăng ký: chủ sở hữu, schema, ý nghĩa cột, độ tươi. <b>Lineage</b> tự động: biết một cột Gold sinh ra từ bảng nào, ai dùng nó downstream → đánh giá tác động khi đổi schema.</p></div>
+      <div class="card"><span class="tag info">Data Contracts</span><h4>Hợp đồng producer↔consumer</h4><p class="muted">Schema + SLA (độ tươi, độ đầy đủ) + ngữ nghĩa, được version &amp; kiểm ở CI. Đổi vi phạm contract → build fail. Đây là “API cho dữ liệu”.</p></div>
+      <div class="card"><span class="tag info">Classification</span><h4>Phân loại &amp; PII tagging</h4><p class="muted">Mỗi cột gắn nhãn: public / internal / PII / sensitive. Tự động áp masking, kiểm soát truy cập &amp; retention theo nhãn.</p></div>
+      <div class="card"><span class="tag info">Lifecycle</span><h4>Retention &amp; quyền được quên</h4><p class="muted">Chính sách giữ/xóa theo loại dữ liệu; hỗ trợ <b>GDPR right-to-be-forgotten</b> nhờ DELETE của Iceberg/Delta. Audit mọi truy cập dữ liệu nhạy cảm.</p></div>
+    </div>
+    <div class="callout key">
+      <b>Tư duy Data-as-a-Product:</b> mỗi dataset Gold được coi là một sản phẩm có chủ sở hữu, tài liệu, SLA, version &amp; người dùng — y như một API. Đây là tinh thần cốt lõi của Data Mesh và là thứ giúp platform mở rộng tới hàng trăm dataset mà không loạn.
+    </div>
+  </div>
+</section>
+
+<!-- 9 SECURITY -->
+<section id="sec">
+  <div class="wrap">
+    <h2><span class="num">09</span>Trục Security &amp; Compliance</h2>
+    <p class="lead">Dữ liệu học viên là dữ liệu cá nhân — bảo mật là yêu cầu pháp lý, không phải tùy chọn.</p>
+    <table>
+      <thead><tr><th>Lĩnh vực</th><th>Chuẩn enterprise</th></tr></thead>
+      <tbody>
+        <tr><td><b>Mã hóa</b></td><td>At-rest (object storage + warehouse) &amp; in-transit (TLS) mặc định; quản khóa qua KMS.</td></tr>
+        <tr><td><b>Kiểm soát truy cập</b></td><td>RBAC/ABAC; <b>row-level &amp; column-level security</b> (vd analyst thấy dữ liệu đã mask, data scientist thấy nhiều hơn theo nhu cầu). Least-privilege.</td></tr>
+        <tr><td><b>PII handling</b></td><td>Pseudonymize/hash ngay ở Silver; tách bảng mapping nhạy cảm với kiểm soát riêng; tokenization cho dữ liệu rất nhạy.</td></tr>
+        <tr><td><b>Tenant isolation</b></td><td>CourseFlow đa tổ chức (organization-service) → phân vùng/áp filter theo <code>orgId</code> xuyên suốt để dữ liệu không rò giữa tenant.</td></tr>
+        <tr><td><b>Audit</b></td><td>Ghi log mọi truy cập dataset nhạy cảm; bất biến; phục vụ điều tra &amp; tuân thủ.</td></tr>
+        <tr><td><b>Compliance</b></td><td>GDPR/Nghị định 13 (PDPD VN): mục đích sử dụng, đồng thuận, retention, quyền truy cập/xóa của chủ thể dữ liệu.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout good">
+      <b>recommendation-ml đã làm gương tốt:</b> hash principal 2 lớp, scrub payload, scope tối thiểu, fail-closed. Hãy nâng chính các nguyên tắc đó thành <b>chuẩn áp cho mọi pipeline</b> trên platform: PII bị xử lý trước khi rời miền nguồn, mọi truy cập có scope &amp; audit.
+    </div>
+  </div>
+</section>
+
+<!-- 10 QUALITY -->
+<section id="quality">
+  <div class="wrap">
+    <h2><span class="num">10</span>Trục Data Quality &amp; Observability</h2>
+    <p class="lead">“Bạn không thể tin một con số nếu không giám sát được dữ liệu sinh ra nó.” Quality là test; observability là monitoring — cho dữ liệu.</p>
+    <div class="grid2">
+      <div class="card"><span class="tag info">Quality (test)</span><h4>Great Expectations / Soda / dbt tests</h4><p class="muted">Khẳng định trong pipeline: không null khóa chính, giá trị trong miền hợp lệ, số dòng hợp lý, unique, tham chiếu toàn vẹn. Fail → chặn publish + alert.</p></div>
+      <div class="card"><span class="tag info">Observability (monitor)</span><h4>4 trụ cột giám sát dữ liệu</h4><p class="muted"><b>Freshness</b> (dữ liệu có mới không), <b>Volume</b> (số dòng có bất thường không), <b>Schema</b> (có thay đổi ngoài ý muốn không), <b>Distribution</b> (phân bố có drift không). Đặt SLO cho từng dataset Gold.</p></div>
+    </div>
+    <p class="muted">Tận dụng <b>Prometheus/Grafana đã có</b>: xuất metric pipeline (độ trễ, tỉ lệ lỗi, độ tươi, số bản ghi bị quarantine) và alert như cách bạn đang làm cho recommendation-ml. Bản ghi “xấu” không bị vứt — đẩy vào <b>quarantine/dead-letter</b> để điều tra.</p>
+  </div>
+</section>
+
+<!-- 11 DATAOPS -->
+<section id="dataops">
+  <div class="wrap">
+    <h2><span class="num">11</span>Trục DataOps &amp; môi trường</h2>
+    <p class="lead">Dữ liệu được vận hành như phần mềm: version, test, CI/CD, nhiều môi trường.</p>
+    <div class="grid3">
+      <div class="card"><h4>Version control</h4><p class="muted">Toàn bộ định nghĩa pipeline, dbt model, schema, contract, IaC nằm trong git. Không có “job chỉnh tay trên UI”.</p></div>
+      <div class="card"><h4>CI/CD cho dữ liệu</h4><p class="muted">PR chạy: lint SQL, unit test transform trên dữ liệu mẫu, kiểm tương thích schema/contract, dry-run. Merge → deploy pipeline.</p></div>
+      <div class="card"><h4>Môi trường tách biệt</h4><p class="muted">dev / staging / prod với dữ liệu &amp; quyền riêng. Staging có thể dùng dữ liệu prod đã mask để test thật.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 12 STACK -->
+<section id="stack">
+  <div class="wrap">
+    <h2><span class="num">12</span>Tech stack tham chiếu (lựa chọn, không giáo điều)</h2>
+    <p class="lead">Hai cột: <b>open-source tự vận hành</b> (chủ động, rẻ license, tốn người) và <b>managed/cloud</b> (nhanh, đắt hơn, ít vận hành). Chọn theo quy mô đội &amp; ngân sách.</p>
+    <table>
+      <thead><tr><th>Lớp</th><th>Open-source self-hosted</th><th>Managed / Cloud</th><th>CourseFlow đã có</th></tr></thead>
+      <tbody>
+        <tr><td>Event backbone</td><td>Apache Kafka</td><td>Confluent Cloud / MSK</td><td><span class="tag have">Kafka ✔</span></td></tr>
+        <tr><td>Schema registry</td><td>Apicurio / Confluent SR</td><td>Confluent Cloud</td><td>—</td></tr>
+        <tr><td>CDC</td><td>Debezium</td><td>Fivetran / Striim</td><td><span class="tag have">outbox ✔</span></td></tr>
+        <tr><td>Batch ELT (external)</td><td>Airbyte</td><td>Fivetran</td><td>—</td></tr>
+        <tr><td>Object storage</td><td>MinIO</td><td>S3 / GCS / Azure Blob</td><td>—</td></tr>
+        <tr><td>Table format</td><td>Apache Iceberg / Delta / Hudi</td><td>(đi kèm warehouse)</td><td>—</td></tr>
+        <tr><td>Batch processing</td><td>Apache Spark</td><td>Databricks / EMR / Dataproc</td><td>—</td></tr>
+        <tr><td>Transformation</td><td>dbt-core</td><td>dbt Cloud</td><td>—</td></tr>
+        <tr><td>Stream processing</td><td>Apache Flink / Kafka Streams</td><td>Confluent Flink</td><td>—</td></tr>
+        <tr><td>Warehouse / OLAP</td><td>ClickHouse / Trino + Iceberg</td><td>BigQuery / Snowflake</td><td>—</td></tr>
+        <tr><td>Feature store</td><td>Feast</td><td>Tecton / Vertex FS</td><td>—</td></tr>
+        <tr><td>Orchestration</td><td>Airflow / Dagster</td><td>Astronomer / MWAA</td><td>—</td></tr>
+        <tr><td>Catalog + Lineage</td><td>DataHub / OpenMetadata</td><td>Collibra / Atlan</td><td>—</td></tr>
+        <tr><td>Data quality</td><td>Great Expectations / Soda</td><td>Monte Carlo</td><td>—</td></tr>
+        <tr><td>BI</td><td>Superset / Metabase</td><td>Looker / Tableau</td><td>—</td></tr>
+        <tr><td>Reverse ETL</td><td>(dbt + job tự viết)</td><td>Hightouch / Census</td><td><span class="tag have">analytics materializer ✔</span></td></tr>
+        <tr><td>Observability</td><td>Prometheus + Grafana</td><td>Datadog</td><td><span class="tag have">Prom/Grafana ✔</span></td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      <b>Gợi ý stack khởi đầu gọn cho CourseFlow (open-source, tự host):</b> Kafka (đã có) + Debezium + MinIO + <b>Iceberg</b> + Spark + <b>dbt</b> + Trino/ClickHouse + Dagster + DataHub + Great Expectations + Feast + Superset. Tất cả chạy được trên K8s, không khóa nhà cung cấp.
+    </div>
+  </div>
+</section>
+
+<!-- 13 FLOW -->
+<section id="flow">
+  <div class="wrap">
+    <h2><span class="num">13</span>Ví dụ luồng xuyên suốt: từ 1 enrollment đến gợi ý khóa học</h2>
+    <p class="lead">Ghép mọi lớp lại bằng một luồng thật, cho thấy recommendation-ml chỉ là một “consumer” chuẩn của platform.</p>
+    <div class="ascii">
+ ① enrollment-service: user đăng ký khóa học
+     └─ ghi DB + ghi bảng outbox (cùng 1 transaction)            ◀── nguyên tử, không mất event
+
+ ② outbox-relay → Kafka topic  enrollment.completed.v3            ◀── Sources → Ingestion
+     (qua Schema Registry: contract được cưỡng chế)
+
+ ③ Kafka Connect sink → BRONZE  bronze.enrollment_events          ◀── Ingestion → Bronze (raw, immutable)
+     (Iceberg, partition dt=2026-06-15, exactly-once)
+
+ ④ Spark/dbt → SILVER  silver.learner_activity                   ◀── Processing → Silver
+     (dedup theo eventId, hash studentId, validate, dq checks)
+
+ ⑤ dbt → GOLD  gold.recsys_interactions                          ◀── Processing → Gold (training dataset)
+     (mô hình hóa cho ML, partition theo ngày, có version)
+
+ ⑥ Feast materialize → feature store (offline + online)          ◀── Serving (ML feature gateway)
+
+ ⑦ Dagster DAG trigger → recommendation-ml worker train          ◀── Consumption (ML)
+     đọc snapshot Gold tại mốc T → train → eval → registry → ACTIVE
+
+ ⑧ Reverse ETL → related_courses read model                      ◀── Serving → Operational
+     (đúng cái analytics materializer đang làm)
+
+ ⑨ học viên thấy "khóa liên quan" trên UI                         ◀── giá trị tới người dùng
+
+ ─ Song song: ④⑤ cũng nuôi  gold.kpi_enrollment → Superset dashboard (BI)
+ ─ Governance: mọi bảng ③→⑤ có trong DataHub với lineage ①→⑨, nhãn PII ở studentId
+ ─ Quality: dq check ở ④ và ⑤; freshness SLO cho gold.recsys_interactions
+    </div>
+    <div class="callout good">
+      Để ý: <b>recommendation-ml không còn tự đi gom dữ liệu</b>. Nó nhận một <b>training dataset Gold đã được làm sạch, kiểm chất lượng, version hóa</b> từ platform. Đây chính là câu trả lời hoàn chỉnh cho thắc mắc ban đầu “có nên cho ML đọc DB” — ML đọc <b>Gold của platform</b>, không bao giờ đọc OLTP của service khác.
+    </div>
+  </div>
+</section>
+
+<!-- 14 ROADMAP -->
+<section id="roadmap">
+  <div class="wrap">
+    <h2><span class="num">14</span>Lộ trình áp dụng (crawl → walk → run)</h2>
+    <p class="lead">Đừng xây cả platform một lúc — đó là cách chắc chắn thất bại. Tăng trưởng theo giá trị, mỗi giai đoạn đều dùng được ngay.</p>
+    <div>
+      <div class="phase"><div class="dot">C1</div><div class="body">
+        <h4>Crawl · Nền tảng lưu trữ &amp; ingest (1–2 tháng)</h4>
+        <p class="muted">Dựng object storage (MinIO) + Iceberg + Spark. CDC/outbox vài domain quan trọng (enrollment, course, gradebook) → Bronze. Bắt đầu Silver bằng dbt. Đăng ký dataset vào DataHub. <b>Mục tiêu:</b> có một nơi tin cậy chứa dữ liệu, tách khỏi OLTP.</p>
+      </div></div>
+      <div class="phase"><div class="dot">C2</div><div class="body">
+        <h4>Crawl · Gold + BI đầu tiên (song song)</h4>
+        <p class="muted">Build vài bảng Gold + dashboard Superset thay cho query tay trên DB nghiệp vụ. Thêm data quality (Great Expectations) &amp; Dagster điều phối. <b>Mục tiêu:</b> tạo giá trị nhìn thấy được cho stakeholder.</p>
+      </div></div>
+      <div class="phase"><div class="dot">W1</div><div class="body">
+        <h4>Walk · ML đọc từ Gold (gắn recommendation-ml vào)</h4>
+        <p class="muted">Chuyển training của recommendation-ml sang đọc <code>gold.recsys_interactions</code> (qua object-storage handoff như đã bàn) thay vì nhồi qua HTTP. Thêm Feast (offline). Thêm Schema Registry cho Kafka. <b>Mục tiêu:</b> đóng vòng dữ liệu cho ML đúng chuẩn.</p>
+      </div></div>
+      <div class="phase"><div class="dot">W2</div><div class="body">
+        <h4>Walk · Governance &amp; security đầy đủ</h4>
+        <p class="muted">Data contracts ở CI, PII classification, column/row-level security, retention &amp; right-to-be-forgotten, audit. <b>Mục tiêu:</b> sẵn sàng tuân thủ &amp; mở rộng an toàn.</p>
+      </div></div>
+      <div class="phase"><div class="dot">R1</div><div class="body">
+        <h4>Run · Real-time &amp; feature store online</h4>
+        <p class="muted">Flink cho stream processing &amp; feature online (Redis) → inference cá nhân hóa real-time. Tiến dần tới kiến trúc Kappa. <b>Mục tiêu:</b> độ trễ thấp, cá nhân hóa.</p>
+      </div></div>
+      <div class="phase"><div class="dot">R2</div><div class="body">
+        <h4>Run · Data Mesh &amp; tự phục vụ</h4>
+        <p class="muted">Mỗi domain tự sở hữu &amp; publish data product trên hạ tầng chung; platform team cung cấp “paved road” (template, CI, catalog). <b>Mục tiêu:</b> mở rộng tới hàng trăm dataset không nghẽn ở một đội.</p>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 ANTI -->
+<section id="anti">
+  <div class="wrap">
+    <h2><span class="num">15</span>Anti-patterns cần tránh</h2>
+    <div class="grid2">
+      <div class="card"><span class="tag risk">Tránh</span><h4>ML/BI đọc thẳng DB nghiệp vụ</h4><p class="muted">Coupling chết người, đè tải lên DB serving, vỡ khi schema đổi. Luôn qua platform (Gold).</p></div>
+      <div class="card"><span class="tag risk">Tránh</span><h4>Data swamp</h4><p class="muted">Đổ dữ liệu vào lake mà không catalog/contract/quality → không ai tin, không ai dùng được. Governance từ ngày 1.</p></div>
+      <div class="card"><span class="tag risk">Tránh</span><h4>“Big bang” platform</h4><p class="muted">Cố xây mọi lớp + mọi công cụ trước khi tạo giá trị. Hãy crawl→walk→run, mỗi bước có người dùng thật.</p></div>
+      <div class="card"><span class="tag risk">Tránh</span><h4>Shared mutable table giữa services</h4><p class="muted">Nhiều service ghi chung một bảng = mất ownership, mất contract. Giao tiếp qua event/contract, không qua bảng dùng chung.</p></div>
+      <div class="card"><span class="tag risk">Tránh</span><h4>Xử lý theo processing-time</h4><p class="muted">Dẫn tới số liệu theo ngày sai khi có trễ. Luôn dùng event-time + watermark.</p></div>
+      <div class="card"><span class="tag risk">Tránh</span><h4>PII trôi vào lake</h4><p class="muted">Một khi dữ liệu nhạy cảm vào Bronze không kiểm soát, rất khó gỡ. Phân loại &amp; xử lý PII ngay ở biên.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b>CourseFlow · Enterprise Data Platform Blueprint</b> — tài liệu kiến trúc tham chiếu nội bộ.</p>
+    <p>Tóm tắt: xây một lakehouse Medallion (Bronze/Silver/Gold) trên object storage + table format ACID; ingest qua Kafka/outbox + CDC; biến đổi bằng Spark/dbt; phục vụ qua warehouse + feature store + reverse ETL; bọc toàn bộ bằng orchestration, governance, security, quality. Bắt đầu nhỏ (crawl), tận dụng Kafka/outbox/Prometheus đã có, và để recommendation-ml trở thành một consumer chuẩn đọc dataset Gold thay vì tự gom dữ liệu. Xem kèm: <code>recommendation-ml-integration-guide.html</code>.</p>
+  </div>
+</footer>
+
+</body>
+</html>

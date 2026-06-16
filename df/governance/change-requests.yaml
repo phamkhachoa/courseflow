@@ -1,0 +1,244 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+change_requests:
+  - id: publish_finance_benefit_reconciliation_prod
+    type: data_product_publish
+    status: approved
+    riskLevel: high
+    targetEnvironment: prod
+    product: enterprise-commerce
+    domain: finance
+    dataProduct: gold.finance_benefit_reconciliation
+    useCase: finance-benefit-reconciliation
+    requester: finance-analytics-po
+    requestedAt: "2026-01-15T09:00:00Z"
+    businessJustification: Publish governed finance benefit reconciliation evidence for FP&A, accounting and finance controls.
+    changeTicket: CHG-DF-0001
+    approvers:
+      - role: product_owner
+        approver: enterprise-commerce-po
+        decision: approved
+        decidedAt: "2026-01-15T10:00:00Z"
+      - role: domain_owner
+        approver: finance-domain-owner
+        decision: approved
+        decidedAt: "2026-01-15T10:15:00Z"
+      - role: data_steward
+        approver: enterprise-data-steward
+        decision: approved
+        decidedAt: "2026-01-15T10:30:00Z"
+      - role: platform_owner
+        approver: data-platform-lead
+        decision: approved
+        decidedAt: "2026-01-15T10:45:00Z"
+      - role: security_owner
+        approver: security-governance-lead
+        decision: approved
+        decidedAt: "2026-01-15T11:00:00Z"
+    evidence:
+      releaseEvidenceUri: evidence://releases/finance-benefit-reconciliation/prod/rel-2026-01-15.json
+      qualityReportUri: evidence://quality/finance-benefit-reconciliation/prod/rel-2026-01-15.json
+      lineageUri: evidence://lineage/finance-benefit-reconciliation/prod/rel-2026-01-15.jsonl
+      catalogBundleUri: evidence://catalog/prod/catalog-bundle-2026-01-15.json
+      rollbackPlanUri: runbook://data-platform/release-rollback
+      impactAssessmentUri: evidence://change-impact/CHG-DF-0001.md
+    controls:
+      makerCheckerRequired: true
+      rollbackRequired: true
+      impactAssessmentRequired: true
+      communicationRequired: true
+      slaHours: 24
+
+  - id: publish_enterprise_semantic_catalog_staging
+    type: catalog_publish
+    status: approved
+    riskLevel: medium
+    targetEnvironment: staging
+    product: enterprise-commerce
+    domain: enterprise-reporting
+    useCase: enterprise-kpi-scorecard
+    requester: enterprise-reporting-po
+    requestedAt: "2026-01-16T09:00:00Z"
+    businessJustification: Validate catalog, lineage and semantic view publication for executive scorecard self-service before production rollout.
+    changeTicket: CHG-DF-0002
+    approvers:
+      - role: domain_owner
+        approver: enterprise-reporting-domain-owner
+        decision: approved
+        decidedAt: "2026-01-16T10:00:00Z"
+      - role: data_steward
+        approver: enterprise-data-steward
+        decision: approved
+        decidedAt: "2026-01-16T10:15:00Z"
+      - role: platform_owner
+        approver: data-platform-lead
+        decision: approved
+        decidedAt: "2026-01-16T10:30:00Z"
+    evidence:
+      catalogPublishManifestUri: evidence://catalog-publish/staging/CHG-DF-0002.json
+      lineageUri: evidence://lineage/staging/openlineage-2026-01-16.jsonl
+      rollbackPlanUri: runbook://data-platform/catalog-publish-rollback
+      impactAssessmentUri: evidence://change-impact/CHG-DF-0002.md
+    controls:
+      makerCheckerRequired: true
+      rollbackRequired: true
+      impactAssessmentRequired: true
+      communicationRequired: false
+      slaHours: 48
+
+  - id: onboard_enterprise_commerce_source_readiness
+    type: source_onboarding
+    status: approved
+    riskLevel: medium
+    targetEnvironment: staging
+    product: enterprise-commerce
+    domain: finance
+    useCase: finance-benefit-reconciliation
+    requester: finance-platform-lead
+    requestedAt: "2026-01-17T08:00:00Z"
+    businessJustification: Prepare source-to-Bronze production readiness evidence for enterprise commerce benefit settlement feeds.
+    changeTicket: CHG-DF-0003
+    approvers:
+      - role: domain_owner
+        approver: finance-domain-owner
+        decision: approved
+        decidedAt: "2026-01-17T09:00:00Z"
+      - role: data_steward
+        approver: enterprise-data-steward
+        decision: approved
+        decidedAt: "2026-01-17T09:15:00Z"
+      - role: platform_owner
+        approver: data-platform-lead
+        decision: approved
+        decidedAt: "2026-01-17T09:30:00Z"
+    evidence:
+      sourceInventoryUri: platform/ingestion/source-registry.yaml
+      contractReviewUri: evidence://source-readiness/enterprise-commerce/contract-review.md
+      rollbackPlanUri: runbook://data-platform/source-onboarding-rollback
+      impactAssessmentUri: evidence://change-impact/CHG-DF-0003.md
+    controls:
+      makerCheckerRequired: true
+      rollbackRequired: true
+      impactAssessmentRequired: true
+      communicationRequired: true
+      slaHours: 72
+
+  - id: onboard_billing_platform_source_readiness
+    type: source_onboarding
+    status: approved
+    riskLevel: medium
+    targetEnvironment: staging
+    product: billing-platform
+    domain: finance
+    useCase: enterprise-revenue-intelligence
+    requester: billing-platform-sa
+    requestedAt: "2026-01-18T08:00:00Z"
+    businessJustification: Prepare source-to-Bronze production readiness evidence for Billing Platform settlement feeds used by revenue intelligence and executive scorecards.
+    changeTicket: CHG-DF-0004
+    approvers:
+      - role: domain_owner
+        approver: finance-domain-owner
+        decision: approved
+        decidedAt: "2026-01-18T09:00:00Z"
+      - role: data_steward
+        approver: enterprise-data-steward
+        decision: approved
+        decidedAt: "2026-01-18T09:15:00Z"
+      - role: platform_owner
+        approver: data-platform-lead
+        decision: approved
+        decidedAt: "2026-01-18T09:30:00Z"
+    evidence:
+      sourceInventoryUri: platform/ingestion/source-registry.yaml
+      contractReviewUri: evidence://source-readiness/billing-platform/contract-review.md
+      rollbackPlanUri: runbook://data-platform/source-onboarding-rollback
+      impactAssessmentUri: evidence://change-impact/CHG-DF-0004.md
+    controls:
+      makerCheckerRequired: true
+      rollbackRequired: true
+      impactAssessmentRequired: true
+      communicationRequired: true
+      slaHours: 72
+
+  - id: revoke_billing_platform_source_activation_staging
+    type: source_activation_revoke
+    status: approved
+    riskLevel: high
+    targetEnvironment: staging
+    product: billing-platform
+    domain: finance
+    useCase: enterprise-revenue-intelligence
+    requester: billing-platform-sa
+    requestedAt: "2026-06-17T08:00:00Z"
+    businessJustification: Revoke the Billing Platform source activation when source-readiness evidence is suspected stale, drifted or unsafe for P0 portfolio decisions.
+    changeTicket: CHG-DF-0005
+    approvers:
+      - role: domain_owner
+        approver: finance-domain-owner
+        decision: approved
+        decidedAt: "2026-06-17T09:00:00Z"
+      - role: data_steward
+        approver: enterprise-data-steward
+        decision: approved
+        decidedAt: "2026-06-17T09:15:00Z"
+      - role: platform_owner
+        approver: data-platform-lead
+        decision: approved
+        decidedAt: "2026-06-17T09:30:00Z"
+    evidence:
+      sourceActivationLedgerUri: governance/source-activations.yaml
+      sourceActivePointerUri: governance/source-active-pointers/billing-platform-billing-transaction-settled-outbox.staging.json
+      sourceActivationManifestUri: evidence://source-activations/billing-platform/staging/activate-billing-platform-source-staging-20260118.json
+      revocationEvidenceUri: evidence://source-activations/billing-platform/staging/revocation-analysis-2026-06-17.json
+      consumerCommunicationUri: runbook://data-platform/source-activation-consumer-communication
+      rollbackPlanUri: runbook://data-platform/source-activation-revoke
+      impactAssessmentUri: evidence://change-impact/CHG-DF-0005.md
+    controls:
+      makerCheckerRequired: true
+      rollbackRequired: true
+      impactAssessmentRequired: true
+      communicationRequired: true
+      slaHours: 24
+
+  - id: backfill_finance_benefit_reconciliation_staging
+    type: backfill_replay
+    status: approved
+    riskLevel: high
+    targetEnvironment: staging
+    product: enterprise-commerce
+    domain: finance
+    dataProduct: gold.finance_benefit_reconciliation
+    useCase: finance-benefit-reconciliation
+    requester: finance-analytics-po
+    requestedAt: "2026-01-17T08:30:00Z"
+    businessJustification: Authorize a bounded staging backfill for finance benefit reconciliation after Bronze source readiness and Silver/Gold snapshot evidence are available.
+    changeTicket: CHG-DF-BF-0001
+    approvers:
+      - role: domain_owner
+        approver: finance-domain-owner
+        decision: approved
+        decidedAt: "2026-01-17T09:00:00Z"
+      - role: data_steward
+        approver: enterprise-data-steward
+        decision: approved
+        decidedAt: "2026-01-17T09:10:00Z"
+      - role: platform_owner
+        approver: data-platform-lead
+        decision: approved
+        decidedAt: "2026-01-17T09:20:00Z"
+    evidence:
+      backfillPlanUri: evidence://backfills/finance-benefit-reconciliation/staging/plan-2026-01-17.json
+      backfillReadinessReportUri: evidence://backfills/finance-benefit-reconciliation/staging/readiness-2026-01-17.json
+      sourceOffsetLedgerUri: evidence://offset-ledger/finance-benefit-settled/staging/2026-01-17.json
+      snapshotEvidenceUri: evidence://snapshots/finance-benefit-reconciliation/staging/backfill-2026-01-17.json
+      releaseEvidenceUri: evidence://releases/finance-benefit-reconciliation/staging/backfill-2026-01-17.json
+      dataDiffReportUri: evidence://data-diff/finance-benefit-reconciliation/staging/backfill-2026-01-17.json
+      consumerCommunicationUri: runbook://data-platform/backfill-consumer-communication
+      rollbackPlanUri: runbook://data-platform/backfill-rollback
+      impactAssessmentUri: evidence://change-impact/CHG-DF-BF-0001.md
+    controls:
+      makerCheckerRequired: true
+      rollbackRequired: true
+      impactAssessmentRequired: true
+      communicationRequired: true
+      slaHours: 24

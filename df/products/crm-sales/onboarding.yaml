@@ -1,0 +1,55 @@
+product:
+  code: crm-sales
+  name: CRM Sales Platform
+  status: pilot
+  businessSponsor: revenue-operations-lead
+  productOwner: crm-sales-po
+  technicalOwner: crm-sales-sa
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: account_id
+
+domains:
+  - customer
+
+governance:
+  classification: CONFIDENTIAL
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: standard_personal_data_3y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: customer
+    services:
+      - crm-account-service
+      - sales-opportunity-service
+      - contract-lifecycle-service
+    publicationModes:
+      - saas_connector
+      - cdc
+      - batch_connector
+
+firstSlice:
+  contractStatus: existing
+  topics:
+    - customer.account.changed.v1
+  dataProducts:
+    - bronze.events_customer_account_changed
+    - silver.customer_identity_link
+    - gold.customer_360_profile
+
+consumers:
+  - BI
+  - ReverseETL
+  - ML
+  - Compliance

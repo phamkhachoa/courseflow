@@ -1,0 +1,55 @@
+product:
+  code: identity-platform
+  name: Identity and Entitlement Platform
+  status: pilot
+  businessSponsor: security-platform-lead
+  productOwner: identity-platform-po
+  technicalOwner: identity-platform-sa
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: org_id
+
+domains:
+  - compliance
+  - customer
+
+governance:
+  classification: PII
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: standard_personal_data_3y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: compliance
+    services:
+      - identity-directory
+      - access-control-service
+      - user-management-service
+    publicationModes:
+      - transactional_outbox
+      - cdc
+
+firstSlice:
+  contractStatus: existing
+  topics:
+    - compliance.identity_subject.changed.v1
+  dataProducts:
+    - bronze.events_identity_subject_changed
+    - silver.identity_subject
+    - gold.access_risk_daily
+
+consumers:
+  - BI
+  - Compliance
+  - Risk
+  - ML

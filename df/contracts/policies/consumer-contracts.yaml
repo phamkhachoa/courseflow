@@ -1,0 +1,40 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+contracts:
+  - id: catalog_registered_access_request_required
+    name: Catalog Registered Access Request Required
+    contractVersion: 1
+    status: active
+    severity: P0
+    owner: data-platform-security
+    effectiveFrom: "2026-01-01"
+    description: Requires every serving dataset access to be requested, approved, time-bound and audited through the enterprise catalog workflow.
+    appliesTo:
+      layers: [BRONZE, SILVER, GOLD]
+      classifications: [PUBLIC, INTERNAL, CONFIDENTIAL, PII, SENSITIVE]
+    allowedPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+      - ProductAnalyst
+      - RiskOperator
+    allowedAccessModes: [read]
+    requiredEvidence:
+      - catalog_access_request_id
+      - business_purpose
+      - data_owner_approval
+      - data_steward_approval
+      - expiry_date
+      - access_review_schedule
+    controls:
+      requireCatalogRegistration: true
+      requireBusinessJustification: true
+      requireOwnerApproval: true
+      requireDataStewardApproval: true
+      requireExpiryDate: true
+      requireAuditLogging: true
+      maxAccessDays: 365
+      reviewCadenceDays: 90

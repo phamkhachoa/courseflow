@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise.local/df/contracts/event-envelope.v1.schema.json",
+  "title": "Enterprise Data Platform Event Envelope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "eventType",
+    "eventVersion",
+    "productId",
+    "sourceService",
+    "occurredAt",
+    "publishedAt",
+    "correlationId",
+    "payload"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Global idempotency key for the event."
+    },
+    "eventType": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 120,
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]*$"
+    },
+    "eventVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "productId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "description": "Enterprise product code such as lms-courseflow."
+    },
+    "domainId": {
+      "type": ["string", "null"],
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "region": {
+      "type": ["string", "null"],
+      "maxLength": 32
+    },
+    "legalEntity": {
+      "type": ["string", "null"],
+      "maxLength": 80
+    },
+    "sourceService": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "tenantId": {
+      "type": ["string", "null"],
+      "maxLength": 80
+    },
+    "orgId": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Business event time."
+    },
+    "publishedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Time the event was published to the platform."
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 120
+    },
+    "causationId": {
+      "type": ["string", "null"],
+      "maxLength": 120
+    },
+    "actor": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "actorType": {
+          "type": "string",
+          "enum": ["USER", "SERVICE", "SYSTEM", "ANONYMOUS"]
+        },
+        "actorId": {
+          "type": ["string", "null"],
+          "maxLength": 120
+        }
+      }
+    },
+    "payloadSchema": {
+      "type": ["string", "null"],
+      "maxLength": 200
+    },
+    "sourceTopic": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "description": "Source topic or equivalent stream used for replay lineage."
+    },
+    "sourcePartition": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Source partition used for replay lineage when available."
+    },
+    "sourceOffset": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Source offset used for replay lineage when available."
+    },
+    "sourceSnapshotId": {
+      "type": ["string", "null"],
+      "maxLength": 160,
+      "description": "CDC snapshot, batch manifest or source export identifier when no offset exists."
+    },
+    "headers": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "description": "Non-secret source headers preserved for lineage and troubleshooting."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific payload governed by its own versioned schema."
+    }
+  },
+  "anyOf": [
+    { "required": ["tenantId"] },
+    { "required": ["orgId"] }
+  ]
+}

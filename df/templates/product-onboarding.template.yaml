@@ -1,0 +1,51 @@
+product:
+  code: example-product
+  name: Example Product
+  status: draft
+  businessSponsor: product-business-sponsor
+  productOwner: product-owner
+  technicalOwner: product-architect
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: product_org_id
+
+domains:
+  - example-domain
+
+governance:
+  classification: CONFIDENTIAL
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: standard_personal_data_3y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: example-domain
+    services:
+      - example-service
+    publicationModes:
+      - transactional_outbox
+      - cdc
+
+firstSlice:
+  contractStatus: planned
+  topics:
+    - example.entity.changed.v1
+  dataProducts:
+    - bronze.events_example_entity_changed
+    - silver.example_entity
+    - gold.example_metric_daily
+
+consumers:
+  - BI
+  - ML
+  - Compliance

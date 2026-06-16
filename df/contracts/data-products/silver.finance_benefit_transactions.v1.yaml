@@ -1,0 +1,225 @@
+contractVersion: 1
+dataProduct:
+  name: silver.finance_benefit_transactions
+  layer: SILVER
+  domain: finance
+  product: enterprise-commerce
+  domainOwner: finance-domain-council
+  ownerTeam: data-platform
+  businessOwner: finance-analytics-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Normalized benefit settlement transaction grain used by finance reconciliation pipelines.
+  status: DRAFT
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: bronze.events_benefit_settled
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: settled_at
+
+schema:
+  columns:
+    - name: transaction_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic transaction id derived from source event and payment identity.
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product that owns the source settlement event.
+    - name: source_product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Business product that originated the order or benefit.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: order_id
+      type: string
+      nullable: false
+      pii: false
+      description: Commerce order identifier.
+    - name: payment_id
+      type: string
+      nullable: false
+      pii: false
+      description: Payment or settlement identifier.
+    - name: entitlement_id
+      type: string
+      nullable: true
+      pii: false
+      description: Optional entitlement or source-right identifier related to the benefit.
+    - name: beneficiary_id_hash
+      type: string
+      nullable: true
+      pii: true
+      description: Tokenized beneficiary identifier when available.
+    - name: item_id
+      type: string
+      nullable: true
+      pii: false
+      description: Optional product, content, SKU or service item identifier.
+    - name: currency
+      type: string
+      nullable: false
+      pii: false
+      description: ISO-4217 currency code.
+    - name: benefit_transaction_id
+      type: string
+      nullable: false
+      pii: false
+      description: Benefit ledger transaction identifier.
+    - name: reconciliation_key
+      type: string
+      nullable: false
+      pii: false
+      description: Business key used to group source evidence for reconciliation.
+    - name: benefit_type
+      type: string
+      nullable: false
+      pii: false
+      description: Benefit category represented by this transaction.
+    - name: expected_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Expected monetary amount for reconciliation in minor currency units.
+    - name: actual_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Actual monetary amount from the source ledger in minor currency units.
+    - name: expected_points
+      type: long
+      nullable: false
+      pii: false
+      description: Expected loyalty points for reconciliation.
+    - name: actual_points
+      type: long
+      nullable: false
+      pii: false
+      description: Actual loyalty points from the source ledger.
+    - name: list_price_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Original list price in minor currency units.
+    - name: final_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Customer final amount after discounts and rewards.
+    - name: paid_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Amount captured by the payment platform.
+    - name: committed_discount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Discount committed by promotion, coupon or benefit systems.
+    - name: loyalty_points_earned
+      type: long
+      nullable: false
+      pii: false
+      description: Loyalty points earned by the settlement.
+    - name: loyalty_points_burned
+      type: long
+      nullable: false
+      pii: false
+      description: Loyalty points burned by the settlement.
+    - name: reward_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Reward monetary equivalent applied to the order.
+    - name: refund_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Refunded amount in minor currency units.
+    - name: settlement_status
+      type: string
+      nullable: false
+      pii: false
+      description: Settlement state from the payment source of truth.
+    - name: benefit_status
+      type: string
+      nullable: false
+      pii: false
+      description: Benefit ledger state for committed or reversed benefits.
+    - name: settled_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Settlement business timestamp.
+    - name: accounting_date
+      type: date
+      nullable: false
+      pii: false
+      description: Finance accounting date used for close and reconciliation windows.
+    - name: reason_code
+      type: string
+      nullable: true
+      pii: false
+      description: Optional upstream reason code for known reconciliation state.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Original source event id for traceability.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: Source record hash from Bronze evidence.
+
+quality:
+  freshnessSloMinutes: 120
+  checks:
+    - name: transaction_id_not_null
+      type: not_null
+      column: transaction_id
+    - name: transaction_id_unique
+      type: unique
+      columns: [transaction_id]
+    - name: product_id_not_null
+      type: not_null
+      column: product_id
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 2555
+  erasureSupported: true
+  subjectKeys:
+    - name: beneficiary_id_hash
+      column: beneficiary_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: REGULATED_SUBJECT_DELETE
+  legalHoldPolicy: regulated_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [DataPlatform, BI]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

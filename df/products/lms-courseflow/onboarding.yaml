@@ -1,0 +1,83 @@
+product:
+  code: lms-courseflow
+  name: CourseFlow LMS
+  status: pilot
+  businessSponsor: learning-platform-lead
+  productOwner: courseflow-po
+  technicalOwner: courseflow-platform-sa
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: org_id
+
+domains:
+  - learning
+  - assessment
+  - recommendation
+  - commerce
+
+governance:
+  classification: PII
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: standard_personal_data_3y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: learning
+    services:
+      - course-service
+      - enrollment-service
+    publicationModes:
+      - transactional_outbox
+      - cdc
+  - domain: assessment
+    services:
+      - gradebook-service
+      - assignment-service
+      - quiz-service
+      - peer-review-service
+    publicationModes:
+      - transactional_outbox
+  - domain: recommendation
+    services:
+      - analytics-service
+      - web-next-learning
+    publicationModes:
+      - http_event_collector
+      - future_outbox_or_cdc
+  - domain: commerce
+    services:
+      - promotion-service
+      - loyalty-service
+    publicationModes:
+      - transactional_outbox
+
+firstSlice:
+  contractStatus: existing
+  topics:
+    - course.published.v1
+    - enrollment.completed.v1
+    - gradebook.final_grade.updated.v1
+    - recommendation.tracking.v1
+  dataProducts:
+    - bronze.events_course_published
+    - bronze.events_enrollment_completed
+    - bronze.events_gradebook_final_grade_updated
+    - bronze.events_recommendation_tracking
+    - silver.learner_activity
+    - gold.recsys_interactions
+
+consumers:
+  - BI
+  - ML
+  - ReverseETL
+  - Compliance

@@ -1,0 +1,177 @@
+contractVersion: 1
+dataProduct:
+  name: gold.access_risk_daily
+  layer: GOLD
+  domain: compliance
+  product: identity-platform
+  domainOwner: compliance-domain-council
+  ownerTeam: data-platform
+  businessOwner: security-platform-lead
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Daily subject-grain access-risk dataset for compliance, risk operations and downstream enterprise scorecards.
+  status: DRAFT
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: silver.identity_subject
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: report_date
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product that owns the identity subject source.
+    - name: dataset_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Immutable snapshot identifier used for audit and release evidence.
+    - name: access_risk_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic access-risk row id.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: report_date
+      type: date
+      nullable: false
+      pii: false
+      description: Reporting date for the risk observation.
+    - name: subject_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized enterprise subject identifier for controlled investigations and DSAR replay.
+    - name: subject_type
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise subject category.
+    - name: lifecycle_status
+      type: string
+      nullable: false
+      pii: false
+      description: Identity lifecycle state used for risk scoring.
+    - name: risk_level
+      type: string
+      nullable: false
+      pii: false
+      description: Source risk level used for risk scoring.
+      allowedValues: [LOW, MEDIUM, HIGH, CRITICAL]
+    - name: entitlement_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of active entitlements.
+    - name: privileged_entitlement_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of privileged entitlements.
+    - name: mfa_enabled
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether MFA is enabled for the subject.
+    - name: access_risk_score
+      type: int
+      nullable: false
+      pii: false
+      description: Deterministic risk score from lifecycle, MFA and entitlement signals.
+    - name: risk_status
+      type: string
+      nullable: false
+      pii: false
+      description: Normalized risk status for support and risk queues.
+      allowedValues: [OK, REVIEW, CRITICAL]
+    - name: reason_code
+      type: string
+      nullable: false
+      pii: false
+      description: Machine-readable reason for the risk status.
+    - name: last_access_at
+      type: timestamp
+      nullable: true
+      pii: false
+      description: Most recent access timestamp.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Original source event id for lineage.
+    - name: source_subject_state_id
+      type: string
+      nullable: false
+      pii: false
+      description: Silver subject state row id used to build this Gold row.
+    - name: built_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the Gold snapshot was built.
+    - name: quality_passed
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether row passed structural Gold quality checks.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: access_risk_id_not_null
+      type: not_null
+      column: access_risk_id
+    - name: subject_id_hash_not_null
+      type: not_null
+      column: subject_id_hash
+    - name: org_id_not_null
+      type: not_null
+      column: org_id
+    - name: risk_status_allowed
+      type: accepted_values
+      column: risk_status
+      values: [OK, REVIEW, CRITICAL]
+    - name: risk_snapshot_unique
+      type: unique
+      columns: [dataset_snapshot_id, subject_id_hash, report_date]
+    - name: access_risk_snapshot_freshness
+      type: freshness
+      column: built_at
+
+privacy:
+  classification: PII
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: subject_id_hash
+      column: subject_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [Compliance, Risk, BI]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ComplianceConsumer, RiskOperator]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

@@ -1,0 +1,57 @@
+product:
+  code: enterprise-data-foundation
+  name: Enterprise Data Foundation
+  status: pilot
+  businessSponsor: group-data-office
+  productOwner: enterprise-data-platform-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: org_id
+
+domains:
+  - enterprise-reporting
+
+governance:
+  classification: CONFIDENTIAL
+  containsPii: false
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: non_personal_operational_3y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+    - ApprovedBIConsumer
+    - ComplianceConsumer
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: false
+
+sourceSystems:
+  - domain: enterprise-reporting
+    services:
+      - enterprise-df-cli
+      - catalog-bundle-export
+      - capability-maturity-report
+      - release-evidence-store
+    publicationModes:
+      - batch_connector
+      - manual_upload
+
+firstSlice:
+  contractStatus: planned
+  topics:
+    - enterprise-reporting.data-product-control-tower.refreshed.v1
+  dataProducts:
+    - gold.data_product_inventory
+    - gold.contract_compliance_daily
+    - gold.quality_sla_daily
+    - gold.lineage_coverage_daily
+
+consumers:
+  - BI
+  - Compliance
+  - OperationalService

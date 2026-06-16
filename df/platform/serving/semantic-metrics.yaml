@@ -1,0 +1,1267 @@
+version: 1
+registryScope: group-enterprise-data-platform
+owner: enterprise-reporting
+description: >
+  Governed semantic metric registry for certified and provisional enterprise KPIs. Metrics must
+  point to approved Gold data products or approved semantic aggregates, declare owners and expose
+  source columns so BI, Dremio, Trino and executive scorecards use the same definitions.
+metrics:
+  - metricId: revenue_net
+    name: Net Revenue
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_revenue_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(net_revenue_cents) / 100.0
+      referencedColumns:
+        - net_revenue_cents
+      unit: currency_major
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - enterprise-kpi-scorecard
+      - enterprise-revenue-intelligence
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.revenue_net
+      dremioVirtualDataset: semantic.enterprise_metrics.revenue_net
+      materialization: virtual
+
+  - metricId: revenue_gross
+    name: Gross Revenue
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_revenue_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(gross_amount_cents) / 100.0
+      referencedColumns:
+        - gross_amount_cents
+      unit: currency_major
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - enterprise-revenue-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.revenue_gross
+      dremioVirtualDataset: semantic.enterprise_metrics.revenue_gross
+      materialization: virtual
+
+  - metricId: recognized_revenue_amount
+    name: Recognized Revenue Amount
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_revenue_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(recognized_revenue_cents) / 100.0
+      referencedColumns:
+        - recognized_revenue_cents
+      unit: currency_major
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - enterprise-revenue-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.recognized_revenue_amount
+      dremioVirtualDataset: semantic.enterprise_metrics.recognized_revenue_amount
+      materialization: virtual
+
+  - metricId: deferred_revenue_amount
+    name: Deferred Revenue Amount
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_revenue_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(deferred_revenue_cents) / 100.0
+      referencedColumns:
+        - deferred_revenue_cents
+      unit: currency_major
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - enterprise-revenue-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.deferred_revenue_amount
+      dremioVirtualDataset: semantic.enterprise_metrics.deferred_revenue_amount
+      materialization: virtual
+
+  - metricId: refund_amount
+    name: Refund Amount
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_revenue_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(refund_amount_cents) / 100.0
+      referencedColumns:
+        - refund_amount_cents
+      unit: currency_major
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - enterprise-revenue-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.refund_amount
+      dremioVirtualDataset: semantic.enterprise_metrics.refund_amount
+      materialization: virtual
+
+  - metricId: billing_transaction_count
+    name: Billing Transaction Count
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_revenue_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - product_line
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(transaction_count)
+      referencedColumns:
+        - transaction_count
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - enterprise-revenue-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.billing_transaction_count
+      dremioVirtualDataset: semantic.enterprise_metrics.billing_transaction_count
+      materialization: virtual
+
+  - metricId: committed_discount_amount
+    name: Committed Discount Amount
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_benefit_reconciliation
+      timeColumn: accounting_date
+    grain:
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(committed_discount_cents) / 100.0
+      referencedColumns:
+        - committed_discount_cents
+      unit: currency_major
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - finance-benefit-reconciliation
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.committed_discount_amount
+      dremioVirtualDataset: semantic.enterprise_metrics.committed_discount_amount
+      materialization: virtual
+
+  - metricId: points_earned
+    name: Loyalty Points Earned
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_benefit_reconciliation
+      timeColumn: accounting_date
+    grain:
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(loyalty_points_earned)
+      referencedColumns:
+        - loyalty_points_earned
+      unit: points
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - finance-benefit-reconciliation
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.points_earned
+      dremioVirtualDataset: semantic.enterprise_metrics.points_earned
+      materialization: virtual
+
+  - metricId: points_reversed
+    name: Loyalty Points Reversed
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_benefit_reconciliation
+      timeColumn: accounting_date
+    grain:
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN benefit_status = 'REVERSED' THEN actual_points ELSE 0 END)
+      referencedColumns:
+        - benefit_status
+        - actual_points
+      unit: points
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - finance-benefit-reconciliation
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.points_reversed
+      dremioVirtualDataset: semantic.enterprise_metrics.points_reversed
+      materialization: virtual
+
+  - metricId: unreconciled_benefit_count
+    name: Unreconciled Benefit Count
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_benefit_reconciliation
+      timeColumn: accounting_date
+    grain:
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN reconciliation_status IN ('EXCEPTION', 'PENDING_SOURCE') THEN 1 ELSE 0 END)
+      referencedColumns:
+        - reconciliation_status
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - finance-benefit-reconciliation
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.unreconciled_benefit_count
+      dremioVirtualDataset: semantic.enterprise_metrics.unreconciled_benefit_count
+      materialization: virtual
+
+  - metricId: benefit_reconciliation_gap
+    name: Benefit Reconciliation Gap
+    domain: finance
+    owner: finance-analytics-po
+    status: provisional
+    source:
+      dataProduct: gold.finance_benefit_reconciliation
+      timeColumn: accounting_date
+    grain:
+      - accounting_date
+      - product_id
+      - source_product_id
+      - org_id
+      - currency
+    dimensions:
+      - product_id
+      - source_product_id
+      - org_id
+      - currency
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(ABS(reconciliation_delta_cents)) / 100.0
+      referencedColumns:
+        - reconciliation_delta_cents
+      unit: currency_major
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - enterprise-kpi-scorecard
+      - finance-benefit-reconciliation
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+      - ComplianceConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.benefit_reconciliation_gap
+      dremioVirtualDataset: semantic.enterprise_metrics.benefit_reconciliation_gap
+      materialization: virtual
+
+  - metricId: recommendation_interaction_count
+    name: Recommendation Interaction Count
+    domain: recommendation
+    owner: ml-platform-po
+    status: provisional
+    source:
+      dataProduct: gold.recsys_interactions
+      timeColumn: occurred_at
+    grain:
+      - product_id
+      - org_id
+      - event_type
+    dimensions:
+      - product_id
+      - org_id
+      - event_type
+    calculation:
+      type: aggregate_sql
+      expressionSql: COUNT(source_event_id)
+      referencedColumns:
+        - source_event_id
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - ml-feature-governance
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.recommendation_interaction_count
+      dremioVirtualDataset: semantic.enterprise_metrics.recommendation_interaction_count
+      materialization: virtual
+
+  - metricId: training_snapshot_count
+    name: Training Snapshot Count
+    domain: ml-ai
+    owner: ml-platform-po
+    status: provisional
+    source:
+      dataProduct: gold.recsys_interactions
+      timeColumn: built_at
+    grain:
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: COUNT(DISTINCT dataset_snapshot_id)
+      referencedColumns:
+        - dataset_snapshot_id
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - ml-feature-governance
+    consumers:
+      - DomainDataOwner
+      - ApprovedMLConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.training_snapshot_count
+      dremioVirtualDataset: semantic.enterprise_metrics.training_snapshot_count
+      materialization: virtual
+
+  - metricId: feature_freshness_minutes
+    name: Feature Freshness Minutes
+    domain: ml-ai
+    owner: ml-platform-po
+    status: provisional
+    source:
+      dataProduct: gold.recsys_interactions
+      timeColumn: built_at
+    grain:
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: DATE_DIFF('minute', MAX(built_at), CURRENT_TIMESTAMP)
+      referencedColumns:
+        - built_at
+      unit: minutes
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - ml-feature-governance
+    consumers:
+      - DomainDataOwner
+      - ApprovedMLConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.feature_freshness_minutes
+      dremioVirtualDataset: semantic.enterprise_metrics.feature_freshness_minutes
+      materialization: virtual
+
+  - metricId: access_risk_subject_count
+    name: Access Risk Subject Count
+    domain: compliance
+    owner: security-platform-lead
+    status: provisional
+    source:
+      dataProduct: gold.access_risk_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+      - risk_status
+      - subject_type
+    dimensions:
+      - product_id
+      - org_id
+      - risk_status
+      - subject_type
+    calculation:
+      type: aggregate_sql
+      expressionSql: COUNT(subject_id_hash)
+      referencedColumns:
+        - subject_id_hash
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - identity-access-governance
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - RiskOperator
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.access_risk_subject_count
+      dremioVirtualDataset: semantic.enterprise_metrics.access_risk_subject_count
+      materialization: virtual
+
+  - metricId: critical_access_risk_subject_count
+    name: Critical Access Risk Subject Count
+    domain: compliance
+    owner: security-platform-lead
+    status: provisional
+    source:
+      dataProduct: gold.access_risk_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN risk_status = 'CRITICAL' THEN 1 ELSE 0 END)
+      referencedColumns:
+        - risk_status
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - identity-access-governance
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - RiskOperator
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.critical_access_risk_subject_count
+      dremioVirtualDataset: semantic.enterprise_metrics.critical_access_risk_subject_count
+      materialization: virtual
+
+  - metricId: privileged_access_subject_count
+    name: Privileged Access Subject Count
+    domain: compliance
+    owner: security-platform-lead
+    status: provisional
+    source:
+      dataProduct: gold.access_risk_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN privileged_entitlement_count > 0 THEN 1 ELSE 0 END)
+      referencedColumns:
+        - privileged_entitlement_count
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - identity-access-governance
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - RiskOperator
+    serving:
+      trinoView: semantic.enterprise_metrics.privileged_access_subject_count
+      dremioVirtualDataset: semantic.enterprise_metrics.privileged_access_subject_count
+      materialization: virtual
+
+  - metricId: mfa_gap_subject_count
+    name: MFA Gap Subject Count
+    domain: compliance
+    owner: security-platform-lead
+    status: provisional
+    source:
+      dataProduct: gold.access_risk_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN mfa_enabled = FALSE THEN 1 ELSE 0 END)
+      referencedColumns:
+        - mfa_enabled
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - identity-access-governance
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - RiskOperator
+    serving:
+      trinoView: semantic.enterprise_metrics.mfa_gap_subject_count
+      dremioVirtualDataset: semantic.enterprise_metrics.mfa_gap_subject_count
+      materialization: virtual
+
+  - metricId: deprovisioned_with_access_count
+    name: Deprovisioned With Access Count
+    domain: compliance
+    owner: security-platform-lead
+    status: provisional
+    source:
+      dataProduct: gold.access_risk_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN lifecycle_status = 'DEPROVISIONED' AND entitlement_count > 0 THEN 1 ELSE 0 END)
+      referencedColumns:
+        - lifecycle_status
+        - entitlement_count
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - identity-access-governance
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - RiskOperator
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.deprovisioned_with_access_count
+      dremioVirtualDataset: semantic.enterprise_metrics.deprovisioned_with_access_count
+      materialization: virtual
+
+  - metricId: customer_profile_count
+    name: Customer Profile Count
+    domain: customer
+    owner: customer-success-po
+    status: provisional
+    source:
+      dataProduct: gold.customer_360_profile
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+      - lifecycle_stage
+      - account_status
+      - profile_status
+    dimensions:
+      - product_id
+      - org_id
+      - lifecycle_stage
+      - account_status
+      - profile_status
+    calculation:
+      type: aggregate_sql
+      expressionSql: COUNT(customer_profile_id)
+      referencedColumns:
+        - customer_profile_id
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-account-health
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.customer_profile_count
+      dremioVirtualDataset: semantic.enterprise_metrics.customer_profile_count
+      materialization: virtual
+
+  - metricId: at_risk_customer_account_count
+    name: At-risk Customer Account Count
+    domain: customer
+    owner: customer-success-po
+    status: provisional
+    source:
+      dataProduct: gold.customer_360_profile
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN profile_status = 'RISK' THEN 1 ELSE 0 END)
+      referencedColumns:
+        - profile_status
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-account-health
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.at_risk_customer_account_count
+      dremioVirtualDataset: semantic.enterprise_metrics.at_risk_customer_account_count
+      materialization: virtual
+
+  - metricId: average_customer_health_score
+    name: Average Customer Health Score
+    domain: customer
+    owner: customer-success-po
+    status: provisional
+    source:
+      dataProduct: gold.customer_360_profile
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+      - lifecycle_stage
+    dimensions:
+      - product_id
+      - org_id
+      - lifecycle_stage
+    calculation:
+      type: aggregate_sql
+      expressionSql: AVG(health_score)
+      referencedColumns:
+        - health_score
+      unit: score
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-account-health
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.average_customer_health_score
+      dremioVirtualDataset: semantic.enterprise_metrics.average_customer_health_score
+      materialization: virtual
+
+  - metricId: consented_customer_profile_count
+    name: Consented Customer Profile Count
+    domain: customer
+    owner: customer-success-po
+    status: provisional
+    source:
+      dataProduct: gold.customer_360_profile
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+    dimensions:
+      - product_id
+      - org_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN consent_status = 'OPTED_IN' THEN 1 ELSE 0 END)
+      referencedColumns:
+        - consent_status
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-account-health
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.consented_customer_profile_count
+      dremioVirtualDataset: semantic.enterprise_metrics.consented_customer_profile_count
+      materialization: virtual
+
+  - metricId: support_case_count
+    name: Support Case Count
+    domain: customer
+    owner: customer-experience-lead
+    status: provisional
+    source:
+      dataProduct: gold.support_sla_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+      - channel
+      - priority
+    dimensions:
+      - product_id
+      - org_id
+      - channel
+      - priority
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(case_count)
+      referencedColumns:
+        - case_count
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-support-experience-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.support_case_count
+      dremioVirtualDataset: semantic.enterprise_metrics.support_case_count
+      materialization: virtual
+
+  - metricId: first_response_sla_breach_count
+    name: First Response SLA Breach Count
+    domain: customer
+    owner: customer-experience-lead
+    status: provisional
+    source:
+      dataProduct: gold.support_sla_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+      - channel
+      - priority
+    dimensions:
+      - product_id
+      - org_id
+      - channel
+      - priority
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(first_response_sla_breached_count)
+      referencedColumns:
+        - first_response_sla_breached_count
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-support-experience-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.first_response_sla_breach_count
+      dremioVirtualDataset: semantic.enterprise_metrics.first_response_sla_breach_count
+      materialization: virtual
+
+  - metricId: resolution_sla_breach_count
+    name: Resolution SLA Breach Count
+    domain: customer
+    owner: customer-experience-lead
+    status: provisional
+    source:
+      dataProduct: gold.support_sla_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+      - channel
+      - priority
+    dimensions:
+      - product_id
+      - org_id
+      - channel
+      - priority
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(resolution_sla_breached_count)
+      referencedColumns:
+        - resolution_sla_breached_count
+      unit: count
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-support-experience-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.resolution_sla_breach_count
+      dremioVirtualDataset: semantic.enterprise_metrics.resolution_sla_breach_count
+      materialization: virtual
+
+  - metricId: average_support_satisfaction_score
+    name: Average Support Satisfaction Score
+    domain: customer
+    owner: customer-experience-lead
+    status: provisional
+    source:
+      dataProduct: gold.support_sla_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - product_id
+      - org_id
+      - channel
+      - priority
+    dimensions:
+      - product_id
+      - org_id
+      - channel
+      - priority
+    calculation:
+      type: aggregate_sql
+      expressionSql: AVG(average_satisfaction_score)
+      referencedColumns:
+        - average_satisfaction_score
+      unit: score
+    filters:
+      - column: quality_passed
+        operator: equals
+        values: ["true"]
+    freshnessSloMinutes: 240
+    useCases:
+      - customer-support-experience-intelligence
+      - enterprise-kpi-scorecard
+    consumers:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.average_support_satisfaction_score
+      dremioVirtualDataset: semantic.enterprise_metrics.average_support_satisfaction_score
+      materialization: virtual
+
+  - metricId: p0_data_product_blocker_count
+    name: P0 Data Product Blocker Count
+    domain: enterprise-reporting
+    owner: enterprise-data-platform-po
+    status: provisional
+    source:
+      dataProduct: gold.data_product_inventory
+      timeColumn: report_date
+    grain:
+      - report_date
+      - org_id
+      - product_id
+      - domain_id
+    dimensions:
+      - org_id
+      - product_id
+      - domain_id
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(blocker_count)
+      referencedColumns:
+        - blocker_count
+      unit: count
+    filters:
+      - column: readiness_state
+        operator: equals
+        values: ["blocked"]
+    freshnessSloMinutes: 240
+    useCases:
+      - data-product-control-tower
+      - enterprise-kpi-scorecard
+    consumers:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.p0_data_product_blocker_count
+      dremioVirtualDataset: semantic.enterprise_metrics.p0_data_product_blocker_count
+      materialization: virtual
+
+  - metricId: contract_compliance_rate
+    name: Contract Compliance Rate
+    domain: enterprise-reporting
+    owner: enterprise-data-platform-po
+    status: provisional
+    source:
+      dataProduct: gold.contract_compliance_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - org_id
+      - contract_status
+    dimensions:
+      - org_id
+      - contract_status
+    calculation:
+      type: aggregate_sql
+      expressionSql: AVG(CASE WHEN contract_valid THEN 1.0 ELSE 0.0 END)
+      referencedColumns:
+        - contract_valid
+      unit: ratio
+    freshnessSloMinutes: 240
+    useCases:
+      - data-product-control-tower
+      - enterprise-kpi-scorecard
+    consumers:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.contract_compliance_rate
+      dremioVirtualDataset: semantic.enterprise_metrics.contract_compliance_rate
+      materialization: virtual
+
+  - metricId: quality_sla_breach_count
+    name: Quality SLA Breach Count
+    domain: enterprise-reporting
+    owner: enterprise-data-platform-po
+    status: provisional
+    source:
+      dataProduct: gold.quality_sla_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - org_id
+      - layer
+    dimensions:
+      - org_id
+      - layer
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN sla_status IN ('RED', 'AMBER') THEN 1 ELSE 0 END)
+      referencedColumns:
+        - sla_status
+      unit: count
+    freshnessSloMinutes: 240
+    useCases:
+      - data-product-control-tower
+      - enterprise-kpi-scorecard
+    consumers:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.quality_sla_breach_count
+      dremioVirtualDataset: semantic.enterprise_metrics.quality_sla_breach_count
+      materialization: virtual
+
+  - metricId: runtime_lineage_gap_count
+    name: Runtime Lineage Gap Count
+    domain: enterprise-reporting
+    owner: enterprise-data-platform-po
+    status: provisional
+    source:
+      dataProduct: gold.lineage_coverage_daily
+      timeColumn: report_date
+    grain:
+      - report_date
+      - org_id
+      - impact_severity
+    dimensions:
+      - org_id
+      - impact_severity
+    calculation:
+      type: aggregate_sql
+      expressionSql: SUM(CASE WHEN runtime_lineage_present = false THEN 1 ELSE 0 END)
+      referencedColumns:
+        - runtime_lineage_present
+      unit: count
+    freshnessSloMinutes: 240
+    useCases:
+      - data-product-control-tower
+      - enterprise-kpi-scorecard
+    consumers:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    serving:
+      trinoView: semantic.enterprise_metrics.runtime_lineage_gap_count
+      dremioVirtualDataset: semantic.enterprise_metrics.runtime_lineage_gap_count
+      materialization: virtual

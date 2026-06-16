@@ -1,0 +1,205 @@
+contractVersion: 1
+dataProduct:
+  name: gold.data_product_inventory
+  layer: GOLD
+  domain: enterprise-reporting
+  product: enterprise-data-foundation
+  domainOwner: enterprise-reporting-council
+  ownerTeam: data-platform
+  businessOwner: enterprise-data-platform-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Daily inventory of governed enterprise data products, ownership, lifecycle, privacy and readiness state.
+  status: DRAFT
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: gold.finance_benefit_reconciliation
+      type: catalog_metadata
+      contractVersion: 1
+    - name: gold.recsys_interactions
+      type: catalog_metadata
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: generated_at
+
+schema:
+  columns:
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation of inventory rows.
+    - name: report_date
+      type: date
+      nullable: false
+      pii: false
+      description: Reporting date for the inventory snapshot.
+    - name: data_product_name
+      type: string
+      nullable: false
+      pii: false
+      description: Governed data product name.
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that owns the data product.
+    - name: domain_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise data domain code.
+    - name: layer
+      type: string
+      nullable: false
+      pii: false
+      description: Medallion layer.
+      allowedValues: [BRONZE, SILVER, GOLD]
+    - name: contract_version
+      type: int
+      nullable: false
+      pii: false
+      description: Active contract version in the control tower snapshot.
+    - name: contract_status
+      type: string
+      nullable: false
+      pii: false
+      description: Contract lifecycle status.
+    - name: environment
+      type: string
+      nullable: false
+      pii: false
+      description: Environment represented by this control tower row.
+    - name: owner_team
+      type: string
+      nullable: false
+      pii: false
+      description: Team accountable for technical operation.
+    - name: business_owner
+      type: string
+      nullable: false
+      pii: false
+      description: Business owner accountable for value and signoff.
+    - name: technical_owner
+      type: string
+      nullable: false
+      pii: false
+      description: Technical owner accountable for implementation and runtime support.
+    - name: data_steward
+      type: string
+      nullable: false
+      pii: false
+      description: Steward accountable for governance quality.
+    - name: classification
+      type: string
+      nullable: false
+      pii: false
+      description: Data classification.
+    - name: contains_pii
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether the source data product contains PII.
+    - name: access_policy
+      type: string
+      nullable: false
+      pii: false
+      description: Required access policy identifier.
+    - name: consumer_contract
+      type: string
+      nullable: false
+      pii: false
+      description: Required consumer contract identifier.
+    - name: freshness_slo_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Contracted freshness SLO for the data product.
+    - name: quality_profile_id
+      type: string
+      nullable: true
+      pii: false
+      description: Attached P0 quality profile when available.
+    - name: top_blocker_gate
+      type: string
+      nullable: true
+      pii: false
+      description: Highest priority failed gate for operator triage.
+    - name: last_successful_release_id
+      type: string
+      nullable: true
+      pii: false
+      description: Last release id with passing release evidence.
+    - name: active_snapshot_id
+      type: string
+      nullable: true
+      pii: false
+      description: Active or candidate snapshot id from release evidence.
+    - name: lifecycle_state
+      type: string
+      nullable: false
+      pii: false
+      description: Control tower lifecycle state for the data product.
+      allowedValues: [DRAFT_CONTRACT, CANDIDATE, CERTIFIED, ACTIVE, DEGRADED, FROZEN, WITHDRAWN, DEPRECATED]
+    - name: readiness_state
+      type: string
+      nullable: false
+      pii: false
+      description: Control tower readiness state for this data product.
+      allowedValues: [ready_for_production_signoff, blocked]
+    - name: blocker_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of active P0 blockers.
+    - name: generated_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the inventory snapshot was generated.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: inventory_product_not_null
+      type: not_null
+      column: data_product_name
+    - name: inventory_key_unique
+      type: unique
+      columns: [org_id, report_date, data_product_name]
+    - name: readiness_state_allowed
+      type: accepted_values
+      column: readiness_state
+      values: [ready_for_production_signoff, blocked]
+    - name: lifecycle_state_allowed
+      type: accepted_values
+      column: lifecycle_state
+      values: [DRAFT_CONTRACT, CANDIDATE, CERTIFIED, ACTIVE, DEGRADED, FROZEN, WITHDRAWN, DEPRECATED]
+    - name: inventory_snapshot_freshness
+      type: freshness
+      column: generated_at
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: false
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: false
+  subjectKeys: []
+  erasureMode: NONE
+  legalHoldPolicy: none
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [BI, Compliance, OperationalService]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ComplianceConsumer, ExecutiveConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CourseFlow · Quy trình chuẩn tích hợp ML vào Recommendation</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --ink:#e8ecf3; --muted:#9aa4b2;
+    --line:#2a2f3a; --accent:#5b9dff; --accent2:#7c5cff; --green:#3ecf8e; --amber:#f5b454;
+    --red:#ff6b6b; --chip:#232834;
+    --mono:'SF Mono',ui-monospace,'JetBrains Mono',Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;font-size:16px}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+  header.hero{padding:64px 0 40px;border-bottom:1px solid var(--line);
+    background:radial-gradient(1200px 400px at 20% -10%,rgba(91,157,255,.18),transparent 60%),
+               radial-gradient(900px 360px at 90% 0%,rgba(124,92,255,.16),transparent 55%);}
+  .kicker{font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+  h1{font-size:40px;line-height:1.15;margin:0 0 14px;font-weight:750;letter-spacing:-.02em}
+  h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:18px;max-width:760px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+  .chip{background:var(--chip);border:1px solid var(--line);color:var(--muted);
+    padding:6px 12px;border-radius:999px;font-size:13px;font-family:var(--mono)}
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(15,17,21,.86);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);padding:12px 0}
+  nav.toc .wrap{display:flex;gap:6px;flex-wrap:wrap}
+  nav.toc a{color:var(--muted);text-decoration:none;font-size:13.5px;padding:6px 11px;border-radius:8px;white-space:nowrap}
+  nav.toc a:hover{background:var(--panel2);color:var(--ink)}
+  section{padding:52px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:28px;margin:0 0 6px;letter-spacing:-.01em;font-weight:720}
+  h2 .num{font-family:var(--mono);color:var(--accent);font-size:18px;margin-right:12px}
+  .lead{color:var(--muted);font-size:17px;margin:0 0 28px;max-width:820px}
+  h3{font-size:20px;margin:34px 0 10px;font-weight:680}
+  h4{font-size:16px;margin:22px 0 8px;color:var(--ink);font-weight:650}
+  p{margin:0 0 14px}
+  .muted{color:var(--muted)}
+  code{font-family:var(--mono);background:var(--panel2);padding:2px 6px;border-radius:5px;font-size:.88em;color:#cfe0ff}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin:18px 0}
+  .panel.tight{padding:16px 18px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .card h4{margin-top:0}
+  .tag{display:inline-block;font-family:var(--mono);font-size:11.5px;padding:3px 9px;border-radius:6px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+  .tag.good{background:rgba(62,207,142,.14);color:var(--green);border:1px solid rgba(62,207,142,.3)}
+  .tag.warn{background:rgba(245,180,84,.14);color:var(--amber);border:1px solid rgba(245,180,84,.3)}
+  .tag.risk{background:rgba(255,107,107,.14);color:var(--red);border:1px solid rgba(255,107,107,.3)}
+  .tag.info{background:rgba(91,157,255,.14);color:var(--accent);border:1px solid rgba(91,157,255,.3)}
+  table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
+  th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.05em}
+  tr:hover td{background:rgba(255,255,255,.015)}
+  .flow{display:flex;flex-direction:column;gap:0;margin:20px 0}
+  .step{display:flex;gap:16px;position:relative;padding-bottom:22px}
+  .step:not(:last-child)::before{content:"";position:absolute;left:17px;top:38px;bottom:-4px;width:2px;background:var(--line)}
+  .step .dot{flex:0 0 36px;height:36px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:600;z-index:1}
+  .step .body{flex:1;padding-top:4px}
+  .step .body b{font-size:16px}
+  .pill{font-family:var(--mono);font-size:12px;color:var(--muted);background:var(--chip);border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin-left:6px}
+  pre{background:#0b0d12;border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow:auto;
+    font-family:var(--mono);font-size:13px;line-height:1.6;color:#d3def0;margin:16px 0}
+  pre .c{color:#6b7686}
+  pre .k{color:#7c9eff}
+  pre .s{color:#7ee0b0}
+  .ascii{background:#0b0d12;border:1px solid var(--line);border-radius:12px;padding:20px;overflow:auto;
+    font-family:var(--mono);font-size:12.5px;line-height:1.5;color:#bcc8da;white-space:pre;margin:18px 0}
+  .callout{border-left:3px solid var(--accent);background:var(--panel2);border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0}
+  .callout.warn{border-left-color:var(--amber)}
+  .callout.good{border-left-color:var(--green)}
+  .callout.key{border-left-color:var(--accent2);background:linear-gradient(90deg,rgba(124,92,255,.1),var(--panel2))}
+  ul,ol{margin:6px 0 16px;padding-left:22px}
+  li{margin:6px 0}
+  .score{display:flex;align-items:center;gap:12px;margin:8px 0}
+  .bar{flex:1;height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .score .lbl{flex:0 0 220px;font-size:14px}
+  .score .val{flex:0 0 48px;text-align:right;font-family:var(--mono);font-size:13px;color:var(--muted)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin:10px 0}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .swatch{width:11px;height:11px;border-radius:3px;display:inline-block}
+  footer{padding:40px 0 80px;color:var(--muted);font-size:14px}
+  .you-are-here{outline:2px solid var(--accent);outline-offset:2px;border-radius:12px}
+  .num-badge{font-family:var(--mono);color:var(--accent2);font-weight:700}
+  a.ref{color:var(--accent);text-decoration:none;border-bottom:1px dotted var(--accent)}
+  details{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px 16px;margin:12px 0}
+  summary{cursor:pointer;padding:10px 0;font-weight:600;color:var(--ink)}
+  details[open] summary{border-bottom:1px solid var(--line);margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Solutions Architecture · Recommendation ML</div>
+    <h1>Tích hợp Machine Learning vào hệ thống:<br><span>quy trình chuẩn cho bài toán Recommendation</span></h1>
+    <p class="sub">Đánh giá lại <code>recommendation-ml-service</code> của CourseFlow dưới góc nhìn SA, đối chiếu với cách các hệ thống lớn (Netflix, Amazon, Spotify, Uber) vận hành ML, và giải thích cặn kẽ: <b>một model được train xong rồi “vào” ứng dụng Java bằng cách nào?</b></p>
+    <div class="meta-row">
+      <span class="chip">Đối tượng: người mới với ML/MLOps</span>
+      <span class="chip">Service: Python · FastAPI</span>
+      <span class="chip">Consumer: Java · Spring (analytics-service)</span>
+      <span class="chip">Thuật toán: IMPLICIT_ITEM_CF_V1</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#tldr">TL;DR</a>
+    <a href="#current">1 · Hiện trạng</a>
+    <a href="#flow">⇄ Flow chi tiết</a>
+    <a href="#eval">2 · Đánh giá SA</a>
+    <a href="#patterns">3 · 4 cách đưa model vào app</a>
+    <a href="#lifecycle">4 · Vòng đời ML chuẩn</a>
+    <a href="#bigtech">5 · Hệ thống lớn làm gì</a>
+    <a href="#java">6 · Model “vào” Java thế nào</a>
+    <a href="#roadmap">7 · Lộ trình</a>
+    <a href="#glossary">Thuật ngữ</a>
+  </div>
+</nav>
+
+<!-- ============ TLDR ============ -->
+<section id="tldr">
+  <div class="wrap">
+    <h2><span class="num">★</span>Tóm tắt nhanh (đọc cái này trước)</h2>
+    <p class="lead">Ba điều quan trọng nhất nếu bạn chỉ có 2 phút.</p>
+
+    <div class="grid3">
+      <div class="card">
+        <span class="tag info">Sự thật #1</span>
+        <h4>Java <u>không</u> import model</h4>
+        <p class="muted">Trong thiết kế hiện tại, “model” không phải file <code>.pkl</code>/<code>.onnx</code>. Nó là <b>bảng điểm số cặp khóa học đã tính sẵn</b> nằm trong Postgres của service Python. Java chỉ <b>gọi API</b> hoặc <b>copy bảng điểm đó về</b> (materialize). Đây là pattern <i>“precompute + serve”</i>.</p>
+      </div>
+      <div class="card">
+        <span class="tag good">Sự thật #2</span>
+        <h4>Service này đã rất “chững”</h4>
+        <p class="muted">Phần <b>ranh giới, bảo mật, governance, vận hành</b> (async worker, maker-checker, quality gate, audit, Prometheus, data privacy) đã ở mức gần production của doanh nghiệp. Đây là phần khó nhất và bạn đã làm tốt.</p>
+      </div>
+      <div class="card">
+        <span class="tag warn">Sự thật #3</span>
+        <h4>Phần “khoa học” còn mỏng</h4>
+        <p class="muted">Cái còn thiếu so với hệ thống lớn là <b>vòng lặp chất lượng model</b>: đánh giá offline (precision/recall), A/B test online, theo dõi drift, và một <b>model registry</b> thực thụ. Đó là bước tiếp theo tự nhiên.</p>
+      </div>
+    </div>
+
+    <div class="callout key">
+      <b>Câu trả lời 1 dòng cho thắc mắc của bạn:</b> Với recommendation, người ta hiếm khi “nhúng model vào app Java”. Thay vào đó model chạy ở <b>service riêng (Python)</b>, sinh ra kết quả, rồi app Java <b>tiêu thụ kết quả qua HTTP API hoặc qua một bảng dữ liệu chung</b>. Bạn đang làm đúng theo hướng các hệ thống lớn — phần 3 &amp; 6 giải thích vì sao và những lựa chọn thay thế.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 1. CURRENT ============ -->
+<section id="current">
+  <div class="wrap">
+    <h2><span class="num">01</span>Hiện trạng — bạn đang có gì</h2>
+    <p class="lead">Bạn đã tách phần ML ra thành một microservice Python độc lập, tách khỏi monolith/Spring. Đây là sơ đồ thực tế đang chạy.</p>
+
+    <div class="ascii">
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          CourseFlow (Java / Spring)                            │
+│                                                                                │
+│   analytics-service                                                            │
+│   ├── RecommendationMlClient ───────────┐  (RestClient + internal JWT scopes)  │
+│   │     • enqueueRelatedCourses()        │                                      │
+│   │     • trainingRun(id)                │   HTTP nội bộ                         │
+│   │     • activeModel()                  │   (không bao giờ import code ML)      │
+│   └── RecommendationMlMaterialization    │                                      │
+│         Scheduler (mỗi 30s)              │                                      │
+│            • copy điểm số về read model  │                                      │
+└──────────────────────────────────────────┼───────────────────────────────────┘
+                                            │
+                                            ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                  recommendation-ml-service  (Python / FastAPI)                  │
+│                                                                                │
+│   API  /internal/recommendation-ml/…                                           │
+│     ├─ related-courses:enqueue   → tạo training run QUEUED                      │
+│     ├─ training-runs/{id}        → tra cứu trạng thái                           │
+│     ├─ models/active             → model đang hoạt động                         │
+│     ├─ models/{v}:request-activation / approve / reject   (maker-checker)       │
+│     └─ courses/{id}/related      → inference (gợi ý khóa liên quan)             │
+│                                                                                │
+│   Worker (courseflow-ml worker)                                                 │
+│     claim job (row lock) → train → quality gate → CANDIDATE → chờ duyệt → ACTIVE│
+│                                                                                │
+│   Thuật toán: ImplicitItemCfTrainer  (item-item collaborative filtering)        │
+└──────────────────────────────────────────┬───────────────────────────────────┘
+                                            │
+                                            ▼
+                          ┌───────────────────────────────┐
+                          │  Postgres  cf_recommendation_ml │
+                          │   • training_runs               │
+                          │   • model_versions              │
+                          │   • recommendation_scores  ◄── “model” thực chất nằm ở đây
+                          │   • *_ops_audit                 │
+                          └───────────────────────────────┘
+    </div>
+
+    <h3>Những gì service đã làm</h3>
+    <div class="grid2">
+      <div class="card">
+        <h4>Huấn luyện (training)</h4>
+        <ul class="muted">
+          <li>Item-item Collaborative Filtering từ tương tác ẩn (enrollment/click/impression có trọng số khác nhau).</li>
+          <li>Chạy <b>bất đồng bộ</b>: <code>enqueue</code> → worker nhận job bằng row-lock, có lease &amp; requeue khi worker chết.</li>
+          <li>Sinh ra điểm số cho từng cặp <code>(course, related_course)</code> kèm <code>score/similarity/support/reason_code</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Quản trị model (governance)</h4>
+        <ul class="muted">
+          <li><b>Quality gate</b>: đủ event/principal/course/pair + quality score mới được làm ứng viên.</li>
+          <li><b>Maker-checker</b>: người tạo request kích hoạt ≠ người duyệt; có audit đầy đủ.</li>
+          <li>Vòng đời rõ ràng: <code>CANDIDATE → ACTIVE → SUPERSEDED/REJECTED</code>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Bảo mật &amp; quyền riêng tư</h4>
+        <ul class="muted">
+          <li>Internal JWT, <b>fail-closed</b>, scope tối thiểu (<code>train/infer/ops</code>).</li>
+          <li><code>principalId</code> được <b>HMAC-SHA256</b> trước khi lưu — không lưu ID học viên thô.</li>
+          <li>Payload training bị <b>scrub</b> sau 30 ngày; docs/OpenAPI tắt mặc định.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Vận hành (ops)</h4>
+        <ul class="muted">
+          <li>Prometheus gauges: job theo trạng thái, model stale, pending approval, migration ready…</li>
+          <li>Health/readiness tách biệt; migration chạy job riêng (không tự chạy trong container app).</li>
+          <li>Smoke test + evidence ký số cho release.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FLOW CHI TIẾT ============ -->
+<section id="flow">
+  <div class="wrap">
+    <h2><span class="num">⇄</span>Flow hoạt động hiện tại (vẽ lại sau khi review sâu toàn bộ code)</h2>
+    <p class="lead">Đây là dòng chảy thực tế của dự án, dựng lại từ chính source code: phía Java <b>analytics-service</b> (vừa là <i>producer</i> kích hoạt train, vừa là <i>consumer</i> tiêu thụ kết quả) và service Python <b>recommendation-ml-service</b>. Điểm cốt lõi: đây là hệ thống <b>2 vòng bất đồng bộ độc lập</b>, nối với nhau chỉ bằng một <code>trainingRunId</code>.</p>
+
+    <h3>A · Bức tranh tổng thể end-to-end (9 chặng)</h3>
+    <div class="ascii">
+ NGƯỜI DÙNG / HỆ THỐNG                JAVA · analytics-service                 PYTHON · recommendation-ml-service        DB
+ ─────────────────────               ───────────────────────                 ─────────────────────────────────        ──
+
+ ① học viên xem/click/enroll  ─────▶ recordRecommendationEvent()
+    (impression/click/enroll)        • idempotent (eventId+hash)         ┌──▶ ghi recommendation_tracking_events
+    enrollment qua Kafka      ─────▶ recordEnrollmentSignal()       ─────┘     (studentId tin cậy, chặn PII)
+
+ ② admin/cron bấm "train"     ─────▶ enqueueMlRelatedCourseTraining()
+                                     • đọc tracking events → interactions
+                                     • HASH principalId (sha256)
+                                     • POST related-courses:enqueue ───────▶ ③ INSERT training_run = QUEUED ──────▶ [training_runs]
+                                     • lưu job theo dõi (Java)               (payload_json: principal đã HMAC)
+                                       [recommendation_ml_training_jobs]
+
+                                                          ┌───── VÒNG ASYNC #1: WORKER ML (courseflow-ml worker) ─────┐
+                                                          │  ④ claim job (FOR UPDATE SKIP LOCKED) → RUNNING           │
+                                                          │  ⑤ train ImplicitItemCfTrainer (item-item CF)            │
+                                                          │  ⑥ quality gate → rẽ nhánh:                              │
+                                                          │       prod  → CANDIDATE + PENDING_ACTIVATION             │
+                                                          │       local → ACTIVE ngay (advisory lock)               │
+                                                          │     ghi recommendation_related_course_scores ──▶ [scores]│
+                                                          └──────────────────────────────────────────────────────────┘
+
+ ③' ops (maker)              ─────▶ (gọi qua gateway)  ──────────────────▶ ⑦ request-activation → PENDING approval
+ ③" ops khác (checker)       ─────▶                    ──────────────────▶    approve → CANDIDATE→ACTIVE (supersede cũ)
+                                                                              reject  → REJECTED / ACTIVATION_REJECTED
+
+              ┌───── VÒNG ASYNC #2: MATERIALIZATION SCHEDULER (Java, mỗi 30s) ─────┐
+              │  ⑧ claim job đang chờ (lock/lease riêng của Java)                   │
+              │     • GET /training-runs/{id}  ──────────────────────────▶ trả status + scores
+              │     • GET /models/active       ──────────────────────────▶ trả model ACTIVE
+              │     • nếu ACTIVE & chưa có → materialize điểm số
+              │       ghi vào read model  ─────────────────────────────▶ [related_courses source=ML]
+              └────────────────────────────────────────────────────────────────────┘
+
+ ⑨ học viên xem trang khóa học ◀──── RecommendationController phục vụ từ [related_courses]
+    (gợi ý "khóa liên quan")          theo thứ tự ưu tiên fallback (xem mục G)
+    </div>
+    <div class="callout">
+      <b>Đọc sơ đồ:</b> Java <b>không chờ</b> ML train xong. Bước ② trả về ngay (<code>202 QUEUED</code>). Việc train chạy ở <b>vòng async #1</b> (worker ML). Việc lấy kết quả về chạy ở <b>vòng async #2</b> (scheduler Java mỗi 30s). Hai vòng này gặp nhau qua <code>trainingRunId</code> — đây là kiến trúc <i>polling</i> bất đồng bộ, rất bền (không có cuộc gọi nào bị treo chờ).
+    </div>
+
+    <h3>B · Chi tiết từng chặng</h3>
+    <div class="grid2">
+      <div class="card"><span class="tag info">① Thu thập</span><h4>Tracking events (producer)</h4><p class="muted"><code>recordRecommendationEvent()</code> ghi impression/click/enrollment vào <code>recommendation_tracking_events</code>, có <b>idempotency</b> (eventId + requestHash), chặn <b>PII</b> trong metadata, dùng <code>studentId</code> tin cậy từ gateway. Enrollment còn vào qua Kafka (<code>recordEnrollmentSignal</code>).</p></div>
+      <div class="card"><span class="tag info">② Kích hoạt</span><h4>Enqueue training</h4><p class="muted"><code>enqueueMlRelatedCourseTraining()</code> đọc tương tác trong N ngày (<code>lookbackDays</code>, mặc định 180), <b>hash principalId</b> rồi POST <code>related-courses:enqueue</code>. Lưu một bản ghi theo dõi riêng phía Java (<code>recommendation_ml_training_jobs</code>).</p></div>
+      <div class="card"><span class="tag info">③ Nhận job</span><h4>QUEUED (ML)</h4><p class="muted">ML INSERT một <code>training_run</code> trạng thái <code>QUEUED</code>, lưu <code>payload_json</code> chứa interactions với principal đã <b>HMAC-SHA256</b> (không phải ID thô), trả <code>202</code> ngay.</p></div>
+      <div class="card"><span class="tag info">④⑤ Train</span><h4>Worker ML claim &amp; train</h4><p class="muted">Worker <code>claim_next_training_job</code> bằng <code>FOR UPDATE SKIP LOCKED</code> → <code>RUNNING</code>, tăng <code>attempt_count</code>. Chạy <code>ImplicitItemCfTrainer</code> sinh điểm số cặp khóa học.</p></div>
+      <div class="card"><span class="tag info">⑥ Gate</span><h4>Quality gate &amp; rẽ nhánh</h4><p class="muted">Kiểm event/principal/course/pair count + quality score. Không đủ → <code>INSUFFICIENT_DATA</code>/<code>QUALITY_GATE_FAILED</code>. Đủ + prod → <code>CANDIDATE</code> chờ duyệt. Đủ + local → <code>ACTIVE</code> ngay.</p></div>
+      <div class="card"><span class="tag info">⑦ Duyệt</span><h4>Maker-checker</h4><p class="muted">Ops A xin kích hoạt (<code>request-activation</code> → PENDING), ops B duyệt/từ chối. Người xin ≠ người duyệt (chặn ở cả service lẫn SQL). Mọi thao tác ghi <code>*_ops_audit</code>.</p></div>
+      <div class="card"><span class="tag info">⑧ Materialize</span><h4>Scheduler Java kéo kết quả</h4><p class="muted">Mỗi 30s: claim job đang chờ (lock/lease <i>riêng của Java</i>), gọi <code>/training-runs/{id}</code> &amp; <code>/models/active</code>, nếu ACTIVE &amp; read model chưa có version đó → copy điểm số vào <code>related_courses</code> (source=ML).</p></div>
+      <div class="card"><span class="tag info">⑨ Phục vụ</span><h4>Serve cho học viên</h4><p class="muted"><code>RecommendationController</code> đọc từ <code>related_courses</code> đã materialize — <b>không gọi ML lúc người dùng request</b>. Nhanh và không phụ thuộc ML đang sống hay chết.</p></div>
+    </div>
+
+    <h3>C · Vòng đời training run (state machine)</h3>
+    <div class="ascii">
+                         ┌─────────────┐  worker claim (SKIP LOCKED)   ┌──────────┐
+        enqueue ───────▶ │   QUEUED    │ ────────────────────────────▶ │ RUNNING  │
+                         └─────────────┘                               └────┬─────┘
+                            ▲      │ cancel                                  │
+              requeue (ops) │      ▼                                         │ train + gate
+              (FAILED/      │  ┌───────────┐                                 ▼
+               CANCELLED    │  │ CANCELLED │             ┌───────────────────┼───────────────────────────┐
+               + payload)   │  └───────────┘             ▼                   ▼                           ▼
+                            │                    INSUFFICIENT_DATA   QUALITY_GATE_FAILED         (gate PASS)
+                            │                            │                   │                    ┌──────┴───────┐
+              lease hết hạn │                            └───────────────────┘              prod  │              │ local
+              attempt<max ──┘                                  (kết thúc)             PENDING_ACTIVATION       ACTIVE
+              attempt≥max ──▶ FAILED (WORKER_LEASE_EXPIRED)                            │        │
+                                                                              approve  │        │ reject
+                                                                                       ▼        ▼
+                                                                                    ACTIVE  ACTIVATION_REJECTED
+    </div>
+
+    <h3>D · Vòng đời model version (state machine)</h3>
+    <div class="ascii">
+   train (local/auto)                ┌──────────┐  maker-checker approve / auto   ┌────────┐
+   ───────────────────────────────▶ │ CANDIDATE │ ──────────────────────────────▶ │ ACTIVE │ ◀── chỉ 1 bản ACTIVE
+                                     └────┬─────┘                                 └───┬────┘     (advisory lock)
+                                          │ reject                                    │ model mới ACTIVE
+                                          ▼                                           ▼
+                                     ┌──────────┐                               ┌────────────┐
+                                     │ REJECTED │                               │ SUPERSEDED │
+                                     └──────────┘                               └─────┬──────┘
+                                                          maker-checker reactivate ◀──┘ (SUPERSEDED → ACTIVE)
+    </div>
+
+    <h3>E · Bảng "ai gọi ai" (endpoint · caller · scope)</h3>
+    <table>
+      <thead><tr><th>Endpoint ML</th><th>Người gọi</th><th>Scope JWT</th><th>Mục đích</th></tr></thead>
+      <tbody>
+        <tr><td><code>related-courses:enqueue</code></td><td>analytics · enqueueMlRelatedCourseTraining</td><td><code>:train</code></td><td>Đẩy job training</td></tr>
+        <tr><td><code>training-runs/{id}</code></td><td>analytics · scheduler (vòng #2)</td><td><code>:train</code></td><td>Poll trạng thái + lấy scores</td></tr>
+        <tr><td><code>models/active</code></td><td>analytics · syncActiveMlModelReadModel</td><td><code>:infer</code></td><td>Đồng bộ model đang ACTIVE</td></tr>
+        <tr><td><code>courses/{id}/related</code></td><td>(inference trực tiếp — tùy chọn)</td><td><code>:infer</code></td><td>Lấy gợi ý real-time</td></tr>
+        <tr><td><code>models/{v}:request-activation</code> / <code>:approve</code> / <code>:reject</code></td><td>ops/admin qua gateway</td><td><code>:ops</code></td><td>Maker-checker kích hoạt</td></tr>
+        <tr><td><code>training-runs/{id}:cancel</code> / <code>:requeue</code></td><td>ops/admin qua gateway</td><td><code>:ops</code></td><td>Vận hành job</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">Mọi cuộc gọi mang internal JWT (mint bởi identity-token-converter), ML xác thực HS256-local hoặc RS256-JWKS, kiểm scope tối thiểu, <b>fail-closed</b>. Token <code>actor_type=service</code> cần đúng scope; <code>actor_type=user</code> phải là ADMIN và khớp header gateway.</p>
+
+    <h3>F · Chuỗi fallback khi phục vụ người dùng (chặng ⑨)</h3>
+    <div class="ascii">
+   GET gợi ý "khóa liên quan" cho courseId
+        │
+        ├─① MANUAL override (admin tự gắn, manual_related_courses)  ──▶ ưu tiên cao nhất
+        │
+        ├─② ML read model (related_courses source=ML, đã materialize) ──▶ kết quả từ model
+        │
+        └─③ BEHAVIORAL fallback (co-enrollment thống kê thuần SQL)   ──▶ khi ML chưa/không có
+            (pairStats.recomputeFromTrackingEvents + refreshGeneratedReadModel)
+    </div>
+    <div class="callout good">
+      <b>Đây là điểm thiết kế xuất sắc:</b> hệ thống <b>không bao giờ trả trang trống</b>. ML chết → tự rơi về thống kê co-enrollment; chưa có dữ liệu → admin vẫn gắn tay được. Mỗi cuộc gọi ML đều có metric <code>...client_requests_total{result="fallback"}</code> để SRE cảnh báo khi production âm thầm chạy bằng fallback thay vì ML.
+    </div>
+
+    <h3>G · Phát hiện mới từ lần review sâu này</h3>
+    <table>
+      <thead><tr><th style="width:32%">Quan sát</th><th>Chi tiết</th><th style="width:90px">Tính chất</th></tr></thead>
+      <tbody>
+        <tr><td><b>Hai hệ thống job song song</b></td><td>ML có <code>training_runs</code>; Java lại có bảng theo dõi riêng <code>recommendation_ml_training_jobs</code> + worker-lock/lease riêng cho materialization. Đây là <i>chủ đích</i> (mỗi bên tự quản phần của mình) nhưng là điểm cần nhớ khi debug: trạng thái job tồn tại ở <b>2 nơi</b> và đồng bộ qua polling.</td><td><span class="tag info">Kiến trúc</span></td></tr>
+        <tr><td><b>Hai cơ chế hash principal khác nhau</b></td><td>Java hash <code>sha256:<hex></code> trước khi gửi; ML lại HMAC-SHA256 (<code>hmac-sha256:...</code>) khi lưu payload. Tức principal bị hash <b>2 lớp</b>. Tốt cho privacy, nhưng nghĩa là <code>request_hash</code> idempotency của ML tính trên giá trị đã-hash-bởi-Java — cần ý thức khi so khớp/tra cứu.</td><td><span class="tag warn">Lưu ý</span></td></tr>
+        <tr><td><b>Đường train đồng bộ là "di sản"</b></td><td><code>recomputeRelatedCoursePairs()</code> (Java) gọi <code>related-courses:train</code> đồng bộ — nhưng prod tắt endpoint này (<code>SYNC_TRAINING_ENABLED=false</code>). Luồng prod thực tế chỉ đi qua <code>enqueue</code>. Đường sync chỉ còn cho local/demo.</td><td><span class="tag info">Ghi chú</span></td></tr>
+        <tr><td><b>Idempotency 2 tầng</b></td><td>Cùng <code>trainingRunId</code> + cùng payload → ML trả lại run cũ thay vì train lại; payload khác → <code>409</code>. Bảo vệ tốt khi scheduler/worker retry. (<code>_duplicate_training_run</code>)</td><td><span class="tag good">Điểm tốt</span></td></tr>
+        <tr><td><b>Bảo toàn "đã hủy"</b></td><td><code>finish_training_run</code> có điều kiện <code>status &lt;&gt; 'CANCELLED'</code>, và <code>activate_model</code>/<code>register_candidate</code> kiểm lại status <code>FOR UPDATE</code> trước khi publish. Worker không thể "ghi đè" một job đã bị ops hủy giữa chừng. Xử lý race rất cẩn thận.</td><td><span class="tag good">Điểm tốt</span></td></tr>
+        <tr><td><b>Chỉ-một-ACTIVE được khóa cứng</b></td><td>Mọi thao tác đổi model ACTIVE đi qua cùng một <code>pg_advisory_xact_lock</code> (namespace 947201/530110): supersede bản cũ rồi mới set bản mới, trong một transaction. Không thể có 2 model ACTIVE đồng thời.</td><td><span class="tag good">Điểm tốt</span></td></tr>
+        <tr><td><b>Metrics tính tại thời điểm scrape</b></td><td><code>/actuator/prometheus</code> chạy query gom số liệu vận hành <i>mỗi lần Prometheus scrape</i>. Tiện (luôn tươi) nhưng mỗi scrape là vài query DB — nếu tần suất scrape cao và bảng lớn, cần để mắt tải DB.</td><td><span class="tag warn">Lưu ý</span></td></tr>
+        <tr><td><b>Materialize có chống "lùi thời gian"</b></td><td><code>existsMlReadModelNewerThan(generatedAt)</code> ngăn ghi đè read model bằng kết quả cũ hơn; <code>forceReplace</code> chỉ dùng khi đồng bộ model ACTIVE. Tránh được tình huống 2 scheduler ghi loạn thứ tự.</td><td><span class="tag good">Điểm tốt</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 2. EVALUATION ============ -->
+<section id="eval">
+  <div class="wrap">
+    <h2><span class="num">02</span>Đánh giá kiến trúc dưới góc nhìn SA</h2>
+    <p class="lead">Chấm theo các trục mà một SA dùng để đánh giá độ trưởng thành của một thành phần ML trong hệ thống.</p>
+
+    <h3>Bảng điểm trưởng thành</h3>
+    <div class="panel">
+      <div class="score"><span class="lbl">Ranh giới &amp; tách biệt service</span><div class="bar"><i style="width:95%"></i></div><span class="val">9.5</span></div>
+      <div class="score"><span class="lbl">Bảo mật &amp; quyền riêng tư</span><div class="bar"><i style="width:92%"></i></div><span class="val">9.0</span></div>
+      <div class="score"><span class="lbl">Governance &amp; audit model</span><div class="bar"><i style="width:90%"></i></div><span class="val">9.0</span></div>
+      <div class="score"><span class="lbl">Vận hành &amp; observability</span><div class="bar"><i style="width:85%"></i></div><span class="val">8.5</span></div>
+      <div class="score"><span class="lbl">Xử lý bất đồng bộ &amp; phục hồi lỗi</span><div class="bar"><i style="width:85%"></i></div><span class="val">8.5</span></div>
+      <div class="score"><span class="lbl">Đánh giá chất lượng model (offline)</span><div class="bar"><i style="width:30%"></i></div><span class="val">3.0</span></div>
+      <div class="score"><span class="lbl">Thử nghiệm online (A/B test)</span><div class="bar"><i style="width:15%"></i></div><span class="val">1.5</span></div>
+      <div class="score"><span class="lbl">Model registry &amp; quản lý artifact</span><div class="bar"><i style="width:35%"></i></div><span class="val">3.5</span></div>
+      <div class="score"><span class="lbl">Feature store / feature pipeline</span><div class="bar"><i style="width:20%"></i></div><span class="val">2.0</span></div>
+      <div class="score"><span class="lbl">Giám sát drift / chất lượng theo thời gian</span><div class="bar"><i style="width:25%"></i></div><span class="val">2.5</span></div>
+    </div>
+    <p class="muted">Nhận định tổng: <b>Phần “kỹ thuật phần mềm/platform” đã rất mạnh; phần “khoa học dữ liệu/MLOps vòng đời model” mới ở giai đoạn đầu.</b> Đây là hình mẫu rất điển hình và <i>lành mạnh</i> — bạn đã xây nền móng đúng trước khi tối ưu thuật toán.</p>
+
+    <h3>Điểm mạnh nổi bật</h3>
+    <div class="grid2">
+      <div class="card"><span class="tag good">Mạnh</span><h4>Ranh giới đúng chuẩn “ML như một service”</h4><p class="muted">Java không import code ML, không ghi thẳng DB của ML. Mọi thứ qua API có hợp đồng (contract) rõ ràng. Đây chính xác là cách Netflix/Uber tách ML khỏi backend nghiệp vụ.</p></div>
+      <div class="card"><span class="tag good">Mạnh</span><h4>Có “fallback” khi ML chết</h4><p class="muted"><code>RecommendationMlClient</code> trả về <i>fallback outcome</i> khi service ML lỗi/timeout, có metric riêng để cảnh báo. Hệ thống không sập chỉ vì ML sập — nguyên tắc vàng khi nhúng ML vào luồng người dùng.</p></div>
+      <div class="card"><span class="tag good">Mạnh</span><h4>Coi model là tài sản cần kiểm soát</h4><p class="muted">Maker-checker + audit + quality gate nghĩa là không model rác nào tự động lên production. Rất nhiều startup bỏ qua bước này và trả giá.</p></div>
+      <div class="card"><span class="tag good">Mạnh</span><h4>Privacy-by-design</h4><p class="muted">Hash principal, scrub payload, scope tối thiểu. Với dữ liệu hành vi học viên, đây là điểm cộng lớn về tuân thủ.</p></div>
+    </div>
+
+    <h3>Điểm cần lưu ý / rủi ro</h3>
+    <table>
+      <thead><tr><th style="width:30%">Vấn đề</th><th>Giải thích &amp; khuyến nghị</th><th style="width:90px">Mức</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>“Model” = điểm số tính sẵn, không có artifact</b></td>
+          <td>Hiện model chỉ là các dòng <code>recommendation_scores</code>. Ưu điểm: serve cực nhanh, đơn giản. Hạn chế: <b>không gợi ý được cho khóa/học viên mới</b> (cold-start), không cá nhân hóa theo người dùng real-time, và muốn đổi thuật toán phải train lại toàn bộ. Cần ý thức rõ đây là <i>batch recommender</i>, không phải <i>online model</i>.</td>
+          <td><span class="tag info">Thiết kế</span></td>
+        </tr>
+        <tr>
+          <td><b>Chưa có đánh giá offline</b></td>
+          <td><code>quality_score</code> hiện là trung bình điểm similarity nội tại — <b>không phải</b> thước đo độ tốt thật sự. Hệ thống lớn tách tập train/test theo thời gian và đo Recall@K, NDCG, MAP… trước khi cho model lên. Khuyến nghị: thêm bước holdout evaluation vào worker.</td>
+          <td><span class="tag risk">Cao</span></td>
+        </tr>
+        <tr>
+          <td><b>Chưa có A/B test online</b></td>
+          <td>Quyết định model mới có tốt hơn model cũ không hiện dựa vào cảm tính/gate tĩnh. Cần cơ chế phục vụ song song 2 model cho 2 nhóm người dùng và đo CTR/enrollment thực tế.</td>
+          <td><span class="tag warn">Trung bình</span></td>
+        </tr>
+        <tr>
+          <td><b>Singleton qua <code>lru_cache</code></b></td>
+          <td><code>get_recommendation_service()</code>/repository cache toàn cục — tiện nhưng khó test và giữ kết nối DB lâu dài. Cân nhắc dùng dependency lifecycle của FastAPI (lifespan) cho pool kết nối.</td>
+          <td><span class="tag warn">Thấp</span></td>
+        </tr>
+        <tr>
+          <td><b>Chưa có model registry thực thụ</b></td>
+          <td><code>model_versions</code> là registry “tự chế” trong DB nghiệp vụ. Khi có model thứ 2 (content-based, ranking…), bạn sẽ cần nơi quản lý artifact + metadata + lineage chuẩn (MLflow / S3 versioned). Xem phần 4.</td>
+          <td><span class="tag warn">Trung bình</span></td>
+        </tr>
+        <tr>
+          <td><b>Train chạy trong process worker</b></td>
+          <td>Hiện train CF bằng vòng lặp Python thuần, ổn ở quy mô nhỏ. Khi dữ liệu lớn (hàng chục triệu tương tác), cấu trúc <code>O(users × items²)</code> sẽ thành nút cổ chai — cần chuyển sang thư viện chuyên (implicit/Spark ALS) hoặc batch job tách riêng.</td>
+          <td><span class="tag info">Tương lai</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <b>Kết luận SA:</b> Service đạt mức <b>“production-ready về mặt platform”</b> nhưng mới <b>“giai đoạn 1 về mặt ML lifecycle”</b>. Đừng vội thêm thuật toán phức tạp — hãy đóng vòng lặp <i>train → đánh giá → so sánh → kích hoạt → giám sát</i> trước. Phần 4 mô tả vòng lặp chuẩn đó.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. PATTERNS ============ -->
+<section id="patterns">
+  <div class="wrap">
+    <h2><span class="num">03</span>4 cách đưa một ML model vào ứng dụng</h2>
+    <p class="lead">Đây là phần trả lời trực tiếp thắc mắc “train ra model rồi import vào Java hay như thế nào”. Có <b>4 pattern</b> phổ biến; “import vào app” chỉ là <b>một</b> trong số đó và thường <i>không</i> phải lựa chọn cho recommendation.</p>
+
+    <div class="grid2">
+      <!-- Pattern A -->
+      <div class="card you-are-here">
+        <span class="tag good">BẠN ĐANG Ở ĐÂY</span>
+        <h4><span class="num-badge">A.</span> Precompute + Serve from table</h4>
+        <p class="muted">Train theo batch → tính sẵn kết quả cho mọi item → lưu vào DB/cache → app chỉ việc <b>SELECT</b>.</p>
+        <p style="font-size:13.5px"><b>Model “đi” vào app:</b> qua <b>bảng dữ liệu</b> (hoặc API đọc bảng). Không có file model nào được nạp vào JVM.</p>
+        <div class="legend" style="margin-top:10px">
+          <span><span class="swatch" style="background:var(--green)"></span>Đơn giản, cực nhanh khi serve</span>
+          <span><span class="swatch" style="background:var(--red)"></span>Cold-start kém, không real-time</span>
+        </div>
+      </div>
+      <!-- Pattern B -->
+      <div class="card">
+        <span class="tag info">Phổ biến nhất ở big-tech</span>
+        <h4><span class="num-badge">B.</span> Model-as-a-Service (online inference)</h4>
+        <p class="muted">Model nạp sẵn trong service riêng (Python/Triton/TF-Serving). App gọi <b>API real-time</b> truyền features, nhận dự đoán.</p>
+        <p style="font-size:13.5px"><b>Model “đi” vào app:</b> <b>không đi đâu cả</b> — app chỉ gọi HTTP/gRPC. Model sống và được nâng cấp độc lập.</p>
+        <div class="legend" style="margin-top:10px">
+          <span><span class="swatch" style="background:var(--green)"></span>Cá nhân hóa real-time, đổi model không đụng app</span>
+          <span><span class="swatch" style="background:var(--red)"></span>Thêm 1 cú network hop, cần lo độ trễ</span>
+        </div>
+      </div>
+      <!-- Pattern C -->
+      <div class="card">
+        <span class="tag warn">Đây mới là “import vào Java”</span>
+        <h4><span class="num-badge">C.</span> Embedded artifact trong app</h4>
+        <p class="muted">Train ở Python → export ra định dạng trung lập (<b>ONNX, PMML, TF SavedModel</b>) → app Java <b>nạp file đó</b> bằng runtime (ONNX Runtime/DJL/PMML4S) và chạy dự đoán <b>ngay trong JVM</b>.</p>
+        <p style="font-size:13.5px"><b>Model “đi” vào app:</b> dưới dạng <b>file artifact</b> được nạp lúc khởi động. Đây chính là hình dung “import model vào Java” của bạn.</p>
+        <div class="legend" style="margin-top:10px">
+          <span><span class="swatch" style="background:var(--green)"></span>Không network hop, độ trễ thấp nhất</span>
+          <span><span class="swatch" style="background:var(--red)"></span>App &amp; model dính chặt, deploy lại app mỗi lần đổi model</span>
+        </div>
+      </div>
+      <!-- Pattern D -->
+      <div class="card">
+        <span class="tag info">Quy mô lớn / trưởng thành</span>
+        <h4><span class="num-badge">D.</span> Model Registry + Feature Store</h4>
+        <p class="muted">Đầy đủ MLOps: artifact lưu ở <b>registry</b> (MLflow), features lấy từ <b>feature store</b>, serving tự động pull model mới nhất theo tag. App vẫn dùng A/B/C ở “điểm cuối” nhưng có cả hệ thống quản lý phía sau.</p>
+        <p style="font-size:13.5px"><b>Model “đi” vào app:</b> registry quyết định bản nào “Production”, serving tự nạp. App không quan tâm version cụ thể.</p>
+        <div class="legend" style="margin-top:10px">
+          <span><span class="swatch" style="background:var(--green)"></span>Tự động hóa, truy vết, rollback dễ</span>
+          <span><span class="swatch" style="background:var(--red)"></span>Đầu tư hạ tầng lớn, thừa cho dự án nhỏ</span>
+        </div>
+      </div>
+    </div>
+
+    <h3>So sánh nhanh</h3>
+    <table>
+      <thead><tr><th>Tiêu chí</th><th>A · Precompute</th><th>B · Service</th><th>C · Embedded</th><th>D · Registry</th></tr></thead>
+      <tbody>
+        <tr><td>Độ trễ serve</td><td>Cực thấp (đọc bảng)</td><td>Thấp–TB (1 hop)</td><td>Thấp nhất (in-process)</td><td>Tùy điểm cuối</td></tr>
+        <tr><td>Cá nhân hóa real-time</td><td>Khó</td><td>Tốt</td><td>Tốt</td><td>Tốt</td></tr>
+        <tr><td>Đổi model không đụng app</td><td>Có</td><td>Có</td><td><b>Không</b></td><td>Có</td></tr>
+        <tr><td>Cold-start (item/user mới)</td><td>Kém</td><td>Tốt (nếu model hỗ trợ)</td><td>Tốt</td><td>Tốt</td></tr>
+        <tr><td>Độ phức tạp vận hành</td><td>Thấp</td><td>TB</td><td>TB</td><td>Cao</td></tr>
+        <tr><td>Hợp với recommendation “khóa liên quan”</td><td><b>Rất hợp</b></td><td>Hợp (ranking cá nhân)</td><td>Ít dùng</td><td>Khi đã lớn</td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout key">
+      <b>Vì sao recommendation hiếm khi dùng pattern C (“import vào Java”)?</b> Recommender thường cần (1) dữ liệu &amp; thư viện toán học của hệ sinh thái Python, (2) train lại thường xuyên, (3) cá nhân hóa theo người dùng. Nhúng model vào JVM khiến mỗi lần đổi model phải deploy lại app — quá cứng nhắc. Vì vậy A và B (đúng những gì bạn đang/đi tới) là chuẩn mực của ngành. Pattern C hợp hơn với model <i>nhỏ, ổn định, độ trễ siêu thấp</i> như chấm điểm gian lận hay xếp hạng tìm kiếm.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. LIFECYCLE ============ -->
+<section id="lifecycle">
+  <div class="wrap">
+    <h2><span class="num">04</span>Vòng đời ML chuẩn — quy trình end-to-end</h2>
+    <p class="lead">Đây là “quy trình chuẩn” mà câu hỏi của bạn nhắm tới. 9 bước, lặp đi lặp lại. Mỗi bước kèm: <i>hệ thống lớn làm gì</i> và <i>CourseFlow của bạn đang ở đâu</i>.</p>
+
+    <div class="flow">
+      <div class="step"><div class="dot">1</div><div class="body">
+        <b>Đóng khung bài toán (Problem framing)</b> <span class="pill">offline · 1 lần đầu</span>
+        <p class="muted">Xác định: gợi ý cái gì, đặt ở đâu, đo thành công bằng chỉ số nào (CTR? tỷ lệ enroll? thời gian học?). Chọn loại bài toán: “khóa liên quan” (item-to-item) hay “gợi ý cho bạn” (personalized).</p>
+        <p style="font-size:13.5px"><span class="tag good">CourseFlow</span> Đã rõ: item-to-item “khóa liên quan”, có <code>reason_code</code>. ✔</p>
+      </div></div>
+
+      <div class="step"><div class="dot">2</div><div class="body">
+        <b>Thu thập &amp; chuẩn bị dữ liệu</b> <span class="pill">data pipeline</span>
+        <p class="muted">Gom log hành vi (xem, click, enroll), làm sạch, khử trùng lặp, gán nhãn ngầm. Đây thường là 70% công sức của một dự án ML.</p>
+        <p style="font-size:13.5px"><span class="tag good">CourseFlow</span> analytics-service gom <code>RecommendationTrackingEvent</code> và đẩy sang ML đã hash. ✔</p>
+      </div></div>
+
+      <div class="step"><div class="dot">3</div><div class="body">
+        <b>Feature engineering</b> <span class="pill">feature store (khi lớn)</span>
+        <p class="muted">Biến dữ liệu thô thành đặc trưng model hiểu được: trọng số theo loại sự kiện, vector tương tác người–khóa… Big-tech tách ra <b>feature store</b> để tái dùng giữa train &amp; serve (tránh “train/serve skew”).</p>
+        <p style="font-size:13.5px"><span class="tag warn">CourseFlow</span> Có trọng số sự kiện (enroll=6, click=2, impression=0.2) ngay trong trainer. Chưa có feature store — chấp nhận được ở giai đoạn này.</p>
+      </div></div>
+
+      <div class="step"><div class="dot">4</div><div class="body">
+        <b>Huấn luyện (training)</b> <span class="pill">batch job</span>
+        <p class="muted">Chạy thuật toán sinh ra model/kết quả. Phải <b>tái lặp được</b> (cùng input → cùng output) và <b>truy vết được</b> (biết model nào train từ dữ liệu nào).</p>
+        <p style="font-size:13.5px"><span class="tag good">CourseFlow</span> Worker train CF, có <code>request_hash</code> để idempotent, lưu lineage training-run → model. ✔</p>
+      </div></div>
+
+      <div class="step"><div class="dot">5</div><div class="body">
+        <b>Đánh giá offline (evaluation)</b> <span class="pill">cổng chất lượng</span>
+        <p class="muted">Giữ lại một phần dữ liệu (theo thời gian) làm tập test, đo <b>Recall@K, NDCG, MAP, coverage, diversity</b>. Chỉ model vượt ngưỡng &amp; tốt hơn model cũ mới đi tiếp.</p>
+        <p style="font-size:13.5px"><span class="tag risk">CourseFlow · còn thiếu</span> Hiện chỉ có gate đếm số lượng + similarity nội tại. <b>Đây là khoảng trống lớn nhất.</b> Đề xuất cụ thể ở phần 7.</p>
+      </div></div>
+
+      <div class="step"><div class="dot">6</div><div class="body">
+        <b>Đăng ký model (model registry)</b> <span class="pill">versioning</span>
+        <p class="muted">Lưu artifact + metadata + chỉ số đánh giá, gắn nhãn <code>Staging/Production</code>, hỗ trợ rollback. MLflow là chuẩn de-facto.</p>
+        <p style="font-size:13.5px"><span class="tag warn">CourseFlow</span> Có <code>model_versions</code> + trạng thái <code>CANDIDATE/ACTIVE/SUPERSEDED</code> — một registry tối giản trong DB. Đủ dùng bây giờ; cân nhắc MLflow khi có model thứ 2.</p>
+      </div></div>
+
+      <div class="step"><div class="dot">7</div><div class="body">
+        <b>Triển khai / kích hoạt (deploy &amp; activate)</b> <span class="pill">maker-checker</span>
+        <p class="muted">Đưa model lên phục vụ: blue-green, canary, hoặc bật cờ. Có người duyệt và khả năng rollback tức thì.</p>
+        <p style="font-size:13.5px"><span class="tag good">CourseFlow</span> Maker-checker activation + audit + advisory lock. Rất chuẩn. ✔✔</p>
+      </div></div>
+
+      <div class="step"><div class="dot">8</div><div class="body">
+        <b>Đánh giá online (A/B test)</b> <span class="pill">experiment</span>
+        <p class="muted">Phục vụ song song model mới (treatment) vs cũ (control) cho 2 nhóm người dùng, đo chỉ số <b>kinh doanh thực tế</b>. Đây là “tòa án tối cao” quyết định model có thật sự tốt hơn.</p>
+        <p style="font-size:13.5px"><span class="tag risk">CourseFlow · còn thiếu</span> Chưa có khung experiment. Bước này cần model registry (6) cho phép giữ nhiều bản ACTIVE song song.</p>
+      </div></div>
+
+      <div class="step"><div class="dot">9</div><div class="body">
+        <b>Giám sát &amp; train lại (monitor &amp; retrain)</b> <span class="pill">vòng lặp</span>
+        <p class="muted">Theo dõi độ trễ, lỗi, <b>data drift</b> (phân bố dữ liệu đổi), <b>model staleness</b>, suy giảm chất lượng → tự động kích hoạt train lại. Vòng lặp khép kín về bước 2.</p>
+        <p style="font-size:13.5px"><span class="tag good">CourseFlow</span> Có metric staleness, pending approval, fallback rate. Chưa có drift detection &amp; auto-retrain trigger — bước tự nhiên tiếp theo.</p>
+      </div></div>
+    </div>
+
+    <div class="callout good">
+      <b>Quy trình này không tuyến tính — nó là một vòng tròn.</b> Bước 9 quay về bước 2. “Train một lần rồi xong” là quan niệm sai phổ biến nhất của người mới: model sẽ <i>cũ đi</i> khi hành vi người dùng &amp; danh mục khóa học thay đổi, nên train lại định kỳ là phần bắt buộc của vận hành, không phải việc làm một lần.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. BIGTECH ============ -->
+<section id="bigtech">
+  <div class="wrap">
+    <h2><span class="num">05</span>Các hệ thống lớn làm thế nào</h2>
+    <p class="lead">Để bạn có “tham chiếu” như yêu cầu. Điểm chung: <b>ML luôn là service/pipeline tách biệt</b>, có registry, có experiment, train lại liên tục. Không ai “nhúng model vào app backend chính”.</p>
+
+    <table>
+      <thead><tr><th style="width:140px">Hệ thống</th><th>Cách tiếp cận đáng học</th><th style="width:150px">Pattern chính</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>Amazon</b><br><span class="muted" style="font-size:13px">“Khách mua món này cũng mua…”</span></td>
+          <td>Khởi nguồn của <b>item-to-item collaborative filtering</b> — chính thuật toán bạn đang dùng. Tính trước ma trận tương đồng item theo batch, serve từ bảng tra cứu. Đơn giản mà cực hiệu quả ở quy mô lớn.</td>
+          <td><span class="tag good">A · Precompute</span></td>
+        </tr>
+        <tr>
+          <td><b>Netflix</b></td>
+          <td>Nhiều tầng model; offline precompute kết hợp online ranking. Nổi tiếng vì <b>văn hóa A/B test</b> (mọi thay đổi đều đo lường) và pipeline đánh giá offline nghiêm ngặt trước khi online.</td>
+          <td><span class="tag info">A + B</span></td>
+        </tr>
+        <tr>
+          <td><b>Spotify</b><br><span class="muted" style="font-size:13px">Discover Weekly</span></td>
+          <td>Batch train embeddings (matrix factorization, sau này deep learning) chạy hàng tuần; kết quả ghi vào store để serve. Cùng triết lý “precompute định kỳ” như bạn nhưng kèm đánh giá &amp; cá nhân hóa mạnh.</td>
+          <td><span class="tag good">A · Precompute</span></td>
+        </tr>
+        <tr>
+          <td><b>Uber · Michelangelo</b></td>
+          <td>Nền tảng ML nội bộ kinh điển: <b>feature store + training pipeline + model registry + serving</b> thống nhất. Là “bản đồ” cho mọi quy trình MLOps chuẩn — đúng vòng đời 9 bước ở trên.</td>
+          <td><span class="tag info">D · Registry</span></td>
+        </tr>
+        <tr>
+          <td><b>LinkedIn / Pinterest</b></td>
+          <td>Hai tầng: <b>candidate generation</b> (lấy ứng viên nhanh, kiểu precompute/ANN) → <b>ranking</b> (model cá nhân hóa real-time xếp hạng lại). Mô hình “2 giai đoạn” là kiến trúc recommender hiện đại tiêu chuẩn.</td>
+          <td><span class="tag info">A → B</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <b>Bài học rút ra cho CourseFlow:</b> kiến trúc của bạn (item-item CF, precompute, serve từ bảng, tách service) <b>trùng khớp với Amazon &amp; Spotify giai đoạn đầu</b>. Hướng tiến hóa tự nhiên là mô hình <b>2 giai đoạn</b> của LinkedIn/Pinterest: giữ CF làm “candidate generation”, thêm một tầng <b>ranking cá nhân hóa</b> (pattern B) về sau — không cần đập đi xây lại.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. JAVA ============ -->
+<section id="java">
+  <div class="wrap">
+    <h2><span class="num">06</span>Trả lời chi tiết: model “vào” ứng dụng Java như thế nào?</h2>
+    <p class="lead">Đây là phần đào sâu đúng câu hỏi của bạn, theo 3 kịch bản — từ cái bạn đang làm đến cái bạn hình dung.</p>
+
+    <h3>Kịch bản 1 — Cái bạn đang làm (qua bảng + API)</h3>
+    <p>Model = các dòng điểm số. Java <b>không nạp model</b>, chỉ tiêu thụ kết quả theo 2 đường:</p>
+    <div class="ascii">
+(a) Materialize — copy điểm số về DB của Java:
+    Python ML  ──train──▶  recommendation_scores (Postgres ML)
+         ▲                          │
+         │   RecommendationMlMaterializationScheduler (mỗi 30s)
+         │   gọi /models/active + đọc điểm số
+         ▼                          ▼
+    analytics-service  ──ghi──▶  read model trong DB analytics
+                                     │
+                                 người dùng đọc gợi ý từ đây (nhanh, không phụ thuộc ML lúc request)
+
+(b) Inference trực tiếp — hỏi ML real-time:
+    người dùng ▶ analytics-service ▶ GET /internal/recommendation-ml/courses/{id}/related ▶ ML trả JSON
+    </div>
+    <p class="muted">Bạn đang dùng chủ yếu (a) — an toàn nhất vì nếu ML chết, gợi ý vẫn phục vụ được từ read model đã copy. Đây là điểm thiết kế <b>rất tốt</b>.</p>
+
+    <h3>Kịch bản 2 — Model-as-a-Service (mở rộng tương lai)</h3>
+    <p>Khi muốn cá nhân hóa real-time (“gợi ý cho riêng học viên X ngay lúc này”), bạn nạp model thật trong service Python (giữ trong RAM) và Java gọi API truyền features người dùng. <b>Vẫn không import gì vào Java.</b> Đây là bước tiến hóa tự nhiên từ kịch bản 1, chỉ thêm một loại endpoint.</p>
+
+    <h3>Kịch bản 3 — “Import model vào Java” thật sự (pattern C)</h3>
+    <p>Nếu một ngày bạn <i>thật sự</i> muốn chạy model trong JVM (vì lý do độ trễ cực thấp), luồng sẽ là:</p>
+    <div class="flow">
+      <div class="step"><div class="dot">1</div><div class="body"><b>Train ở Python</b><p class="muted">Dùng scikit-learn / PyTorch / LightGBM như bình thường.</p></div></div>
+      <div class="step"><div class="dot">2</div><div class="body"><b>Export sang định dạng trung lập</b><p class="muted">Chuyển model sang <b>ONNX</b> (phổ biến nhất), <b>PMML</b>, hoặc <b>TF SavedModel</b> — định dạng mà JVM đọc được, không phụ thuộc Python.</p></div></div>
+      <div class="step"><div class="dot">3</div><div class="body"><b>Đẩy artifact ra storage có version</b><p class="muted">Lưu file <code>model-v3.onnx</code> lên S3/registry kèm checksum.</p></div></div>
+      <div class="step"><div class="dot">4</div><div class="body"><b>Java nạp artifact lúc khởi động</b><p class="muted">Dùng <b>ONNX Runtime for Java</b>, <b>DJL (Deep Java Library)</b>, hoặc <b>PMML4S/JPMML</b> để load file và chạy <code>predict()</code> ngay trong JVM.</p></div></div>
+      <div class="step"><div class="dot">5</div><div class="body"><b>Cập nhật model = deploy lại app (hoặc hot-reload artifact)</b><p class="muted">Đây là nhược điểm: model &amp; app dính nhau. Vì vậy pattern này chỉ đáng dùng khi độ trễ là tối quan trọng.</p></div></div>
+    </div>
+    <pre><span class="c">// Minh họa pattern C: nạp ONNX trong Java (KHÔNG khuyến nghị cho recommendation của bạn)</span>
+<span class="k">try</span> (OrtEnvironment env = OrtEnvironment.getEnvironment();
+     OrtSession session = env.createSession(<span class="s">"model-v3.onnx"</span>, <span class="k">new</span> OrtSession.SessionOptions())) {
+    <span class="c">// chuẩn bị features → tensor đầu vào</span>
+    OnnxTensor input = OnnxTensor.createTensor(env, features);
+    <span class="c">// chạy dự đoán ngay trong JVM, không gọi mạng</span>
+    OrtSession.Result result = session.run(Map.of(<span class="s">"input"</span>, input));
+}</pre>
+
+    <div class="callout key">
+      <b>Khuyến nghị dứt khoát cho CourseFlow:</b> <u>không</u> dùng pattern C. Hãy ở lại kịch bản 1, và khi cần real-time thì tiến sang kịch bản 2. Lý do: recommender của bạn cần train lại thường xuyên và sống trong hệ sinh thái Python — giữ model ngoài JVM là đúng đắn. Việc “import model vào Java” mà bạn hình dung thực ra là pattern <i>ít phù hợp nhất</i> với chính bài toán này.
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7. ROADMAP ============ -->
+<section id="roadmap">
+  <div class="wrap">
+    <h2><span class="num">07</span>Lộ trình đề xuất (ưu tiên theo giá trị/công sức)</h2>
+    <p class="lead">Đừng làm hết một lúc. Thứ tự dưới đây vá đúng những khoảng trống lớn nhất trước.</p>
+
+    <div class="grid2">
+      <div class="card"><span class="tag risk">Ưu tiên 1</span><h4>Đánh giá offline thật sự</h4><p class="muted">Tách tương tác theo mốc thời gian: train trên dữ liệu cũ, test trên dữ liệu mới. Tính <b>Recall@K</b> &amp; <b>NDCG@K</b>, lưu vào <code>model_versions</code>. Quality gate chuyển từ “đếm số lượng” sang “phải tốt hơn model ACTIVE hiện tại”.</p></div>
+      <div class="card"><span class="tag warn">Ưu tiên 2</span><h4>So sánh model mới vs cũ (shadow)</h4><p class="muted">Trước khi A/B đầy đủ: cho model mới chạy “âm thầm” (shadow), log gợi ý của cả hai, so sánh offline trên cùng traffic. Rẻ và rất sáng tỏ.</p></div>
+      <div class="card"><span class="tag warn">Ưu tiên 3</span><h4>Drift &amp; auto-retrain trigger</h4><p class="muted">Thêm metric: số tương tác mới kể từ lần train cuối, độ phủ khóa học mới. Vượt ngưỡng → tự enqueue training run. Khép kín vòng lặp bước 9 → bước 4.</p></div>
+      <div class="card"><span class="tag info">Ưu tiên 4</span><h4>A/B test khung tối giản</h4><p class="muted">Cho phép 2 model ACTIVE song song, gán người dùng theo hash, đo CTR/enroll thực tế qua tracking event sẵn có. Cần nâng nhẹ schema model_versions.</p></div>
+      <div class="card"><span class="tag info">Ưu tiên 5</span><h4>Cold-start fallback</h4><p class="muted">Với khóa mới chưa có tương tác: dùng content-based (tương đồng theo tag/chủ đề/mô tả) làm tầng dự phòng. Đây là “content-similarity fallback” mà README đã dự liệu.</p></div>
+      <div class="card"><span class="tag info">Ưu tiên 6</span><h4>MLflow khi có model thứ 2</h4><p class="muted">Chỉ khi vượt 1 thuật toán: chuyển từ registry tự chế trong DB sang MLflow để quản artifact, lineage, so sánh experiment một cách bài bản.</p></div>
+    </div>
+
+    <details>
+      <summary>Gợi ý nhỏ về code (không bắt buộc)</summary>
+      <ul class="muted">
+        <li>Cân nhắc thay <code>lru_cache</code> singleton bằng FastAPI <code>lifespan</code> để quản lý vòng đời connection pool sạch hơn, dễ test hơn.</li>
+        <li>Tách bước evaluation thành module <code>training/evaluation.py</code> trả về <code>EvaluationResult(recall_at_k, ndcg_at_k, coverage)</code> và đưa vào <code>_execute_training_run</code> ngay trước quality gate.</li>
+        <li>Lưu chỉ số đánh giá vào <code>model_versions</code> (thêm cột) để dashboard &amp; gate so sánh giữa các version.</li>
+        <li>Vòng lặp train hiện <code>O(users × items²)</code>: khi dữ liệu lớn, cân nhắc thư viện <code>implicit</code> (ALS/BM25) hoặc Spark — giữ nguyên contract API, chỉ đổi “ruột” trainer.</li>
+      </ul>
+    </details>
+  </div>
+</section>
+
+<!-- ============ GLOSSARY ============ -->
+<section id="glossary">
+  <div class="wrap">
+    <h2><span class="num">∎</span>Thuật ngữ cho người mới</h2>
+    <div class="grid2">
+      <div class="panel tight"><b>Collaborative Filtering (CF)</b><br><span class="muted">Gợi ý dựa trên hành vi: “những thứ thường được dùng cùng nhau”. Item-item CF tính độ tương đồng giữa các item từ việc người dùng tương tác chung.</span></div>
+      <div class="panel tight"><b>Implicit feedback</b><br><span class="muted">Tín hiệu ngầm (click, enroll, xem) thay vì điểm số rõ ràng (rating sao). Mỗi loại có trọng số khác nhau.</span></div>
+      <div class="panel tight"><b>Artifact</b><br><span class="muted">File model đã train (vd <code>.onnx</code>, <code>.pkl</code>). Trong thiết kế của bạn hiện <i>không</i> có artifact — model là các dòng điểm số trong DB.</span></div>
+      <div class="panel tight"><b>Inference / Serving</b><br><span class="muted">Quá trình dùng model để tạo dự đoán cho request thực tế (khác với training là quá trình tạo ra model).</span></div>
+      <div class="panel tight"><b>Model Registry</b><br><span class="muted">Kho quản lý các phiên bản model + metadata + nhãn (Staging/Production), hỗ trợ rollback. MLflow là công cụ phổ biến.</span></div>
+      <div class="panel tight"><b>Feature Store</b><br><span class="muted">Nơi lưu &amp; phục vụ đặc trưng (features) dùng chung giữa lúc train và lúc serve, tránh sai lệch train/serve.</span></div>
+      <div class="panel tight"><b>Recall@K / NDCG@K</b><br><span class="muted">Chỉ số đo độ tốt của recommender: trong K gợi ý hàng đầu, bắt được bao nhiêu thứ người dùng thực sự thích, và xếp đúng thứ tự đến đâu.</span></div>
+      <div class="panel tight"><b>A/B test</b><br><span class="muted">Chia người dùng thành nhóm, mỗi nhóm dùng một model, so sánh chỉ số thực tế để biết model nào tốt hơn.</span></div>
+      <div class="panel tight"><b>Drift</b><br><span class="muted">Hiện tượng dữ liệu/hành vi thay đổi theo thời gian khiến model cũ kém dần → cần train lại.</span></div>
+      <div class="panel tight"><b>Cold-start</b><br><span class="muted">Vấn đề không gợi ý được cho item/người dùng mới vì chưa có dữ liệu tương tác.</span></div>
+      <div class="panel tight"><b>Maker-checker</b><br><span class="muted">Cơ chế kiểm soát: người tạo yêu cầu ≠ người duyệt. Bạn đã áp dụng cho việc kích hoạt model.</span></div>
+      <div class="panel tight"><b>ONNX</b><br><span class="muted">Định dạng model trung lập, cho phép model train ở Python chạy được ở Java/C++/… Dùng cho pattern C.</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b>CourseFlow · Recommendation ML Integration Guide</b> — tài liệu kiến trúc nội bộ.</p>
+    <p>Tóm lại: bạn đã xây phần nền (service boundary, bảo mật, governance, vận hành) rất chắc — đúng cách big-tech làm. Bước tiếp theo là <b>đóng vòng lặp chất lượng model</b> (đánh giá offline → so sánh → A/B → giám sát → train lại), <b>không</b> phải “import model vào Java”. Java cứ tiêu thụ kết quả qua bảng/API như hiện tại.</p>
+  </div>
+</footer>
+
+</body>
+</html>

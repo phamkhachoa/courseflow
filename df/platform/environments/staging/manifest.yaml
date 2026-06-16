@@ -1,0 +1,119 @@
+version: 1
+environment: staging
+tier: staging
+owner: data-platform-team
+evidenceMode: production_like_preflight
+runtimeReadiness: topology_manifested_not_live_iac
+description: Production-like release gate environment for masked data, compatibility checks and SLO evidence.
+controls:
+  serviceIdentity: enterprise_oidc_service_accounts
+  secrets: external_secret_manager_required
+  storageEncryption: required
+  networkExposure: private_network
+  piiPolicy: masked_production_like_data_only
+runtimeServices:
+  - serviceId: event_backbone
+    capability: Event backbone
+    technology: Kafka
+    phase: P0
+    required: true
+    implementationStatus: planned_managed_or_self_hosted
+    evidence: broker health, topic ACL and consumer lag report
+  - serviceId: outbox_relay
+    capability: Transactional event publishing
+    technology: Outbox relay pattern
+    phase: P0
+    required: true
+    implementationStatus: planned_product_bridge
+    evidence: source outbox relay deployment and replay proof
+  - serviceId: cdc
+    capability: Change data capture
+    technology: Debezium
+    phase: P0
+    required: true
+    implementationStatus: planned_connector_runtime
+    evidence: connector status, offset and schema history report
+  - serviceId: schema_registry
+    capability: Schema registry
+    technology: Apicurio or Confluent Schema Registry
+    phase: P0
+    required: true
+    implementationStatus: planned_managed_or_self_hosted
+    evidence: compatibility report and subject version export
+  - serviceId: object_storage
+    capability: Object storage
+    technology: S3/GCS/ADLS-compatible object storage
+    phase: P0
+    required: true
+    implementationStatus: planned_managed_service
+    evidence: bucket policy, lifecycle and encryption report
+  - serviceId: table_format
+    capability: Lakehouse table format
+    technology: Apache Iceberg
+    phase: P0
+    required: true
+    implementationStatus: planned_catalog_runtime
+    evidence: catalog snapshot and table property export
+  - serviceId: batch_processing
+    capability: Batch processing
+    technology: Spark
+    phase: P0
+    required: true
+    implementationStatus: planned_job_runtime
+    evidence: Spark event log and pipeline manifest
+  - serviceId: sql_transform
+    capability: SQL transformation
+    technology: dbt Core
+    phase: P0
+    required: true
+    implementationStatus: planned_job_runtime
+    evidence: dbt run_results and manifest artifacts
+  - serviceId: orchestration
+    capability: Orchestration
+    technology: Dagster
+    phase: P0
+    required: true
+    implementationStatus: planned_orchestrator_runtime
+    evidence: asset materialization and retry history
+  - serviceId: data_quality
+    capability: Data quality
+    technology: Great Expectations, Soda or dbt tests
+    phase: P0
+    required: true
+    implementationStatus: planned_quality_runtime
+    evidence: blocking quality report
+  - serviceId: lakehouse_sql
+    capability: Lakehouse SQL
+    technology: Trino
+    phase: P0
+    required: true
+    implementationStatus: planned_query_runtime
+    evidence: governed query smoke test
+  - serviceId: observability
+    capability: Data platform observability
+    technology: Prometheus and Grafana
+    phase: P0
+    required: true
+    implementationStatus: planned_metrics_runtime
+    evidence: data SLO dashboard and alert export
+  - serviceId: catalog_lineage
+    capability: Catalog and lineage
+    technology: DataHub or OpenMetadata
+    phase: P1
+    required: false
+    implementationStatus: planned_catalog_publish
+    evidence: catalog ingest run and lineage publish report
+  - serviceId: semantic_lakehouse
+    capability: Semantic lakehouse serving
+    technology: Dremio
+    phase: P1/P2
+    required: false
+    implementationStatus: candidate
+    evidence: future POC benchmark
+  - serviceId: distributed_htap
+    capability: Distributed SQL and HTAP
+    technology: TiDB + TiFlash
+    phase: P3+
+    required: false
+    implementationStatus: conditional_future_option
+    evidence: product-specific migration and SLO evidence only

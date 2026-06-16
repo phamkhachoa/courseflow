@@ -1,0 +1,289 @@
+contractVersion: 1
+dataProduct:
+  name: bronze.events_customer_account_changed
+  layer: BRONZE
+  domain: customer
+  product: crm-sales
+  domainOwner: customer-domain-council
+  ownerTeam: data-platform
+  businessOwner: customer-success-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Raw tokenized CRM account lifecycle events for enterprise Customer 360 and account-health data products.
+  status: DRAFT
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream: []
+  ingestionMode: streaming
+  eventTimeColumn: occurred_at
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that produced or owns this record.
+    - name: domain_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise data domain code used for mesh ownership and catalog grouping.
+    - name: event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Global event idempotency key.
+    - name: event_type
+      type: string
+      nullable: false
+      pii: false
+      description: Customer account event type.
+      allowedValues: [CUSTOMER_ACCOUNT_CHANGED]
+    - name: event_version
+      type: int
+      nullable: false
+      pii: false
+      description: Version of the source event contract.
+    - name: source_service
+      type: string
+      nullable: false
+      pii: false
+      description: Service that emitted the event.
+    - name: tenant_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise tenant boundary from the source event envelope.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: account_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product-local account identifier used for lineage and controlled reverse ETL.
+    - name: customer_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized customer subject identifier.
+    - name: external_account_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized external CRM account identifier.
+    - name: account_type
+      type: string
+      nullable: false
+      pii: false
+      description: Account category.
+      allowedValues: [BUSINESS, INDIVIDUAL, PUBLIC_SECTOR, PARTNER, UNKNOWN]
+    - name: lifecycle_stage
+      type: string
+      nullable: false
+      pii: false
+      description: Customer lifecycle stage.
+      allowedValues: [PROSPECT, TRIAL, ACTIVE_CUSTOMER, EXPANSION, RENEWAL, DORMANT, CHURNED]
+    - name: account_status
+      type: string
+      nullable: false
+      pii: false
+      description: Current account state.
+      allowedValues: [ACTIVE, INACTIVE, TRIAL, AT_RISK, CHURNED, SUSPENDED]
+    - name: market_segment
+      type: string
+      nullable: false
+      pii: false
+      description: Commercial segment for reporting and routing.
+    - name: region_code
+      type: string
+      nullable: false
+      pii: false
+      description: Region or sales territory code.
+    - name: consent_status
+      type: string
+      nullable: false
+      pii: false
+      description: Consent state for analytics and activation use.
+      allowedValues: [OPTED_IN, OPTED_OUT, UNKNOWN, NOT_APPLICABLE]
+    - name: mrr_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Monthly recurring revenue signal in minor currency units.
+    - name: open_opportunity_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of open revenue opportunities.
+    - name: open_support_case_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of open support cases known to the CRM source.
+    - name: product_usage_score
+      type: int
+      nullable: false
+      pii: false
+      description: Normalized product usage score from source product telemetry.
+    - name: health_signal_score
+      type: int
+      nullable: false
+      pii: false
+      description: Source health score from customer success or CRM scoring.
+    - name: risk_level
+      type: string
+      nullable: false
+      pii: false
+      description: Source account risk level.
+      allowedValues: [LOW, MEDIUM, HIGH, CRITICAL]
+    - name: source_system_record_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized source record identifier used for DSAR replay and lineage.
+    - name: changed_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Source business timestamp for the account change.
+    - name: occurred_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Business event time from the envelope.
+    - name: published_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event was published into the platform stream.
+    - name: ingested_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event landed in Bronze.
+    - name: source_system
+      type: string
+      nullable: false
+      pii: false
+      description: Logical source system name from the source registry.
+    - name: source_topic
+      type: string
+      nullable: false
+      pii: false
+      description: Kafka topic or equivalent source stream.
+    - name: source_partition
+      type: int
+      nullable: true
+      pii: false
+      description: Kafka partition for replay lineage.
+    - name: source_offset
+      type: long
+      nullable: true
+      pii: false
+      description: Kafka offset for replay lineage.
+    - name: source_snapshot_id
+      type: string
+      nullable: true
+      pii: false
+      description: CDC snapshot, file manifest or source export id when no stream offset exists.
+    - name: source_record_key
+      type: string
+      nullable: false
+      pii: false
+      description: Non-sensitive source key used for replay and deduplication evidence.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of canonical source identity and raw source record.
+    - name: payload_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of the platform-approved event payload.
+    - name: schema_subject
+      type: string
+      nullable: false
+      pii: false
+      description: Schema registry subject used to validate the event payload.
+    - name: schema_id
+      type: string
+      nullable: false
+      pii: false
+      description: Schema id used for compatibility verification.
+    - name: raw_headers
+      type: json
+      nullable: false
+      pii: false
+      description: Non-secret source headers after platform filtering.
+    - name: raw_payload
+      type: json
+      nullable: false
+      pii: true
+      description: Raw tokenized CRM payload retained under governed Bronze controls.
+    - name: ingest_run_id
+      type: string
+      nullable: false
+      pii: false
+      description: Platform ingestion run id.
+    - name: event_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date partition derived from occurred_at.
+    - name: ingest_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date partition derived from ingested_at.
+
+quality:
+  freshnessSloMinutes: 30
+  checks:
+    - name: event_id_not_null
+      type: not_null
+      column: event_id
+    - name: customer_id_hash_not_null
+      type: not_null
+      column: customer_id_hash
+    - name: org_id_not_null
+      type: not_null
+      column: org_id
+    - name: account_id_not_null
+      type: not_null
+      column: account_id
+    - name: source_offset_unique
+      type: unique
+      columns: [source_topic, source_partition, source_offset]
+
+privacy:
+  classification: PII
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: customer_id_hash
+      column: customer_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: SECURE_RAW_PAYLOAD_WITH_SUBJECT_ERASURE
+
+serving:
+  consumers: [DataPlatform]
+  accessPolicy: platform_engineer_only
+  accessPersonas: [DataPlatformOperator, DomainDataOwner]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: platform_operator_approval
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

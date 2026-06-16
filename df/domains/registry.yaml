@@ -1,0 +1,183 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+first_product_pilot: lms-courseflow
+domains:
+  - code: customer
+    name: Customer
+    status: planned
+    business_capability: Customer, learner, organization and account lifecycle intelligence.
+    first_data_products:
+      - gold.customer_360_profile
+      - gold.customer_engagement_daily
+      - silver.customer_identity_link
+    first_consumers:
+      - customer-success
+      - growth-analytics
+      - enterprise-reporting
+      - ml-ai
+    pilot_product_contribution: Learner, organization, engagement, review and notification signals.
+    future_onboarding_products:
+      - crm
+      - commerce
+      - support
+      - marketing-automation
+
+  - code: finance
+    name: Finance
+    status: planned
+    business_capability: Revenue, payment, discount, incentive, loyalty and reconciliation analytics.
+    first_data_products:
+      - gold.finance_revenue_daily
+      - gold.finance_benefit_reconciliation
+      - gold.finance_margin_daily
+    first_consumers:
+      - fp-and-a
+      - accounting
+      - revenue-operations
+      - enterprise-reporting
+    pilot_product_contribution: Enrollment, paid course, coupon, promotion, loyalty and reward events.
+    future_onboarding_products:
+      - payment-platform
+      - subscription-billing
+      - marketplace
+      - erp
+
+  - code: workforce
+    name: Workforce
+    status: planned
+    business_capability: Skills, training compliance, readiness and workforce learning intelligence.
+    first_data_products:
+      - gold.workforce_skill_profile
+      - gold.training_compliance_status
+      - gold.workforce_readiness_daily
+    first_consumers:
+      - people-operations
+      - learning-and-development
+      - managers
+      - enterprise-reporting
+    pilot_product_contribution: Completion, gradebook, certificate and course taxonomy events.
+    future_onboarding_products:
+      - hris
+      - talent-management
+      - identity-directory
+      - project-staffing
+
+  - code: risk-compliance
+    name: Risk and Compliance Controls
+    status: planned
+    business_capability: Fraud, abuse, anomaly, case queue and operational risk controls.
+    first_data_products:
+      - gold.risk_signal_daily
+      - gold.fraud_case_queue
+      - gold.control_exception_daily
+    first_consumers:
+      - risk-operations
+      - trust-and-safety
+      - finance-controls
+      - compliance
+    pilot_product_contribution: Quiz, grade, certificate, coupon and loyalty anomaly signals.
+    future_onboarding_products:
+      - payments
+      - identity
+      - commerce
+      - customer-support
+
+  - code: product-analytics
+    name: Product Analytics
+    status: planned
+    business_capability: Funnel, cohort, retention, feature usage, experimentation and product health.
+    first_data_products:
+      - gold.product_usage_daily
+      - gold.experiment_metrics_daily
+      - gold.feature_adoption_daily
+    first_consumers:
+      - product-management
+      - ux-research
+      - growth-analytics
+      - engineering-leads
+    pilot_product_contribution: Web, mobile and admin clickstream, enrollment funnel and learning runtime events.
+    future_onboarding_products:
+      - mobile-apps
+      - admin-portals
+      - marketplace
+      - support-portal
+
+  - code: ml-ai
+    name: ML and AI
+    status: planned
+    business_capability: Feature store, model governance, AI usage, next-best-action and scoring datasets.
+    first_data_products:
+      - gold.ml_feature_snapshot
+      - gold.model_performance_daily
+      - gold.ai_usage_audit_daily
+    first_consumers:
+      - data-science
+      - ml-platform
+      - product-teams
+      - risk-operations
+    pilot_product_contribution: Recommendation tracking, learner activity and course graph features.
+    future_onboarding_products:
+      - ai-assistant
+      - search
+      - customer-success-platform
+      - risk-scoring
+
+  - code: compliance
+    name: Compliance
+    status: planned
+    business_capability: Audit evidence, privacy, retention, consent, residency and access governance.
+    first_data_products:
+      - silver.audit_access_events
+      - gold.compliance_retention_status
+      - gold.privacy_subject_request_status
+    first_consumers:
+      - compliance-office
+      - privacy-office
+      - security
+      - internal-audit
+    pilot_product_contribution: Access-control, entitlement, learner PII and tenant or organization scope evidence.
+    future_onboarding_products:
+      - identity-access-management
+      - legal-case-management
+      - customer-data-platform
+      - document-management
+
+  - code: enterprise-reporting
+    name: Enterprise Reporting
+    status: planned
+    business_capability: KPI catalog, semantic metrics and executive reporting across domains.
+    first_data_products:
+      - gold.enterprise_kpi_daily
+      - gold.executive_scorecard_daily
+      - semantic.enterprise_metrics
+    first_consumers:
+      - executive-leadership
+      - strategy-and-operations
+      - finance
+      - product-leadership
+    pilot_product_contribution: Learner success, course quality and organization learning dashboards.
+    future_onboarding_products:
+      - finance
+      - customer-success
+      - people-operations
+      - sales-operations
+
+  - code: recommendation
+    name: Recommendation
+    status: pilot
+    business_capability: Recommendation signals, ML training datasets and reverse ETL.
+    first_data_products:
+      - gold.recsys_interactions
+      - gold.recommendation_quality_daily
+      - feature.recommendation_candidate_features
+    first_consumers:
+      - ml-services
+      - product-analytics
+      - reverse-etl
+      - enterprise-reporting
+    pilot_product_contribution: Related-course impression, click and enrollment signals.
+    future_onboarding_products:
+      - content-marketplace
+      - ecommerce
+      - support-knowledge-base
+      - employee-learning

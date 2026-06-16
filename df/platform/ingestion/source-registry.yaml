@@ -1,0 +1,324 @@
+version: 1
+registryScope: group-enterprise-data-platform
+owner: data-platform-team
+description: >
+  Machine-readable source onboarding registry for enterprise Bronze ingestion. This registry records
+  product ownership, raw source shape, canonical topic mapping, normalizer requirements, schema
+  registry expectations and release evidence before production ingestion is enabled.
+sources:
+  - sourceId: billing-platform-billing-transaction-settled-outbox
+    priority: P0
+    status: pilot
+    product: billing-platform
+    domain: finance
+    source:
+      type: transactional_outbox
+      system: billing-platform
+      service: billing-service
+      database: billing_ledger
+      rawTopic: finance.billing_transaction.settled.v1
+      rawEventTypes:
+        - finance.billing_transaction.settled.v1
+    canonical:
+      topic: finance.billing_transaction.settled.v1
+      bronzeTarget: bronze.events_billing_transaction_settled
+      schemaSubject: finance.billing_transaction.settled.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: false
+      mode: direct_canonical
+      status: ready
+      normalizerId: none
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: enterprise-commerce-benefit-settled-outbox
+    priority: P0
+    status: production_ready
+    product: enterprise-commerce
+    domain: finance
+    source:
+      type: transactional_outbox
+      system: payment-platform
+      service: benefit-ledger-service
+      database: commerce_benefit
+      rawTopic: finance.benefit_settled.v1
+      rawEventTypes:
+        - finance.benefit_settled.v1
+    canonical:
+      topic: finance.benefit_settled.v1
+      bronzeTarget: bronze.events_benefit_settled
+      schemaSubject: finance.benefit_settled.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: false
+      mode: direct_canonical
+      status: ready
+      normalizerId: none
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: identity-platform-subject-changed-outbox
+    priority: P0
+    status: production_ready
+    product: identity-platform
+    domain: compliance
+    source:
+      type: transactional_outbox
+      system: identity-platform
+      service: identity-directory
+      database: identity_directory
+      rawTopic: compliance.identity_subject.changed.v1
+      rawEventTypes:
+        - compliance.identity_subject.changed.v1
+    canonical:
+      topic: compliance.identity_subject.changed.v1
+      bronzeTarget: bronze.events_identity_subject_changed
+      schemaSubject: compliance.identity_subject.changed.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: false
+      mode: direct_canonical
+      status: ready
+      normalizerId: none
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: crm-sales-account-changed-outbox
+    priority: P0
+    status: production_ready
+    product: crm-sales
+    domain: customer
+    source:
+      type: transactional_outbox
+      system: crm-sales
+      service: crm-account-service
+      database: crm_customer
+      rawTopic: customer.account.changed.v1
+      rawEventTypes:
+        - customer.account.changed.v1
+    canonical:
+      topic: customer.account.changed.v1
+      bronzeTarget: bronze.events_customer_account_changed
+      schemaSubject: customer.account.changed.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: false
+      mode: direct_canonical
+      status: ready
+      normalizerId: none
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: support-platform-support-case-changed-connector
+    priority: P1
+    status: pilot
+    product: support-platform
+    domain: customer
+    source:
+      type: saas_connector
+      system: support-platform
+      service: support-case-service
+      database: support_case
+      rawTopic: customer.support_case.changed.v1
+      rawEventTypes:
+        - customer.support_case.changed.v1
+    canonical:
+      topic: customer.support_case.changed.v1
+      bronzeTarget: bronze.events_support_case_changed
+      schemaSubject: customer.support_case.changed.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: false
+      mode: direct_canonical
+      status: ready
+      normalizerId: none
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: lms-courseflow-course-published-outbox
+    priority: P0
+    status: pilot
+    product: lms-courseflow
+    domain: workforce
+    source:
+      type: transactional_outbox
+      system: course-service
+      service: course-service
+      database: cf_course
+      rawTopic: course.published
+      rawEventTypes:
+        - course.published
+    canonical:
+      topic: course.published.v1
+      bronzeTarget: bronze.events_course_published
+      schemaSubject: course.published.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: true
+      mode: producer_dual_publish_or_normalizer
+      status: local_preflight
+      normalizerId: lms-courseflow-course-published-v1
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: non_personal_payload_verified
+      tenantMapping: org_id_required
+      subjectKeyStrategy: none
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: lms-courseflow-enrollment-completed-outbox
+    priority: P0
+    status: pilot
+    product: lms-courseflow
+    domain: workforce
+    source:
+      type: transactional_outbox
+      system: enrollment-service
+      service: enrollment-service
+      database: cf_enrollment
+      rawTopic: enrollment.completed
+      rawEventTypes:
+        - enrollment.completed
+    canonical:
+      topic: enrollment.completed.v1
+      bronzeTarget: bronze.events_enrollment_completed
+      schemaSubject: enrollment.completed.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: true
+      mode: producer_dual_publish_or_normalizer
+      status: local_preflight
+      normalizerId: lms-courseflow-enrollment-completed-v1
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: lms-courseflow-gradebook-final-grade-outbox
+    priority: P0
+    status: pilot
+    product: lms-courseflow
+    domain: workforce
+    source:
+      type: transactional_outbox
+      system: gradebook-service
+      service: gradebook-service
+      database: cf_gradebook
+      rawTopic: gradebook.final_grade.updated
+      rawEventTypes:
+        - gradebook.final_grade.updated
+    canonical:
+      topic: gradebook.final_grade.updated.v1
+      bronzeTarget: bronze.events_gradebook_final_grade_updated
+      schemaSubject: gradebook.final_grade.updated.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: true
+      mode: producer_dual_publish_or_normalizer
+      status: local_preflight
+      normalizerId: lms-courseflow-gradebook-final-grade-updated-v1
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true
+
+  - sourceId: lms-courseflow-recommendation-tracking-collector
+    priority: P0
+    status: pilot
+    product: lms-courseflow
+    domain: recommendation
+    source:
+      type: http_event_collector
+      system: analytics-service
+      service: analytics-service
+      database: cf_analytics
+      rawTopic: analytics.recommendation_tracking_events
+      rawEventTypes:
+        - recommendation.impression
+        - recommendation.click
+        - recommendation.enrollment
+    canonical:
+      topic: recommendation.tracking.v1
+      bronzeTarget: bronze.events_recommendation_tracking
+      schemaSubject: recommendation.tracking.v1-value
+      compatibility: BACKWARD_TRANSITIVE
+    bridge:
+      required: true
+      mode: collector_to_canonical_topic
+      status: local_preflight
+      normalizerId: lms-courseflow-recommendation-tracking-v1
+      preservesSourcePosition: true
+      envelopeRequired: true
+    privacy:
+      piiHandling: tokenized_before_bronze
+      tenantMapping: org_id_required
+      subjectKeyStrategy: tokenized_subject_id
+    evidence:
+      schemaRegistryReportRequired: true
+      replayProofRequired: true
+      sourceOffsetRequired: true
+      productionAttestationRequired: true

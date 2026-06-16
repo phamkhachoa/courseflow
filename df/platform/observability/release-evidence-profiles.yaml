@@ -1,0 +1,60 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+profiles:
+  - id: local-medallion-release.v1
+    name: Local Medallion Release Evidence v1
+    owner: data-platform-sre
+    status: active
+    description: Generic release evidence policy for local/dev and production-like Medallion use-case runs.
+    appliesTo:
+      useCases:
+        - finance-benefit-reconciliation
+        - enterprise-revenue-intelligence
+        - identity-access-governance
+        - customer-account-health
+        - customer-support-experience-intelligence
+        - ml-feature-governance
+        - data-product-control-tower
+        - enterprise-kpi-scorecard
+      runnerInputKinds:
+        - approved_bronze_jsonl
+        - data_product_snapshot
+        - semantic_metric_snapshot
+    requiredGates:
+      - P0-CONTRACT-COMPATIBILITY
+      - P0-SCHEMA-REGISTRY-COMPATIBILITY
+      - P0-ACCESS-POLICY
+      - P0-ACCESS-GRANT-EVIDENCE
+      - P0-RETENTION-ERASURE
+      - P0-PRODUCTION-EVIDENCE
+      - P0-INGESTION-LAG
+      - P0-FRESHNESS
+      - P0-PIPELINE-QUALITY
+      - P0-QUALITY-PROFILE
+      - P0-OUTPUT-EVIDENCE
+      - P0-LAKEHOUSE-SNAPSHOT-EVIDENCE
+      - P0-CATALOG-LINEAGE
+    requiredArtifacts:
+      - pipeline_manifest_hash
+      - catalog_bundle_hash
+      - quality_profile_hash
+    productionEvidenceRequirements:
+      codeCommitSha: true
+      schemaRegistryReportUri: true
+      schemaRegistryReportHash: true
+      validatorOutputUri: true
+      accessPolicyCheckId: true
+      accessPolicyReportUri: true
+      accessPolicyReportHash: true
+      accessGrantEvidenceUri: true
+      accessGrantEvidenceHash: true
+      retentionEvidenceUri: true
+      retentionEvidenceHash: true
+      snapshotEvidenceUri: true
+      snapshotEvidenceHash: true
+      approver: true
+    localEvidenceRequirements:
+      schemaRegistryReportUri: true
+      accessPolicyReportUri: true
+      accessGrantEvidenceUri: true
+      retentionEvidenceUri: true

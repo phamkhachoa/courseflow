@@ -1,0 +1,55 @@
+product:
+  code: billing-platform
+  name: Billing and Subscription Platform
+  status: pilot
+  businessSponsor: finance-platform-lead
+  productOwner: billing-platform-po
+  technicalOwner: billing-platform-sa
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: account_id
+
+domains:
+  - finance
+
+governance:
+  classification: SENSITIVE
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: regulated_finance_and_assessment_7y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: finance
+    services:
+      - billing-service
+      - subscription-service
+      - invoice-service
+      - revenue-recognition-service
+    publicationModes:
+      - transactional_outbox
+      - cdc
+      - batch_connector
+
+firstSlice:
+  contractStatus: existing
+  topics:
+    - finance.billing_transaction.settled.v1
+  dataProducts:
+    - bronze.events_billing_transaction_settled
+    - silver.finance_billing_transactions
+    - gold.finance_revenue_daily
+
+consumers:
+  - BI
+  - Compliance
+  - ReverseETL

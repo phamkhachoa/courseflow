@@ -1,0 +1,56 @@
+product:
+  code: hris-workforce
+  name: HRIS Workforce Platform
+  status: draft
+  businessSponsor: people-operations-lead
+  productOwner: hris-workforce-po
+  technicalOwner: hris-workforce-sa
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: org_unit_id
+
+domains:
+  - workforce
+  - compliance
+
+governance:
+  classification: PII
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: standard_personal_data_3y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: workforce
+    services:
+      - employee-profile-service
+      - org-hierarchy-service
+      - skill-taxonomy-service
+      - workforce-capacity-service
+    publicationModes:
+      - saas_connector
+      - batch_connector
+      - cdc
+
+firstSlice:
+  contractStatus: planned
+  topics:
+    - workforce.employee_profile.changed.v1
+  dataProducts:
+    - bronze.events_employee_profile_changed
+    - silver.employee_profile
+    - gold.workforce_skill_profile
+
+consumers:
+  - BI
+  - Compliance
+  - ML

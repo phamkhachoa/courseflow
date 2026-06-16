@@ -1,0 +1,77 @@
+contractVersion: 1
+dataProduct:
+  name: gold.example_dataset
+  layer: GOLD
+  domain: example-domain
+  product: example-product
+  domainOwner: example-domain-council
+  ownerTeam: data-platform
+  businessOwner: product-owner
+  technicalOwner: senior-data-engineer
+  dataSteward: enterprise-data-steward
+  description: Replace with the business meaning of this dataset.
+  status: DRAFT
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: silver.example_source
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: occurred_at
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that produced or owns this record.
+    - name: example_id
+      type: string
+      nullable: false
+      pii: false
+      description: Stable business key.
+
+quality:
+  freshnessSloMinutes: 60
+  checks:
+    - name: product_id_not_null
+      type: not_null
+      column: product_id
+    - name: primary_key_not_null
+      type: not_null
+      column: example_id
+    - name: primary_key_unique
+      type: unique
+      column: example_id
+
+privacy:
+  classification: INTERNAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: false
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys: []
+  erasureMode: NONE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers:
+    - BI
+    - ML
+  accessPolicy: row_level_org_isolation
+  accessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+    - ApprovedBIConsumer
+    - ApprovedMLConsumer
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

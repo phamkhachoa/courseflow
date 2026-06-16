@@ -1,0 +1,286 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+profiles:
+  - id: p0-finance-benefit-reconciliation
+    name: P0 Finance Benefit Reconciliation
+    owner: finance-analytics-po
+    severity: P0
+    description: Production release quality profile for finance benefit reconciliation Gold evidence.
+    appliesTo:
+      domains:
+        - finance
+      useCases:
+        - finance-benefit-reconciliation
+      primaryOutputs:
+        - gold.finance_benefit_reconciliation
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - silver.finance_benefit_transactions
+      - gold.finance_benefit_reconciliation
+    requiredColumns:
+      gold.finance_benefit_reconciliation:
+        - org_id
+        - dataset_snapshot_id
+        - reconciliation_key
+        - reconciliation_status
+        - reason_code
+        - source_record_hash_sha256
+
+  - id: p0-enterprise-revenue-intelligence
+    name: P0 Enterprise Revenue Intelligence
+    owner: finance-analytics-po
+    severity: P0
+    description: Production release quality profile for certified daily enterprise revenue aggregates.
+    appliesTo:
+      domains:
+        - finance
+      useCases:
+        - enterprise-revenue-intelligence
+      primaryOutputs:
+        - gold.finance_revenue_daily
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - silver.finance_billing_transactions
+      - gold.finance_revenue_daily
+    requiredColumns:
+      gold.finance_revenue_daily:
+        - org_id
+        - dataset_snapshot_id
+        - report_date
+        - accounting_date
+        - revenue_daily_id
+        - source_product_id
+        - currency
+        - net_revenue_cents
+        - recognized_revenue_cents
+        - revenue_status
+        - source_record_hash_sha256
+
+  - id: p0-identity-access-governance
+    name: P0 Identity Access Governance
+    owner: security-platform-lead
+    severity: P0
+    description: Production release quality profile for identity subject state and Gold access-risk evidence.
+    appliesTo:
+      domains:
+        - compliance
+      useCases:
+        - identity-access-governance
+      primaryOutputs:
+        - gold.access_risk_daily
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - silver.identity_subject
+      - gold.access_risk_daily
+    requiredColumns:
+      gold.access_risk_daily:
+        - org_id
+        - dataset_snapshot_id
+        - report_date
+        - subject_id_hash
+        - risk_status
+        - access_risk_score
+
+  - id: p0-customer-account-health
+    name: P0 Customer Account Health
+    owner: customer-success-po
+    severity: P0
+    description: Production release quality profile for Customer 360 profile and account-health evidence.
+    appliesTo:
+      domains:
+        - customer
+      useCases:
+        - customer-account-health
+      primaryOutputs:
+        - gold.customer_360_profile
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - silver.customer_identity_link
+      - gold.customer_360_profile
+    requiredColumns:
+      gold.customer_360_profile:
+        - org_id
+        - dataset_snapshot_id
+        - report_date
+        - customer_id_hash
+        - profile_status
+        - health_score
+
+  - id: p1-customer-support-experience
+    name: P1 Customer Support Experience
+    owner: customer-experience-lead
+    severity: P1
+    description: Production-style quality profile for support case state and daily support SLA evidence.
+    appliesTo:
+      domains:
+        - customer
+      useCases:
+        - customer-support-experience-intelligence
+      primaryOutputs:
+        - gold.support_sla_daily
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - silver.support_case
+      - gold.support_sla_daily
+    requiredColumns:
+      gold.support_sla_daily:
+        - org_id
+        - dataset_snapshot_id
+        - report_date
+        - support_sla_id
+        - account_id
+        - customer_id_hash
+        - case_count
+        - sla_health_status
+
+  - id: p0-gold-ml-feature
+    name: P0 Gold ML Feature Handoff
+    owner: ml-platform-po
+    severity: P0
+    description: Production release quality profile for Gold ML feature or training handoff datasets.
+    appliesTo:
+      domains:
+        - ml-ai
+      useCases:
+        - ml-feature-governance
+      primaryOutputs:
+        - gold.recsys_interactions
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - silver.learner_activity
+      - gold.recsys_interactions
+    requiredColumns:
+      gold.recsys_interactions:
+        - org_id
+        - dataset_snapshot_id
+        - course_id
+        - related_course_id
+        - source_event_id
+
+  - id: p0-data-product-control-tower
+    name: P0 Data Product Control Tower
+    owner: enterprise-data-platform-po
+    severity: P0
+    description: Production quality profile for enterprise data product health, compliance, quality and lineage dashboards.
+    appliesTo:
+      domains:
+        - enterprise-reporting
+      useCases:
+        - data-product-control-tower
+      primaryOutputs:
+        - gold.data_product_inventory
+        - gold.contract_compliance_daily
+        - gold.quality_sla_daily
+        - gold.lineage_coverage_daily
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - gold.data_product_inventory
+      - gold.contract_compliance_daily
+      - gold.quality_sla_daily
+      - gold.lineage_coverage_daily
+    requiredColumns:
+      gold.data_product_inventory:
+        - org_id
+        - report_date
+        - data_product_name
+        - owner_team
+        - readiness_state
+      gold.contract_compliance_daily:
+        - org_id
+        - report_date
+        - data_product_name
+        - contract_valid
+        - failed_gate_count
+      gold.quality_sla_daily:
+        - org_id
+        - report_date
+        - data_product_name
+        - sla_status
+        - release_evidence_passed
+      gold.lineage_coverage_daily:
+        - org_id
+        - report_date
+        - data_product_name
+        - static_lineage_present
+        - runtime_lineage_present
+
+  - id: p0-enterprise-kpi-scorecard
+    name: P0 Enterprise KPI Scorecard
+    owner: enterprise-reporting-po
+    severity: P0
+    description: Production release quality profile for non-PII executive KPI and scorecard Gold outputs materialized from semantic metrics.
+    appliesTo:
+      domains:
+        - enterprise-reporting
+      useCases:
+        - enterprise-kpi-scorecard
+      primaryOutputs:
+        - gold.enterprise_kpi_daily
+        - gold.executive_scorecard_daily
+    thresholds:
+      maxQuarantineRows: 0
+      minPrimaryOutputRows: 1
+      requireUpstreamQuality: true
+      requireAllOutputLayersQuality: true
+      requireContentHash: true
+    requiredOutputDataProducts:
+      - gold.enterprise_kpi_daily
+      - gold.executive_scorecard_daily
+    requiredColumns:
+      gold.enterprise_kpi_daily:
+        - org_id
+        - report_date
+        - metric_id
+        - metric_domain
+        - metric_value
+        - metric_unit
+        - threshold_status
+        - source_data_product
+        - source_metric_snapshot_hash
+        - semantic_registry_hash
+      gold.executive_scorecard_daily:
+        - org_id
+        - report_date
+        - scorecard_id
+        - section
+        - metric_id
+        - actual_value
+        - status
+        - certification_status
+        - source_data_product
+        - semantic_registry_hash

@@ -1,0 +1,298 @@
+contractVersion: 1
+dataProduct:
+  name: bronze.events_support_case_changed
+  layer: BRONZE
+  domain: customer
+  product: support-platform
+  domainOwner: customer-domain-council
+  ownerTeam: data-platform
+  businessOwner: customer-experience-lead
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Raw tokenized support case lifecycle events for customer experience and SLA analytics.
+  status: DRAFT
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream: []
+  ingestionMode: streaming
+  eventTimeColumn: occurred_at
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that produced or owns this record.
+    - name: domain_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise data domain code used for mesh ownership and catalog grouping.
+    - name: event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Global event idempotency key.
+    - name: event_type
+      type: string
+      nullable: false
+      pii: false
+      description: Support case event type.
+      allowedValues: [SUPPORT_CASE_CHANGED]
+    - name: event_version
+      type: int
+      nullable: false
+      pii: false
+      description: Version of the source event contract.
+    - name: source_service
+      type: string
+      nullable: false
+      pii: false
+      description: Service that emitted the event.
+    - name: tenant_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise tenant boundary from the source event envelope.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: case_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product-local support case identifier.
+    - name: account_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product-local account identifier used for Customer 360 joins.
+    - name: customer_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized customer subject identifier.
+    - name: channel
+      type: string
+      nullable: false
+      pii: false
+      description: Support intake channel.
+      allowedValues: [WEB, EMAIL, CHAT, PHONE, API, SOCIAL, INTERNAL]
+    - name: priority
+      type: string
+      nullable: false
+      pii: false
+      description: Support case priority.
+      allowedValues: [LOW, NORMAL, HIGH, URGENT, CRITICAL]
+    - name: case_type
+      type: string
+      nullable: false
+      pii: false
+      description: Support case category.
+      allowedValues: [INCIDENT, QUESTION, BILLING, TECHNICAL, ACCOUNT, FEATURE_REQUEST, OTHER]
+    - name: case_status
+      type: string
+      nullable: false
+      pii: false
+      description: Support case state.
+      allowedValues: [OPEN, PENDING, RESOLVED, CLOSED, ESCALATED]
+    - name: created_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the case was created.
+    - name: first_response_at
+      type: timestamp
+      nullable: true
+      pii: false
+      description: Time of first public support response.
+    - name: resolved_at
+      type: timestamp
+      nullable: true
+      pii: false
+      description: Time the case was resolved or closed.
+    - name: first_response_sla_target_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: First response SLA target in minutes.
+    - name: resolution_sla_target_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Resolution SLA target in minutes.
+    - name: first_response_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Minutes from case creation to first response.
+    - name: resolution_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Minutes from case creation to resolution.
+    - name: reopened_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of times the case was reopened.
+    - name: escalation_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of support escalations.
+    - name: satisfaction_score
+      type: int
+      nullable: true
+      pii: false
+      description: Optional customer satisfaction score from 1 to 5.
+    - name: source_system_record_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized source record identifier used for DSAR replay and lineage.
+    - name: changed_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Source business timestamp for the support case change.
+    - name: occurred_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Business event time from the envelope.
+    - name: published_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event was published into the platform stream.
+    - name: ingested_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event landed in Bronze.
+    - name: source_system
+      type: string
+      nullable: false
+      pii: false
+      description: Logical source system name from the source registry.
+    - name: source_topic
+      type: string
+      nullable: false
+      pii: false
+      description: Kafka topic or equivalent source stream.
+    - name: source_partition
+      type: int
+      nullable: true
+      pii: false
+      description: Kafka partition for replay lineage.
+    - name: source_offset
+      type: long
+      nullable: true
+      pii: false
+      description: Kafka offset for replay lineage.
+    - name: source_snapshot_id
+      type: string
+      nullable: true
+      pii: false
+      description: CDC snapshot, file manifest or source export id when no stream offset exists.
+    - name: source_record_key
+      type: string
+      nullable: false
+      pii: false
+      description: Non-sensitive source key used for replay and deduplication evidence.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of canonical source identity and raw source record.
+    - name: payload_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of the platform-approved event payload.
+    - name: schema_subject
+      type: string
+      nullable: false
+      pii: false
+      description: Schema registry subject used to validate the event payload.
+    - name: schema_id
+      type: string
+      nullable: false
+      pii: false
+      description: Schema id used for compatibility verification.
+    - name: raw_headers
+      type: json
+      nullable: false
+      pii: false
+      description: Non-secret source headers after platform filtering.
+    - name: raw_payload
+      type: json
+      nullable: false
+      pii: true
+      description: Raw tokenized support payload retained under governed Bronze controls.
+    - name: ingest_run_id
+      type: string
+      nullable: false
+      pii: false
+      description: Platform ingestion run id.
+    - name: event_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date partition derived from occurred_at.
+    - name: ingest_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date partition derived from ingested_at.
+
+quality:
+  freshnessSloMinutes: 30
+  checks:
+    - name: event_id_not_null
+      type: not_null
+      column: event_id
+    - name: customer_id_hash_not_null
+      type: not_null
+      column: customer_id_hash
+    - name: org_id_not_null
+      type: not_null
+      column: org_id
+    - name: case_id_not_null
+      type: not_null
+      column: case_id
+    - name: source_offset_unique
+      type: unique
+      columns: [source_topic, source_partition, source_offset]
+
+privacy:
+  classification: PII
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: customer_id_hash
+      column: customer_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: SECURE_RAW_PAYLOAD_WITH_SUBJECT_ERASURE
+
+serving:
+  consumers: [DataPlatform]
+  accessPolicy: platform_engineer_only
+  accessPersonas: [DataPlatformOperator, DomainDataOwner]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: platform_operator_approval
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

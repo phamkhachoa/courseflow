@@ -1,0 +1,56 @@
+product:
+  code: support-platform
+  name: Customer Support Platform
+  status: pilot
+  businessSponsor: customer-experience-lead
+  productOwner: support-platform-po
+  technicalOwner: support-platform-sa
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: account_id
+
+domains:
+  - customer
+  - risk-compliance
+
+governance:
+  classification: CONFIDENTIAL
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: standard_personal_data_3y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: customer
+    services:
+      - support-case-service
+      - customer-feedback-service
+      - knowledge-base-service
+    publicationModes:
+      - saas_connector
+      - batch_connector
+      - http_event_collector
+
+firstSlice:
+  contractStatus: existing
+  topics:
+    - customer.support_case.changed.v1
+  dataProducts:
+    - bronze.events_support_case_changed
+    - silver.support_case
+    - gold.support_sla_daily
+
+consumers:
+  - BI
+  - Compliance
+  - ReverseETL
+  - ML

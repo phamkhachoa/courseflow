@@ -1,0 +1,53 @@
+product:
+  code: enterprise-commerce
+  name: Enterprise Commerce Platform
+  status: pilot
+  businessSponsor: finance-platform-lead
+  productOwner: enterprise-commerce-po
+  technicalOwner: commerce-platform-sa
+  dataSteward: enterprise-data-steward
+  defaultDataResidency: REGION_CONTROLLED
+  tenantModel:
+    enterpriseTenantKey: tenant_id
+    productOrgKey: org_id
+
+domains:
+  - finance
+
+governance:
+  classification: SENSITIVE
+  containsPii: true
+  tenantIsolation: REQUIRED
+  defaultRetentionPolicy: regulated_finance_and_assessment_7y
+  defaultAccessPersonas:
+    - DataPlatformOperator
+    - DomainDataOwner
+  consumerContract: catalog_registered_access_request_required
+  releaseEvidenceProfile: local-medallion-release.v1
+  lineageRequired: true
+  catalogRegistrationRequired: true
+  dsarRequired: true
+
+sourceSystems:
+  - domain: finance
+    services:
+      - payment-platform
+      - billing-service
+      - benefit-ledger-service
+    publicationModes:
+      - transactional_outbox
+      - cdc
+
+firstSlice:
+  contractStatus: existing
+  topics:
+    - finance.benefit_settled.v1
+  dataProducts:
+    - bronze.events_benefit_settled
+    - silver.finance_benefit_transactions
+    - gold.finance_benefit_reconciliation
+
+consumers:
+  - BI
+  - Compliance
+  - ReverseETL

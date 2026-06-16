@@ -1,0 +1,174 @@
+version: 1
+product: lms-courseflow
+owner: courseflow-platform-sa
+description: >
+  Product-owned source bridge adapters for CourseFlow LMS P0 pilot sources. Shared platform code
+  reads this manifest to normalize raw source records into enterprise event envelopes without
+  embedding LMS-specific field mappings in platform code.
+normalizers:
+  - normalizerId: lms-courseflow-course-published-v1
+    sourceId: lms-courseflow-course-published-outbox
+    timestamps:
+      occurredAt:
+        - occurredAt
+        - occurred_at
+        - coursePublishedAt
+        - course_published_at
+      publishedAt:
+        - publishedAt
+        - published_at
+    requiredPayloadFields:
+      - orgId
+      - courseId
+      - coursePublishedAt
+      - publishingState
+    payload:
+      orgId:
+        source: [orgId, org_id]
+      courseId:
+        source: [courseId, course_id]
+      courseSlug:
+        source: [courseSlug, course_slug]
+      coursePublishedAt:
+        source: [coursePublishedAt, course_published_at, publishedAt, occurredAt]
+      publishingState:
+        source: [publishingState, publishing_state]
+        default: PUBLISHED
+      catalogVisibility:
+        source: [catalogVisibility, catalog_visibility]
+      metadata:
+        source: metadata
+        transform: safe_metadata
+
+  - normalizerId: lms-courseflow-enrollment-completed-v1
+    sourceId: lms-courseflow-enrollment-completed-outbox
+    timestamps:
+      occurredAt:
+        - occurredAt
+        - occurred_at
+        - completedAt
+        - completed_at
+      publishedAt:
+        - publishedAt
+        - published_at
+    requiredPayloadFields:
+      - orgId
+      - enrollmentId
+      - learnerIdHash
+      - courseId
+      - completedAt
+    payload:
+      orgId:
+        source: [orgId, org_id]
+      enrollmentId:
+        source: [enrollmentId, enrollment_id]
+      learnerIdHash:
+        source: [learnerIdHash, learner_id_hash]
+        fallback:
+          source: [learnerId, learner_id]
+          transform: token_hash
+      courseId:
+        source: [courseId, course_id]
+      completedAt:
+        source: [completedAt, completed_at, occurredAt]
+      completionSource:
+        source: [completionSource, completion_source]
+      metadata:
+        source: metadata
+        transform: safe_metadata
+
+  - normalizerId: lms-courseflow-gradebook-final-grade-updated-v1
+    sourceId: lms-courseflow-gradebook-final-grade-outbox
+    timestamps:
+      occurredAt:
+        - occurredAt
+        - occurred_at
+        - gradeUpdatedAt
+        - grade_updated_at
+      publishedAt:
+        - publishedAt
+        - published_at
+    requiredPayloadFields:
+      - orgId
+      - courseId
+      - gradebookId
+      - learnerIdHash
+      - finalGradeValue
+      - finalGradeScale
+      - gradeUpdatedAt
+    payload:
+      orgId:
+        source: [orgId, org_id]
+      courseId:
+        source: [courseId, course_id]
+      gradebookId:
+        source: [gradebookId, gradebook_id]
+      learnerIdHash:
+        source: [learnerIdHash, learner_id_hash]
+        fallback:
+          source: [learnerId, learner_id]
+          transform: token_hash
+      gradingPeriodId:
+        source: [gradingPeriodId, grading_period_id]
+      finalGradeValue:
+        source: [finalGradeValue, final_grade_value]
+      finalGradeScale:
+        source: [finalGradeScale, final_grade_scale]
+        default: PERCENT
+      finalGradeLetter:
+        source: [finalGradeLetter, final_grade_letter]
+      gradeUpdatedAt:
+        source: [gradeUpdatedAt, grade_updated_at, occurredAt]
+      changeReason:
+        source: [changeReason, change_reason]
+      metadata:
+        source: metadata
+        transform: safe_metadata
+
+  - normalizerId: lms-courseflow-recommendation-tracking-v1
+    sourceId: lms-courseflow-recommendation-tracking-collector
+    timestamps:
+      occurredAt:
+        - occurredAt
+        - occurred_at
+      publishedAt:
+        - publishedAt
+        - published_at
+    requiredPayloadFields:
+      - eventType
+      - orgId
+      - courseId
+      - occurredAt
+    requiredAnyPayloadFields:
+      - [learnerIdHash, sessionIdHash]
+    payload:
+      eventType:
+        source: [eventType, event_type]
+        transform: upper_strip_prefix
+        stripPrefixes: [RECOMMENDATION.]
+        allowedValues: [IMPRESSION, CLICK, ENROLLMENT]
+      orgId:
+        source: [orgId, org_id]
+      learnerIdHash:
+        source: [learnerIdHash, learner_id_hash]
+        fallback:
+          source: [learnerId, learner_id]
+          transform: token_hash
+      sessionIdHash:
+        source: [sessionIdHash, session_id_hash]
+        fallback:
+          source: [sessionId, session_id]
+          transform: token_hash
+      courseId:
+        source: [courseId, course_id]
+      relatedCourseId:
+        source: [relatedCourseId, related_course_id]
+      surface:
+        source: surface
+      position:
+        source: position
+      occurredAt:
+        source: [occurredAt, occurred_at]
+      metadata:
+        source: metadata
+        transform: safe_metadata

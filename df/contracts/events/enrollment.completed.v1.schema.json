@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise.local/df/contracts/events/enrollment.completed.v1.schema.json",
+  "title": "Enrollment Completed Event Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "orgId",
+    "enrollmentId",
+    "learnerIdHash",
+    "courseId",
+    "completedAt"
+  ],
+  "properties": {
+    "orgId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "enrollmentId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "learnerIdHash": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "courseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completionSource": {
+      "type": ["string", "null"],
+      "enum": ["LEARNER", "ADMIN", "SYSTEM", null]
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "maxProperties": 30
+    }
+  }
+}
