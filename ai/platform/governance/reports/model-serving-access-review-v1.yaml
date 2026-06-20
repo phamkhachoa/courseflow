@@ -1,0 +1,164 @@
+version: 1
+report_id: model-serving-access-review-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  request_count: 5
+  applied_count: 2
+  ready_for_apply_count: 1
+  needs_approval_count: 1
+  blocked_count: 1
+  rejected_count: 0
+  critical_risk_count: 2
+  high_risk_count: 2
+by_status:
+  applied: 2
+  blocked: 1
+  needs_approval: 1
+  ready_for_apply: 1
+by_risk_level:
+  critical: 2
+  high: 2
+  medium: 1
+action_queue:
+  applied:
+  - lms-sequence-risk-serving-grant
+  - support-agent-assist-serving-grant
+  blocked:
+  - finance-cross-product-support-risk-grant
+  needs_approval:
+  - enterprise-operations-serving-ops-observability
+  ready_for_apply:
+  - lms-sequence-risk-sandbox-tenant
+  rejected: []
+items:
+- request_id: lms-sequence-risk-serving-grant
+  target_principal_id: service:lms-courseflow-serving
+  change_type: add_principal
+  product: lms-courseflow
+  requested_scopes:
+  - internal:ai-platform:model-serving:catalog
+  - internal:ai-platform:model-serving:invoke
+  requested_tenant_ids:
+  - tenant-lms
+  requested_model_ids:
+  - sequence-risk-baseline-v1
+  risk_level: medium
+  review_status: applied
+  current_policy_covered: true
+  required_approval_roles:
+  - PO/BA
+  - SA AI Engineer
+  - SA AI Platform
+  missing_approval_roles: []
+  validation_errors: []
+  action: monitor_grant
+  refs:
+  - contracts/models/sequence-risk-model-io.v1.yaml
+  - platform/artifacts/manifests/sequence-risk-baseline-v1.yaml
+- request_id: support-agent-assist-serving-grant
+  target_principal_id: service:support-platform-serving
+  change_type: add_principal
+  product: support-platform
+  requested_scopes:
+  - internal:ai-platform:model-serving:catalog
+  - internal:ai-platform:model-serving:invoke
+  requested_tenant_ids:
+  - tenant-support
+  requested_model_ids:
+  - support-agent-assist-baseline-v1
+  - support-sla-risk-baseline-v1
+  risk_level: high
+  review_status: applied
+  current_policy_covered: true
+  required_approval_roles:
+  - PO/BA
+  - SA AI Engineer
+  - SA AI Platform
+  missing_approval_roles: []
+  validation_errors: []
+  action: monitor_grant
+  refs:
+  - platform/artifacts/manifests/support-agent-assist-baseline-v1.yaml
+  - platform/artifacts/manifests/support-sla-risk-baseline-v1.yaml
+- request_id: lms-sequence-risk-sandbox-tenant
+  target_principal_id: service:lms-courseflow-serving
+  change_type: expand_tenant
+  product: lms-courseflow
+  requested_scopes:
+  - internal:ai-platform:model-serving:catalog
+  - internal:ai-platform:model-serving:invoke
+  requested_tenant_ids:
+  - tenant-lms
+  - tenant-lms-sandbox
+  requested_model_ids:
+  - sequence-risk-baseline-v1
+  risk_level: high
+  review_status: ready_for_apply
+  current_policy_covered: false
+  required_approval_roles:
+  - Governance Reviewer
+  - PO/BA
+  - SA AI Engineer
+  - SA AI Platform
+  missing_approval_roles: []
+  validation_errors: []
+  action: apply_policy_change
+  refs:
+  - platform/artifacts/manifests/sequence-risk-baseline-v1.yaml
+  - platform/evaluation/reports/sequence-risk-baseline-v1-eval.yaml
+- request_id: enterprise-operations-serving-ops-observability
+  target_principal_id: service:enterprise-operations-serving
+  change_type: expand_scope
+  product: enterprise-operations
+  requested_scopes:
+  - internal:ai-platform:model-serving:catalog
+  - internal:ai-platform:model-serving:invoke
+  - internal:ai-platform:model-serving:ops
+  requested_tenant_ids:
+  - tenant-ops
+  requested_model_ids:
+  - operations-demand-forecast-baseline-v1
+  - operations-routing-policy-simulator-v1
+  risk_level: critical
+  review_status: needs_approval
+  current_policy_covered: false
+  required_approval_roles:
+  - Admin/Ops
+  - PO/BA
+  - SA AI Engineer
+  - SA AI Platform
+  missing_approval_roles:
+  - Admin/Ops
+  - PO/BA
+  validation_errors: []
+  action: collect_required_approvals
+  refs:
+  - platform/governance/policies/model-serving-access-policy.yaml
+  - platform/operations/reports/operating-cockpit-v1.yaml
+- request_id: finance-cross-product-support-risk-grant
+  target_principal_id: service:finance-risk-serving
+  change_type: expand_model
+  product: billing-finance
+  requested_scopes:
+  - internal:ai-platform:model-serving:catalog
+  - internal:ai-platform:model-serving:invoke
+  requested_tenant_ids:
+  - tenant-finance
+  requested_model_ids:
+  - support-sla-risk-baseline-v1
+  risk_level: critical
+  review_status: blocked
+  current_policy_covered: false
+  required_approval_roles:
+  - PO/BA
+  - SA AI Engineer
+  - SA AI Platform
+  missing_approval_roles:
+  - SA AI Engineer
+  validation_errors:
+  - product billing-finance cannot grant model support-sla-risk-baseline-v1 owned
+    by support-platform
+  action: fix_request_or_policy_before_review
+  refs:
+  - platform/artifacts/manifests/support-sla-risk-baseline-v1.yaml

@@ -1,0 +1,46 @@
+version: 1
+service_id: forecasting-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_forecasting_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/forecasting-access-policy.yaml
+observability:
+  metrics: in_memory_score_error_identifier_capacity_hitl_counters
+  tenant_safety: cross_tenant_forecast_forbidden
+routes:
+  - method: POST
+    path: /v1/forecasting/demand/score
+    scope: internal:ai-platform:forecasting:score
+    purpose: demand_forecast_capacity_planning
+  - method: GET
+    path: /v1/forecasting/health
+    scope: internal:ai-platform:forecasting:ops
+    purpose: forecasting_health
+  - method: GET
+    path: /v1/forecasting/metrics
+    scope: internal:ai-platform:forecasting:ops
+    purpose: forecasting_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/forecasting_service.py
+  model_modules:
+    - models/forecasting/demand_forecast_baseline/demand_forecast_baseline.py
+  artifacts:
+    - contracts/features/operations-demand-features.v1.yaml
+    - contracts/models/operations-demand-forecast-model-io.v1.yaml
+    - platform/evaluation/reports/operations-demand-forecast-v1-eval.yaml
+    - platform/artifacts/manifests/operations-demand-forecast-baseline-v1.yaml
+promotion_guardrails:
+  - route_scopes_must_match_forecasting_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - direct_employee_customer_learner_or_contact_identifiers_must_be_rejected
+  - high_demand_or_incident_capacity_actions_must_require_human_review
+  - automated_capacity_change_must_remain_forbidden
+  - demand_forecast_quality_gate_must_remain_green

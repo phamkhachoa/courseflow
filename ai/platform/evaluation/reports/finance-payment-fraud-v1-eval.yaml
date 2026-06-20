@@ -1,0 +1,73 @@
+version: 1
+evaluation_id: finance-payment-fraud-v1-eval
+model_id: finance-payment-fraud-baseline-v1
+algorithm: deterministic_payment_fraud_risk_scorer
+use_case_id: finance-payment-fraud-scoring
+product: billing-finance
+owner: ai-platform
+evaluation_type: service_integrated_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: finance-payment-fraud-golden-v1
+  source: platform/evaluation/datasets/finance-payment-fraud-golden.yaml
+  feature_contract: contracts/features/finance-payment-risk-features.v1.yaml
+  model_io_contract: contracts/models/finance-payment-fraud-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 4
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/anomaly_fraud/payment_fraud_baseline/tests/test_payment_fraud_baseline.py
+  risk_band_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  reason_code_recall:
+    value: 1.00
+    threshold: 0.85
+    status: passed
+  entity_link_recall:
+    value: 1.00
+    threshold: 0.85
+    status: passed
+  human_review_policy_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  score_threshold_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  risk_ordering_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Payment Fraud Service serves payment fraud scoring, reason-code and entity-link behavior for a non-LMS finance use case.
+    - Model output is advisory and requires human review before payment hold or account action.
+    - This is a deterministic baseline, not a trained anomaly detector or graph ML model.
+risks:
+  - deterministic_rules_baseline
+  - no_governed_payment_snapshot
+  - no_chargeback_label_backtest_yet
+  - trained_anomaly_detector_not_yet_promoted
+required_next_steps:
+  - bind_to_governed_payment_and_chargeback_snapshots
+  - compare_against_isolation_forest_or_gradient_boosted_classifier
+  - add_shadow_false_positive_monitoring_before_workflow_activation
+  - add_payment_fraud_service_metrics_to_release_review
+service_evidence:
+  service: services/payment-fraud-service/service.yaml
+  platform_runtime: platform/src/courseflow_ai_platform/payment_fraud_service.py
+  service_tests: services/payment-fraud-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_payment_fraud_service.py
+  policy: platform/governance/policies/payment-fraud-access-policy.yaml
+graph_entity_service_evidence:
+  service: services/graph-entity-service/service.yaml
+  platform_runtime: platform/src/courseflow_ai_platform/graph_entity_service.py
+  service_tests: services/graph-entity-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_graph_entity_service.py
+  policy: platform/governance/policies/graph-entity-access-policy.yaml

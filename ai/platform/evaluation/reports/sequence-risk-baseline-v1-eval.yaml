@@ -1,0 +1,59 @@
+version: 1
+evaluation_id: sequence-risk-baseline-v1-eval
+model_id: sequence-risk-baseline-v1
+algorithm: deterministic_recurrent_sequence_scorer
+use_case_id: lms-at-risk-prediction
+product: lms-courseflow
+owner: ai-platform
+evaluation_type: service_integrated_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: sequence-risk-baseline-golden-v1
+  source: platform/evaluation/datasets/sequence-risk-baseline-golden.yaml
+  feature_contract: contracts/features/lms-learning-features.v1.yaml
+  model_io_contract: contracts/models/sequence-risk-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 4
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/deep_learning/sequence_risk_baseline/tests/test_sequence_risk_baseline.py
+  risk_band_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  reason_code_recall:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  score_threshold_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  risk_ordering_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Sequence Risk Service serves bounded recurrent sequence-risk IO behind tenant/product/use-case policy.
+    - This is a deterministic recurrent scoring baseline, not a trained PyTorch or ONNX model.
+    - Future deep-learning promotion must replace fixed weights with governed training artifacts.
+risks:
+  - fixed_weight_sequence_scorer
+  - no_training_dataset_snapshot
+  - no_model_binary_artifact
+  - trainable_sequence_model_not_yet_promoted
+required_next_steps:
+  - bind_to_governed_dp_gold_learning_snapshot
+  - add_trainable_sequence_model_artifact
+  - add_shadow_comparison_against_classical_at_risk_baseline
+  - define_intervention_feedback_loop_metrics
+  - add_sequence_risk_service_metrics_to_release_review
+service_evidence:
+  service: services/sequence-risk-service/service.yaml
+  access_policy: platform/governance/policies/sequence-risk-access-policy.yaml
+  service_tests: services/sequence-risk-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_sequence_risk_service.py

@@ -1,0 +1,158 @@
+version: 1
+report_id: product-readiness-freshness-incident-response-drill-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+runbook_id: product-readiness-freshness-incident-response-v1
+runbook_path: platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+human_runbook_path: runbooks/product-readiness-freshness-incident-response.md
+summary:
+  drill_status: passed
+  response_step_count: 8
+  scenario_count: 5
+  passed_count: 5
+  failed_count: 0
+  p0_scenario_count: 1
+  p1_scenario_count: 4
+  current_incident_count: 0
+  current_open_incident_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+  omitted_sensitive_fields:
+  - tenant_ids
+  - principal_ids
+  - request_bodies
+  - credential_values
+  - raw_runtime_payloads
+next_actions:
+- exercise_product_readiness_response_slo_drift_alert_drill
+scenarios:
+- scenario_id: report-stale-p1
+  condition: product_readiness_freshness_report_stale
+  expected_severity: p1
+  expected_owner_role: Admin/Ops
+  expected_action: refresh_product_readiness_freshness_report
+  observed_severity: p1
+  observed_owner_role: Admin/Ops
+  observed_action: refresh_product_readiness_freshness_report
+  incident_status: open
+  incident_id: prf-819053b8aef9cb79-product-readiness-freshness-report-stale
+  application_ref: product-readiness:7965538fd0277d7a
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+- scenario_id: route-unreachable-p0
+  condition: product_readiness_runtime_route_unreachable
+  expected_severity: p0
+  expected_owner_role: Admin/Ops
+  expected_action: triage_product_readiness_runtime_route
+  observed_severity: p0
+  observed_owner_role: Admin/Ops
+  observed_action: triage_product_readiness_runtime_route
+  incident_status: open
+  incident_id: prf-9cf99c91a55c36a3-product-readiness-runtime-route-unreachable
+  application_ref: product-readiness:7965538fd0277d7a
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+- scenario_id: static-snapshot-stale-p1
+  condition: product_readiness_static_snapshot_stale
+  expected_severity: p1
+  expected_owner_role: Admin/Ops
+  expected_action: refresh_product_readiness_snapshots
+  observed_severity: p1
+  observed_owner_role: Admin/Ops
+  observed_action: refresh_product_readiness_snapshots
+  incident_status: open
+  incident_id: prf-c3f5074c1aa4721b-product-readiness-static-snapshot-stale
+  application_ref: product-readiness:7965538fd0277d7a
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+- scenario_id: runtime-error-audit-failure-p1
+  condition: product_readiness_runtime_error_or_audit_failure
+  expected_severity: p1
+  expected_owner_role: Admin/Ops
+  expected_action: triage_product_readiness_runtime_metrics
+  observed_severity: p1
+  observed_owner_role: Admin/Ops
+  observed_action: triage_product_readiness_runtime_metrics
+  incident_status: open
+  incident_id: prf-d7d76b63de46bee6-product-readiness-runtime-error-or-audit-failure
+  application_ref: product-readiness:7965538fd0277d7a
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+- scenario_id: runtime-audit-gap-p1
+  condition: product_readiness_runtime_audit_gap
+  expected_severity: p1
+  expected_owner_role: Admin/Ops
+  expected_action: restore_product_readiness_audit_coverage
+  observed_severity: p1
+  observed_owner_role: Admin/Ops
+  observed_action: restore_product_readiness_audit_coverage
+  incident_status: open
+  incident_id: prf-89c9e3306c5b66be-product-readiness-runtime-audit-gap
+  application_ref: product-readiness:7965538fd0277d7a
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1

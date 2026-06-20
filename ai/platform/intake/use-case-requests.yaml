@@ -1,0 +1,202 @@
+version: 1
+owner: ai-platform
+policy:
+  allowed_statuses:
+    - ready_for_solution_design
+    - waiting_for_data_contract
+    - waiting_for_evaluation_strategy
+    - waiting_for_privacy_review
+    - waiting_for_simulator
+    - rejected
+    - withdrawn
+  allowed_priorities:
+    - p0
+    - p1
+    - p2
+    - p3
+  required_roles:
+    - po_ba
+    - sa_ai_platform
+    - sa_ai_engineer
+requests:
+  - request_id: enterprise-knowledge-assistant-discovery
+    product: ai-platform
+    use_case_id: enterprise-knowledge-assistant
+    submitted_at: "2026-06-16"
+    submitted_by: ai-platform-product
+    business_owner: ai-platform-product
+    priority: p1
+    status: ready_for_solution_design
+    objective: >
+      Provide a governed enterprise knowledge assistant that answers policy and
+      operational questions with citations and human review for high impact
+      decisions.
+    target_modules:
+      - nlp-transformers
+      - genai-llm
+      - rag-retrieval-vector
+    requested_capabilities:
+      - grounded_enterprise_qa
+      - citation_enforcement
+      - policy_escalation
+      - prompt_safety_gateway
+    expected_business_kpis:
+      - knowledge_lookup_time_saved
+      - grounded_answer_acceptance_rate
+      - policy_escalation_reduction
+    data_domains:
+      - enterprise_policy_documents
+      - support_and_operations_knowledge
+    constraints:
+      - high_impact_answers_require_human_review
+      - tenant_scoped_retrieval
+
+  - request_id: lms-at-risk-prediction-baseline
+    product: lms-courseflow
+    use_case_id: lms-at-risk-prediction
+    submitted_at: "2026-06-16"
+    submitted_by: courseflow-product
+    business_owner: courseflow-product
+    priority: p1
+    status: ready_for_solution_design
+    objective: >
+      Predict learners likely to drop or fail so the LMS can trigger coached
+      interventions before the cohort outcome is locked.
+    target_modules:
+      - classical-ml-baselines
+      - deep-learning-sequence-models
+    requested_capabilities:
+      - explainable_risk_scoring
+      - sequence_prediction
+      - intervention_reason_codes
+    expected_business_kpis:
+      - dropout_rate
+      - intervention_acceptance_rate
+      - course_completion_rate
+    data_domains:
+      - enrollment_events
+      - assessment_attempts
+      - engagement_events
+    constraints:
+      - feature_contract_required_before_training
+      - no_automated_adverse_action
+
+  - request_id: support-sla-risk-discovery
+    product: support-platform
+    use_case_id: support-sla-risk
+    submitted_at: "2026-06-16"
+    submitted_by: support-product
+    business_owner: support-product
+    priority: p1
+    status: ready_for_solution_design
+    objective: >
+      Score cases at risk of breaching SLA and provide reason codes for
+      supervisor review.
+    target_modules:
+      - classical-ml-baselines
+      - deep-learning-sequence-models
+    requested_capabilities:
+      - breach_probability
+      - escalation_reason_codes
+      - next_best_action
+    expected_business_kpis:
+      - sla_breach_rate
+      - escalation_precision
+      - resolution_time
+    data_domains:
+      - support_case_events
+      - entitlement_and_sla_policy
+    constraints:
+      - human_review_required_for_escalation
+      - support_sla_risk_baseline_available
+
+  - request_id: finance-document-intelligence-discovery
+    product: billing-finance
+    use_case_id: finance-document-intelligence
+    submitted_at: "2026-06-16"
+    submitted_by: finance-product
+    business_owner: finance-product
+    priority: p2
+    status: ready_for_solution_design
+    objective: >
+      Extract invoice and receipt fields, link source evidence and prepare
+      exception reason codes for finance operators.
+    target_modules:
+      - computer-vision-document-ai
+      - rag-retrieval-vector
+    requested_capabilities:
+      - invoice_ocr
+      - receipt_field_extraction
+      - evidence_linked_document_search
+      - exception_reason_codes
+    expected_business_kpis:
+      - invoice_extraction_accuracy
+      - reconciliation_cycle_time
+      - manual_document_touch_reduction
+    data_domains:
+      - invoice_documents
+      - receipt_images
+      - vendor_master_data
+    constraints:
+      - media_privacy_review_approved_before_raw_document_processing
+      - financial_adjustments_require_human_review
+
+  - request_id: operations-routing-optimization-simulator
+    product: enterprise-operations
+    use_case_id: operations-routing-optimization
+    submitted_at: "2026-06-16"
+    submitted_by: operations-product
+    business_owner: operations-product
+    priority: p2
+    status: ready_for_solution_design
+    objective: >
+      Recommend constrained routing decisions and evaluate safe exploration
+      before any online policy is activated.
+    target_modules:
+      - rl-bandit-decisioning
+    requested_capabilities:
+      - next_best_queue
+      - constrained_assignment_policy
+      - offline_policy_evaluation
+      - safe_exploration_budget
+    expected_business_kpis:
+      - routing_success_rate
+      - average_handle_time
+      - intervention_outcome_lift
+    data_domains:
+      - work_item_arrivals
+      - queue_capacity
+      - routing_outcomes
+    constraints:
+      - simulator_baseline_required_before_shadow_policy
+      - safety_constraints_required
+
+  - request_id: finance-payment-fraud-scoring-discovery
+    product: billing-finance
+    use_case_id: finance-payment-fraud-scoring
+    submitted_at: "2026-06-16"
+    submitted_by: finance-product
+    business_owner: finance-product
+    priority: p2
+    status: ready_for_solution_design
+    objective: >
+      Score payment fraud risk with reason codes and entity-link evidence before
+      any hold or account action is proposed.
+    target_modules:
+      - classical-ml-baselines
+      - anomaly-fraud-risk
+      - graph-knowledge-intelligence
+    requested_capabilities:
+      - payment_risk_score
+      - fraud_reason_codes
+      - entity_link_analysis
+    expected_business_kpis:
+      - fraud_precision
+      - chargeback_loss_reduction
+      - false_positive_rate
+    data_domains:
+      - payment_events
+      - account_entities
+      - chargeback_outcomes
+    constraints:
+      - human_review_required_for_payment_hold_or_account_action

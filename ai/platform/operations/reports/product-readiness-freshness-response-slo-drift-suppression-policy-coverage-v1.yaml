@@ -1,0 +1,160 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  coverage_status: coverage_expanded
+  effectiveness_status: effectiveness_monitored
+  trend_status: trend_ready_with_watch
+  scenario_class_count: 5
+  covered_scenario_count: 5
+  failed_coverage_count: 0
+  active_policy_scenario_count: 1
+  explicit_non_watch_scenario_count: 4
+  policy_rule_count: 1
+  effective_signal_count: 4
+  coverage_pct: 100
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  min_coverage_pct: 100
+action_queue:
+  covered:
+  - prf-response-slo-drift-report-stale-p1-policy-coverage
+  - prf-response-slo-drift-route-unreachable-p0-policy-coverage
+  - prf-response-slo-drift-static-snapshot-stale-p1-policy-coverage
+  - prf-response-slo-drift-runtime-error-audit-failure-p1-policy-coverage
+  - prf-response-slo-drift-runtime-audit-gap-p1-policy-coverage
+  blocked: []
+  next_actions:
+  - monitor_product_readiness_response_slo_drift_suppression_policy_coverage_regression
+coverage_items:
+- coverage_id: prf-response-slo-drift-report-stale-p1-policy-coverage
+  scenario_id: report-stale-p1
+  condition: product_readiness_freshness_report_stale
+  severity: p1
+  trend_status: within_slo
+  coverage_mode: explicit_non_watch_exclusion
+  coverage_decision: no_suppression_policy_required
+  policy_rule_ids: []
+  matched_signal_count: 0
+  matched_effective_signal_count: 0
+  required_signal_types: []
+  covered: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+- coverage_id: prf-response-slo-drift-route-unreachable-p0-policy-coverage
+  scenario_id: route-unreachable-p0
+  condition: product_readiness_runtime_route_unreachable
+  severity: p0
+  trend_status: watch
+  coverage_mode: active_suppression_policy
+  coverage_decision: covered_by_effective_suppression_policy
+  policy_rule_ids:
+  - prf-response-slo-drift-route-unreachable-p0-suppression-policy
+  matched_signal_count: 4
+  matched_effective_signal_count: 4
+  required_signal_types:
+  - escalation_preservation
+  - noise_reduction
+  covered: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-suppression-policy-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-calibration-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alerts-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- coverage_id: prf-response-slo-drift-static-snapshot-stale-p1-policy-coverage
+  scenario_id: static-snapshot-stale-p1
+  condition: product_readiness_static_snapshot_stale
+  severity: p1
+  trend_status: within_slo
+  coverage_mode: explicit_non_watch_exclusion
+  coverage_decision: no_suppression_policy_required
+  policy_rule_ids: []
+  matched_signal_count: 0
+  matched_effective_signal_count: 0
+  required_signal_types: []
+  covered: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+- coverage_id: prf-response-slo-drift-runtime-error-audit-failure-p1-policy-coverage
+  scenario_id: runtime-error-audit-failure-p1
+  condition: product_readiness_runtime_error_or_audit_failure
+  severity: p1
+  trend_status: within_slo
+  coverage_mode: explicit_non_watch_exclusion
+  coverage_decision: no_suppression_policy_required
+  policy_rule_ids: []
+  matched_signal_count: 0
+  matched_effective_signal_count: 0
+  required_signal_types: []
+  covered: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1
+- coverage_id: prf-response-slo-drift-runtime-audit-gap-p1-policy-coverage
+  scenario_id: runtime-audit-gap-p1
+  condition: product_readiness_runtime_audit_gap
+  severity: p1
+  trend_status: within_slo
+  coverage_mode: explicit_non_watch_exclusion
+  coverage_decision: no_suppression_policy_required
+  policy_rule_ids: []
+  matched_signal_count: 0
+  matched_effective_signal_count: 0
+  required_signal_types: []
+  covered: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1

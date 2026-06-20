@@ -1,0 +1,44 @@
+version: 1
+contract: finance_document_intelligence_model_io
+owner: ai-platform
+product: billing-finance
+use_case: finance-document-intelligence
+model_id: finance-document-intelligence-baseline-v1
+input:
+  tenant_id: string
+  document_id: string
+  document_checksum: string
+  mime_type: string
+  document_language: string
+  vendor_name_hint_optional: string
+  tokens:
+    type: array
+    item:
+      text: string
+      page: integer
+      bbox_optional:
+        type: array
+        items: number
+output:
+  model_id: string
+  document_type: string
+  extracted_fields:
+    type: object
+  confidence: number
+  reason_codes:
+    type: array
+  evidence_terms:
+    type: array
+  requires_human_review: boolean
+sla:
+  p95_latency_ms: 400
+  fallback_required: true
+  batch_refresh: on_upload
+governance:
+  tenant_isolation_required: true
+  raw_document_processing_allowed: false
+  ocr_tokens_must_be_bounded: true
+  raw_tax_id_allowed: false
+  pii_redaction_before_indexing_required: true
+  financial_adjustment_human_review_required: true
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml

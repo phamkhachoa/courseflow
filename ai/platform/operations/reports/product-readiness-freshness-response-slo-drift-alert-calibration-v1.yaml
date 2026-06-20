@@ -1,0 +1,53 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-alert-calibration-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  calibration_status: calibrated_with_watch
+  drill_status: passed
+  alert_count: 1
+  routed_alert_count: 1
+  scenario_count: 1
+  calibrated_count: 1
+  failed_count: 0
+  noisy_alert_count: 0
+  under_threshold_count: 0
+  escalation_required_count: 0
+  max_margin_pct: 7
+  tenant_safe: true
+  raw_identifier_count: 0
+action_queue:
+  calibrated:
+  - prf-response-slo-drift-route-unreachable-p0-calibration
+  blocked: []
+  next_actions:
+  - codify_product_readiness_response_slo_drift_alert_suppression_policy
+items:
+- calibration_id: prf-response-slo-drift-route-unreachable-p0-calibration
+  alert_id: prf-response-slo-drift-route-unreachable-p0
+  scenario_id: route-unreachable-p0
+  condition: product_readiness_runtime_route_unreachable
+  route: admin-ops
+  action: triage_product_readiness_response_slo_drift
+  trigger_metric: recover
+  trigger_usage_pct: 87
+  threshold_pct: 80
+  margin_pct: 7
+  calibration_status: calibrated_watch
+  noise_status: quiet
+  escalation_status: watch_only
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alerts-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1

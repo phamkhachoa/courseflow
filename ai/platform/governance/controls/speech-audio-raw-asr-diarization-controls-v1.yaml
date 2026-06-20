@@ -1,0 +1,50 @@
+version: 1
+control_id: speech-audio-raw-asr-diarization-controls-v1
+status: accepted_control
+owner: support-platform-governance
+applies_to_reviews:
+  - speech-audio-raw-asr-diarization-review
+product: support-platform
+use_case_id: support-speech-quality-assurance
+taxonomy_module_id: speech-audio-ai
+control_ids:
+  - raw_audio_access_policy
+  - speaker_role_minimization
+processing_modes:
+  - raw_audio_asr
+  - speaker_diarization
+requirements:
+  raw_audio_access_policy:
+    tenant_scope_required: true
+    raw_audio_uri_in_ai_payload: forbidden
+    access_review_cadence: quarterly
+    allowed_raw_audio_duration_seconds_max: 900
+  speaker_role_minimization:
+    allowed_labels:
+      - agent
+      - customer
+      - unknown
+    biometric_identity_linking: forbidden
+    speaker_embedding_storage: forbidden
+    diarization_output_scope: role_segment_only
+  transcript_redaction:
+    redact_before_model_output:
+      - payment_card
+      - tax_identifier
+      - email
+      - phone
+      - address
+human_review:
+  required_for:
+    - complaint_escalation
+    - agent_quality_score_below_threshold
+    - pii_detected_in_transcript
+audit:
+  event_required: true
+  reason_codes_required: true
+evidence_refs:
+  - contracts/features/speech-audio-features.v1.yaml
+  - contracts/models/speech-quality-model-io.v1.yaml
+  - platform/evaluation/reports/speech-quality-v1-eval.yaml
+  - platform/model-registry/model-cards/speech-quality-baseline-v1.md
+

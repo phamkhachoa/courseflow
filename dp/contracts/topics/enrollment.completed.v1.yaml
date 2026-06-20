@@ -1,0 +1,55 @@
+contractVersion: 1
+topic:
+  name: enrollment.completed.v1
+  domain: workforce
+  product: lms-courseflow
+  domainOwner: lms-domain-council
+  ownerTeam: data-platform
+  dataSteward: enterprise-data-steward
+  sourceServices:
+    - enrollment-service
+  description: Enrollment completion events emitted when a learner completes a course enrollment.
+  status: ACTIVE
+
+schema:
+  format: JSON_SCHEMA
+  compatibility: BACKWARD_TRANSITIVE
+  envelopeSchema: contracts/event-envelope.v1.schema.json
+  payloadSchema: contracts/events/enrollment.completed.v1.schema.json
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: learner_id_hash
+      topicPath: $.payload.learnerIdHash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: SECURE_RAW_PAYLOAD_WITH_SUBJECT_ERASURE
+
+ingestion:
+  bronzeTarget: bronze.events_enrollment_completed
+  partitionStrategy: event_date/source_service/org_id
+
+quality:
+  freshnessSloMinutes: 15
+  checks:
+    - name: event_id_not_null
+      type: not_null
+      column: eventId
+    - name: event_type_allowed
+      type: accepted_values
+      column: eventType
+      values: [enrollment.completed.v1]
+    - name: source_offset_unique
+      type: unique
+      columns: [topic, partition, offset]
+    - name: no_sensitive_payload
+      type: no_sensitive_payload
+      column: payload

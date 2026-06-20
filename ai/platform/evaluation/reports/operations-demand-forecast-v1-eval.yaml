@@ -1,0 +1,67 @@
+version: 1
+evaluation_id: operations-demand-forecast-v1-eval
+model_id: operations-demand-forecast-baseline-v1
+algorithm: deterministic_weighted_moving_average_capacity_planner
+use_case_id: operations-demand-forecasting
+product: enterprise-operations
+owner: ai-platform
+evaluation_type: service_integrated_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: operations-demand-forecast-golden-v1
+  source: platform/evaluation/datasets/operations-demand-forecast-golden.yaml
+  feature_contract: contracts/features/operations-demand-features.v1.yaml
+  model_io_contract: contracts/models/operations-demand-forecast-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 4
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/forecasting/demand_forecast_baseline/tests/test_demand_forecast_baseline.py
+  demand_band_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  staffing_recommendation_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  reason_code_recall:
+    value: 1.00
+    threshold: 0.85
+    status: passed
+  forecast_threshold_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  human_review_policy_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  forecast_ordering_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Forecasting Service serves demand forecasting IO, capacity planning signals and HITL policy.
+    - It covers surge, stable, declining and backlog-pressure planning scenarios.
+    - It is deterministic source evidence behind a service boundary, not a trained probabilistic forecaster.
+risks:
+  - deterministic_weighted_moving_average
+  - no_probabilistic_prediction_interval
+  - no_causal_intervention_estimator
+  - no_live_staffing_feedback_loop
+required_next_steps:
+  - bind_to_governed_operations_workload_snapshot
+  - add probabilistic backtesting by time split
+  - compare against trained time-series model
+  - add forecasting service metrics to release review
+service_evidence:
+  service: services/forecasting-service/service.yaml
+  platform_runtime: platform/src/courseflow_ai_platform/forecasting_service.py
+  service_tests: services/forecasting-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_forecasting_service.py
+  policy: platform/governance/policies/forecasting-access-policy.yaml

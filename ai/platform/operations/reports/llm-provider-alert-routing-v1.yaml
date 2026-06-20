@@ -1,0 +1,68 @@
+version: 1
+report_id: llm-provider-alert-routing-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+policy_id: llm-provider-alert-routing-policy-v1
+runtime_probe_report_id: llm-provider-runtime-probes-v1
+summary:
+  alert_routing_status: contract_stub_alerts_configured
+  runtime_rollout_status: contract_stub_observable
+  provider_count: 2
+  routed_provider_count: 2
+  sink_count: 1
+  valid_sink_count: 1
+  live_provider_count: 0
+  contract_stub_provider_count: 2
+  rotation_automation_provider_count: 0
+  blocked_route_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+  omitted_sensitive_fields:
+  - credential_ref
+  - secret_values
+  - prompt_payload
+  - provider_api_key
+next_actions:
+- run_llm_provider_alert_delivery_drill
+- align_live_alert_routes_with_secret_rotation_report_when_network_enabled
+sinks:
+- sink_id: admin-ops-llm-provider-oncall
+  sink_type: ops_alert_queue
+  destination_ref: ops-alert://ai-platform/admin-ops/llm-provider
+  owner_role: Admin/Ops
+  escalation_policy_ref: ops-alert://ai-platform/escalation/llm-provider-p2
+  tenant_safe: true
+  validation_errors: []
+routes:
+- provider_id: contract-stub-llm-failover-v1
+  runtime_rollout_status: contract_stub_observable
+  sink_id: admin-ops-llm-provider-oncall
+  alert_route_ref: ops-alert://ai-platform/routes/llm-provider/contract-stub-llm-failover-v1
+  budget_threshold_micros_per_day: 500000
+  p95_latency_threshold_ms: 2500
+  rotation_automation_ref: not_required
+  rotation_evidence_ref: not_required
+  alert_dimensions:
+  - provider_id
+  - product
+  - use_case
+  - tenant_id
+  alert_route_status: contract_stub_alert_configured
+  rotation_status: not_required
+  validation_errors: []
+- provider_id: contract-stub-llm-v1
+  runtime_rollout_status: contract_stub_observable
+  sink_id: admin-ops-llm-provider-oncall
+  alert_route_ref: ops-alert://ai-platform/routes/llm-provider/contract-stub-llm-v1
+  budget_threshold_micros_per_day: 500000
+  p95_latency_threshold_ms: 2500
+  rotation_automation_ref: not_required
+  rotation_evidence_ref: not_required
+  alert_dimensions:
+  - provider_id
+  - product
+  - use_case
+  - tenant_id
+  alert_route_status: contract_stub_alert_configured
+  rotation_status: not_required
+  validation_errors: []

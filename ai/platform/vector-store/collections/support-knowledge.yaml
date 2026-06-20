@@ -1,0 +1,43 @@
+version: 1
+collection: support_knowledge_articles
+owner: ai-platform
+product: support-platform
+purpose:
+  - support_agent_assist
+  - support_rag_retrieval
+  - case_deflection
+embedding:
+  model_family: multilingual_sentence_embedding
+  dimensions: 768
+  distance: cosine
+chunking:
+  source_types:
+    - knowledge_article
+    - runbook
+    - troubleshooting_guide
+  max_tokens: 450
+  overlap_tokens: 60
+metadata_schema:
+  tenant_id: string
+  article_id: string
+  source_type: string
+  product_area: string
+  language: string
+  content_version: string
+  published_at: timestamp
+  access_scope: string
+  pii_class: none_or_low
+quality_checks:
+  require_non_empty_text: true
+  require_source_reference: true
+  require_published_content: true
+  require_tenant_scope: true
+  max_duplicate_chunk_ratio: 0.10
+serving:
+  top_k_default: 5
+  top_k_max: 20
+  min_similarity_for_rag: 0.70
+retention:
+  delete_when_article_unpublished: true
+  rebuild_on_content_version_change: true
+

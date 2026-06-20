@@ -1,0 +1,48 @@
+version: 1
+owner: ai-platform
+policy_id: llm-provider-runtime-probe-policy-v1
+max_probe_age_days: 1
+max_allowed_p95_latency_ms: 2500
+required_live_probe_checks:
+  - secret_ref_resolves_in_runtime_environment
+  - network_egress_allowlist_applied
+  - provider_cost_monitoring_configured
+  - provider_latency_monitoring_configured
+  - prompt_gateway_mandatory_in_service_path
+next_actions:
+  - connect_secret_manager_probe_to_runtime_environment
+  - enable_live_network_provider_with_secret_rotation_report
+  - run_llm_provider_alert_delivery_drill
+providers:
+  - provider_id: contract-stub-llm-v1
+    probe_mode: contract_stub
+    runtime_secret_probe: not_required
+    runtime_secret_ref_resolved: false
+    network_egress_allowlisted: true
+    prompt_gateway_mandatory: true
+    cost_monitoring_enabled: true
+    latency_monitoring_enabled: true
+    sample_request_count: 1
+    p95_latency_ms: 0
+    estimated_cost_micros: 0
+    probe_checks:
+      - contract_stub_no_network
+      - provider_cost_monitoring_configured
+      - provider_latency_monitoring_configured
+      - prompt_gateway_mandatory_in_service_path
+  - provider_id: contract-stub-llm-failover-v1
+    probe_mode: contract_stub
+    runtime_secret_probe: not_required
+    runtime_secret_ref_resolved: false
+    network_egress_allowlisted: true
+    prompt_gateway_mandatory: true
+    cost_monitoring_enabled: true
+    latency_monitoring_enabled: true
+    sample_request_count: 1
+    p95_latency_ms: 0
+    estimated_cost_micros: 0
+    probe_checks:
+      - contract_stub_no_network
+      - provider_cost_monitoring_configured
+      - provider_latency_monitoring_configured
+      - prompt_gateway_mandatory_in_service_path

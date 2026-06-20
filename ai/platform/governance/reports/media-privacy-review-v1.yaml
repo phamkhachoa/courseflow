@@ -1,0 +1,164 @@
+version: 1
+report_id: media-privacy-review-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+policy_id: media-privacy-review-policy-v1
+summary:
+  review_status: approved
+  review_count: 3
+  approved_count: 3
+  ready_for_approval_count: 0
+  waiting_for_controls_count: 0
+  blocked_count: 0
+  raw_media_request_count: 2
+  transcript_only_approved_count: 1
+  control_gap_count: 0
+  blocked_mode_count: 0
+next_actions:
+- attach_missing_control_evidence_before_raw_media_approval
+- keep_transcript_and_ocr_token_baselines_runtime_safe
+- reject_speaker_biometrics_until_explicit_policy_is_approved
+action_queue:
+  approved:
+  - support-speech-transcript-baseline-review
+  - finance-document-raw-ocr-review
+  - speech-audio-raw-asr-diarization-review
+  ready_for_approval: []
+  waiting_for_controls: []
+  blocked: []
+items:
+- review_id: support-speech-transcript-baseline-review
+  name: Support speech transcript baseline review
+  product: support-platform
+  use_case_id: support-speech-quality-assurance
+  taxonomy_module_id: speech-audio-ai
+  media_type: transcript
+  requested_processing_modes:
+  - transcript_only
+  raw_media_requested: false
+  status: approved
+  review_status: approved
+  reviewer_role: Governance Reviewer
+  requested_by: support-product
+  submitted_at: '2026-06-17'
+  decision_ref: platform/evaluation/reports/speech-quality-v1-eval.yaml
+  required_controls:
+  - tenant_isolation
+  - retention_policy
+  - deletion_export_impact_review
+  - human_review_routing
+  - audit_logging
+  - transcript_redaction
+  - consent_or_notice
+  satisfied_controls:
+  - tenant_isolation
+  - retention_policy
+  - deletion_export_impact_review
+  - human_review_routing
+  - audit_logging
+  - transcript_redaction
+  - consent_or_notice
+  missing_controls: []
+  blocked_processing_modes: []
+  refs:
+  - contracts/features/speech-audio-features.v1.yaml
+  - contracts/models/speech-quality-model-io.v1.yaml
+  - platform/evaluation/reports/speech-quality-v1-eval.yaml
+  - platform/model-registry/model-cards/speech-quality-baseline-v1.md
+  validation_errors: []
+- review_id: finance-document-raw-ocr-review
+  name: Finance document raw OCR and layout review
+  product: billing-finance
+  use_case_id: finance-document-intelligence
+  taxonomy_module_id: computer-vision-document-ai
+  media_type: pdf_document
+  requested_processing_modes:
+  - raw_document_ocr
+  - layout_extraction
+  raw_media_requested: true
+  status: approved
+  review_status: approved
+  reviewer_role: Governance Reviewer
+  requested_by: finance-product
+  submitted_at: '2026-06-17'
+  decision_ref: docs/team/council-meetings/0069-raw-media-control-evidence-approval.md
+  required_controls:
+  - tenant_isolation
+  - retention_policy
+  - deletion_export_impact_review
+  - human_review_routing
+  - audit_logging
+  - source_document_access_policy
+  - pii_redaction
+  - reviewer_override_queue
+  - raw_media_storage_boundary
+  - layout_region_redaction
+  satisfied_controls:
+  - tenant_isolation
+  - retention_policy
+  - deletion_export_impact_review
+  - human_review_routing
+  - audit_logging
+  - source_document_access_policy
+  - pii_redaction
+  - reviewer_override_queue
+  - raw_media_storage_boundary
+  - layout_region_redaction
+  missing_controls: []
+  blocked_processing_modes: []
+  refs:
+  - contracts/features/finance-document-intelligence-features.v1.yaml
+  - contracts/models/finance-document-intelligence-model-io.v1.yaml
+  - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+  - platform/model-registry/model-cards/finance-document-intelligence-baseline-v1.md
+  - platform/governance/controls/raw-media-storage-boundary-v1.yaml
+  - platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+  validation_errors: []
+- review_id: speech-audio-raw-asr-diarization-review
+  name: Speech audio raw ASR and diarization review
+  product: support-platform
+  use_case_id: support-speech-quality-assurance
+  taxonomy_module_id: speech-audio-ai
+  media_type: audio
+  requested_processing_modes:
+  - raw_audio_asr
+  - speaker_diarization
+  raw_media_requested: true
+  status: approved
+  review_status: approved
+  reviewer_role: Governance Reviewer
+  requested_by: support-product
+  submitted_at: '2026-06-17'
+  decision_ref: docs/team/council-meetings/0069-raw-media-control-evidence-approval.md
+  required_controls:
+  - tenant_isolation
+  - retention_policy
+  - deletion_export_impact_review
+  - human_review_routing
+  - audit_logging
+  - consent_or_notice
+  - raw_audio_access_policy
+  - transcript_redaction
+  - raw_media_storage_boundary
+  - speaker_role_minimization
+  satisfied_controls:
+  - tenant_isolation
+  - retention_policy
+  - deletion_export_impact_review
+  - human_review_routing
+  - audit_logging
+  - consent_or_notice
+  - raw_audio_access_policy
+  - transcript_redaction
+  - raw_media_storage_boundary
+  - speaker_role_minimization
+  missing_controls: []
+  blocked_processing_modes: []
+  refs:
+  - contracts/features/speech-audio-features.v1.yaml
+  - contracts/models/speech-quality-model-io.v1.yaml
+  - platform/evaluation/reports/speech-quality-v1-eval.yaml
+  - platform/model-registry/model-cards/speech-quality-baseline-v1.md
+  - platform/governance/controls/raw-media-storage-boundary-v1.yaml
+  - platform/governance/controls/speech-audio-raw-asr-diarization-controls-v1.yaml
+  validation_errors: []

@@ -1,0 +1,38 @@
+version: 1
+report_id: governance-evaluation-incident-export-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  as_of: '2026-06-17'
+  current_ops_status: release_gate_observable
+  observation_count: 1
+  consecutive_failure_count: 0
+  repeated_failure_threshold: 2
+  repeated_failure_count: 0
+  incident_count: 0
+  open_count: 0
+  watch_count: 0
+  p0_count: 0
+  p1_count: 0
+  p2_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+  omitted_sensitive_fields:
+  - principal_ids
+  - tenant_ids
+  - request_bodies
+  - credential_values
+  - raw_drill_payloads
+by_condition: {}
+by_severity: {}
+by_status: {}
+action_queue:
+  open: []
+  watch: []
+  p0: []
+  p1: []
+  p2: []
+  governance_evaluation_release_gate_mismatch: []
+  governance_evaluation_unexpected_error: []
+  governance_evaluation_guardrail_gap: []
+incidents: []

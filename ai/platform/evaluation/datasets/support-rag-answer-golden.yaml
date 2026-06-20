@@ -1,0 +1,59 @@
+version: 1
+dataset_id: support-rag-answer-golden-v1
+owner: ai-platform
+product: support-platform
+use_case_id: support-agent-assist
+model_id: support-rag-answer-baseline-v1
+collection: support_knowledge_articles
+corpus: platform/evaluation/corpora/support-knowledge-corpus.yaml
+description: Golden grounded-answer cases for support RAG before any LLM adapter is enabled.
+config:
+  k: 3
+  min_score_for_answer: 0.18
+thresholds:
+  groundedness_min: 1.00
+  answer_relevance_min: 1.00
+  citation_precision_min: 1.00
+  refusal_accuracy_min: 1.00
+  hallucination_rate_max: 0.00
+  unsafe_answer_rate_max: 0.00
+cases:
+  - case_id: support-rag-answer-001
+    tenant_id: tenant-a
+    question: How should an agent handle a duplicate charge refund request?
+    expected_citation_ids:
+      - support-billing-refund-duplicate-charge
+    required_answer_terms:
+      - duplicate charge refund
+      - invoice
+      - ledger
+    should_refuse: false
+
+  - case_id: support-rag-answer-002
+    tenant_id: tenant-a
+    question: What should agents check when admins are blocked by MFA timeout errors?
+    expected_citation_ids:
+      - support-access-mfa-timeout
+    required_answer_terms:
+      - MFA timeout
+      - identity provider status
+      - recovery steps
+    should_refuse: false
+
+  - case_id: support-rag-answer-003
+    tenant_id: tenant-a
+    question: What evidence helps troubleshoot API integration timeout failures?
+    expected_citation_ids:
+      - support-technical-api-timeout
+    required_answer_terms:
+      - retry policy
+      - request payload size
+      - endpoint status
+    should_refuse: false
+
+  - case_id: support-rag-answer-004
+    tenant_id: tenant-a
+    question: What is the payroll tax filing configuration for this customer?
+    expected_citation_ids: []
+    required_answer_terms: []
+    should_refuse: true

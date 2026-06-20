@@ -1,0 +1,171 @@
+version: 1
+dataset_id: operations-routing-policy-golden-v1
+model_id: operations-routing-policy-simulator-v1
+product: enterprise-operations
+use_case_id: operations-routing-optimization
+module: models/bandit_rl/routing_policy_simulator/routing_policy_simulator.py
+feature_contract: contracts/features/operations-routing-features.v1.yaml
+model_io_contract: contracts/models/operations-routing-policy-model-io.v1.yaml
+thresholds:
+  assignment_accuracy_min: 1.0
+  constraint_pass_rate_min: 1.0
+  baseline_lift_pass_rate_min: 1.0
+  reason_code_recall_min: 0.8
+  exploration_budget_pass_rate_min: 1.0
+  deterministic_replay_rate_min: 1.0
+cases:
+  - case_id: urgent-identity-outage
+    input:
+      tenant_id: tenant-ops
+      policy_id: routing-policy-v1
+      safe_exploration_budget: 0.0
+      baseline_queue_id: queue-general
+      work_item:
+        work_item_id: work-1001
+        work_type: identity_outage
+        priority: p1
+        required_skill_ids:
+          - identity
+          - integration
+        expected_effort_minutes: 30
+      queues:
+        - queue_id: queue-general
+          available_agent_count: 3
+          backlog_count: 9
+          average_handle_time_minutes: 45
+          skill_ids:
+            - general
+          max_concurrency: 4
+        - queue_id: queue-identity
+          available_agent_count: 2
+          backlog_count: 2
+          average_handle_time_minutes: 30
+          skill_ids:
+            - identity
+            - integration
+          max_concurrency: 3
+    expected:
+      assigned_queue_id: queue-identity
+      max_constraint_violations: 0
+      min_baseline_score_delta: 0.20
+      max_exploration_budget_used: 0.0
+      reason_codes:
+        - SKILL_MATCH
+        - CAPACITY_AVAILABLE
+        - NO_EXPLORATION_FOR_HIGH_PRIORITY
+
+  - case_id: billing-refund-standard
+    input:
+      tenant_id: tenant-ops
+      policy_id: routing-policy-v1
+      safe_exploration_budget: 0.05
+      baseline_queue_id: queue-general
+      work_item:
+        work_item_id: work-1002
+        work_type: refund_followup
+        priority: p2
+        required_skill_ids:
+          - billing
+        expected_effort_minutes: 25
+      queues:
+        - queue_id: queue-general
+          available_agent_count: 2
+          backlog_count: 5
+          average_handle_time_minutes: 35
+          skill_ids:
+            - general
+          max_concurrency: 3
+        - queue_id: queue-finance
+          available_agent_count: 3
+          backlog_count: 2
+          average_handle_time_minutes: 24
+          skill_ids:
+            - billing
+            - refunds
+          max_concurrency: 4
+    expected:
+      assigned_queue_id: queue-finance
+      max_constraint_violations: 0
+      min_baseline_score_delta: 0.25
+      max_exploration_budget_used: 0.05
+      reason_codes:
+        - SKILL_MATCH
+        - CAPACITY_AVAILABLE
+        - BACKLOG_HEALTHY
+
+  - case_id: low-risk-close-queues
+    input:
+      tenant_id: tenant-ops
+      policy_id: routing-policy-v1
+      safe_exploration_budget: 0.10
+      baseline_queue_id: queue-ops-b
+      work_item:
+        work_item_id: work-1003
+        work_type: ops_question
+        priority: p3
+        required_skill_ids:
+          - operations
+        expected_effort_minutes: 20
+      queues:
+        - queue_id: queue-ops-a
+          available_agent_count: 2
+          backlog_count: 3
+          average_handle_time_minutes: 20
+          skill_ids:
+            - operations
+          max_concurrency: 3
+        - queue_id: queue-ops-b
+          available_agent_count: 2
+          backlog_count: 4
+          average_handle_time_minutes: 22
+          skill_ids:
+            - operations
+          max_concurrency: 3
+    expected:
+      assigned_queue_id: queue-ops-a
+      max_constraint_violations: 0
+      min_baseline_score_delta: 0.0
+      max_exploration_budget_used: 0.05
+      reason_codes:
+        - SAFE_EXPLORATION_AVAILABLE
+        - SKILL_MATCH
+
+  - case_id: escalation-skilled-queue
+    input:
+      tenant_id: tenant-ops
+      policy_id: routing-policy-v1
+      safe_exploration_budget: 0.0
+      baseline_queue_id: queue-general
+      work_item:
+        work_item_id: work-1004
+        work_type: fraud_escalation
+        priority: p1
+        required_skill_ids:
+          - fraud
+          - escalation
+        expected_effort_minutes: 45
+      queues:
+        - queue_id: queue-general
+          available_agent_count: 4
+          backlog_count: 4
+          average_handle_time_minutes: 35
+          skill_ids:
+            - general
+          max_concurrency: 4
+        - queue_id: queue-escalation
+          available_agent_count: 1
+          backlog_count: 1
+          average_handle_time_minutes: 45
+          skill_ids:
+            - fraud
+            - escalation
+          max_concurrency: 2
+    expected:
+      assigned_queue_id: queue-escalation
+      max_constraint_violations: 0
+      min_baseline_score_delta: 0.15
+      max_exploration_budget_used: 0.0
+      reason_codes:
+        - SKILL_MATCH
+        - EFFORT_FIT
+        - NO_EXPLORATION_FOR_HIGH_PRIORITY

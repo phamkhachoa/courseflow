@@ -1,0 +1,114 @@
+name: Enterprise Data Platform Gates
+
+on:
+  pull_request:
+    paths:
+      - "dp/**"
+      - ".github/workflows/data-platform.yml"
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "dp/**"
+      - ".github/workflows/data-platform.yml"
+  workflow_dispatch:
+    inputs:
+      production_readiness_gate:
+        description: "Also fail the run unless the production review pack is production-ready"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  data-platform:
+    name: DP validation and data-plane smoke
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: dp/pyproject.toml
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - name: Install DP tooling
+        run: python -m pip install -e . pytest
+
+      - name: Pre-pull live runtime images
+        run: |
+          docker compose -f platform/runtime/local/docker-compose.yaml pull redpanda schema-registry minio source-postgres iceberg-postgres trino
+          docker pull openpolicyagent/opa:0.70.0
+
+      - name: Run enterprise DP CI gate
+        run: make ci EVENT_BACKBONE_TIMEOUT_SECONDS=180 BROKER_ACL_TIMEOUT_SECONDS=180
+
+      - name: Verify DP code/control-plane review verdict
+        run: make code-control-plane-gate
+
+      - name: Verify DP source-onboarding release gate
+        run: make source-onboarding-release-gate
+
+      - name: Generate DP managed runtime ops readiness artifacts
+        if: always()
+        run: make production-ops-readiness-pack
+
+      - name: Verify DP production readiness verdict
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.production_readiness_gate }}
+        run: make production-readiness-gate
+
+      - name: Validate local runtime compose config
+        run: docker compose -f platform/runtime/local/docker-compose.yaml config --quiet
+
+      - name: Upload data-plane smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-dp-data-plane-smoke
+          path: |
+            dp/build/data-plane-smoke
+            dp/build/schema-registry-runtime-smoke
+            dp/build/schema-registry-attestation
+            dp/build/schema-registry-auth-smoke
+            dp/build/schema-registry-storage-smoke
+            dp/build/live-lakehouse-smoke
+            dp/build/iceberg-catalog-smoke
+            dp/build/object-store-smoke
+            dp/build/trino-sql-smoke
+            dp/build/trino-iceberg-minio-smoke
+            dp/build/catalog-cross-engine-smoke
+            dp/build/trino-runtime-security-smoke
+            dp/build/policy-decision-smoke
+            dp/build/oidc-auth-smoke
+            dp/build/secret-rotation-smoke
+            dp/build/catalog-runtime-ops
+            dp/build/orchestration-runtime-ops
+            dp/build/secret-rotation-ops
+            dp/build/managed-runtime-ops-review
+            dp/build/runtime-iac-contract-check
+            dp/build/dagster-orchestration-smoke
+            dp/build/dagster-day2-smoke
+            dp/build/event-backbone-smoke
+            dp/build/broker-acl-smoke
+            dp/build/transactional-outbox-smoke
+            dp/build/live-bronze-ingestion-smoke
+            dp/build/orchestrated-publication-smoke
+            dp/build/live-quality-slo-smoke
+            dp/build/portfolio-release-smoke
+            dp/build/source-activation-ops
+            dp/build/source-onboarding-review-pack
+            dp/build/production-review-pack
+            dp/build/production-review-gates
+          if-no-files-found: error

@@ -1,0 +1,77 @@
+version: 1
+owner: ai-platform
+scope: courseflow-ai-mentor
+default_policy:
+  require_baseline_comparison: true
+  require_model_card: true
+  require_feature_contract: true
+  require_model_io_contract: true
+  require_approval_before_activation: true
+gates:
+  recommendation:
+    offline_metrics:
+      recall_at_10:
+        min: 0.10
+      ndcg_at_10:
+        min: 0.08
+    product_metrics:
+      ctr:
+        monitor_only_until_ab_test: true
+    must_not_regress_against:
+      - IMPLICIT_ITEM_CF_V1
+
+  semantic_search:
+    offline_metrics:
+      relevance_at_10:
+        min: 0.75
+      query_coverage:
+        min: 0.90
+    safety:
+      pii_leakage_findings:
+        max: 0
+
+  rag_tutor:
+    offline_metrics:
+      groundedness:
+        min: 0.85
+      answer_relevance:
+        min: 0.80
+      citation_precision:
+        min: 0.90
+    safety:
+      hallucination_rate:
+        max: 0.05
+      unsafe_answer_rate:
+        max: 0.00
+
+  auto_grading:
+    offline_metrics:
+      instructor_agreement:
+        min: 0.75
+      rubric_consistency:
+        min: 0.80
+    governance:
+      final_grade_requires_human_approval: true
+
+  at_risk_prediction:
+    offline_metrics:
+      auc:
+        min: 0.70
+      precision_at_20_percent:
+        min: 0.50
+      false_positive_rate:
+        max: 0.30
+    output_requirements:
+      require_reason_codes: true
+      require_recommended_action: true
+
+  knowledge_tracing:
+    offline_metrics:
+      auc:
+        min: 0.72
+      calibration_error:
+        max: 0.10
+    data_requirements:
+      require_skill_mapping: true
+      require_question_attempt_sequence: true
+

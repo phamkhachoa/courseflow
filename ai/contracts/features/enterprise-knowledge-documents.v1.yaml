@@ -1,0 +1,56 @@
+version: 1
+contract: enterprise_knowledge_documents
+owner: ai-platform
+producer: ai-platform
+consumer: ai-platform
+product: ai-platform
+entities:
+  tenant:
+    key: tenant_id
+    pii_class: none
+  document:
+    key: document_id
+    pii_class: low
+  section:
+    key: section_id
+    pii_class: low
+  source_system:
+    key: source_system_id
+    pii_class: none
+feature_groups:
+  enterprise_policy_documents:
+    freshness: on_publish
+    features:
+      - title
+      - body_text
+      - policy_type
+      - owner_team
+      - effective_at
+      - supersedes_document_id
+      - access_group_ids
+    consumers:
+      - enterprise-knowledge-assistant
+
+  support_and_operations_knowledge:
+    freshness: 24h
+    features:
+      - article_title
+      - article_body
+      - product_area
+      - resolution_steps
+      - escalation_policy
+      - operational_runbook_refs
+      - access_group_ids
+    consumers:
+      - enterprise-knowledge-assistant
+privacy:
+  tenant_isolation_required: true
+  access_group_filter_required: true
+  redact_secrets_before_ai: true
+  high_impact_answer_human_review_required: true
+  deletion_export_impact_review_required: true
+quality:
+  require_not_null_keys: true
+  require_document_checksum: true
+  max_lag_hours: 24
+  owner_on_failure: ai-platform

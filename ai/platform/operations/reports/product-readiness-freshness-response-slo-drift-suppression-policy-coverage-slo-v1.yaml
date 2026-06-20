@@ -1,0 +1,76 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  slo_status: coverage_slo_published
+  regression_status: regression_monitored
+  coverage_status: coverage_expanded
+  scenario_class_count: 5
+  covered_scenario_count: 5
+  failed_coverage_count: 0
+  coverage_pct: 100
+  regression_check_count: 7
+  passed_regression_check_count: 7
+  failed_regression_check_count: 0
+  objective_count: 4
+  met_objective_count: 4
+  failed_objective_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  target_coverage_pct: 100
+  target_regression_pass_pct: 100
+  max_failed_coverage_count: 0
+  max_raw_identifier_count: 0
+  review_cadence_days: 30
+action_queue:
+  met:
+  - scenario-coverage-slo
+  - coverage-regression-health-slo
+  - tenant-safety-slo
+  - owner-cadence-slo
+  blocked: []
+  next_actions:
+  - attach_product_readiness_response_slo_drift_suppression_policy_coverage_slo_to_release_governance
+objectives:
+- objective_id: scenario-coverage-slo
+  objective_type: scenario_coverage
+  target: coverage_pct>=100;failed_coverage_count<=0
+  observed: coverage_pct=100;covered=5/5;failed=0
+  met: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- objective_id: coverage-regression-health-slo
+  objective_type: regression_health
+  target: regression_status=regression_monitored;pass_pct>=100
+  observed: regression_status=regression_monitored;passed=7/7;failed=0
+  met: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- objective_id: tenant-safety-slo
+  objective_type: tenant_safety
+  target: tenant_safe=true;raw_identifier_count<=0
+  observed: tenant_safe=true;raw_identifier_count=0
+  met: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- objective_id: owner-cadence-slo
+  objective_type: owner_cadence
+  target: review_cadence_days<=30;dashboard_panel=true
+  observed: review_cadence_days=30;owner=SA AI Platform + Admin/Ops;dashboard_panel=true
+  met: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html

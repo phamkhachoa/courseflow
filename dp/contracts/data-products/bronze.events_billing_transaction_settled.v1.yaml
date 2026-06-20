@@ -1,0 +1,342 @@
+contractVersion: 1
+dataProduct:
+  name: bronze.events_billing_transaction_settled
+  layer: BRONZE
+  domain: finance
+  product: billing-platform
+  domainOwner: finance-domain-council
+  ownerTeam: data-platform
+  businessOwner: finance-analytics-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Raw billing transaction settlement events for certified enterprise revenue intelligence.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream: []
+  ingestionMode: streaming
+  eventTimeColumn: occurred_at
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that produced or owns this record.
+    - name: source_product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Business product that originated the billed product or service.
+    - name: domain_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise data domain code used for mesh ownership and catalog grouping.
+    - name: event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Global event idempotency key.
+    - name: event_type
+      type: string
+      nullable: false
+      pii: false
+      description: Billing transaction event type.
+      allowedValues: [BILLING_TRANSACTION_SETTLED]
+    - name: event_version
+      type: int
+      nullable: false
+      pii: false
+      description: Version of the source event contract.
+    - name: source_service
+      type: string
+      nullable: false
+      pii: false
+      description: Service that emitted the event.
+    - name: tenant_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise tenant boundary from the source event envelope.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: account_id
+      type: string
+      nullable: false
+      pii: false
+      description: Billing account identifier scoped by organization.
+    - name: customer_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized customer subject identifier for governed finance workflows.
+    - name: billing_transaction_id
+      type: string
+      nullable: false
+      pii: false
+      description: Billing ledger transaction identifier.
+    - name: invoice_id
+      type: string
+      nullable: false
+      pii: false
+      description: Invoice identifier related to the transaction.
+    - name: payment_id
+      type: string
+      nullable: true
+      pii: false
+      description: Payment or settlement identifier when available.
+    - name: subscription_id
+      type: string
+      nullable: true
+      pii: false
+      description: Subscription identifier when revenue is recurring.
+    - name: contract_id
+      type: string
+      nullable: true
+      pii: false
+      description: Contract lifecycle identifier when available.
+    - name: order_id
+      type: string
+      nullable: true
+      pii: false
+      description: Upstream order identifier when billing originates from commerce.
+    - name: product_line
+      type: string
+      nullable: false
+      pii: false
+      description: Finance product line or revenue stream grouping.
+    - name: offering_id
+      type: string
+      nullable: true
+      pii: false
+      description: Product offering, plan or bundle identifier.
+    - name: sku_id
+      type: string
+      nullable: true
+      pii: false
+      description: SKU identifier when available.
+    - name: currency
+      type: string
+      nullable: false
+      pii: false
+      description: ISO-4217 currency code.
+    - name: gross_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Gross billing amount in minor currency units.
+    - name: discount_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Discount amount in minor currency units.
+    - name: tax_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Tax amount in minor currency units, excluded from revenue metrics unless explicitly requested.
+    - name: refund_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Refund amount in minor currency units.
+    - name: net_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Net revenue in minor currency units after discounts and refunds.
+    - name: recognized_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Revenue recognized for the accounting date in minor currency units.
+    - name: deferred_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Revenue deferred beyond the accounting date in minor currency units.
+    - name: transaction_status
+      type: string
+      nullable: false
+      pii: false
+      description: Settlement state from the billing source of truth.
+      allowedValues: [SETTLED, PENDING, FAILED, REFUNDED, CHARGEBACK, REVERSED]
+    - name: revenue_recognition_status
+      type: string
+      nullable: false
+      pii: false
+      description: Revenue recognition state for this transaction.
+      allowedValues: [RECOGNIZED, DEFERRED, PARTIAL, REVERSED, PENDING]
+    - name: billing_period_start
+      type: date
+      nullable: true
+      pii: false
+      description: Start date of the billed service period.
+    - name: billing_period_end
+      type: date
+      nullable: true
+      pii: false
+      description: End date of the billed service period.
+    - name: accounting_date
+      type: date
+      nullable: false
+      pii: false
+      description: Finance accounting date used for revenue reporting.
+    - name: settled_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Settlement business timestamp.
+    - name: source_system_record_id_hash
+      type: string
+      nullable: false
+      pii: false
+      description: Tokenized source record identifier for support and replay.
+    - name: reason_code
+      type: string
+      nullable: true
+      pii: false
+      description: Optional upstream reason code for known revenue status.
+    - name: occurred_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Business event time from the envelope.
+    - name: published_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event was published into the platform stream.
+    - name: ingested_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event landed in Bronze.
+    - name: source_system
+      type: string
+      nullable: false
+      pii: false
+      description: Logical source system name from the source registry.
+    - name: source_topic
+      type: string
+      nullable: false
+      pii: false
+      description: Kafka topic or equivalent source stream.
+    - name: source_partition
+      type: int
+      nullable: true
+      pii: false
+      description: Kafka partition for replay lineage.
+    - name: source_offset
+      type: long
+      nullable: true
+      pii: false
+      description: Kafka offset for replay lineage.
+    - name: source_snapshot_id
+      type: string
+      nullable: true
+      pii: false
+      description: CDC snapshot, file manifest or source export id when no stream offset exists.
+    - name: source_record_key
+      type: string
+      nullable: false
+      pii: false
+      description: Non-sensitive source key used for replay and deduplication evidence.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of canonical source identity and raw source record.
+    - name: payload_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of the platform-approved event payload.
+    - name: schema_subject
+      type: string
+      nullable: false
+      pii: false
+      description: Schema registry subject used to validate the event payload.
+    - name: schema_id
+      type: string
+      nullable: false
+      pii: false
+      description: Schema registry id or local schema hash.
+    - name: raw_headers
+      type: json
+      nullable: false
+      pii: false
+      description: Non-secret source headers retained for lineage.
+    - name: raw_payload
+      type: json
+      nullable: false
+      pii: true
+      description: Raw event payload with tokenized subject only, secured for erasure replay.
+    - name: ingest_run_id
+      type: string
+      nullable: false
+      pii: false
+      description: Bronze ingestion run id.
+    - name: event_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date partition derived from event time.
+    - name: ingest_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date partition derived from ingestion time.
+
+quality:
+  freshnessSloMinutes: 60
+  checks:
+    - name: event_id_not_null
+      type: not_null
+      column: event_id
+    - name: billing_transaction_id_not_null
+      type: not_null
+      column: billing_transaction_id
+    - name: source_offset_unique
+      type: unique
+      columns: [source_topic, source_partition, source_offset]
+    - name: billing_transaction_event_type_allowed
+      type: accepted_values
+      column: event_type
+      values: [BILLING_TRANSACTION_SETTLED]
+    - name: no_sensitive_payload
+      type: no_sensitive_payload
+      column: raw_payload
+
+privacy:
+  classification: SENSITIVE
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 2555
+  erasureSupported: true
+  subjectKeys:
+    - name: customer_id_hash
+      column: customer_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: REGULATED_SUBJECT_DELETE
+  legalHoldPolicy: regulated_legal_hold_check
+  rawPayloadPolicy: SECURE_RAW_PAYLOAD_WITH_SUBJECT_ERASURE
+
+serving:
+  consumers: [DataPlatform]
+  accessPolicy: platform_engineer_only
+  accessPersonas: [DataPlatformOperator, DomainDataOwner]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

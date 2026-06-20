@@ -1,0 +1,390 @@
+version: 1
+report_id: operating-cockpit-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  platform_status: attention_required
+  delivery_status: ready_work_available
+  release_status: release_ready
+  serving_status: healthy
+  serving_metrics_connected: true
+  serving_request_count: 3
+  serving_error_count: 0
+  serving_audit_failure_count: 0
+  serving_audit_record_count: 3
+  serving_access_governance_status: pending_policy_apply
+  serving_access_pending_apply_count: 1
+  serving_access_ledger_update_required_count: 0
+  serving_access_drift_count: 0
+  llm_provider_ops_status: contract_stub_observable
+  llm_provider_rollout_status: contract_stub_observable
+  llm_provider_alert_routing_status: contract_stub_alerts_configured
+  llm_provider_secret_rotation_status: contract_stub_rotation_controls_ready
+  llm_provider_count: 2
+  llm_provider_blocked_count: 0
+  llm_provider_cost_monitoring_count: 2
+  llm_provider_latency_monitoring_count: 2
+  llm_provider_alert_route_count: 2
+  llm_provider_alert_sink_count: 1
+  llm_provider_secret_manager_binding_count: 0
+  llm_provider_rotation_evidence_count: 0
+  llm_provider_estimated_cost_micros: 0
+  llm_provider_max_p95_latency_ms: 0
+  product_count: 8
+  use_case_count: 30
+  non_lms_use_case_count: 18
+  capability_count: 41
+  coverage_module_count: 14
+  missing_required_area_count: 0
+  executable_surface_count: 14
+  evaluation_required_count: 20
+  evaluation_required_passed_count: 20
+  governance_evaluation_ops_status: release_gate_observable
+  governance_evaluation_assessment_count: 3
+  governance_evaluation_approved_count: 1
+  governance_evaluation_review_required_count: 1
+  governance_evaluation_blocked_count: 1
+  governance_evaluation_direct_identifier_rejection_count: 1
+  governance_evaluation_secret_value_rejection_count: 1
+  governance_evaluation_unexpected_error_count: 0
+  data_contract_count: 7
+  data_contract_design_ready_request_count: 6
+  data_contract_production_ready_request_count: 3
+  data_contract_missing_domain_count: 0
+  artifact_manifest_count: 12
+  artifact_promotion_count: 4
+  solution_request_count: 6
+  solution_ready_count: 6
+  solution_waiting_count: 0
+  solution_non_lms_count: 5
+  promotion_request_count: 5
+  promotion_request_ready_count: 3
+  promotion_request_waiting_count: 2
+  promotion_count: 4
+  promotion_ready_count: 4
+  promotion_blocked_count: 0
+  promotion_non_lms_count: 2
+  media_privacy_review_status: approved
+  media_privacy_review_count: 3
+  media_privacy_approved_count: 3
+  media_privacy_waiting_count: 0
+  media_privacy_blocked_count: 0
+  media_privacy_raw_media_request_count: 2
+  media_privacy_control_gap_count: 0
+  action_count: 23
+serving_health:
+  status: healthy
+  metrics_connected: true
+  request_count: 3
+  success_count: 3
+  fallback_count: 0
+  error_count: 0
+  human_review_count: 2
+  audit_record_count: 3
+  audit_failure_count: 0
+  model_count: 3
+  models_with_errors: []
+  models_with_audit_failures: []
+  models_without_audit_coverage: []
+serving_access_governance:
+  status: pending_policy_apply
+  application_count: 1
+  pending_apply_count: 1
+  reconciled_count: 0
+  ledger_update_required_count: 0
+  drift_count: 0
+  active_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  pending_application_ids:
+  - lms-sequence-risk-sandbox-tenant-apply-20260617
+  ledger_update_required_application_ids: []
+  drift_application_ids: []
+llm_provider_ops:
+  status: contract_stub_observable
+  rollout_status: contract_stub_observable
+  alert_routing_status: contract_stub_alerts_configured
+  secret_rotation_status: contract_stub_rotation_controls_ready
+  provider_count: 2
+  live_provider_count: 0
+  blocked_provider_count: 0
+  cost_monitoring_provider_count: 2
+  latency_monitoring_provider_count: 2
+  alert_sink_count: 1
+  alert_route_count: 2
+  routed_provider_count: 2
+  secret_manager_binding_count: 0
+  rotation_automation_provider_count: 0
+  rotation_evidence_provider_count: 0
+  total_estimated_cost_micros: 0
+  max_p95_latency_ms: 0
+  blocked_provider_ids: []
+  providers_without_cost_monitoring: []
+  providers_without_latency_monitoring: []
+  providers_without_alert_routes: []
+  providers_without_secret_rotation: []
+governance_evaluation_ops:
+  version: 1
+  report_id: governance-evaluation-service-v1
+  owner: ai-platform
+  generated_at: '2026-06-17'
+  summary:
+    ops_status: release_gate_observable
+    policy_id: governance-evaluation-access-policy-v1
+    route_count: 3
+    evaluation_count: 20
+    promotion_count: 4
+    assessment_count: 3
+    approved_count: 1
+    review_required_count: 1
+    blocked_count: 1
+    direct_identifier_rejection_count: 1
+    secret_value_rejection_count: 1
+    unexpected_error_count: 0
+  by_product:
+    lms-courseflow: 1
+    support-platform: 2
+  by_use_case:
+    lms-related-course-recommendation: 1
+    support-agent-assist: 2
+  drills:
+  - scenario_id: lms-recommendation-active-baseline
+    product: lms-courseflow
+    use_case_id: lms-related-course-recommendation
+    expected_decision: approved
+    decision: approved
+    ready_for_release: true
+    requires_human_review: false
+    blocked_reasons: []
+    passed: true
+  - scenario_id: support-agent-assist-approved-baseline
+    product: support-platform
+    use_case_id: support-agent-assist
+    expected_decision: review_required
+    decision: review_required
+    ready_for_release: true
+    requires_human_review: true
+    blocked_reasons: []
+    passed: true
+  - scenario_id: support-agent-assist-external-auto-send
+    product: support-platform
+    use_case_id: support-agent-assist
+    expected_decision: blocked
+    decision: blocked
+    ready_for_release: false
+    requires_human_review: true
+    blocked_reasons:
+    - external_auto_send_forbidden
+    passed: true
+actions:
+- action_id: solution_blueprint:publish_solution_architecture:enterprise-knowledge-assistant-discovery
+  source: solution_blueprint
+  action_type: publish_solution_architecture
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  reason: solution blueprint has no blockers
+  refs:
+  - enterprise-knowledge-assistant-discovery
+- action_id: solution_blueprint:publish_solution_architecture:lms-at-risk-prediction-baseline
+  source: solution_blueprint
+  action_type: publish_solution_architecture
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  reason: solution blueprint has no blockers
+  refs:
+  - lms-at-risk-prediction-baseline
+- action_id: solution_blueprint:publish_solution_architecture:support-sla-risk-discovery
+  source: solution_blueprint
+  action_type: publish_solution_architecture
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  reason: solution blueprint has no blockers
+  refs:
+  - support-sla-risk-discovery
+- action_id: solution_blueprint:publish_solution_architecture:finance-document-intelligence-discovery
+  source: solution_blueprint
+  action_type: publish_solution_architecture
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  reason: solution blueprint has no blockers
+  refs:
+  - finance-document-intelligence-discovery
+- action_id: solution_blueprint:publish_solution_architecture:operations-routing-optimization-simulator
+  source: solution_blueprint
+  action_type: publish_solution_architecture
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  reason: solution blueprint has no blockers
+  refs:
+  - operations-routing-optimization-simulator
+- action_id: solution_blueprint:publish_solution_architecture:finance-payment-fraud-scoring-discovery
+  source: solution_blueprint
+  action_type: publish_solution_architecture
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  reason: solution blueprint has no blockers
+  refs:
+  - finance-payment-fraud-scoring-discovery
+- action_id: data_contract_coverage:harden_data_contract_for_production:enterprise-knowledge-assistant-discovery
+  source: data_contract_coverage
+  action_type: harden_data_contract_for_production
+  owner_role: Data Platform + Product Owner
+  priority: p2
+  status: draft
+  reason: data contract is sufficient for design but not production-ready
+  refs:
+  - enterprise-knowledge-assistant-discovery
+- action_id: data_contract_coverage:harden_data_contract_for_production:operations-routing-optimization-simulator
+  source: data_contract_coverage
+  action_type: harden_data_contract_for_production
+  owner_role: Data Platform + Product Owner
+  priority: p2
+  status: draft
+  reason: data contract is sufficient for design but not production-ready
+  refs:
+  - operations-routing-optimization-simulator
+- action_id: data_contract_coverage:harden_data_contract_for_production:finance-payment-fraud-scoring-discovery
+  source: data_contract_coverage
+  action_type: harden_data_contract_for_production
+  owner_role: Data Platform + Product Owner
+  priority: p2
+  status: draft
+  reason: data contract is sufficient for design but not production-ready
+  refs:
+  - finance-payment-fraud-scoring-discovery
+- action_id: promotion_intake:review_promotion_request:support-agent-assist-active-request
+  source: promotion_intake
+  action_type: review_promotion_request
+  owner_role: SA AI Platform + Governance Reviewer
+  priority: p1
+  status: ready
+  reason: candidate artifact has enough evidence for approval review
+  refs:
+  - support-agent-assist-active-request
+- action_id: promotion_intake:review_promotion_request:finance-document-intelligence-privacy-request
+  source: promotion_intake
+  action_type: review_promotion_request
+  owner_role: SA AI Platform + Governance Reviewer
+  priority: p1
+  status: ready
+  reason: candidate artifact has enough evidence for approval review
+  refs:
+  - finance-document-intelligence-privacy-request
+- action_id: promotion_intake:review_promotion_request:operations-routing-rl-simulator-request
+  source: promotion_intake
+  action_type: review_promotion_request
+  owner_role: SA AI Platform + Governance Reviewer
+  priority: p1
+  status: ready
+  reason: candidate artifact has enough evidence for approval review
+  refs:
+  - operations-routing-rl-simulator-request
+- action_id: promotion_intake:publish_artifact_manifest:lms-at-risk-baseline-shadow-request
+  source: promotion_intake
+  action_type: publish_artifact_manifest
+  owner_role: SA AI Engineer
+  priority: p1
+  status: waiting
+  reason: promotion request is missing model or artifact evidence
+  refs:
+  - lms-at-risk-baseline-shadow-request
+- action_id: promotion_intake:run_required_evaluation:finance-anomaly-shadow-request
+  source: promotion_intake
+  action_type: run_required_evaluation
+  owner_role: SA AI Engineer
+  priority: p1
+  status: waiting
+  reason: promotion request is missing accepted evaluation evidence
+  refs:
+  - finance-anomaly-shadow-request
+- action_id: promotion_readiness:activate_approved_artifact:support-agent-assist-baseline-approved
+  source: promotion_readiness
+  action_type: activate_approved_artifact
+  owner_role: Admin/Ops + Governance Reviewer
+  priority: p1
+  status: ready
+  reason: approved artifact is ready for activation
+  refs:
+  - support-agent-assist-baseline-approved
+- action_id: promotion_readiness:monitor_active_artifact:recommendation-item-cf-v1-active-baseline
+  source: promotion_readiness
+  action_type: monitor_active_artifact
+  owner_role: Admin/Ops
+  priority: p2
+  status: active
+  reason: active artifact needs ongoing monitoring
+  refs:
+  - recommendation-item-cf-v1-active-baseline
+- action_id: promotion_readiness:keep_shadow_monitoring:course-content-vector-index-shadow
+  source: promotion_readiness
+  action_type: keep_shadow_monitoring
+  owner_role: SA AI Engineer
+  priority: p2
+  status: shadow
+  reason: shadow artifact should continue collecting rollout evidence
+  refs:
+  - course-content-vector-index-shadow
+- action_id: promotion_readiness:keep_shadow_monitoring:support-knowledge-vector-index-shadow
+  source: promotion_readiness
+  action_type: keep_shadow_monitoring
+  owner_role: SA AI Engineer
+  priority: p2
+  status: shadow
+  reason: shadow artifact should continue collecting rollout evidence
+  refs:
+  - support-knowledge-vector-index-shadow
+- action_id: serving_access_governance:run_controlled_policy_applier:lms-sequence-risk-sandbox-tenant-apply-20260617
+  source: serving_access_governance
+  action_type: run_controlled_policy_applier
+  owner_role: Admin/Ops
+  priority: p1
+  status: ready
+  reason: serving access policy proposal is approved and pending apply
+  refs:
+  - lms-sequence-risk-sandbox-tenant-apply-20260617
+- action_id: llm_provider_ops:run_llm_provider_alert_delivery_drill:llm-provider-alert-routing-v1
+  source: llm_provider_ops
+  action_type: run_llm_provider_alert_delivery_drill
+  owner_role: Admin/Ops
+  priority: p2
+  status: ready
+  reason: LLM provider alert routes are configured and need an Admin/Ops delivery
+    drill
+  refs:
+  - llm-provider-alert-routing-v1
+- action_id: governance_evaluation_ops:run_governance_evaluation_release_gate_alert_drill:governance-evaluation-service-v1
+  source: governance_evaluation_ops
+  action_type: run_governance_evaluation_release_gate_alert_drill
+  owner_role: Admin/Ops
+  priority: p2
+  status: ready
+  reason: governance evaluation release gate metrics are observable and need an Admin/Ops
+    alert drill
+  refs:
+  - governance-evaluation-service-v1
+- action_id: governance_evaluation_response_drill:accept_governance_evaluation_incident_response_runbook_drill:governance-evaluation-incident-response-drill-v1
+  source: governance_evaluation_response_drill
+  action_type: accept_governance_evaluation_incident_response_runbook_drill
+  owner_role: Admin/Ops
+  priority: p2
+  status: ready
+  reason: Governance Evaluation incident response drill passed and needs Admin/Ops
+    acceptance evidence
+  refs:
+  - governance-evaluation-incident-response-drill-v1
+  - governance-evaluation-incident-response-v1
+- action_id: product_readiness_freshness_response_drill:accept_product_readiness_freshness_incident_response_drill_state:product-readiness-freshness-incident-response-drill-v1
+  source: product_readiness_freshness_response_drill
+  action_type: accept_product_readiness_freshness_incident_response_drill_state
+  owner_role: Admin/Ops
+  priority: p2
+  status: ready
+  reason: Product Readiness Freshness incident response drill passed and needs Admin/Ops
+    delivery-state acceptance evidence
+  refs:
+  - product-readiness-freshness-incident-response-drill-v1
+  - product-readiness-freshness-incident-response-v1

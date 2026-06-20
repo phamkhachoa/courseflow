@@ -1,0 +1,66 @@
+version: 1
+evaluation_id: speech-quality-v1-eval
+model_id: speech-quality-baseline-v1
+algorithm: deterministic_transcript_audio_quality
+use_case_id: support-speech-quality-assurance
+product: support-platform
+owner: ai-platform
+evaluation_type: service_integrated_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: speech-quality-golden-v1
+  source: platform/evaluation/datasets/speech-quality-golden.yaml
+  feature_contract: contracts/features/speech-audio-features.v1.yaml
+  model_io_contract: contracts/models/speech-quality-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 4
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/speech/audio_quality_baseline/tests/test_audio_quality_baseline.py
+  intent_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  quality_band_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  reason_code_recall:
+    value: 1.00
+    threshold: 0.85
+    status: passed
+  evidence_term_recall:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  human_review_policy_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  privacy_guardrail_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Media Intelligence Service serves bounded transcript-segment speech/audio IO behind tenant/product/use-case policy.
+    - Raw audio ingestion, ASR and speaker diarization have approved controls but remain separate adapter work before raw-media serving.
+    - Raw PII transcript signals force human review and are not emitted as structured output fields.
+risks:
+  - deterministic_transcript_rules
+  - no_raw_audio_or_asr_runtime
+  - no_governed_audio_snapshot
+  - raw_asr_adapter_not_yet_service_route
+required_next_steps:
+  - bind_to_governed_audio_or_transcript_snapshot
+  - add_asr_or_diarization_artifact_after_privacy_approval
+  - add_shadow_review_queue_for_speech_quality_findings
+  - add_media_intelligence_service_metrics_to_release_review
+service_evidence:
+  service: services/media-intelligence-service/service.yaml
+  access_policy: platform/governance/policies/media-intelligence-access-policy.yaml
+  service_tests: services/media-intelligence-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_media_intelligence_service.py

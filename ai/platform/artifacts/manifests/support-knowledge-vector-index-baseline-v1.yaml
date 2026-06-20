@@ -1,0 +1,30 @@
+version: 1
+artifact_id: support-knowledge-vector-index-baseline-v1-snapshot
+model_id: support-knowledge-vector-index-baseline-v1
+algorithm: deterministic_hash_embedding_baseline_v1
+model_family: vector_search
+artifact_type: vector_index_snapshot
+status: accepted_contract_baseline
+owner: ai-platform
+product: support-platform
+use_case_id: support-agent-assist
+created_at: "2026-06-16"
+artifact_uri: platform/artifacts/vector-indexes/support-knowledge-vector-index-baseline-v1.json
+artifact_hash:
+  algorithm: sha256
+  value: 4c75c6fcaa00f1c30611e459c3ff67db365935cae556a938c46acf65eeaebff6
+lineage:
+  corpus: platform/evaluation/corpora/support-knowledge-corpus.yaml
+  collection_schema: platform/vector-store/collections/support-knowledge.yaml
+  evaluation_report: platform/evaluation/reports/support-knowledge-vector-index-v1-eval.yaml
+  shadow_evaluation_report: platform/evaluation/reports/support-knowledge-hybrid-retrieval-v1-eval.yaml
+  builder: platform/src/courseflow_ai_platform/vector_index.py
+runtime:
+  package: courseflow-ai-platform
+  optional_extras: []
+  entrypoint: courseflow_ai_platform.vector_index:build_vector_index
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  tenant_isolation_required: true
+  rollback_supported: true
+  production_serving_status: shadow_only

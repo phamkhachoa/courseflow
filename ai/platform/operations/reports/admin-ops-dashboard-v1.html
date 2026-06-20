@@ -1,0 +1,2346 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Platform Admin/Ops Dashboard</title>
+  <style>:root {
+  color-scheme: light;
+  --bg: #f6f8fb;
+  --panel: #ffffff;
+  --ink: #17202a;
+  --muted: #667085;
+  --line: #d8dee9;
+  --ok: #13795b;
+  --warn: #a15c07;
+  --critical: #b42318;
+  --info: #255e9c;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px;
+}
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.masthead p,
+.masthead h1 {
+  margin: 0;
+}
+.masthead p,
+time,
+small {
+  color: var(--muted);
+}
+.masthead h1 {
+  font-size: 28px;
+  font-weight: 700;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.metric-card,
+.panel,
+.owner-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.metric-card {
+  padding: 12px;
+}
+.metric-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.metric-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 17px;
+}
+.panel {
+  padding: 16px;
+  margin-top: 14px;
+}
+.panel h2,
+.owner-card h3,
+.owner-card h4 {
+  margin: 0 0 12px;
+}
+.panel h2 {
+  font-size: 18px;
+}
+.owner-card h3 {
+  font-size: 16px;
+}
+.owner-card h4 {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.split-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  gap: 20px;
+}
+.owner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+.owner-card {
+  padding: 14px;
+}
+.mini-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mini-metrics span,
+.badge {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #eef2f6;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.work-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.work-list li {
+  display: grid;
+  grid-template-columns: auto 96px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.work-list small {
+  grid-column: 3;
+}
+.incident-list li {
+  grid-template-columns: auto minmax(120px, 1fr) minmax(0, 1.5fr);
+}
+.empty-row {
+  color: var(--muted);
+}
+.kv-table,
+.action-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.kv-table th,
+.kv-table td,
+.action-table th,
+.action-table td {
+  border-top: 1px solid var(--line);
+  padding: 8px 6px;
+  text-align: left;
+  vertical-align: top;
+}
+.kv-table th {
+  color: var(--muted);
+  font-weight: 600;
+  width: 45%;
+}
+.status-ok {
+  color: var(--ok);
+}
+.status-warn {
+  color: var(--warn);
+}
+.status-critical {
+  color: var(--critical);
+}
+.status-info {
+  color: var(--info);
+}
+.badge.status-ok,
+.badge.status-warn,
+.badge.status-critical,
+.badge.status-info {
+  color: #ffffff;
+}
+.badge.status-ok {
+  background: var(--ok);
+}
+.badge.status-warn {
+  background: var(--warn);
+}
+.badge.status-critical {
+  background: var(--critical);
+}
+.badge.status-info {
+  background: var(--info);
+}
+@media (max-width: 760px) {
+  main {
+    padding: 18px;
+  }
+  .masthead,
+  .split-panel {
+    display: block;
+  }
+  .work-list li,
+  .incident-list li {
+    grid-template-columns: 1fr;
+  }
+  .work-list small {
+    grid-column: auto;
+  }
+}</style>
+</head>
+<body>
+  <main>
+    <header class="masthead">
+      <div>
+        <p>CourseFlow Enterprise AI Platform</p>
+        <h1>Admin/Ops Dashboard</h1>
+      </div>
+      <time>2026-06-17</time>
+    </header>
+    <section class="metric-grid" aria-label="Platform status">
+      <article class="metric-card">
+        <span>Platform</span>
+        <strong class="status-critical">attention_required</strong>
+      </article>
+      <article class="metric-card">
+        <span>Delivery</span>
+        <strong class="status-warn">ready_work_available</strong>
+      </article>
+      <article class="metric-card">
+        <span>Release</span>
+        <strong class="status-ok">release_ready</strong>
+      </article>
+      <article class="metric-card">
+        <span>Serving</span>
+        <strong class="status-ok">healthy</strong>
+      </article>
+      <article class="metric-card">
+        <span>Access</span>
+        <strong class="status-warn">pending_policy_apply</strong>
+      </article>
+      <article class="metric-card">
+        <span>LLM Providers</span>
+        <strong class="status-ok">contract_stub_observable</strong>
+      </article>
+      <article class="metric-card">
+        <span>LLM Alerts</span>
+        <strong class="status-ok">contract_stub_alerts_configured</strong>
+      </article>
+      <article class="metric-card">
+        <span>LLM Secrets</span>
+        <strong class="status-ok">contract_stub_rotation_controls_ready</strong>
+      </article>
+      <article class="metric-card">
+        <span>Governance Eval</span>
+        <strong class="status-ok">release_gate_observable</strong>
+      </article>
+      <article class="metric-card">
+        <span>Gov Eval Runbook</span>
+        <strong class="status-ok">passed</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Freshness</span>
+        <strong class="status-ok">current</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Runbook</span>
+        <strong class="status-ok">passed</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Metrics</span>
+        <strong class="status-ok">slo_met</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Metrics Ingest</span>
+        <strong class="status-ok">live_ingest_connected</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Trend</span>
+        <strong class="status-ok">trend_ready_with_watch</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Alerts</span>
+        <strong class="status-ok">alerts_configured_with_watch</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Alert Drill</span>
+        <strong class="status-ok">passed</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Alert Calibration</span>
+        <strong class="status-ok">calibrated_with_watch</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Alert Policy</span>
+        <strong class="status-ok">suppression_policy_codified</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Drill</span>
+        <strong class="status-ok">passed</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Monitor</span>
+        <strong class="status-ok">effectiveness_monitored</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Coverage</span>
+        <strong class="status-ok">coverage_expanded</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Regression</span>
+        <strong class="status-ok">regression_monitored</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy SLO</span>
+        <strong class="status-ok">coverage_slo_published</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Release Gate</span>
+        <strong class="status-ok">release_governance_attached</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Gate Drill</span>
+        <strong class="status-ok">passed</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Gate Effectiveness</span>
+        <strong class="status-ok">effectiveness_monitored</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Enterprise Pattern</span>
+        <strong class="status-ok">enterprise_pattern_expanded</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Enterprise Adoption</span>
+        <strong class="status-ok">adoption_monitored</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Enterprise Adoption SLO</span>
+        <strong class="status-ok">adoption_slo_published</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Enterprise Adoption SLO Governance</span>
+        <strong class="status-ok">enterprise_adoption_slo_release_governance_attached</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Policy Enterprise Adoption SLO Governance Drill</span>
+        <strong class="status-ok">passed</strong>
+      </article>
+      <article class="metric-card">
+        <span>Open Incidents</span>
+        <strong class="status-ok">0</strong>
+      </article>
+      <article class="metric-card">
+        <span>Gov Eval Incidents</span>
+        <strong class="status-ok">0</strong>
+      </article>
+      <article class="metric-card">
+        <span>Product Incidents</span>
+        <strong class="status-ok">0</strong>
+      </article>
+      <article class="metric-card">
+        <span>Owner Queues</span>
+        <strong class="status-ok">6</strong>
+      </article>
+      <article class="metric-card">
+        <span>Due Soon Owners</span>
+        <strong class="status-ok">5</strong>
+      </article>
+    </section>
+    <section class="panel">
+      <h2>Operating Cockpit</h2>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Products</th>
+          <td>8</td>
+        </tr>
+        <tr>
+          <th>Use cases</th>
+          <td>30</td>
+        </tr>
+        <tr>
+          <th>Non-LMS use cases</th>
+          <td>18</td>
+        </tr>
+        <tr>
+          <th>Coverage modules</th>
+          <td>14</td>
+        </tr>
+        <tr>
+          <th>Evaluations passed</th>
+          <td>20/20</td>
+        </tr>
+        <tr>
+          <th>Control-plane actions</th>
+          <td>23</td>
+        </tr>
+        <tr>
+          <th>Serving requests</th>
+          <td>3</td>
+        </tr>
+        <tr>
+          <th>Serving audit failures</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>LLM provider rollout</th>
+          <td>contract_stub_observable</td>
+        </tr>
+        <tr>
+          <th>LLM provider alerts</th>
+          <td>contract_stub_alerts_configured</td>
+        </tr>
+        <tr>
+          <th>LLM provider secret rotation</th>
+          <td>contract_stub_rotation_controls_ready</td>
+        </tr>
+        <tr>
+          <th>LLM provider alert routes</th>
+          <td>2</td>
+        </tr>
+        <tr>
+          <th>LLM provider secret bindings</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>LLM provider rotation evidence</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>LLM provider blocked</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>LLM provider cost micros</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>LLM provider max p95 ms</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Governance evaluation</th>
+          <td>release_gate_observable</td>
+        </tr>
+        <tr>
+          <th>Governance assessments</th>
+          <td>3</td>
+        </tr>
+        <tr>
+          <th>Governance review required</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Governance blocked</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Governance identifier rejects</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Governance secret rejects</th>
+          <td>1</td>
+        </tr></tbody>
+      </table>
+    </section>
+    <section class="panel">
+      <h2>Admin/Ops Owner Queues</h2>
+      <div class="owner-grid">        <article class="owner-card">
+          <h3>admin-ops</h3>
+          <div class="mini-metrics">
+            <span>6 items</span>
+            <span>1 due soon</span>
+            <span>0 incidents</span>
+          </div>
+          <h4>Delivery work</h4>
+          <ul class="work-list">            <li>
+              <span class="badge status-warn">p1</span>
+              <strong>AIP-BLG-0019</strong>
+              <span>Run Controlled Policy Applier</span>
+              <small>in_progress / due_soon / 2026-06-20</small>
+            </li>
+            <li>
+              <span class="badge status-info">p2</span>
+              <strong>AIP-BLG-0020</strong>
+              <span>Run Llm Provider Alert Delivery Drill</span>
+              <small>ready / on_track / 2026-06-27</small>
+            </li>
+            <li>
+              <span class="badge status-info">p2</span>
+              <strong>AIP-BLG-0021</strong>
+              <span>Run Governance Evaluation Release Gate Alert Drill</span>
+              <small>accepted / on_track / 2026-06-27</small>
+            </li>
+            <li>
+              <span class="badge status-info">p2</span>
+              <strong>AIP-BLG-0022</strong>
+              <span>Accept Governance Evaluation Incident Response Runbook Drill</span>
+              <small>accepted / on_track / 2026-06-27</small>
+            </li>
+            <li>
+              <span class="badge status-info">p2</span>
+              <strong>AIP-BLG-0023</strong>
+              <span>Accept Product Readiness Freshness Incident Response Drill State</span>
+              <small>accepted / on_track / 2026-06-27</small>
+            </li></ul>
+          <h4>Incident handoffs</h4>
+          <ul class="work-list incident-list"><li class="empty-row">No open P0/P1 incidents</li></ul>
+        </article>
+        <article class="owner-card">
+          <h3>admin-ops-governance</h3>
+          <div class="mini-metrics">
+            <span>1 items</span>
+            <span>1 due soon</span>
+            <span>0 incidents</span>
+          </div>
+          <h4>Delivery work</h4>
+          <ul class="work-list">            <li>
+              <span class="badge status-warn">p1</span>
+              <strong>AIP-BLG-0015</strong>
+              <span>Activate Approved Artifact</span>
+              <small>ready / due_soon / 2026-06-20</small>
+            </li></ul>
+          <h4>Incident handoffs</h4>
+          <ul class="work-list incident-list"><li class="empty-row">No open P0/P1 incidents</li></ul>
+        </article></div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Serving Access Incident Export</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-info">p2</span>
+              <strong>pending_policy_apply</strong>
+              <span>run_controlled_policy_applier</span>
+              <small>sai-8640e9419144a5d6-pending-policy-apply / application:ef7e80ff924a9bfe</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Open</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Watch</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>P0</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P1</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P2</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Governance Evaluation Incident Export</h2>
+        <ul class="work-list incident-list"><li class="empty-row">No repeated governance evaluation incidents</li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Open</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Watch</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P0</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P1</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Repeated failures</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Failure streak</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Threshold</th>
+          <td>2</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Governance Evaluation Response Drill</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-critical">p0</span>
+              <strong>governance_evaluation_release_gate_mismatch</strong>
+              <span>escalate_governance_evaluation_release_gate_mismatch</span>
+              <small>release-gate-mismatch-p0 / passed</small>
+            </li>
+            <li>
+              <span class="badge status-critical">p0</span>
+              <strong>governance_evaluation_unexpected_error</strong>
+              <span>triage_governance_evaluation_runtime_error</span>
+              <small>unexpected-runtime-error-p0 / passed</small>
+            </li>
+            <li>
+              <span class="badge status-warn">p1</span>
+              <strong>governance_evaluation_guardrail_gap</strong>
+              <span>complete_governance_evaluation_guardrail_drills</span>
+              <small>guardrail-gap-p1 / passed</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>3</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>3</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P0 drills</th>
+          <td>2</td>
+        </tr>
+        <tr>
+          <th>P1 drills</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Runbook steps</th>
+          <td>8</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">passed</span>
+              <strong>static_snapshot_current</strong>
+              <span>Checked-in product readiness snapshot is current.</span>
+            </li>
+            <li>
+              <span class="badge status-ok">passed</span>
+              <strong>runtime_route_reachable</strong>
+              <span>/v1/model-serving/product-readiness returned 200 after probe invocation 200.</span>
+            </li>
+            <li>
+              <span class="badge status-ok">passed</span>
+              <strong>runtime_serving_metrics_live</strong>
+              <span>1 runtime requests, 1 audit records, 0 errors and 0 audit failures.</span>
+            </li>
+            <li>
+              <span class="badge status-ok">passed</span>
+              <strong>static_runtime_gate_alignment</strong>
+              <span>Static and runtime readiness gate summaries align.</span>
+            </li>
+            <li>
+              <span class="badge status-ok">passed</span>
+              <strong>required_ai_spectrum_runtime_ready</strong>
+              <span>8/8 required spectrum areas covered; 6 extended modules.</span>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Freshness</th>
+          <td>current</td>
+        </tr>
+        <tr>
+          <th>Runtime readiness</th>
+          <td>stakeholder_ready_with_followups</td>
+        </tr>
+        <tr>
+          <th>Route</th>
+          <td>/v1/model-serving/product-readiness</td>
+        </tr>
+        <tr>
+          <th>Route status</th>
+          <td>200</td>
+        </tr>
+        <tr>
+          <th>Runtime requests</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Runtime audit records</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Runtime errors</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Runtime audit failures</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Failed checks</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Required AI spectrum</th>
+          <td>8/8</td>
+        </tr>
+        <tr>
+          <th>Extended modules</th>
+          <td>6</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Incident Export</h2>
+        <ul class="work-list incident-list"><li class="empty-row">No product-readiness freshness incidents</li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Freshness</th>
+          <td>current</td>
+        </tr>
+        <tr>
+          <th>Open</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Watch</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P0</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P1</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P2</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response Drill</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-warn">p1</span>
+              <strong>product_readiness_freshness_report_stale</strong>
+              <span>refresh_product_readiness_freshness_report</span>
+              <small>report-stale-p1 / passed</small>
+            </li>
+            <li>
+              <span class="badge status-critical">p0</span>
+              <strong>product_readiness_runtime_route_unreachable</strong>
+              <span>triage_product_readiness_runtime_route</span>
+              <small>route-unreachable-p0 / passed</small>
+            </li>
+            <li>
+              <span class="badge status-warn">p1</span>
+              <strong>product_readiness_static_snapshot_stale</strong>
+              <span>refresh_product_readiness_snapshots</span>
+              <small>static-snapshot-stale-p1 / passed</small>
+            </li>
+            <li>
+              <span class="badge status-warn">p1</span>
+              <strong>product_readiness_runtime_error_or_audit_failure</strong>
+              <span>triage_product_readiness_runtime_metrics</span>
+              <small>runtime-error-audit-failure-p1 / passed</small>
+            </li>
+            <li>
+              <span class="badge status-warn">p1</span>
+              <strong>product_readiness_runtime_audit_gap</strong>
+              <span>restore_product_readiness_audit_coverage</span>
+              <small>runtime-audit-gap-p1 / passed</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P0 drills</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>P1 drills</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Runbook steps</th>
+          <td>8</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response Metrics</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">slo_met</span>
+              <strong>product_readiness_freshness_report_stale</strong>
+              <span>130/240 min recovery</span>
+              <small>report-stale-p1 / p1</small>
+            </li>
+            <li>
+              <span class="badge status-ok">slo_met</span>
+              <strong>product_readiness_runtime_route_unreachable</strong>
+              <span>52/60 min recovery</span>
+              <small>route-unreachable-p0 / p0</small>
+            </li>
+            <li>
+              <span class="badge status-ok">slo_met</span>
+              <strong>product_readiness_static_snapshot_stale</strong>
+              <span>118/240 min recovery</span>
+              <small>static-snapshot-stale-p1 / p1</small>
+            </li>
+            <li>
+              <span class="badge status-ok">slo_met</span>
+              <strong>product_readiness_runtime_error_or_audit_failure</strong>
+              <span>170/240 min recovery</span>
+              <small>runtime-error-audit-failure-p1 / p1</small>
+            </li>
+            <li>
+              <span class="badge status-ok">slo_met</span>
+              <strong>product_readiness_runtime_audit_gap</strong>
+              <span>112/240 min recovery</span>
+              <small>runtime-audit-gap-p1 / p1</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>slo_met</td>
+        </tr>
+        <tr>
+          <th>Ingest</th>
+          <td>live_ingest_connected</td>
+        </tr>
+        <tr>
+          <th>Measured</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Live observations</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Synthetic observations</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Missing live observations</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Breaches</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Max ack min</th>
+          <td>11</td>
+        </tr>
+        <tr>
+          <th>Max recover min</th>
+          <td>170</td>
+        </tr>
+        <tr>
+          <th>Max close min</th>
+          <td>210</td>
+        </tr>
+        <tr>
+          <th>Avg recover min</th>
+          <td>116</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response Trends</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-info">watch</span>
+              <strong>Admin/Ops</strong>
+              <span>1 watch / 0 breach</span>
+              <small>5 scenarios, 87% max recover budget</small>
+            </li></ul>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">within_slo</span>
+              <strong>product_readiness_freshness_report_stale</strong>
+              <span>54% recover / 57% close budget</span>
+              <small>Admin/Ops / p1</small>
+            </li>
+            <li>
+              <span class="badge status-info">watch</span>
+              <strong>product_readiness_runtime_route_unreachable</strong>
+              <span>87% recover / 78% close budget</span>
+              <small>Admin/Ops / p0</small>
+            </li>
+            <li>
+              <span class="badge status-ok">within_slo</span>
+              <strong>product_readiness_static_snapshot_stale</strong>
+              <span>49% recover / 53% close budget</span>
+              <small>Admin/Ops / p1</small>
+            </li>
+            <li>
+              <span class="badge status-ok">within_slo</span>
+              <strong>product_readiness_runtime_error_or_audit_failure</strong>
+              <span>71% recover / 70% close budget</span>
+              <small>Admin/Ops / p1</small>
+            </li>
+            <li>
+              <span class="badge status-ok">within_slo</span>
+              <strong>product_readiness_runtime_audit_gap</strong>
+              <span>47% recover / 50% close budget</span>
+              <small>Admin/Ops / p1</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>trend_ready_with_watch</td>
+        </tr>
+        <tr>
+          <th>Metrics</th>
+          <td>slo_met</td>
+        </tr>
+        <tr>
+          <th>Ingest</th>
+          <td>live_ingest_connected</td>
+        </tr>
+        <tr>
+          <th>Owners</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Live observations</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Watch</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Breaches</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Max recover budget</th>
+          <td>87%</td>
+        </tr>
+        <tr>
+          <th>Max close budget</th>
+          <td>78%</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Alerts</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">routed</span>
+              <strong>product_readiness_runtime_route_unreachable</strong>
+              <span>admin-ops / triage_product_readiness_response_slo_drift</span>
+              <small>p1 alert, 87% recover budget</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>alerts_configured_with_watch</td>
+        </tr>
+        <tr>
+          <th>Trend</th>
+          <td>trend_ready_with_watch</td>
+        </tr>
+        <tr>
+          <th>Watch scenarios</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Alerts</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Routed</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>P0 alerts</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>P1 alerts</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Max trigger usage</th>
+          <td>87%</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Alert Drill</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>product_readiness_runtime_route_unreachable</strong>
+              <span>admin-ops / triage_product_readiness_response_slo_drift</span>
+              <small>87% recover budget replayed</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Alert status</th>
+          <td>alerts_configured_with_watch</td>
+        </tr>
+        <tr>
+          <th>Alerts</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Routed</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Max trigger usage</th>
+          <td>87%</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr>
+        <tr>
+          <th>All passed</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Alert Calibration</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">calibrated_watch</span>
+              <strong>product_readiness_runtime_route_unreachable</strong>
+              <span>quiet / watch_only</span>
+              <small>7% margin over 80% threshold</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>calibrated_with_watch</td>
+        </tr>
+        <tr>
+          <th>Drill</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Alerts</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Routed</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Calibrated</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Noisy</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Under threshold</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Escalation required</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Max margin</th>
+          <td>7%</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Alert Suppression Policy</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">active</span>
+              <strong>product_readiness_runtime_route_unreachable</strong>
+              <span>dedupe_watch_noise / admin-ops</span>
+              <small>30m dedupe, 60m cooldown, 100% escalation floor</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>suppression_policy_codified</td>
+        </tr>
+        <tr>
+          <th>Calibration</th>
+          <td>calibrated_with_watch</td>
+        </tr>
+        <tr>
+          <th>Rules</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Active</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Dedupe window</th>
+          <td>30m</td>
+        </tr>
+        <tr>
+          <th>Cooldown</th>
+          <td>60m</td>
+        </tr>
+        <tr>
+          <th>Escalation floor</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Preserve escalation</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Suppress under threshold</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Drill</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>under_threshold_suppressed</strong>
+              <span>suppressed / product_readiness_runtime_route_unreachable</span>
+              <small>79% trigger, 0m replay age</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>dedupe_window_suppressed</strong>
+              <span>suppressed / product_readiness_runtime_route_unreachable</span>
+              <small>80% trigger, 10m replay age</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>cooldown_window_suppressed</strong>
+              <span>suppressed / product_readiness_runtime_route_unreachable</span>
+              <small>80% trigger, 45m replay age</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>escalation_preserved</strong>
+              <span>routed / product_readiness_runtime_route_unreachable</span>
+              <small>100% trigger, 61m replay age</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Policy</th>
+          <td>suppression_policy_codified</td>
+        </tr>
+        <tr>
+          <th>Rules</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Active</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Expected</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Suppressed</th>
+          <td>3</td>
+        </tr>
+        <tr>
+          <th>Escalation preserved</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Effectiveness</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>noise_reduction</strong>
+              <span>suppressed / product_readiness_runtime_route_unreachable</span>
+              <small>prf-response-slo-drift-route-unreachable-p0-suppression-policy</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>noise_reduction</strong>
+              <span>suppressed / product_readiness_runtime_route_unreachable</span>
+              <small>prf-response-slo-drift-route-unreachable-p0-suppression-policy</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>noise_reduction</strong>
+              <span>suppressed / product_readiness_runtime_route_unreachable</span>
+              <small>prf-response-slo-drift-route-unreachable-p0-suppression-policy</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>escalation_preservation</strong>
+              <span>routed / product_readiness_runtime_route_unreachable</span>
+              <small>prf-response-slo-drift-route-unreachable-p0-suppression-policy</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>effectiveness_monitored</td>
+        </tr>
+        <tr>
+          <th>Drill</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Policy</th>
+          <td>suppression_policy_codified</td>
+        </tr>
+        <tr>
+          <th>Signals</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Effective</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Suppression candidates</th>
+          <td>3</td>
+        </tr>
+        <tr>
+          <th>Suppressed</th>
+          <td>3</td>
+        </tr>
+        <tr>
+          <th>Suppression effectiveness</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Escalation signals</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Escalation preserved</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Escalation preservation</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>explicit_non_watch_exclusion</strong>
+              <span>no_suppression_policy_required / product_readiness_freshness_report_stale</span>
+              <small>report-stale-p1; 0/0 signals</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>active_suppression_policy</strong>
+              <span>covered_by_effective_suppression_policy / product_readiness_runtime_route_unreachable</span>
+              <small>route-unreachable-p0; 4/4 signals</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>explicit_non_watch_exclusion</strong>
+              <span>no_suppression_policy_required / product_readiness_static_snapshot_stale</span>
+              <small>static-snapshot-stale-p1; 0/0 signals</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>explicit_non_watch_exclusion</strong>
+              <span>no_suppression_policy_required / product_readiness_runtime_error_or_audit_failure</span>
+              <small>runtime-error-audit-failure-p1; 0/0 signals</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>explicit_non_watch_exclusion</strong>
+              <span>no_suppression_policy_required / product_readiness_runtime_audit_gap</span>
+              <small>runtime-audit-gap-p1; 0/0 signals</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>coverage_expanded</td>
+        </tr>
+        <tr>
+          <th>Effectiveness</th>
+          <td>effectiveness_monitored</td>
+        </tr>
+        <tr>
+          <th>Trend</th>
+          <td>trend_ready_with_watch</td>
+        </tr>
+        <tr>
+          <th>Scenario classes</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Covered</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Active policy scenarios</th>
+          <td>1</td>
+        </tr>
+        <tr>
+          <th>Non-watch exclusions</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Coverage</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Regression</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>coverage_status</strong>
+              <span>coverage_expanded / coverage_expanded</span>
+              <small>coverage-status-stable</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>scenario_class_floor</strong>
+              <span>5 / &gt;=5</span>
+              <small>scenario-class-floor-stable</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>scenario_coverage</strong>
+              <span>5/5 / covered_scenario_count == scenario_class_count</span>
+              <small>scenario-coverage-full</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>coverage_pct_floor</strong>
+              <span>100 / &gt;=100</span>
+              <small>coverage-pct-floor-stable</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>active_policy_watch_guard</strong>
+              <span>active=1;signals=4 / active&gt;=1;signals&gt;=4</span>
+              <small>active-policy-watch-guard-stable</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>explicit_non_watch_exclusion_guard</strong>
+              <span>4 / &gt;=4</span>
+              <small>explicit-non-watch-exclusions-stable</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>tenant_safe=true;raw_identifier_count=0 / tenant_safe=true; raw_identifier_count=0</span>
+              <small>tenant-safety-stable</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>regression_monitored</td>
+        </tr>
+        <tr>
+          <th>Coverage</th>
+          <td>coverage_expanded</td>
+        </tr>
+        <tr>
+          <th>Scenario classes</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Covered</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Coverage pct</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Checks</th>
+          <td>7</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>7</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage SLO</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>scenario_coverage</strong>
+              <span>coverage_pct=100;covered=5/5;failed=0 / coverage_pct&gt;=100;failed_coverage_count&lt;=0</span>
+              <small>scenario-coverage-slo</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>regression_health</strong>
+              <span>regression_status=regression_monitored;passed=7/7;failed=0 / regression_status=regression_monitored;pass_pct&gt;=100</span>
+              <small>coverage-regression-health-slo</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>tenant_safe=true;raw_identifier_count=0 / tenant_safe=true;raw_identifier_count&lt;=0</span>
+              <small>tenant-safety-slo</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>owner_cadence</strong>
+              <span>review_cadence_days=30;owner=SA AI Platform + Admin/Ops;dashboard_panel=true / review_cadence_days&lt;=30;dashboard_panel=true</span>
+              <small>owner-cadence-slo</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>coverage_slo_published</td>
+        </tr>
+        <tr>
+          <th>Regression</th>
+          <td>regression_monitored</td>
+        </tr>
+        <tr>
+          <th>Coverage</th>
+          <td>coverage_expanded</td>
+        </tr>
+        <tr>
+          <th>Coverage pct</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Objectives</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Met</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Review cadence</th>
+          <td>30 days</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Governance</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_publication</strong>
+              <span>slo_status=coverage_slo_published / slo_status=coverage_slo_published</span>
+              <small>coverage-slo-published-release-gate; SA AI Platform + Admin/Ops</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_objectives</strong>
+              <span>met=4/4;failed=0 / met_objective_count == objective_count;failed_objective_count=0</span>
+              <small>coverage-slo-objectives-release-gate; SA AI Platform + SA AI Engineer</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>dashboard_visibility</strong>
+              <span>dashboard_panel=true;readiness_gate=product_readiness_freshness_response_slo_drift_suppression_policy_coverage_slo_published / dashboard_panel=true;readiness_gate=true</span>
+              <small>coverage-slo-dashboard-release-gate; Admin/Ops</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>owner_cadence</strong>
+              <span>review_cadence_days=30 / review_cadence_days&lt;=30</span>
+              <small>coverage-slo-owner-cadence-release-gate; PO/BA + Admin/Ops</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>tenant_safe=true;raw_identifier_count=0 / tenant_safe=true;raw_identifier_count=0</span>
+              <small>coverage-slo-tenant-safety-release-gate; Governance Reviewer</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>release_governance_attached</td>
+        </tr>
+        <tr>
+          <th>SLO</th>
+          <td>coverage_slo_published</td>
+        </tr>
+        <tr>
+          <th>Coverage</th>
+          <td>coverage_expanded</td>
+        </tr>
+        <tr>
+          <th>Coverage pct</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Release gates</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Attached</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Review cadence</th>
+          <td>30 days</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Gate Drill</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_publication_replay</strong>
+              <span>release_gate_holds / release_gate_holds</span>
+              <small>coverage-slo-published-release-gate; SA AI Platform + Admin/Ops</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_objectives_replay</strong>
+              <span>release_gate_holds / release_gate_holds</span>
+              <small>coverage-slo-objectives-release-gate; SA AI Platform + SA AI Engineer</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>dashboard_visibility_replay</strong>
+              <span>release_gate_holds / release_gate_holds</span>
+              <small>coverage-slo-dashboard-release-gate; Admin/Ops</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>owner_cadence_replay</strong>
+              <span>release_gate_holds / release_gate_holds</span>
+              <small>coverage-slo-owner-cadence-release-gate; PO/BA + Admin/Ops</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety_replay</strong>
+              <span>release_gate_holds / release_gate_holds</span>
+              <small>coverage-slo-tenant-safety-release-gate; Governance Reviewer</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Release governance</th>
+          <td>release_governance_attached</td>
+        </tr>
+        <tr>
+          <th>Release gates</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Attached</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Gate Effectiveness</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>drill_status</strong>
+              <span>passed / passed</span>
+              <small>release-gate-drill-passed-signal</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>scenario_pass_rate</strong>
+              <span>5/5 / 5/5</span>
+              <small>release-gate-scenario-pass-rate-signal</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>blocked_queue</strong>
+              <span>0 blocked / 0 blocked</span>
+              <small>release-gate-blocked-scenario-clean-signal</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>tenant_safe=true raw_identifier_count=0 / tenant_safe=true raw_identifier_count=0</span>
+              <small>release-gate-tenant-safety-signal</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>evidence_completeness</strong>
+              <span>5/5 complete / all scenarios have &gt;=3 evidence refs and hold outcome</span>
+              <small>release-gate-evidence-completeness-signal</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>effectiveness_monitored</td>
+        </tr>
+        <tr>
+          <th>Drill</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Release governance</th>
+          <td>release_governance_attached</td>
+        </tr>
+        <tr>
+          <th>Release gates</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Signals</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Effective</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Effectiveness</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Gate Enterprise Pattern</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>enterprise-knowledge-assistant</strong>
+              <span>ai-platform / ready_for_solution_design</span>
+              <small>13 eval gates; 3 taxonomy areas</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>lms-at-risk-prediction</strong>
+              <span>lms-courseflow / ready_for_solution_design</span>
+              <small>4 eval gates; 2 taxonomy areas</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>support-sla-risk</strong>
+              <span>support-platform / ready_for_solution_design</span>
+              <small>4 eval gates; 2 taxonomy areas</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>finance-document-intelligence</strong>
+              <span>billing-finance / ready_for_solution_design</span>
+              <small>9 eval gates; 2 taxonomy areas</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>operations-routing-optimization</strong>
+              <span>enterprise-operations / ready_for_solution_design</span>
+              <small>1 eval gates; 1 taxonomy areas</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>finance-payment-fraud-scoring</strong>
+              <span>billing-finance / ready_for_solution_design</span>
+              <small>5 eval gates; 3 taxonomy areas</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>enterprise_pattern_expanded</td>
+        </tr>
+        <tr>
+          <th>Release gate effectiveness</th>
+          <td>effectiveness_monitored</td>
+        </tr>
+        <tr>
+          <th>Blueprints</th>
+          <td>6</td>
+        </tr>
+        <tr>
+          <th>Assigned</th>
+          <td>6</td>
+        </tr>
+        <tr>
+          <th>Non-LMS blueprints</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Non-LMS products</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Taxonomy areas</th>
+          <td>9</td>
+        </tr>
+        <tr>
+          <th>Target modules</th>
+          <td>13</td>
+        </tr>
+        <tr>
+          <th>Executable modules</th>
+          <td>13</td>
+        </tr>
+        <tr>
+          <th>Evaluation gates</th>
+          <td>36</td>
+        </tr>
+        <tr>
+          <th>Blocked</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Gate Enterprise Adoption</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>enterprise_pattern_status</strong>
+              <span>enterprise_pattern_expanded</span>
+              <small>enterprise release gate pattern must be expanded first</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>assignment_coverage</strong>
+              <span>6/6 assigned; 0 blocked</span>
+              <small>all ready solution blueprints must be assigned</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>enterprise_product_span</strong>
+              <span>5 non-LMS blueprints; 4 non-LMS products</span>
+              <small>adoption must cover non-LMS blueprints and products</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>taxonomy_evaluation_span</strong>
+              <span>9 taxonomy areas; 36 evaluation gates</span>
+              <small>adoption must span enough taxonomy areas and eval gates</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>tenant_safe=true raw_identifier_count=0</span>
+              <small>adoption evidence must be tenant-safe</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>adoption_followup</strong>
+              <span>monitor_enterprise_release_gate_pattern_adoption</span>
+              <small>Product Readiness must track enterprise adoption monitoring</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Status</th>
+          <td>adoption_monitored</td>
+        </tr>
+        <tr>
+          <th>Enterprise pattern</th>
+          <td>enterprise_pattern_expanded</td>
+        </tr>
+        <tr>
+          <th>Signals</th>
+          <td>6</td>
+        </tr>
+        <tr>
+          <th>Adopted</th>
+          <td>6</td>
+        </tr>
+        <tr>
+          <th>Blocked</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Adoption pct</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Blueprints</th>
+          <td>6</td>
+        </tr>
+        <tr>
+          <th>Non-LMS products</th>
+          <td>4</td>
+        </tr>
+        <tr>
+          <th>Evaluation gates</th>
+          <td>36</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Gate Enterprise Adoption SLO</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>adoption_health</strong>
+              <span>adoption_status=adoption_monitored;adoption_pct=100;adopted=6/6;blocked=0</span>
+              <small>adoption_status=adoption_monitored;adoption_pct&gt;=100;blocked_signal_count=0</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>enterprise_product_span</strong>
+              <span>5 non-LMS blueprints;4 non-LMS products;9 taxonomy areas;36 evaluation gates</span>
+              <small>&gt;=5 non-LMS blueprints;&gt;=4 non-LMS products;&gt;=8 taxonomy areas;&gt;=30 evaluation gates</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>governance_intake</strong>
+              <span>enterprise_pattern_status=enterprise_pattern_expanded;assigned=6/6</span>
+              <small>enterprise_pattern_status=enterprise_pattern_expanded;assigned_use_case_count=blueprint_count</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>tenant_safe=true;raw_identifier_count=0</span>
+              <small>tenant_safe=true;raw_identifier_count&lt;=0</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>owner_cadence</strong>
+              <span>review_cadence_days=30;owner=SA AI Platform + PO/BA + Admin/Ops;dashboard_panel=true</span>
+              <small>review_cadence_days&lt;=30;dashboard_panel=true</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>SLO status</th>
+          <td>adoption_slo_published</td>
+        </tr>
+        <tr>
+          <th>Adoption status</th>
+          <td>adoption_monitored</td>
+        </tr>
+        <tr>
+          <th>Objectives</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Met objectives</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed objectives</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Adoption pct</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Target adoption pct</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Review cadence days</th>
+          <td>30</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Gate Enterprise Adoption SLO Release Governance</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_publication</strong>
+              <span>slo_status=adoption_slo_published</span>
+              <small>slo_status=adoption_slo_published</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_objectives</strong>
+              <span>met=5/5;failed=0</span>
+              <small>met_objective_count == objective_count;failed_objective_count=0</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>enterprise_span</strong>
+              <span>non_lms_blueprint_count=5;non_lms_product_count=4;taxonomy_area_count=9;evaluation_gate_count=36</span>
+              <small>non_lms_blueprint_count&gt;=5;non_lms_product_count&gt;=4;taxonomy_area_count&gt;=8;evaluation_gate_count&gt;=30</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>owner_cadence</strong>
+              <span>target_adoption_pct=100;review_cadence_days=30</span>
+              <small>target_adoption_pct&gt;=100;review_cadence_days&lt;=30</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>tenant_safe=true;raw_identifier_count=0</span>
+              <small>tenant_safe=true;raw_identifier_count=0</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Release governance</th>
+          <td>enterprise_adoption_slo_release_governance_attached</td>
+        </tr>
+        <tr>
+          <th>SLO status</th>
+          <td>adoption_slo_published</td>
+        </tr>
+        <tr>
+          <th>Adoption status</th>
+          <td>adoption_monitored</td>
+        </tr>
+        <tr>
+          <th>Release gates</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Attached gates</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed gates</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Target adoption pct</th>
+          <td>100%</td>
+        </tr>
+        <tr>
+          <th>Review cadence days</th>
+          <td>30</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel split-panel">
+      <div>
+        <h2>Product Readiness Freshness Response SLO Drift Suppression Policy Coverage Release Gate Enterprise Adoption SLO Release Governance Drill</h2>
+        <ul class="work-list incident-list">            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_publication</strong>
+              <span>enterprise_adoption_slo_release_governance_gate_holds</span>
+              <small>slo_publication_release_governance_replay</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>slo_objectives</strong>
+              <span>enterprise_adoption_slo_release_governance_gate_holds</span>
+              <small>slo_objectives_release_governance_replay</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>enterprise_span</strong>
+              <span>enterprise_adoption_slo_release_governance_gate_holds</span>
+              <small>enterprise_span_release_governance_replay</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>owner_cadence</strong>
+              <span>enterprise_adoption_slo_release_governance_gate_holds</span>
+              <small>owner_cadence_release_governance_replay</small>
+            </li>
+            <li>
+              <span class="badge status-ok">true</span>
+              <strong>tenant_safety</strong>
+              <span>enterprise_adoption_slo_release_governance_gate_holds</span>
+              <small>tenant_safety_release_governance_replay</small>
+            </li></ul>
+      </div>
+      <div>
+      <table class="kv-table">
+        <tbody>        <tr>
+          <th>Drill status</th>
+          <td>passed</td>
+        </tr>
+        <tr>
+          <th>Release governance</th>
+          <td>enterprise_adoption_slo_release_governance_attached</td>
+        </tr>
+        <tr>
+          <th>Scenarios</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Passed</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Failed</th>
+          <td>0</td>
+        </tr>
+        <tr>
+          <th>Release gates</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Attached gates</th>
+          <td>5</td>
+        </tr>
+        <tr>
+          <th>Tenant safe</th>
+          <td>true</td>
+        </tr></tbody>
+      </table>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Next Control-Plane Actions</h2>
+      <table class="action-table">
+        <thead><tr><th>Priority</th><th>Status</th><th>Owner</th><th>Action</th></tr></thead>
+        <tbody>        <tr>
+          <td>p1</td>
+          <td>ready</td>
+          <td>Admin/Ops</td>
+          <td>run controlled policy applier</td>
+        </tr>
+        <tr>
+          <td>p1</td>
+          <td>ready</td>
+          <td>Admin/Ops + Governance Reviewer</td>
+          <td>activate approved artifact</td>
+        </tr>
+        <tr>
+          <td>p1</td>
+          <td>waiting</td>
+          <td>SA AI Engineer</td>
+          <td>publish artifact manifest</td>
+        </tr>
+        <tr>
+          <td>p1</td>
+          <td>waiting</td>
+          <td>SA AI Engineer</td>
+          <td>run required evaluation</td>
+        </tr>
+        <tr>
+          <td>p1</td>
+          <td>ready</td>
+          <td>SA AI Platform</td>
+          <td>publish solution architecture</td>
+        </tr>
+        <tr>
+          <td>p1</td>
+          <td>ready</td>
+          <td>SA AI Platform</td>
+          <td>publish solution architecture</td>
+        </tr>
+        <tr>
+          <td>p1</td>
+          <td>ready</td>
+          <td>SA AI Platform</td>
+          <td>publish solution architecture</td>
+        </tr>
+        <tr>
+          <td>p1</td>
+          <td>ready</td>
+          <td>SA AI Platform</td>
+          <td>publish solution architecture</td>
+        </tr></tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

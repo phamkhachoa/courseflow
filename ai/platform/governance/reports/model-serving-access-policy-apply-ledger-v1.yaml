@@ -1,0 +1,51 @@
+version: 1
+report_id: model-serving-access-policy-apply-ledger-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  application_count: 1
+  ready_to_apply_count: 1
+  pending_review_count: 0
+  applied_count: 0
+  rejected_count: 0
+  blocked_count: 0
+  checksum_mismatch_count: 0
+  source_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  proposed_policy_sha256: sha256:b90440fbee21733a26b99b2eb54843590f3cb9203902fe7f8132f2c6e16c1331
+by_status:
+  approved: 1
+by_action:
+  apply_proposed_policy_to_access_policy: 1
+action_queue:
+  blocked: []
+  pending_review: []
+  ready_to_apply:
+  - lms-sequence-risk-sandbox-tenant-apply-20260617
+  applied: []
+  rejected: []
+items:
+- application_id: lms-sequence-risk-sandbox-tenant-apply-20260617
+  status: approved
+  plan_id: model-serving-access-policy-patch-plan-v1
+  request_ids:
+  - lms-sequence-risk-sandbox-tenant
+  required_reviewer_roles:
+  - Admin/Ops
+  - Governance Reviewer
+  missing_reviewer_roles: []
+  source_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  expected_source_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  proposed_policy_sha256: sha256:b90440fbee21733a26b99b2eb54843590f3cb9203902fe7f8132f2c6e16c1331
+  expected_proposed_policy_sha256: sha256:b90440fbee21733a26b99b2eb54843590f3cb9203902fe7f8132f2c6e16c1331
+  checksum_status: matched
+  validation_errors: []
+  action: apply_proposed_policy_to_access_policy
+  reviewers:
+  - role: Admin/Ops
+    reviewer_id: adminops-ai-platform
+    decision: approved
+    reviewed_at: '2026-06-17T09:30:00Z'
+  - role: Governance Reviewer
+    reviewer_id: governance-ai-reviewer
+    decision: approved
+    reviewed_at: '2026-06-17T09:45:00Z'

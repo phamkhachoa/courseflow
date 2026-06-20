@@ -69,7 +69,7 @@ jobs:
           --health-retries 5
     defaults:
       run:
-        working-directory: backend/services/recommendation-ml-service
+        working-directory: ai/services/recommendation-ml-service
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: backend/services/recommendation-ml-service/pyproject.toml
+          cache-dependency-path: ai/services/recommendation-ml-service/pyproject.toml
 
       - name: Install ML service
         run: python -m pip install -e ".[dev]"
@@ -105,10 +105,10 @@ jobs:
         run: pytest tests/test_postgres_integration.py
 
       - name: Build ML Docker image
-        working-directory: backend
+        working-directory: .
         run: >
           docker build
-          -f services/recommendation-ml-service/Dockerfile
+          -f ai/services/recommendation-ml-service/Dockerfile
           -t courseflow-recommendation-ml-service:ci
           .
 
@@ -235,6 +235,21 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai/platform/pyproject.toml
+
+      - name: Install AI Platform tooling
+        run: python -m pip install -e "ai/platform[dev]"
+
+      - name: Validate AI Platform registry
+        run: |
+          python -m pytest ai/platform/tests
+          python -m courseflow_ai_platform.cli --ai-root ai
+
       - name: Validate gateway smoke script syntax
         run: node --check backend/scripts/product-hardening-smoke.mjs
 
@@ -278,7 +293,7 @@ jobs:
         run: bash -n backend/scripts/recommendation-ml-image-runtime-smoke.sh
 
       - name: Validate recommendation ML Python syntax
-        run: python -m compileall -q backend/services/recommendation-ml-service/src backend/services/recommendation-ml-service/tests
+        run: python -m compileall -q ai/platform/src ai/platform/tests ai/services/recommendation-ml-service/src ai/services/recommendation-ml-service/tests
 
       - name: Validate Docker Compose topology
         run: >
@@ -337,6 +352,7 @@ jobs:
           export TOKEN_CONVERTER_URI=http://identity-token-converter-service:8080
           export CERTIFICATE_SIGNING_SECRET=prod-ci-cert-signing-secret-32-byte-minimum-value-001
           export COURSEFLOW_DB_PASSWORD=prod-ci-db-password-strong-value-001
+          export RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET=prod-ci-recommendation-ml-principal-hash-secret-32-byte-minimum-value-001
           export COURSEFLOW_STORAGE_ACCESS_KEY=prod-ci-storage-access-key
           export COURSEFLOW_STORAGE_SECRET_KEY=prod-ci-storage-secret-strong-value-001
           export COURSEFLOW_STORAGE_EXTERNAL_ENDPOINT=https://storage.example.invalid

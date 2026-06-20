@@ -1,0 +1,46 @@
+version: 1
+dataset_id: course-content-hybrid-retrieval-shadow-v1
+owner: ai-platform
+product: lms-courseflow
+use_case_id: lms-rag-tutor
+model_id: course-content-hybrid-retriever-shadow-v1
+collection: course_content_chunks
+corpus: platform/evaluation/corpora/course-content-corpus.yaml
+collection_schema: platform/vector-store/collections/course-content.yaml
+description: Shadow evaluation for course-content hybrid lexical/vector retrieval.
+config:
+  k: 3
+  index_id: course-content-vector-index-baseline-v1
+  algorithm: deterministic_hash_embedding_baseline_v1
+  lexical_weight: 0.60
+  vector_weight: 0.40
+thresholds:
+  lexical_recall_at_k_min: 1.00
+  vector_recall_at_k_min: 1.00
+  hybrid_recall_at_k_min: 1.00
+  hybrid_not_worse_than_lexical_rate_min: 1.00
+  tenant_isolation_rate_min: 1.00
+queries:
+  - query_id: course-hybrid-001
+    tenant_id: tenant-a
+    query: Python for loops while loops break continue
+    expected_chunk_ids:
+      - course-python-loops-lesson
+
+  - query_id: course-hybrid-002
+    tenant_id: tenant-a
+    query: SQL left join inner join analytics tables
+    expected_chunk_ids:
+      - course-sql-join-lesson
+
+  - query_id: course-hybrid-003
+    tenant_id: tenant-a
+    query: item collaborative filtering implicit learner course interactions
+    expected_chunk_ids:
+      - course-recsys-collaborative-filtering
+
+  - query_id: course-hybrid-004
+    tenant_id: tenant-a
+    query: RAG grounded answers citations retrieval confidence
+    expected_chunk_ids:
+      - course-rag-grounded-answer

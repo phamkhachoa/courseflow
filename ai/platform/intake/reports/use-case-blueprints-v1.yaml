@@ -1,0 +1,339 @@
+version: 1
+report_id: use-case-solution-blueprints-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+source_registry: platform/intake/use-case-requests.yaml
+summary:
+  request_count: 6
+  ready_count: 6
+  waiting_count: 0
+  non_lms_count: 5
+  data_contract_gap_count: 0
+  evaluation_strategy_gap_count: 0
+  privacy_review_count: 0
+  simulator_required_count: 0
+  platform_build_gap_count: 0
+  target_module_count: 13
+  executable_module_count: 13
+  coverage_module_count: 9
+by_status:
+  ready_for_solution_design: 6
+  rejected: 0
+  waiting_for_data_contract: 0
+  waiting_for_evaluation_strategy: 0
+  waiting_for_privacy_review: 0
+  waiting_for_simulator: 0
+  withdrawn: 0
+action_queue:
+  closed: []
+  needs_data_contract: []
+  needs_evaluation_strategy: []
+  needs_platform_build: []
+  needs_privacy_review: []
+  needs_simulator: []
+  ready_for_solution_design:
+  - enterprise-knowledge-assistant-discovery
+  - lms-at-risk-prediction-baseline
+  - support-sla-risk-discovery
+  - finance-document-intelligence-discovery
+  - operations-routing-optimization-simulator
+  - finance-payment-fraud-scoring-discovery
+blueprints:
+- request_id: enterprise-knowledge-assistant-discovery
+  product: ai-platform
+  use_case_id: enterprise-knowledge-assistant
+  use_case_name: Enterprise Knowledge Assistant
+  status: ready_for_solution_design
+  priority: p1
+  submitted_by: ai-platform-product
+  business_owner: ai-platform-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  ready_for_solution_design: true
+  target_module_count: 3
+  executable_module_count: 3
+  roadmap_module_count: 0
+  privacy_gated_module_count: 0
+  simulator_required_module_count: 0
+  evaluation_gate_count: 13
+  blocking_reasons: []
+  workstreams:
+  - po_ba_confirm_business_value_and_acceptance_metrics
+  - sa_ai_platform_publish_solution_architecture
+  - sa_ai_engineer_prepare_baseline_artifact_and_eval_plan
+  target_modules:
+  - module_id: nlp-transformers
+    taxonomy_area: nlp_transformers
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 1
+    business_capabilities:
+    - intent_classification
+    - semantic_understanding
+    - rubric_feedback
+    - transformer_upgrade_path
+    - policy_enforced_nlp_understanding_service_boundary
+    - lms_support_and_enterprise_language_understanding_reuse
+  - module_id: genai-llm
+    taxonomy_area: genai_llm
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 4
+    business_capabilities:
+    - summarization
+    - reply_drafting
+    - content_generation
+    - human_reviewed_assistance
+    - provider_neutral_generation_gateway
+    - provider_runtime_ops_visibility
+    - provider_alert_route_governance
+    - provider_secret_rotation_governance
+  - module_id: rag-retrieval-vector
+    taxonomy_area: rag
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 8
+    business_capabilities:
+    - grounded_answers
+    - citation_enforcement
+    - semantic_search
+    - hybrid_retrieval
+    - policy_enforced_grounded_answer_service_boundary
+    - insufficient_context_refusal
+    - lms_and_support_rag_answer_reuse
+- request_id: lms-at-risk-prediction-baseline
+  product: lms-courseflow
+  use_case_id: lms-at-risk-prediction
+  use_case_name: Learner At-risk Prediction
+  status: ready_for_solution_design
+  priority: p1
+  submitted_by: courseflow-product
+  business_owner: courseflow-product
+  submitted_at: '2026-06-16'
+  is_non_lms: false
+  blueprint_status: ready_for_solution_design
+  ready_for_solution_design: true
+  target_module_count: 2
+  executable_module_count: 2
+  roadmap_module_count: 0
+  privacy_gated_module_count: 0
+  simulator_required_module_count: 0
+  evaluation_gate_count: 4
+  blocking_reasons: []
+  workstreams:
+  - po_ba_confirm_business_value_and_acceptance_metrics
+  - sa_ai_platform_publish_solution_architecture
+  - sa_ai_engineer_prepare_baseline_artifact_and_eval_plan
+  target_modules:
+  - module_id: classical-ml-baselines
+    taxonomy_area: classical_ml
+    coverage_status: implemented_baseline
+    executable: true
+    evaluation_gate_count: 3
+    business_capabilities:
+    - explainable_risk_scoring
+    - tabular_classification
+    - ranking_baseline
+    - anomaly_triage
+  - module_id: deep-learning-sequence-models
+    taxonomy_area: deep_learning
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 1
+    business_capabilities:
+    - sequence_prediction
+    - neural_ranking
+    - representation_learning
+    - transfer_learning_path
+    - policy_enforced_sequence_risk_service_boundary
+    - human_reviewed_intervention_routing
+- request_id: support-sla-risk-discovery
+  product: support-platform
+  use_case_id: support-sla-risk
+  use_case_name: Support SLA Risk Prediction
+  status: ready_for_solution_design
+  priority: p1
+  submitted_by: support-product
+  business_owner: support-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  ready_for_solution_design: true
+  target_module_count: 2
+  executable_module_count: 2
+  roadmap_module_count: 0
+  privacy_gated_module_count: 0
+  simulator_required_module_count: 0
+  evaluation_gate_count: 4
+  blocking_reasons: []
+  workstreams:
+  - po_ba_confirm_business_value_and_acceptance_metrics
+  - sa_ai_platform_publish_solution_architecture
+  - sa_ai_engineer_prepare_baseline_artifact_and_eval_plan
+  target_modules:
+  - module_id: classical-ml-baselines
+    taxonomy_area: classical_ml
+    coverage_status: implemented_baseline
+    executable: true
+    evaluation_gate_count: 3
+    business_capabilities:
+    - explainable_risk_scoring
+    - tabular_classification
+    - ranking_baseline
+    - anomaly_triage
+  - module_id: deep-learning-sequence-models
+    taxonomy_area: deep_learning
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 1
+    business_capabilities:
+    - sequence_prediction
+    - neural_ranking
+    - representation_learning
+    - transfer_learning_path
+    - policy_enforced_sequence_risk_service_boundary
+    - human_reviewed_intervention_routing
+- request_id: finance-document-intelligence-discovery
+  product: billing-finance
+  use_case_id: finance-document-intelligence
+  use_case_name: Finance Document Intelligence
+  status: ready_for_solution_design
+  priority: p2
+  submitted_by: finance-product
+  business_owner: finance-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  ready_for_solution_design: true
+  target_module_count: 2
+  executable_module_count: 2
+  roadmap_module_count: 0
+  privacy_gated_module_count: 0
+  simulator_required_module_count: 0
+  evaluation_gate_count: 9
+  blocking_reasons: []
+  workstreams:
+  - po_ba_confirm_business_value_and_acceptance_metrics
+  - sa_ai_platform_publish_solution_architecture
+  - sa_ai_engineer_prepare_baseline_artifact_and_eval_plan
+  target_modules:
+  - module_id: computer-vision-document-ai
+    taxonomy_area: computer_vision
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 1
+    business_capabilities:
+    - ocr_extraction
+    - visual_quality_check
+    - document_understanding
+    - privacy_reviewed_media_processing
+    - policy_enforced_media_service_boundary
+  - module_id: rag-retrieval-vector
+    taxonomy_area: rag
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 8
+    business_capabilities:
+    - grounded_answers
+    - citation_enforcement
+    - semantic_search
+    - hybrid_retrieval
+    - policy_enforced_grounded_answer_service_boundary
+    - insufficient_context_refusal
+    - lms_and_support_rag_answer_reuse
+- request_id: operations-routing-optimization-simulator
+  product: enterprise-operations
+  use_case_id: operations-routing-optimization
+  use_case_name: Operations Routing Optimization
+  status: ready_for_solution_design
+  priority: p2
+  submitted_by: operations-product
+  business_owner: operations-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  ready_for_solution_design: true
+  target_module_count: 1
+  executable_module_count: 1
+  roadmap_module_count: 0
+  privacy_gated_module_count: 0
+  simulator_required_module_count: 0
+  evaluation_gate_count: 1
+  blocking_reasons: []
+  workstreams:
+  - po_ba_confirm_business_value_and_acceptance_metrics
+  - sa_ai_platform_publish_solution_architecture
+  - sa_ai_engineer_prepare_baseline_artifact_and_eval_plan
+  target_modules:
+  - module_id: rl-bandit-decisioning
+    taxonomy_area: reinforcement_learning
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 1
+    business_capabilities:
+    - next_best_action
+    - constrained_policy_learning
+    - safe_exploration
+    - offline_policy_evaluation_path
+    - policy_enforced_routing_policy_service_boundary
+    - human_reviewed_constraint_violation_routing
+- request_id: finance-payment-fraud-scoring-discovery
+  product: billing-finance
+  use_case_id: finance-payment-fraud-scoring
+  use_case_name: Finance Payment Fraud Scoring
+  status: ready_for_solution_design
+  priority: p2
+  submitted_by: finance-product
+  business_owner: finance-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  ready_for_solution_design: true
+  target_module_count: 3
+  executable_module_count: 3
+  roadmap_module_count: 0
+  privacy_gated_module_count: 0
+  simulator_required_module_count: 0
+  evaluation_gate_count: 5
+  blocking_reasons: []
+  workstreams:
+  - po_ba_confirm_business_value_and_acceptance_metrics
+  - sa_ai_platform_publish_solution_architecture
+  - sa_ai_engineer_prepare_baseline_artifact_and_eval_plan
+  target_modules:
+  - module_id: classical-ml-baselines
+    taxonomy_area: classical_ml
+    coverage_status: implemented_baseline
+    executable: true
+    evaluation_gate_count: 3
+    business_capabilities:
+    - explainable_risk_scoring
+    - tabular_classification
+    - ranking_baseline
+    - anomaly_triage
+  - module_id: anomaly-fraud-risk
+    taxonomy_area: anomaly_fraud_risk
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 1
+    business_capabilities:
+    - anomaly_score
+    - fraud_triage
+    - entitlement_outlier_detection
+    - reason_codes
+    - policy_enforced_payment_fraud_service_boundary
+    - entity_link_risk_evidence
+    - human_reviewed_payment_action_routing
+  - module_id: graph-knowledge-intelligence
+    taxonomy_area: graph_knowledge
+    coverage_status: executable_gate
+    executable: true
+    evaluation_gate_count: 1
+    business_capabilities:
+    - entity_resolution
+    - relationship_reasoning
+    - skill_graph
+    - fraud_or_access_graph_path
+    - policy_enforced_graph_entity_service_boundary
+    - human_reviewed_graph_risk_evidence_routing

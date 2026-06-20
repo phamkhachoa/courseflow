@@ -25,6 +25,11 @@ Gateway:
 http://localhost:28080
 ```
 
+Recommendation ML is no longer started inside the backend Compose project. Run the AI cluster from
+`../ai` when recommendation features need the Python ML runtime. The backend defaults to
+`http://host.docker.internal:18088` for both `RECOMMENDATION_ML_SERVICE_URL` and
+`RECOMMENDATION_ML_SERVICE_URI`; override those variables if the AI platform is exposed elsewhere.
+
 If port `28080` is already in use:
 
 ```bash
@@ -143,6 +148,8 @@ KEYCLOAK_SETUP_EMAIL_REDIRECT_URI="https://admin.example.com/login/callback" \
 KEYCLOAK_ISSUER_URI="https://auth.example.com/realms/courseflow" \
 KEYCLOAK_JWK_SET_URI="https://auth.example.com/realms/courseflow/protocol/openid-connect/certs" \
 KEYCLOAK_AUDIENCE="courseflow-api" \
+RECOMMENDATION_ML_SERVICE_URI="https://ai.example.com" \
+RECOMMENDATION_ML_SERVICE_URL="https://ai.example.com" \
   scripts/validate-prod-profile.sh --compose
 ```
 
@@ -225,16 +232,11 @@ Validate a dump by restoring it into a temporary local database:
 
 ```bash
 scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
-scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_recommendation_ml
 ```
 
 The restore check writes `restore-check-cf_promotion.json` in the backup directory. For promotion
 retention testing, register the restore drill from that file instead of typing the artifact hash by
 hand.
-
-The Recommendation ML restore check writes `restore-check-cf_recommendation_ml.json` and also probes
-the restored Alembic revision plus core ML tables. Keep that evidence with any release that changes
-ML migrations, model registry storage, or activation approval storage.
 
 ## Trust Boundary
 

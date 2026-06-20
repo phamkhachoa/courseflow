@@ -1,0 +1,34 @@
+version: 1
+owner: ai-platform
+policy_id: delivery-sla-policy-v1
+due_soon_threshold_days: 3
+priority_sla_days:
+  p0: 1
+  p1: 3
+  p2: 10
+  p3: 20
+monitoring_review_days:
+  active: 1
+  shadow: 7
+owner_aliases:
+  - owner_role: Admin/Ops
+    alias: admin-ops
+    escalation_role: ai-platform-ops-lead
+  - owner_role: Admin/Ops + Governance Reviewer
+    alias: admin-ops-governance
+    escalation_role: ai-platform-ops-lead
+  - owner_role: Data Platform + Product Owner
+    alias: data-platform-product-owner
+    escalation_role: data-platform-lead
+  - owner_role: Governance Reviewer
+    alias: ai-governance-reviewer
+    escalation_role: governance-lead
+  - owner_role: SA AI Engineer
+    alias: sa-ai-engineering
+    escalation_role: ai-engineering-lead
+  - owner_role: SA AI Platform
+    alias: sa-ai-platform
+    escalation_role: ai-platform-architect
+  - owner_role: SA AI Platform + Governance Reviewer
+    alias: sa-ai-platform-governance
+    escalation_role: ai-platform-architect

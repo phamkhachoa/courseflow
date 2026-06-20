@@ -1,0 +1,35 @@
+version: 1
+report_id: model-serving-access-policy-reconciliation-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  application_count: 1
+  pending_apply_count: 1
+  reconciled_count: 0
+  ledger_update_required_count: 0
+  drift_count: 0
+  rejected_count: 0
+  active_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+by_status:
+  pending_policy_apply: 1
+by_action:
+  run_controlled_policy_applier: 1
+action_queue:
+  pending_apply:
+  - lms-sequence-risk-sandbox-tenant-apply-20260617
+  ledger_update_required: []
+  reconciled: []
+  drift: []
+  rejected: []
+items:
+- application_id: lms-sequence-risk-sandbox-tenant-apply-20260617
+  ledger_status: approved
+  reconciliation_status: pending_policy_apply
+  action: run_controlled_policy_applier
+  active_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  source_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  proposed_policy_sha256: sha256:b90440fbee21733a26b99b2eb54843590f3cb9203902fe7f8132f2c6e16c1331
+  applied_policy_sha256: ''
+  request_ids:
+  - lms-sequence-risk-sandbox-tenant
+  validation_errors: []

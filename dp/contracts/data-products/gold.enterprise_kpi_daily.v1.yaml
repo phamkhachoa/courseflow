@@ -1,0 +1,278 @@
+contractVersion: 1
+dataProduct:
+  name: gold.enterprise_kpi_daily
+  layer: GOLD
+  domain: enterprise-reporting
+  product: enterprise-data-platform
+  domainOwner: enterprise-reporting-council
+  ownerTeam: data-platform
+  businessOwner: enterprise-reporting-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Certified non-PII daily KPI facts materialized from governed semantic metric snapshots across enterprise source products.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: gold.finance_revenue_daily
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.finance_benefit_reconciliation
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.customer_360_profile
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.access_risk_daily
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.support_sla_daily
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.recsys_interactions
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.data_product_inventory
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.contract_compliance_daily
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.quality_sla_daily
+      type: semantic_metric_source
+      contractVersion: 1
+    - name: gold.lineage_coverage_daily
+      type: semantic_metric_source
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: report_date
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise platform product that materialized the KPI fact.
+    - name: dataset_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Immutable Gold snapshot identifier.
+    - name: kpi_daily_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic KPI fact row id for the metric, report date, organization and dimension scope.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for row-level tenant isolation.
+    - name: report_date
+      type: date
+      nullable: false
+      pii: false
+      description: Business report date for the KPI observation.
+    - name: metric_id
+      type: string
+      nullable: false
+      pii: false
+      description: Stable semantic metric identifier.
+    - name: metric_name
+      type: string
+      nullable: false
+      pii: false
+      description: Human-readable metric name.
+    - name: metric_domain
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise domain owning the metric definition.
+    - name: metric_owner
+      type: string
+      nullable: false
+      pii: false
+      description: Business owner accountable for metric definition and certification.
+    - name: metric_status
+      type: string
+      nullable: false
+      pii: false
+      description: Runtime health status of the metric row.
+      allowedValues: [ACTIVE, DEGRADED, MISSING]
+    - name: certification_status
+      type: string
+      nullable: false
+      pii: false
+      description: Certification state of the metric definition.
+      allowedValues: [CERTIFIED, PROVISIONAL, EXPLORATORY]
+    - name: source_data_product
+      type: string
+      nullable: false
+      pii: false
+      description: Gold source data product that supplied the semantic metric value.
+    - name: source_product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product that owns or originated the source metric signal.
+    - name: source_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Source Gold snapshot id represented by this KPI row.
+    - name: source_content_hash
+      type: string
+      nullable: false
+      pii: false
+      description: Source Gold content hash or semantic source artifact hash.
+    - name: semantic_view
+      type: string
+      nullable: false
+      pii: false
+      description: Semantic view or metric path used to produce the row.
+    - name: dimension_hash
+      type: string
+      nullable: false
+      pii: false
+      description: Hash of the non-PII reporting dimension scope.
+    - name: dimension_scope
+      type: json
+      nullable: false
+      pii: false
+      description: Non-PII dimensions such as product line, region, currency or scorecard segment.
+    - name: metric_value
+      type: double
+      nullable: false
+      pii: false
+      description: Numeric metric value at the declared grain.
+    - name: target_value
+      type: double
+      nullable: true
+      pii: false
+      description: Target or threshold value when defined.
+    - name: prior_value
+      type: double
+      nullable: true
+      pii: false
+      description: Comparable previous period metric value when supplied.
+    - name: delta_value
+      type: double
+      nullable: true
+      pii: false
+      description: Difference between current and prior value when supplied or derived.
+    - name: metric_unit
+      type: string
+      nullable: false
+      pii: false
+      description: Metric unit such as count, ratio, percent or currency_major.
+    - name: currency
+      type: string
+      nullable: true
+      pii: false
+      description: ISO-4217 currency code when metric_unit is monetary.
+    - name: threshold_status
+      type: string
+      nullable: false
+      pii: false
+      description: Business threshold status for executive attention.
+      allowedValues: [GREEN, AMBER, RED, UNKNOWN]
+    - name: trend
+      type: string
+      nullable: false
+      pii: false
+      description: Direction against prior value.
+      allowedValues: [UP, DOWN, FLAT, UNKNOWN]
+    - name: freshness_slo_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Required freshness SLO inherited from semantic metric governance.
+    - name: freshness_age_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Observed age of the source metric snapshot.
+    - name: quality_passed
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether semantic and row-level quality checks passed.
+    - name: source_metric_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Source semantic metric snapshot id.
+    - name: source_metric_snapshot_hash
+      type: string
+      nullable: false
+      pii: false
+      description: Source semantic metric snapshot content hash.
+    - name: semantic_registry_hash
+      type: string
+      nullable: false
+      pii: false
+      description: Hash of the governed semantic metric registry used for the snapshot.
+    - name: blocker_count
+      type: int
+      nullable: false
+      pii: false
+      description: Count of source or control-tower blockers associated with the metric.
+    - name: top_blocker_gate
+      type: string
+      nullable: true
+      pii: false
+      description: Highest priority blocker gate when the metric is not green.
+    - name: built_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the Gold KPI snapshot was materialized.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: enterprise_kpi_id_not_null
+      type: not_null
+      column: kpi_daily_id
+    - name: enterprise_kpi_org_not_null
+      type: not_null
+      column: org_id
+    - name: enterprise_kpi_unique
+      type: unique
+      columns: [dataset_snapshot_id, kpi_daily_id]
+    - name: enterprise_kpi_status_allowed
+      type: accepted_values
+      column: threshold_status
+      values: [GREEN, AMBER, RED, UNKNOWN]
+    - name: enterprise_kpi_certification_allowed
+      type: accepted_values
+      column: certification_status
+      values: [CERTIFIED, PROVISIONAL, EXPLORATORY]
+    - name: enterprise_kpi_snapshot_freshness
+      type: freshness
+      column: built_at
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: false
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: false
+  subjectKeys: []
+  erasureMode: NONE
+  legalHoldPolicy: none
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [BI, Reporting, OperationalService]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ExecutiveConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

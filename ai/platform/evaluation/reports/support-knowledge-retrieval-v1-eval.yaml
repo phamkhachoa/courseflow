@@ -1,0 +1,46 @@
+version: 1
+evaluation_id: support-knowledge-retrieval-v1-eval
+model_id: support-knowledge-retrieval-baseline-v1
+algorithm: lexical_retrieval_baseline
+use_case_id: support-agent-assist
+product: support-platform
+owner: ai-platform
+evaluation_type: retrieval_golden_set
+status: accepted_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: support-knowledge-retrieval-golden-v1
+  source: platform/evaluation/datasets/support-knowledge-retrieval-golden.yaml
+  corpus: platform/evaluation/corpora/support-knowledge-corpus.yaml
+  collection: support_knowledge_articles
+  case_count: 4
+metrics:
+  recall_at_3:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  hit_rate_at_3:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  citation_precision_at_3:
+    value: 0.75
+    threshold: 0.60
+    status: passed
+  tenant_isolation_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Lexical baseline is a deterministic gate before embedding/vector infrastructure.
+    - Future RAG variants must beat this retrieval gate and add grounded answer/citation evaluation.
+risks:
+  - lexical_matching_only
+  - no_semantic_embedding_recall_yet
+  - no_llm_groundedness_yet
+required_next_steps:
+  - add_sentence_transformer_support_embedding_model
+  - add_support_hybrid_retriever_shadow_eval
+  - enable_network_provider_with_secret_manager_refs_when_approved

@@ -1,0 +1,72 @@
+version: 1
+owner: ai-platform
+policies:
+  activation:
+    maker_checker_required: true
+    maker_cannot_approve_own_request: true
+    require_quality_gate_pass: true
+    require_rollback_target: true
+
+  human_in_the_loop:
+    auto_grading:
+      final_grade_requires_instructor_approval: true
+      ai_output_type: suggested_grade
+    at_risk_prediction:
+      learner_intervention_requires_human_owner: true
+    rag_tutor:
+      high_risk_topics_require_refusal_or_escalation: true
+
+  privacy:
+    tenant_isolation_required: true
+    cross_tenant_retrieval_allowed: false
+    raw_learner_pii_in_training_payload: forbidden
+    principal_identifiers:
+      storage: hmac_sha256_hash
+    behavioral_payload_retention_days:
+      default: 30
+      maximum: 30
+    audit_evidence:
+      secret_values_allowed: false
+      bounded_json_required: true
+      prompt_audit_contract: contracts/prompts/prompt-audit-event.v1.yaml
+    prompt_response_audit_retention_days:
+      default: 30
+      maximum: 90
+    deletion_export_requests:
+      impact_review_required: true
+      prompt_response_logs_in_scope: true
+      vector_embeddings_in_scope: true
+
+  security:
+    internal_jwt_required: true
+    wildcard_scopes_allowed: false
+    docs_enabled_in_production: false
+    endpoint_scopes:
+      train: internal:recommendation-ml:train
+      infer: internal:recommendation-ml:infer
+      ops: internal:recommendation-ml:ops
+    serving_endpoint_scopes:
+      catalog: internal:ai-platform:model-serving:catalog
+      invoke: internal:ai-platform:model-serving:invoke
+      ops: internal:ai-platform:model-serving:ops
+
+  monitoring:
+    require_latency_metric: true
+    require_error_metric: true
+    require_model_age_metric: true
+    require_fallback_metric: true
+    require_cost_metric_for_llm: true
+    require_drift_metric_for_predictive_models: true
+
+  llm_safety:
+    require_grounding_for_rag: true
+    require_citations_for_tutor_answers: true
+    require_refusal_when_context_insufficient: true
+    require_prompt_redaction_before_model_call: true
+    require_cost_budget_before_model_call: true
+    cross_tenant_context_allowed: false
+    external_auto_send_default: false
+    store_prompt_and_response_audit:
+      enabled: true
+      redact_sensitive_values: true
+      store_hashes_not_raw_values: true

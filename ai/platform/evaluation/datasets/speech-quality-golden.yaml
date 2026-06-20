@@ -1,0 +1,138 @@
+version: 1
+dataset_id: speech-quality-golden-v1
+model_id: speech-quality-baseline-v1
+product: support-platform
+use_case_id: support-speech-quality-assurance
+module: models/speech/audio_quality_baseline/audio_quality_baseline.py
+feature_contract: contracts/features/speech-audio-features.v1.yaml
+model_io_contract: contracts/models/speech-quality-model-io.v1.yaml
+thresholds:
+  intent_accuracy_min: 1.0
+  quality_band_accuracy_min: 1.0
+  reason_code_recall_min: 0.85
+  evidence_term_recall_min: 0.8
+  human_review_policy_pass_rate_min: 1.0
+  privacy_guardrail_pass_rate_min: 1.0
+cases:
+  - case_id: account-access-clean
+    input:
+      tenant_id: tenant-support
+      audio_id: call-1001
+      audio_checksum: sha256-call-1001
+      transcript_language: en
+      duration_seconds: 420
+      consent_captured: true
+      segments:
+        - speaker_role: customer
+          text: I cannot login after the MFA reset
+          start_ms: 0
+          end_ms: 4000
+          confidence: 0.96
+        - speaker_role: agent
+          text: We reset the account password and confirmed login
+          start_ms: 4200
+          end_ms: 9000
+          confidence: 0.98
+    expected:
+      intent: account_access
+      quality_band: good
+      compliance_risk: low
+      requires_human_review: false
+      privacy_guardrail: safe
+      reason_codes:
+        - INTENT_ACCOUNT_ACCESS
+        - CONSENT_CAPTURED
+      evidence_terms:
+        - I cannot login after the MFA reset
+        - We reset the account password and confirmed login
+
+  - case_id: billing-escalation-review
+    input:
+      tenant_id: tenant-support
+      audio_id: call-refund
+      audio_checksum: sha256-call-refund
+      transcript_language: en
+      duration_seconds: 760
+      consent_captured: true
+      segments:
+        - speaker_role: customer
+          text: I am angry about the refund and want a manager
+          start_ms: 0
+          end_ms: 5000
+          confidence: 0.91
+        - speaker_role: agent
+          text: I can escalate the billing refund complaint
+          start_ms: 5200
+          end_ms: 10000
+          confidence: 0.92
+    expected:
+      intent: billing_support
+      quality_band: escalation_review
+      compliance_risk: low
+      requires_human_review: true
+      privacy_guardrail: safe
+      reason_codes:
+        - INTENT_BILLING_SUPPORT
+        - QUALITY_REVIEW_REQUIRED
+        - HUMAN_REVIEW_REQUIRED
+      evidence_terms:
+        - I am angry about the refund and want a manager
+        - I can escalate the billing refund complaint
+
+  - case_id: raw-pii-review
+    input:
+      tenant_id: tenant-support
+      audio_id: call-pii
+      audio_checksum: sha256-call-pii
+      transcript_language: en
+      duration_seconds: 300
+      consent_captured: true
+      segments:
+        - speaker_role: customer
+          text: My credit card is 4111 1111 1111 1111
+          start_ms: 0
+          end_ms: 4000
+          confidence: 0.95
+    expected:
+      intent: general_support
+      quality_band: good
+      compliance_risk: raw_pii_detected
+      requires_human_review: true
+      privacy_guardrail: raw_pii_detected
+      reason_codes:
+        - RAW_AUDIO_PII_DETECTED
+        - HUMAN_REVIEW_REQUIRED
+      evidence_terms:
+        - My credit card is 4111 1111 1111 1111
+
+  - case_id: lms-learning-support-clean
+    input:
+      tenant_id: tenant-lms
+      audio_id: lesson-transcript-9
+      audio_checksum: sha256-lesson-transcript-9
+      transcript_language: en
+      duration_seconds: 540
+      consent_captured: true
+      product_hint: lms-courseflow
+      segments:
+        - speaker_role: learner
+          text: I need help with the quiz assignment
+          start_ms: 0
+          end_ms: 3000
+          confidence: 0.94
+        - speaker_role: instructor
+          text: Review the lesson section before the course quiz
+          start_ms: 3200
+          end_ms: 7000
+          confidence: 0.95
+    expected:
+      intent: learning_support
+      quality_band: good
+      compliance_risk: low
+      requires_human_review: false
+      privacy_guardrail: safe
+      reason_codes:
+        - INTENT_LEARNING_SUPPORT
+      evidence_terms:
+        - I need help with the quiz assignment
+        - Review the lesson section before the course quiz

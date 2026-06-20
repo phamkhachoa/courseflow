@@ -1,0 +1,129 @@
+version: 1
+dataset_id: finance-document-intelligence-golden-v1
+model_id: finance-document-intelligence-baseline-v1
+product: billing-finance
+use_case_id: finance-document-intelligence
+module: models/multimodal/document_intelligence_baseline/document_intelligence_baseline.py
+feature_contract: contracts/features/finance-document-intelligence-features.v1.yaml
+model_io_contract: contracts/models/finance-document-intelligence-model-io.v1.yaml
+thresholds:
+  document_type_accuracy_min: 1.0
+  field_recall_min: 1.0
+  evidence_term_recall_min: 0.8
+  human_review_policy_pass_rate_min: 1.0
+  privacy_guardrail_pass_rate_min: 1.0
+cases:
+  - case_id: invoice-clean-acme
+    input:
+      tenant_id: tenant-finance
+      document_id: invoice-1042
+      document_checksum: sha256-invoice-1042
+      mime_type: application/pdf
+      document_language: en
+      vendor_name_hint: Acme Supply
+      tokens:
+        - text: Invoice INV-1042
+          page: 1
+        - text: Vendor Acme Supply
+          page: 1
+        - text: Total USD 1280.50
+          page: 1
+        - text: Due 2026-07-01
+          page: 1
+    expected:
+      document_type: invoice
+      requires_human_review: false
+      privacy_guardrail: safe
+      fields:
+        vendor_name: Acme Supply
+        document_number: "1042"
+        total_amount: "1280.50"
+        currency: USD
+        document_date: "2026-07-01"
+      evidence_terms:
+        - Invoice INV-1042
+        - Total USD 1280.50
+
+  - case_id: receipt-clean-travel
+    input:
+      tenant_id: tenant-finance
+      document_id: receipt-77
+      document_checksum: sha256-receipt-77
+      mime_type: image/png
+      document_language: en
+      vendor_name_hint: Metro Travel
+      tokens:
+        - text: Receipt RCPT-77
+          page: 1
+        - text: Merchant Metro Travel
+          page: 1
+        - text: Paid USD 42.10
+          page: 1
+    expected:
+      document_type: receipt
+      requires_human_review: false
+      privacy_guardrail: safe
+      fields:
+        vendor_name: Metro Travel
+        document_number: "77"
+        total_amount: "42.10"
+        currency: USD
+      evidence_terms:
+        - Receipt RCPT-77
+        - Paid USD 42.10
+
+  - case_id: invoice-raw-tax-id-review
+    input:
+      tenant_id: tenant-finance
+      document_id: invoice-tax-id
+      document_checksum: sha256-invoice-tax
+      mime_type: application/pdf
+      document_language: en
+      vendor_name_hint: Northwind
+      tokens:
+        - text: Invoice INV-777
+          page: 1
+        - text: Total USD 900.00
+          page: 1
+        - text: Tax ID 12-3456789
+          page: 1
+    expected:
+      document_type: invoice
+      requires_human_review: true
+      privacy_guardrail: raw_pii_detected
+      fields:
+        vendor_name: Northwind
+        document_number: "777"
+        total_amount: "900.00"
+        currency: USD
+      reason_codes:
+        - RAW_FINANCIAL_PII_DETECTED
+        - HUMAN_REVIEW_REQUIRED
+      evidence_terms:
+        - Invoice INV-777
+        - Total USD 900.00
+
+  - case_id: unknown-payment-instruction-review
+    input:
+      tenant_id: tenant-finance
+      document_id: payment-instruction
+      document_checksum: sha256-payment-instruction
+      mime_type: application/pdf
+      document_language: en
+      tokens:
+        - text: Payment instruction
+          page: 1
+        - text: Approver review required
+          page: 1
+        - text: Wire account pending redaction
+          page: 1
+    expected:
+      document_type: unknown
+      requires_human_review: true
+      privacy_guardrail: raw_pii_detected
+      fields: {}
+      reason_codes:
+        - DOCUMENT_TYPE_UNKNOWN
+        - RAW_FINANCIAL_PII_DETECTED
+        - HUMAN_REVIEW_REQUIRED
+      evidence_terms: []

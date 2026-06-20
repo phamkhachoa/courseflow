@@ -1,0 +1,33 @@
+version: 1
+owner: ai-platform
+policy_id: graph-entity-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  direct_identifier_submission_allowed: false
+  automated_adverse_action_allowed: false
+scope_aliases:
+  analyze: internal:ai-platform:graph-entity:analyze
+  ops: internal:ai-platform:graph-entity:ops
+principals:
+  - principal_id: service:ai-platform-graph-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:finance-graph-risk
+    owner_role: Finance graph risk service
+    product: billing-finance
+    scopes:
+      - analyze
+    tenant_ids:
+      - tenant-finance
+      - tenant-finance-sandbox
+    product_ids:
+      - billing-finance
+    use_case_ids:
+      - finance-payment-fraud-scoring

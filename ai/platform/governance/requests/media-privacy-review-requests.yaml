@@ -1,0 +1,125 @@
+version: 1
+owner: ai-platform
+requests:
+  - review_id: support-speech-transcript-baseline-review
+    name: Support speech transcript baseline review
+    product: support-platform
+    use_case_id: support-speech-quality-assurance
+    taxonomy_module_id: speech-audio-ai
+    media_type: transcript
+    requested_processing_modes:
+      - transcript_only
+    status: approved
+    requested_by: support-product
+    reviewer_role: Governance Reviewer
+    submitted_at: "2026-06-17"
+    decision_ref: platform/evaluation/reports/speech-quality-v1-eval.yaml
+    refs:
+      - contracts/features/speech-audio-features.v1.yaml
+      - contracts/models/speech-quality-model-io.v1.yaml
+      - platform/evaluation/reports/speech-quality-v1-eval.yaml
+      - platform/model-registry/model-cards/speech-quality-baseline-v1.md
+    controls:
+      tenant_isolation: true
+      retention_policy: true
+      deletion_export_impact_review: true
+      human_review_routing: true
+      audit_logging: true
+      transcript_redaction: true
+      consent_or_notice: true
+    control_evidence:
+      tenant_isolation: contracts/features/speech-audio-features.v1.yaml
+      retention_policy: contracts/features/speech-audio-features.v1.yaml
+      deletion_export_impact_review: contracts/features/speech-audio-features.v1.yaml
+      human_review_routing: platform/evaluation/reports/speech-quality-v1-eval.yaml
+      audit_logging: platform/model-registry/model-cards/speech-quality-baseline-v1.md
+      transcript_redaction: contracts/features/speech-audio-features.v1.yaml
+      consent_or_notice: contracts/features/speech-audio-features.v1.yaml
+
+  - review_id: finance-document-raw-ocr-review
+    name: Finance document raw OCR and layout review
+    product: billing-finance
+    use_case_id: finance-document-intelligence
+    taxonomy_module_id: computer-vision-document-ai
+    media_type: pdf_document
+    requested_processing_modes:
+      - raw_document_ocr
+      - layout_extraction
+    status: approved
+    requested_by: finance-product
+    reviewer_role: Governance Reviewer
+    submitted_at: "2026-06-17"
+    decision_ref: docs/team/council-meetings/0069-raw-media-control-evidence-approval.md
+    refs:
+      - contracts/features/finance-document-intelligence-features.v1.yaml
+      - contracts/models/finance-document-intelligence-model-io.v1.yaml
+      - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      - platform/model-registry/model-cards/finance-document-intelligence-baseline-v1.md
+      - platform/governance/controls/raw-media-storage-boundary-v1.yaml
+      - platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+    controls:
+      tenant_isolation: true
+      retention_policy: true
+      deletion_export_impact_review: true
+      human_review_routing: true
+      audit_logging: true
+      source_document_access_policy: true
+      pii_redaction: true
+      reviewer_override_queue: true
+      raw_media_storage_boundary: true
+      layout_region_redaction: true
+    control_evidence:
+      tenant_isolation: contracts/features/finance-document-intelligence-features.v1.yaml
+      retention_policy: contracts/features/finance-document-intelligence-features.v1.yaml
+      deletion_export_impact_review: platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+      human_review_routing: platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      audit_logging: platform/model-registry/model-cards/finance-document-intelligence-baseline-v1.md
+      source_document_access_policy: platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+      pii_redaction: platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      reviewer_override_queue: platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      raw_media_storage_boundary: platform/governance/controls/raw-media-storage-boundary-v1.yaml
+      layout_region_redaction: platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+
+  - review_id: speech-audio-raw-asr-diarization-review
+    name: Speech audio raw ASR and diarization review
+    product: support-platform
+    use_case_id: support-speech-quality-assurance
+    taxonomy_module_id: speech-audio-ai
+    media_type: audio
+    requested_processing_modes:
+      - raw_audio_asr
+      - speaker_diarization
+    status: approved
+    requested_by: support-product
+    reviewer_role: Governance Reviewer
+    submitted_at: "2026-06-17"
+    decision_ref: docs/team/council-meetings/0069-raw-media-control-evidence-approval.md
+    refs:
+      - contracts/features/speech-audio-features.v1.yaml
+      - contracts/models/speech-quality-model-io.v1.yaml
+      - platform/evaluation/reports/speech-quality-v1-eval.yaml
+      - platform/model-registry/model-cards/speech-quality-baseline-v1.md
+      - platform/governance/controls/raw-media-storage-boundary-v1.yaml
+      - platform/governance/controls/speech-audio-raw-asr-diarization-controls-v1.yaml
+    controls:
+      tenant_isolation: true
+      retention_policy: true
+      deletion_export_impact_review: true
+      human_review_routing: true
+      audit_logging: true
+      consent_or_notice: true
+      raw_audio_access_policy: true
+      transcript_redaction: true
+      raw_media_storage_boundary: true
+      speaker_role_minimization: true
+    control_evidence:
+      tenant_isolation: contracts/features/speech-audio-features.v1.yaml
+      retention_policy: contracts/features/speech-audio-features.v1.yaml
+      deletion_export_impact_review: contracts/features/speech-audio-features.v1.yaml
+      human_review_routing: platform/evaluation/reports/speech-quality-v1-eval.yaml
+      audit_logging: platform/model-registry/model-cards/speech-quality-baseline-v1.md
+      consent_or_notice: contracts/features/speech-audio-features.v1.yaml
+      raw_audio_access_policy: platform/governance/controls/speech-audio-raw-asr-diarization-controls-v1.yaml
+      transcript_redaction: contracts/features/speech-audio-features.v1.yaml
+      raw_media_storage_boundary: platform/governance/controls/raw-media-storage-boundary-v1.yaml
+      speaker_role_minimization: platform/governance/controls/speech-audio-raw-asr-diarization-controls-v1.yaml

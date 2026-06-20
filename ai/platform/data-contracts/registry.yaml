@@ -1,0 +1,109 @@
+version: 1
+owner: ai-platform
+policy:
+  allowed_statuses:
+    - active
+    - draft
+    - privacy_gated
+    - simulator_gated
+  design_ready_statuses:
+    - active
+    - draft
+  production_ready_statuses:
+    - active
+contracts:
+  - contract_id: lms-learning-features-v1
+    name: LMS Learning Features
+    status: active
+    product: lms-courseflow
+    path: contracts/features/lms-learning-features.v1.yaml
+    use_cases:
+      - lms-at-risk-prediction
+      - lms-related-course-recommendation
+      - lms-semantic-search
+      - lms-rag-tutor
+      - lms-knowledge-tracing
+      - lms-adaptive-path
+    data_domains:
+      - enrollment_events
+      - assessment_attempts
+      - engagement_events
+      - course_content_profile
+    owner_role: Data Platform
+
+  - contract_id: support-case-features-v1
+    name: Support Case Features
+    status: active
+    product: support-platform
+    path: contracts/features/support-case-features.v1.yaml
+    use_cases:
+      - support-agent-assist
+      - support-sla-risk
+    data_domains:
+      - support_case_events
+      - entitlement_and_sla_policy
+    owner_role: Support Platform
+
+  - contract_id: enterprise-knowledge-documents-v1
+    name: Enterprise Knowledge Documents
+    status: draft
+    product: ai-platform
+    path: contracts/features/enterprise-knowledge-documents.v1.yaml
+    use_cases:
+      - enterprise-knowledge-assistant
+    data_domains:
+      - enterprise_policy_documents
+      - support_and_operations_knowledge
+    owner_role: AI Platform
+
+  - contract_id: finance-payment-risk-features-v1
+    name: Finance Payment Risk Features
+    status: draft
+    product: billing-finance
+    path: contracts/features/finance-payment-risk-features.v1.yaml
+    use_cases:
+      - finance-payment-fraud-scoring
+    data_domains:
+      - payment_events
+      - account_entities
+      - chargeback_outcomes
+    owner_role: Billing/Finance
+
+  - contract_id: finance-document-intelligence-features-v1
+    name: Finance Document Intelligence Features
+    status: active
+    product: billing-finance
+    path: contracts/features/finance-document-intelligence-features.v1.yaml
+    use_cases:
+      - finance-document-intelligence
+    data_domains:
+      - invoice_documents
+      - receipt_images
+      - vendor_master_data
+    owner_role: Billing/Finance
+
+  - contract_id: operations-routing-features-v1
+    name: Operations Routing Features
+    status: draft
+    product: enterprise-operations
+    path: contracts/features/operations-routing-features.v1.yaml
+    use_cases:
+      - operations-routing-optimization
+    data_domains:
+      - work_item_arrivals
+      - queue_capacity
+      - routing_outcomes
+    owner_role: Enterprise Operations
+
+  - contract_id: operations-demand-features-v1
+    name: Operations Demand Features
+    status: draft
+    product: enterprise-operations
+    path: contracts/features/operations-demand-features.v1.yaml
+    use_cases:
+      - operations-demand-forecasting
+    data_domains:
+      - workload_history
+      - staffing_capacity
+      - calendar_and_incident_signals
+    owner_role: Enterprise Operations

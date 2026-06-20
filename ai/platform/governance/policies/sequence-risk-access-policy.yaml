@@ -1,0 +1,34 @@
+version: 1
+owner: ai-platform
+policy_id: sequence-risk-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  direct_identifier_submission_allowed: false
+scope_aliases:
+  score: internal:ai-platform:sequence-risk:score
+  ops: internal:ai-platform:sequence-risk:ops
+principals:
+  - principal_id: service:ai-platform-sequence-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:lms-courseflow-sequence
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+      - score
+    tenant_ids:
+      - tenant-a
+      - tenant-lms
+      - tenant-lms-sandbox
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-at-risk-prediction
+      - lms-knowledge-tracing

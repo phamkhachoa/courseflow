@@ -1,0 +1,259 @@
+version: 1
+report_id: data-contract-coverage-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+source_registry: platform/data-contracts/registry.yaml
+summary:
+  contract_count: 7
+  active_contract_count: 3
+  draft_contract_count: 4
+  privacy_gated_contract_count: 0
+  simulator_gated_contract_count: 0
+  request_count: 6
+  design_ready_request_count: 6
+  production_ready_request_count: 3
+  missing_request_count: 0
+  privacy_gated_request_count: 0
+  simulator_gated_request_count: 0
+  non_lms_request_count: 5
+  domain_count: 16
+  mapped_domain_count: 16
+  missing_domain_count: 0
+action_queue:
+  design_ready:
+  - enterprise-knowledge-assistant-discovery
+  - lms-at-risk-prediction-baseline
+  - support-sla-risk-discovery
+  - finance-document-intelligence-discovery
+  - operations-routing-optimization-simulator
+  - finance-payment-fraud-scoring-discovery
+  missing_contract: []
+  needs_privacy_review: []
+  needs_production_hardening:
+  - enterprise-knowledge-assistant-discovery
+  - operations-routing-optimization-simulator
+  - finance-payment-fraud-scoring-discovery
+  needs_simulator: []
+  production_ready:
+  - lms-at-risk-prediction-baseline
+  - support-sla-risk-discovery
+  - finance-document-intelligence-discovery
+contracts:
+- contract_id: lms-learning-features-v1
+  name: LMS Learning Features
+  status: active
+  product: lms-courseflow
+  path: contracts/features/lms-learning-features.v1.yaml
+  use_cases:
+  - lms-at-risk-prediction
+  - lms-related-course-recommendation
+  - lms-semantic-search
+  - lms-rag-tutor
+  - lms-knowledge-tracing
+  - lms-adaptive-path
+  data_domains:
+  - enrollment_events
+  - assessment_attempts
+  - engagement_events
+  - course_content_profile
+  owner_role: Data Platform
+- contract_id: support-case-features-v1
+  name: Support Case Features
+  status: active
+  product: support-platform
+  path: contracts/features/support-case-features.v1.yaml
+  use_cases:
+  - support-agent-assist
+  - support-sla-risk
+  data_domains:
+  - support_case_events
+  - entitlement_and_sla_policy
+  owner_role: Support Platform
+- contract_id: enterprise-knowledge-documents-v1
+  name: Enterprise Knowledge Documents
+  status: draft
+  product: ai-platform
+  path: contracts/features/enterprise-knowledge-documents.v1.yaml
+  use_cases:
+  - enterprise-knowledge-assistant
+  data_domains:
+  - enterprise_policy_documents
+  - support_and_operations_knowledge
+  owner_role: AI Platform
+- contract_id: finance-payment-risk-features-v1
+  name: Finance Payment Risk Features
+  status: draft
+  product: billing-finance
+  path: contracts/features/finance-payment-risk-features.v1.yaml
+  use_cases:
+  - finance-payment-fraud-scoring
+  data_domains:
+  - payment_events
+  - account_entities
+  - chargeback_outcomes
+  owner_role: Billing/Finance
+- contract_id: finance-document-intelligence-features-v1
+  name: Finance Document Intelligence Features
+  status: active
+  product: billing-finance
+  path: contracts/features/finance-document-intelligence-features.v1.yaml
+  use_cases:
+  - finance-document-intelligence
+  data_domains:
+  - invoice_documents
+  - receipt_images
+  - vendor_master_data
+  owner_role: Billing/Finance
+- contract_id: operations-routing-features-v1
+  name: Operations Routing Features
+  status: draft
+  product: enterprise-operations
+  path: contracts/features/operations-routing-features.v1.yaml
+  use_cases:
+  - operations-routing-optimization
+  data_domains:
+  - work_item_arrivals
+  - queue_capacity
+  - routing_outcomes
+  owner_role: Enterprise Operations
+- contract_id: operations-demand-features-v1
+  name: Operations Demand Features
+  status: draft
+  product: enterprise-operations
+  path: contracts/features/operations-demand-features.v1.yaml
+  use_cases:
+  - operations-demand-forecasting
+  data_domains:
+  - workload_history
+  - staffing_capacity
+  - calendar_and_incident_signals
+  owner_role: Enterprise Operations
+items:
+- request_id: enterprise-knowledge-assistant-discovery
+  product: ai-platform
+  use_case_id: enterprise-knowledge-assistant
+  status: ready_for_solution_design
+  is_non_lms: true
+  data_domains:
+  - enterprise_policy_documents
+  - support_and_operations_knowledge
+  mapped_domains:
+  - enterprise_policy_documents
+  - support_and_operations_knowledge
+  missing_domains: []
+  contract_ids:
+  - enterprise-knowledge-documents-v1
+  contract_statuses:
+  - draft
+  design_ready: true
+  production_ready: false
+  privacy_gated: false
+  simulator_gated: false
+- request_id: lms-at-risk-prediction-baseline
+  product: lms-courseflow
+  use_case_id: lms-at-risk-prediction
+  status: ready_for_solution_design
+  is_non_lms: false
+  data_domains:
+  - enrollment_events
+  - assessment_attempts
+  - engagement_events
+  mapped_domains:
+  - enrollment_events
+  - assessment_attempts
+  - engagement_events
+  missing_domains: []
+  contract_ids:
+  - lms-learning-features-v1
+  contract_statuses:
+  - active
+  design_ready: true
+  production_ready: true
+  privacy_gated: false
+  simulator_gated: false
+- request_id: support-sla-risk-discovery
+  product: support-platform
+  use_case_id: support-sla-risk
+  status: ready_for_solution_design
+  is_non_lms: true
+  data_domains:
+  - support_case_events
+  - entitlement_and_sla_policy
+  mapped_domains:
+  - support_case_events
+  - entitlement_and_sla_policy
+  missing_domains: []
+  contract_ids:
+  - support-case-features-v1
+  contract_statuses:
+  - active
+  design_ready: true
+  production_ready: true
+  privacy_gated: false
+  simulator_gated: false
+- request_id: finance-document-intelligence-discovery
+  product: billing-finance
+  use_case_id: finance-document-intelligence
+  status: ready_for_solution_design
+  is_non_lms: true
+  data_domains:
+  - invoice_documents
+  - receipt_images
+  - vendor_master_data
+  mapped_domains:
+  - invoice_documents
+  - receipt_images
+  - vendor_master_data
+  missing_domains: []
+  contract_ids:
+  - finance-document-intelligence-features-v1
+  contract_statuses:
+  - active
+  design_ready: true
+  production_ready: true
+  privacy_gated: false
+  simulator_gated: false
+- request_id: operations-routing-optimization-simulator
+  product: enterprise-operations
+  use_case_id: operations-routing-optimization
+  status: ready_for_solution_design
+  is_non_lms: true
+  data_domains:
+  - work_item_arrivals
+  - queue_capacity
+  - routing_outcomes
+  mapped_domains:
+  - work_item_arrivals
+  - queue_capacity
+  - routing_outcomes
+  missing_domains: []
+  contract_ids:
+  - operations-routing-features-v1
+  contract_statuses:
+  - draft
+  design_ready: true
+  production_ready: false
+  privacy_gated: false
+  simulator_gated: false
+- request_id: finance-payment-fraud-scoring-discovery
+  product: billing-finance
+  use_case_id: finance-payment-fraud-scoring
+  status: ready_for_solution_design
+  is_non_lms: true
+  data_domains:
+  - payment_events
+  - account_entities
+  - chargeback_outcomes
+  mapped_domains:
+  - payment_events
+  - account_entities
+  - chargeback_outcomes
+  missing_domains: []
+  contract_ids:
+  - finance-payment-risk-features-v1
+  contract_statuses:
+  - draft
+  design_ready: true
+  production_ready: false
+  privacy_gated: false
+  simulator_gated: false

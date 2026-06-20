@@ -1,0 +1,100 @@
+version: 1
+runbook_id: governance-evaluation-incident-response-v1
+owner: admin-ops
+summary: Tenant-safe incident response runbook for repeated Governance Evaluation release-control failures.
+incident_scope:
+  report_id: governance-evaluation-incident-export-v1
+  source_report: platform/governance/reports/governance-evaluation-incident-export-v1.yaml
+  conditions:
+    - governance_evaluation_release_gate_mismatch
+    - governance_evaluation_unexpected_error
+    - governance_evaluation_guardrail_gap
+required_steps:
+  - step_id: detect
+    owner_role: Admin/Ops
+    evidence_ref: report:governance-evaluation-incident-export-v1
+    description: Confirm open P0/P1 Governance Evaluation incident export without copying raw tenant, principal or request payloads.
+  - step_id: acknowledge
+    owner_role: Admin/Ops
+    evidence_ref: platform/operations/reports/admin-ops-dashboard-v1.html
+    description: Acknowledge incident in the Admin/Ops queue and keep the incident ref as the tracking key.
+  - step_id: assign
+    owner_role: Admin/Ops
+    evidence_ref: platform/delivery/reports/delivery-owner-views-v1.yaml
+    description: Assign incident commander and Governance Reviewer using role aliases, not raw service principals.
+  - step_id: contain
+    owner_role: Governance Reviewer
+    evidence_ref: platform/governance/reports/governance-evaluation-service-v1.yaml
+    description: Hold affected promotions until release-gate drills and privacy guardrails are observable.
+  - step_id: remediate
+    owner_role: SA AI Platform
+    evidence_ref: platform/governance/policies/governance-evaluation-access-policy.yaml
+    description: Fix drill, policy or runtime cause and document the remediation path.
+  - step_id: verify
+    owner_role: SA AI Engineer
+    evidence_ref: platform/governance/reports/governance-evaluation-service-v1.yaml
+    description: Re-run ops and incident exports until the repeated failure streak clears or the incident is explicitly accepted.
+  - step_id: communicate
+    owner_role: PO/BA
+    evidence_ref: docs/team/council-meetings
+    description: Publish release-impact summary to product owners without exposing tenant or credential values.
+  - step_id: close
+    owner_role: Admin/Ops
+    evidence_ref: platform/governance/ledgers/governance-evaluation-alert-drill-ledger.yaml
+    description: Close or downgrade the incident only after evidence refs show recovered release-control behavior.
+scenario_expectations:
+  - scenario_id: release-gate-mismatch-p0
+    condition: governance_evaluation_release_gate_mismatch
+    severity: p0
+    owner_role: Admin/Ops
+    action: escalate_governance_evaluation_release_gate_mismatch
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+  - scenario_id: unexpected-runtime-error-p0
+    condition: governance_evaluation_unexpected_error
+    severity: p0
+    owner_role: Admin/Ops
+    action: triage_governance_evaluation_runtime_error
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+  - scenario_id: guardrail-gap-p1
+    condition: governance_evaluation_guardrail_gap
+    severity: p1
+    owner_role: Admin/Ops
+    action: complete_governance_evaluation_guardrail_drills
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+tenant_safety:
+  omitted_sensitive_fields:
+    - principal_ids
+    - tenant_ids
+    - request_bodies
+    - credential_values
+    - raw_drill_payloads
+  exported_identifiers:
+    - incident_id
+    - platform_hash_ref
+    - role_alias
+next_actions:
+  - add_governance_evaluation_incident_response_state_ledger_acceptance

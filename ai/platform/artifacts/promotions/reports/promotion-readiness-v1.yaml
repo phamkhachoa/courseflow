@@ -1,0 +1,208 @@
+version: 1
+report_id: promotion-readiness-v1
+owner: ai-platform
+generated_at: '2026-06-16'
+source_registry: platform/artifacts/promotions/registry.yaml
+summary:
+  promotion_count: 4
+  ready_count: 4
+  blocked_count: 0
+  active_count: 1
+  approved_count: 1
+  shadow_count: 2
+  non_lms_count: 2
+action_queue:
+  active_monitoring:
+  - recommendation-item-cf-v1-active-baseline
+  ready_to_activate:
+  - support-agent-assist-baseline-approved
+  keep_shadow:
+  - course-content-vector-index-shadow
+  - support-knowledge-vector-index-shadow
+  blocked: []
+gate_readiness:
+  required_gate_count: 7
+  gate_ready_count: 7
+  missing_gate_count: 0
+  failed_gate_count: 0
+freshness:
+  max_artifact_age_days: 90
+  max_gate_age_days: 30
+  stale_artifact_count: 0
+  stale_gate_count: 0
+  missing_artifact_created_at_count: 0
+  missing_gate_evaluated_at_count: 0
+rollback_readiness:
+  rollback_required_count: 2
+  rollback_ready_count: 2
+  rollback_missing_count: 0
+maker_checker:
+  required: true
+  satisfied_count: 4
+  violation_count: 0
+items:
+- promotion_id: recommendation-item-cf-v1-active-baseline
+  artifact_id: recommendation-item-cf-v1-source-artifact
+  artifact_manifest: platform/artifacts/manifests/recommendation-item-cf-v1.yaml
+  model_id: recommendation-item-cf-v1
+  artifact_type: source_algorithm
+  artifact_freshness:
+    created_at: '2026-06-16'
+    age_days: 0
+    fresh: true
+  product: lms-courseflow
+  use_case_id: lms-related-course-recommendation
+  stage: active_baseline
+  stage_group: active
+  is_non_lms: false
+  ready_for_stage: true
+  blocked_reasons: []
+  gate_readiness:
+    required_gate_count: 1
+    gate_ready_count: 1
+    gates:
+    - age_days: 0
+      evaluated_at: '2026-06-16'
+      fresh: true
+      path: platform/evaluation/reports/recommendation-item-cf-v1-eval.yaml
+      status: accepted_baseline
+      status_ready: true
+      ready: true
+  rollback_readiness:
+    required: true
+    ready: true
+    rollback_target_artifact_id: recommendation-item-cf-v1-source-artifact
+  maker_checker:
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: '2026-06-16'
+    satisfied: true
+- promotion_id: support-agent-assist-baseline-approved
+  artifact_id: support-agent-assist-baseline-v1-source-artifact
+  artifact_manifest: platform/artifacts/manifests/support-agent-assist-baseline-v1.yaml
+  model_id: support-agent-assist-baseline-v1
+  artifact_type: source_algorithm
+  artifact_freshness:
+    created_at: '2026-06-16'
+    age_days: 0
+    fresh: true
+  product: support-platform
+  use_case_id: support-agent-assist
+  stage: approved_baseline
+  stage_group: approved
+  is_non_lms: true
+  ready_for_stage: true
+  blocked_reasons: []
+  gate_readiness:
+    required_gate_count: 2
+    gate_ready_count: 2
+    gates:
+    - age_days: 0
+      evaluated_at: '2026-06-16'
+      fresh: true
+      path: platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+      status: accepted_baseline
+      status_ready: true
+      ready: true
+    - age_days: 0
+      evaluated_at: '2026-06-16'
+      fresh: true
+      path: platform/evaluation/reports/support-rag-answer-v1-eval.yaml
+      status: accepted_baseline
+      status_ready: true
+      ready: true
+  rollback_readiness:
+    required: true
+    ready: true
+    rollback_target_artifact_id: support-agent-assist-baseline-v1-source-artifact
+  maker_checker:
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: '2026-06-16'
+    satisfied: true
+- promotion_id: course-content-vector-index-shadow
+  artifact_id: course-content-vector-index-baseline-v1-snapshot
+  artifact_manifest: platform/artifacts/manifests/course-content-vector-index-baseline-v1.yaml
+  model_id: course-content-vector-index-baseline-v1
+  artifact_type: vector_index_snapshot
+  artifact_freshness:
+    created_at: '2026-06-16'
+    age_days: 0
+    fresh: true
+  product: lms-courseflow
+  use_case_id: lms-rag-tutor
+  stage: shadow
+  stage_group: shadow
+  is_non_lms: false
+  ready_for_stage: true
+  blocked_reasons: []
+  gate_readiness:
+    required_gate_count: 2
+    gate_ready_count: 2
+    gates:
+    - age_days: 0
+      evaluated_at: '2026-06-16'
+      fresh: true
+      path: platform/evaluation/reports/course-content-vector-index-v1-eval.yaml
+      status: accepted_contract_baseline
+      status_ready: true
+      ready: true
+    - age_days: 0
+      evaluated_at: '2026-06-16'
+      fresh: true
+      path: platform/evaluation/reports/course-content-hybrid-retrieval-v1-eval.yaml
+      status: accepted_shadow_baseline
+      status_ready: true
+      ready: true
+  rollback_readiness:
+    required: false
+    ready: true
+    rollback_target_artifact_id: course-content-vector-index-baseline-v1-snapshot
+  maker_checker:
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: '2026-06-16'
+    satisfied: true
+- promotion_id: support-knowledge-vector-index-shadow
+  artifact_id: support-knowledge-vector-index-baseline-v1-snapshot
+  artifact_manifest: platform/artifacts/manifests/support-knowledge-vector-index-baseline-v1.yaml
+  model_id: support-knowledge-vector-index-baseline-v1
+  artifact_type: vector_index_snapshot
+  artifact_freshness:
+    created_at: '2026-06-16'
+    age_days: 0
+    fresh: true
+  product: support-platform
+  use_case_id: support-agent-assist
+  stage: shadow
+  stage_group: shadow
+  is_non_lms: true
+  ready_for_stage: true
+  blocked_reasons: []
+  gate_readiness:
+    required_gate_count: 2
+    gate_ready_count: 2
+    gates:
+    - age_days: 0
+      evaluated_at: '2026-06-16'
+      fresh: true
+      path: platform/evaluation/reports/support-knowledge-vector-index-v1-eval.yaml
+      status: accepted_contract_baseline
+      status_ready: true
+      ready: true
+    - age_days: 0
+      evaluated_at: '2026-06-16'
+      fresh: true
+      path: platform/evaluation/reports/support-knowledge-hybrid-retrieval-v1-eval.yaml
+      status: accepted_shadow_baseline
+      status_ready: true
+      ready: true
+  rollback_readiness:
+    required: false
+    ready: true
+    rollback_target_artifact_id: support-knowledge-vector-index-baseline-v1-snapshot
+  maker_checker:
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: '2026-06-16'
+    satisfied: true

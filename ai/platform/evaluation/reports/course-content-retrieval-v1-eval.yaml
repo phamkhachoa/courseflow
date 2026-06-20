@@ -1,0 +1,47 @@
+version: 1
+evaluation_id: course-content-retrieval-v1-eval
+model_id: course-content-retrieval-baseline-v1
+algorithm: lexical_retrieval_baseline
+use_case_id: lms-rag-tutor
+product: lms-courseflow
+owner: ai-platform
+evaluation_type: retrieval_golden_set
+status: accepted_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: course-content-retrieval-golden-v1
+  source: platform/evaluation/datasets/course-content-retrieval-golden.yaml
+  corpus: platform/evaluation/corpora/course-content-corpus.yaml
+  collection: course_content_chunks
+  case_count: 4
+metrics:
+  recall_at_3:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  hit_rate_at_3:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  citation_precision_at_3:
+    value: 1.00
+    threshold: 0.60
+    status: passed
+  tenant_isolation_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Lexical baseline gives semantic search and RAG tutor a runnable retrieval gate.
+    - Future embedding retrievers must beat this gate and prove no cross-tenant retrieval.
+risks:
+  - lexical_matching_only
+  - no_semantic_embedding_recall_yet
+  - no_rag_answer_eval_yet
+required_next_steps:
+  - add_sentence_transformer_course_embedding_model
+  - add_course_hybrid_retriever_shadow_eval
+  - add_rag_tutor_llm_shadow_eval
+  - bind_course_chunks_to_dp_gold_content_snapshot

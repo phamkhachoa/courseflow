@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 backend_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$backend_dir/.." && pwd)"
-service_dir="$backend_dir/services/recommendation-ml-service"
+service_dir="$repo_root/ai/services/recommendation-ml-service"
 
 postgres_image="${RECOMMENDATION_ML_LOCAL_SMOKE_POSTGRES_IMAGE:-postgres:16-alpine}"
 container="${RECOMMENDATION_ML_LOCAL_SMOKE_CONTAINER:-courseflow-reco-ml-http-smoke-$(date +%s)}"

@@ -1,0 +1,78 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  monitor_status: effectiveness_monitored
+  drill_status: passed
+  release_governance_status: release_governance_attached
+  release_gate_count: 5
+  scenario_count: 5
+  passed_count: 5
+  failed_count: 0
+  signal_count: 5
+  effective_signal_count: 5
+  failed_signal_count: 0
+  release_gate_effectiveness_pct: 100
+  tenant_safe: true
+  raw_identifier_count: 0
+action_queue:
+  effective:
+  - release-gate-drill-passed-signal
+  - release-gate-scenario-pass-rate-signal
+  - release-gate-blocked-scenario-clean-signal
+  - release-gate-tenant-safety-signal
+  - release-gate-evidence-completeness-signal
+  blocked: []
+  next_actions:
+  - expand_product_readiness_response_slo_drift_suppression_policy_coverage_release_gate_pattern_to_enterprise_use_cases
+signals:
+- signal_id: release-gate-drill-passed-signal
+  signal_type: drill_status
+  condition: release gate drill must pass before release guard rollout
+  expected: passed
+  observed: passed
+  effective: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+- signal_id: release-gate-scenario-pass-rate-signal
+  signal_type: scenario_pass_rate
+  condition: every release gate scenario must pass
+  expected: 5/5
+  observed: 5/5
+  effective: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+- signal_id: release-gate-blocked-scenario-clean-signal
+  signal_type: blocked_queue
+  condition: release gate drill action queue must have no blocked scenarios
+  expected: 0 blocked
+  observed: 0 blocked
+  effective: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+- signal_id: release-gate-tenant-safety-signal
+  signal_type: tenant_safety
+  condition: release gate evidence must be tenant-safe
+  expected: tenant_safe=true raw_identifier_count=0
+  observed: tenant_safe=true raw_identifier_count=0
+  effective: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- signal_id: release-gate-evidence-completeness-signal
+  signal_type: evidence_completeness
+  condition: release gate scenarios must carry complete hold evidence
+  expected: all scenarios have >=3 evidence refs and hold outcome
+  observed: 5/5 complete
+  effective: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml

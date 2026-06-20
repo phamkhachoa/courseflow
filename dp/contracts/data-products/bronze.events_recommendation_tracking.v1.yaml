@@ -1,0 +1,220 @@
+contractVersion: 1
+dataProduct:
+  name: bronze.events_recommendation_tracking
+  layer: BRONZE
+  domain: recommendation
+  product: lms-courseflow
+  domainOwner: lms-domain-council
+  ownerTeam: data-platform
+  businessOwner: learner-experience-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Raw recommendation tracking events from learner product surfaces.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream: []
+  ingestionMode: streaming
+  eventTimeColumn: occurred_at
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that produced or owns this record.
+    - name: domain_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise data domain code used for mesh ownership and catalog grouping.
+    - name: event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Global event idempotency key.
+    - name: event_type
+      type: string
+      nullable: false
+      pii: false
+      description: Recommendation tracking event type from the platform event envelope.
+      allowedValues: [IMPRESSION, CLICK, ENROLLMENT]
+    - name: event_version
+      type: int
+      nullable: false
+      pii: false
+      description: Version of the source event contract.
+    - name: source_service
+      type: string
+      nullable: false
+      pii: false
+      description: Service or frontend collector that emitted the event.
+    - name: tenant_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise tenant boundary from the source event envelope.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: learner_id_hash
+      type: string
+      nullable: true
+      pii: true
+      description: HMAC or tokenized learner identifier when a learner is known.
+    - name: session_id_hash
+      type: string
+      nullable: true
+      pii: true
+      description: Tokenized anonymous session identifier when learner identity is not known.
+    - name: course_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Source course context.
+    - name: related_course_id
+      type: uuid
+      nullable: true
+      pii: false
+      description: Related course displayed or clicked.
+    - name: occurred_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Business event time.
+    - name: published_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event was published into the platform stream.
+    - name: ingested_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the event landed in Bronze.
+    - name: source_system
+      type: string
+      nullable: false
+      pii: false
+      description: Logical source system name from the source registry.
+    - name: source_topic
+      type: string
+      nullable: false
+      pii: false
+      description: Kafka topic or equivalent source stream.
+    - name: source_partition
+      type: int
+      nullable: true
+      pii: false
+      description: Kafka partition for replay lineage.
+    - name: source_offset
+      type: long
+      nullable: true
+      pii: false
+      description: Kafka offset for replay lineage.
+    - name: source_snapshot_id
+      type: string
+      nullable: true
+      pii: false
+      description: CDC snapshot, file manifest or source export id when no stream offset exists.
+    - name: source_record_key
+      type: string
+      nullable: false
+      pii: false
+      description: Non-sensitive source key used for replay and deduplication evidence.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of canonical source identity and raw source record.
+    - name: payload_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: SHA-256 hash of the platform-approved event payload.
+    - name: schema_subject
+      type: string
+      nullable: false
+      pii: false
+      description: Schema registry subject used to validate the event payload.
+    - name: schema_id
+      type: string
+      nullable: false
+      pii: false
+      description: Schema registry artifact id, version or local compatibility id.
+    - name: raw_headers
+      type: json
+      nullable: false
+      pii: false
+      description: Source headers after secret stripping.
+    - name: raw_payload
+      type: json
+      nullable: false
+      pii: true
+      description: Original event payload preserved for reproducible reprocessing.
+    - name: ingest_run_id
+      type: string
+      nullable: false
+      pii: false
+      description: Orchestrator or sink run id that committed the Bronze row.
+    - name: event_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date derived from occurred_at for partition pruning.
+    - name: ingest_date
+      type: date
+      nullable: false
+      pii: false
+      description: Date derived from ingested_at for operational triage.
+
+quality:
+  freshnessSloMinutes: 15
+  checks:
+    - name: product_id_not_null
+      type: not_null
+      column: product_id
+    - name: event_id_not_null
+      type: not_null
+      column: event_id
+    - name: source_position_unique
+      type: unique
+      columns: [source_topic, source_partition, source_offset]
+    - name: recommendation_event_type_allowed
+      type: accepted_values
+      column: event_type
+      values: [IMPRESSION, CLICK, ENROLLMENT]
+    - name: no_sensitive_payload
+      type: no_sensitive_payload
+      column: raw_payload
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: learner_id_hash
+      column: learner_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: SECURE_RAW_PAYLOAD_WITH_SUBJECT_ERASURE
+
+serving:
+  consumers: [DataPlatform]
+  accessPolicy: platform_engineer_only
+  accessPersonas: [DataPlatformOperator, DomainDataOwner]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

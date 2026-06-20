@@ -1,0 +1,106 @@
+version: 1
+report_id: governance-evaluation-incident-response-drill-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+runbook_id: governance-evaluation-incident-response-v1
+runbook_path: platform/operations/runbooks/governance-evaluation-incident-response-v1.yaml
+human_runbook_path: runbooks/governance-evaluation-incident-response.md
+summary:
+  drill_status: passed
+  response_step_count: 8
+  scenario_count: 3
+  passed_count: 3
+  failed_count: 0
+  p0_scenario_count: 2
+  p1_scenario_count: 1
+  current_incident_count: 0
+  current_open_incident_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+  omitted_sensitive_fields:
+  - principal_ids
+  - tenant_ids
+  - request_bodies
+  - credential_values
+  - raw_drill_payloads
+next_actions:
+- add_governance_evaluation_incident_response_state_ledger_acceptance
+scenarios:
+- scenario_id: release-gate-mismatch-p0
+  condition: governance_evaluation_release_gate_mismatch
+  expected_severity: p0
+  expected_owner_role: Admin/Ops
+  expected_action: escalate_governance_evaluation_release_gate_mismatch
+  observed_severity: p0
+  observed_owner_role: Admin/Ops
+  observed_action: escalate_governance_evaluation_release_gate_mismatch
+  incident_status: open
+  incident_id: gei-071ec612a74d79ba-governance-evaluation-release-gate-mismatch
+  application_ref: platform:82737fc5dcf11293
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:governance-evaluation-incident-response-v1
+  - report:governance-evaluation-incident-export-v1
+  - policy:governance-evaluation-incident-policy-v1
+- scenario_id: unexpected-runtime-error-p0
+  condition: governance_evaluation_unexpected_error
+  expected_severity: p0
+  expected_owner_role: Admin/Ops
+  expected_action: triage_governance_evaluation_runtime_error
+  observed_severity: p0
+  observed_owner_role: Admin/Ops
+  observed_action: triage_governance_evaluation_runtime_error
+  incident_status: open
+  incident_id: gei-3ceeadae6d28983d-governance-evaluation-unexpected-error
+  application_ref: platform:82737fc5dcf11293
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:governance-evaluation-incident-response-v1
+  - report:governance-evaluation-incident-export-v1
+  - policy:governance-evaluation-incident-policy-v1
+- scenario_id: guardrail-gap-p1
+  condition: governance_evaluation_guardrail_gap
+  expected_severity: p1
+  expected_owner_role: Admin/Ops
+  expected_action: complete_governance_evaluation_guardrail_drills
+  observed_severity: p1
+  observed_owner_role: Admin/Ops
+  observed_action: complete_governance_evaluation_guardrail_drills
+  incident_status: open
+  incident_id: gei-8f52b5756af25915-governance-evaluation-guardrail-gap
+  application_ref: platform:82737fc5dcf11293
+  runbook_step_ids:
+  - detect
+  - acknowledge
+  - assign
+  - contain
+  - remediate
+  - verify
+  - communicate
+  - close
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - runbook:governance-evaluation-incident-response-v1
+  - report:governance-evaluation-incident-export-v1
+  - policy:governance-evaluation-incident-policy-v1

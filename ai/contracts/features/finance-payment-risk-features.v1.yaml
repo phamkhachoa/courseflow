@@ -1,0 +1,67 @@
+version: 1
+contract: finance_payment_risk_features
+owner: ai-platform
+producer: billing-finance
+consumer: ai-platform
+product: billing-finance
+entities:
+  tenant:
+    key: tenant_id
+    pii_class: none
+  payment:
+    key: payment_id
+    pii_class: low
+  account:
+    key: account_hash
+    pii_class: pseudonymous
+  counterparty:
+    key: counterparty_hash
+    pii_class: pseudonymous
+feature_groups:
+  payment_events:
+    freshness: 15m
+    features:
+      - amount_minor
+      - currency
+      - payment_method
+      - country_code
+      - device_fingerprint_hash
+      - velocity_1h
+      - velocity_24h
+      - prior_failed_attempts_7d
+    consumers:
+      - finance-payment-fraud-scoring
+
+  account_entities:
+    freshness: 1h
+    features:
+      - account_age_days
+      - verified_payment_methods_count
+      - linked_account_count
+      - shared_counterparty_count
+      - prior_chargeback_count
+      - risk_review_outcome
+    consumers:
+      - finance-payment-fraud-scoring
+
+  chargeback_outcomes:
+    freshness: 24h
+    features:
+      - chargeback_opened_at
+      - chargeback_reason_code
+      - loss_amount_minor
+      - dispute_outcome
+      - confirmed_fraud_label
+    consumers:
+      - finance-payment-fraud-scoring
+privacy:
+  tenant_isolation_required: true
+  raw_account_identifier_allowed: false
+  account_hash_algorithm: hmac_sha256
+  human_review_required_for_payment_hold: true
+  deletion_export_impact_review_required: true
+quality:
+  require_not_null_keys: true
+  max_lag_minutes: 15
+  label_delay_days: 30
+  owner_on_failure: billing-finance

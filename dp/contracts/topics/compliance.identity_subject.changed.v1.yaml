@@ -1,0 +1,57 @@
+contractVersion: 1
+topic:
+  name: compliance.identity_subject.changed.v1
+  domain: compliance
+  product: identity-platform
+  domainOwner: compliance-domain-council
+  ownerTeam: data-platform
+  dataSteward: enterprise-data-steward
+  sourceServices:
+    - identity-directory
+    - access-control-service
+    - user-management-service
+  description: Identity subject lifecycle and access-risk signal used by enterprise access governance.
+  status: ACTIVE
+
+schema:
+  format: JSON_SCHEMA
+  compatibility: BACKWARD_TRANSITIVE
+  envelopeSchema: contracts/event-envelope.v1.schema.json
+  payloadSchema: contracts/events/compliance.identity_subject.changed.v1.schema.json
+
+privacy:
+  classification: PII
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: subject_id_hash
+      topicPath: $.payload.subjectIdHash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: SECURE_RAW_PAYLOAD_WITH_SUBJECT_ERASURE
+
+ingestion:
+  bronzeTarget: bronze.events_identity_subject_changed
+  partitionStrategy: event_date/source_service/org_id
+
+quality:
+  freshnessSloMinutes: 15
+  checks:
+    - name: event_id_not_null
+      type: not_null
+      column: eventId
+    - name: identity_event_type_allowed
+      type: accepted_values
+      column: payload.eventType
+      values: [IDENTITY_SUBJECT_CHANGED]
+    - name: source_offset_unique
+      type: unique
+      columns: [topic, partition, offset]
+    - name: no_sensitive_payload
+      type: no_sensitive_payload
+      column: payload

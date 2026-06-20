@@ -1,0 +1,59 @@
+version: 1
+owner: ai-platform
+policy_id: prompt-gateway-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  external_auto_send_allowed: false
+scope_aliases:
+  evaluate: internal:ai-platform:prompt-gateway:evaluate
+  ops: internal:ai-platform:prompt-gateway:ops
+principals:
+  - principal_id: service:ai-platform-prompt-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    use_case_ids: []
+    product_ids: []
+
+  - principal_id: service:lms-courseflow-prompt
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+      - evaluate
+    tenant_ids:
+      - tenant-a
+      - tenant-lms
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-rag-tutor
+      - lms-auto-grading
+
+  - principal_id: service:support-platform-prompt
+    owner_role: Support Platform service
+    product: support-platform
+    scopes:
+      - evaluate
+    tenant_ids:
+      - tenant-a
+      - tenant-support
+    product_ids:
+      - support-platform
+    use_case_ids:
+      - support-agent-assist
+
+  - principal_id: service:finance-platform-prompt
+    owner_role: Billing/Finance service
+    product: billing-finance
+    scopes:
+      - evaluate
+    tenant_ids:
+      - tenant-finance
+    product_ids:
+      - billing-finance
+    use_case_ids:
+      - finance-reconciliation-assistant
+      - finance-document-intelligence

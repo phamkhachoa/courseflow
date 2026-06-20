@@ -1,0 +1,82 @@
+version: 1
+report_id: model-serving-access-policy-apply-report-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  apply_status: ready_to_write
+  ready_application_count: 1
+  blocked_count: 0
+  checksum_mismatch_count: 0
+  source_policy_path: ai/platform/governance/policies/model-serving-access-policy.yaml
+  target_policy_path: ai/platform/governance/policies/model-serving-access-policy.yaml
+  source_policy_sha256: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  proposed_policy_sha256: sha256:b90440fbee21733a26b99b2eb54843590f3cb9203902fe7f8132f2c6e16c1331
+  active_policy_would_change: true
+  planned_operation_count: 1
+ready_application_ids:
+- lms-sequence-risk-sandbox-tenant-apply-20260617
+validation_errors: []
+proposed_policy:
+  version: 1
+  owner: ai-platform
+  policy_id: model-serving-access-policy-v1
+  defaults:
+    wildcard_scopes_allowed: false
+    tenant_isolation_required: true
+  scope_aliases:
+    catalog: internal:ai-platform:model-serving:catalog
+    invoke: internal:ai-platform:model-serving:invoke
+    ops: internal:ai-platform:model-serving:ops
+  principals:
+  - principal_id: service:ai-platform-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+    - catalog
+    - ops
+    tenant_ids: []
+    model_ids: []
+  - principal_id: service:enterprise-operations-serving
+    owner_role: Enterprise Operations service
+    product: enterprise-operations
+    scopes:
+    - catalog
+    - invoke
+    tenant_ids:
+    - tenant-ops
+    model_ids:
+    - operations-demand-forecast-baseline-v1
+    - operations-routing-policy-simulator-v1
+  - principal_id: service:finance-risk-serving
+    owner_role: Billing/Finance service
+    product: billing-finance
+    scopes:
+    - catalog
+    - invoke
+    tenant_ids:
+    - tenant-finance
+    model_ids:
+    - finance-document-intelligence-baseline-v1
+    - finance-payment-fraud-baseline-v1
+  - principal_id: service:lms-courseflow-serving
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+    - catalog
+    - invoke
+    tenant_ids:
+    - tenant-lms
+    - tenant-lms-sandbox
+    model_ids:
+    - sequence-risk-baseline-v1
+  - principal_id: service:support-platform-serving
+    owner_role: Support Platform service
+    product: support-platform
+    scopes:
+    - catalog
+    - invoke
+    tenant_ids:
+    - tenant-support
+    model_ids:
+    - support-agent-assist-baseline-v1
+    - support-sla-risk-baseline-v1

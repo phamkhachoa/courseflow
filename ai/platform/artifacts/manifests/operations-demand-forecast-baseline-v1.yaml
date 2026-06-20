@@ -1,0 +1,30 @@
+version: 1
+artifact_id: operations-demand-forecast-baseline-v1-source-artifact
+model_id: operations-demand-forecast-baseline-v1
+algorithm: deterministic_weighted_moving_average_capacity_planner
+model_family: time_series_forecasting
+artifact_type: source_algorithm
+status: runtime_library_baseline
+owner: ai-platform
+product: enterprise-operations
+use_case_id: operations-demand-forecasting
+created_at: "2026-06-17"
+artifact_uri: models/forecasting/demand_forecast_baseline/demand_forecast_baseline.py
+artifact_hash:
+  algorithm: sha256
+  value: 00f6ab35d70a895128096a582e0fc831a4500402f12d7e57ec8b52182ec65bb5
+lineage:
+  model_code: models/forecasting/demand_forecast_baseline/demand_forecast_baseline.py
+  feature_contract: contracts/features/operations-demand-features.v1.yaml
+  model_io_contract: contracts/models/operations-demand-forecast-model-io.v1.yaml
+  model_card: platform/model-registry/model-cards/operations-demand-forecast-baseline-v1.md
+  evaluation_report: platform/evaluation/reports/operations-demand-forecast-v1-eval.yaml
+runtime:
+  package: demand_forecast_baseline
+  optional_extras: []
+  entrypoint: demand_forecast_baseline:DemandForecastBaseline
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  human_in_the_loop_required: true
+  automated_capacity_change_allowed: false
+  rollback_supported: true

@@ -1,0 +1,7 @@
+version: 1
+description: >
+  Operational incident registry for enterprise data platform SLO, quality, lineage, access and
+  production-readiness blockers. Automation derives incident candidates from Control Tower reports;
+  operators persist acknowledgement, assignee, state and SLA overrides here when human workflow state
+  must survive repeated report generation.
+incidents: []

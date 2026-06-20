@@ -1,0 +1,458 @@
+version: 1
+report_id: delivery-owner-views-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  owner_count: 6
+  item_count: 23
+  overloaded_owner_count: 2
+  due_soon_owner_count: 5
+  overdue_owner_count: 0
+  monitoring_owner_count: 2
+  missing_owner_alias_count: 0
+  incident_count: 0
+  open_incident_count: 0
+  owners_with_open_incidents_count: 0
+  top_owner_alias: admin-ops
+owner_views:
+- owner_alias: admin-ops
+  owner_roles:
+  - Admin/Ops
+  escalation_roles:
+  - ai-platform-ops-lead
+  item_count: 6
+  overdue_count: 0
+  due_soon_count: 1
+  on_track_count: 4
+  monitoring_count: 1
+  p0_count: 0
+  p1_count: 1
+  p2_count: 5
+  p3_count: 0
+  incident_count: 0
+  open_incident_count: 0
+  p0_incident_count: 0
+  p1_incident_count: 0
+  next_due_at: '2026-06-20'
+  next_review_at: '2026-06-18'
+  by_phase:
+    governance_review: 3
+    release_monitoring: 1
+    runtime_observability: 1
+    serving_access_governance: 1
+  backlog_ids:
+  - AIP-BLG-0019
+  - AIP-BLG-0020
+  - AIP-BLG-0021
+  - AIP-BLG-0022
+  - AIP-BLG-0023
+  - AIP-BLG-0016
+  incident_ids: []
+  items:
+  - backlog_id: AIP-BLG-0019
+    title: 'Run Controlled Policy Applier: lms-sequence-risk-sandbox-tenant-apply-20260617'
+    priority: p1
+    status: in_progress
+    delivery_phase: serving_access_governance
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - lms-sequence-risk-sandbox-tenant-apply-20260617
+  - backlog_id: AIP-BLG-0020
+    title: 'Run Llm Provider Alert Delivery Drill: llm-provider-alert-routing-v1'
+    priority: p2
+    status: ready
+    delivery_phase: runtime_observability
+    sla_status: on_track
+    due_at: '2026-06-27'
+    days_until_due: 10
+    next_review_at: ''
+    refs:
+    - llm-provider-alert-routing-v1
+  - backlog_id: AIP-BLG-0021
+    title: 'Run Governance Evaluation Release Gate Alert Drill: governance-evaluation-service-v1'
+    priority: p2
+    status: accepted
+    delivery_phase: governance_review
+    sla_status: on_track
+    due_at: '2026-06-27'
+    days_until_due: 10
+    next_review_at: ''
+    refs:
+    - governance-evaluation-service-v1
+  - backlog_id: AIP-BLG-0022
+    title: 'Accept Governance Evaluation Incident Response Runbook Drill: governance-evaluation-incident-response-drill-v1,
+      governance-evaluation-incident-response-v1'
+    priority: p2
+    status: accepted
+    delivery_phase: governance_review
+    sla_status: on_track
+    due_at: '2026-06-27'
+    days_until_due: 10
+    next_review_at: ''
+    refs:
+    - governance-evaluation-incident-response-drill-v1
+    - governance-evaluation-incident-response-v1
+  - backlog_id: AIP-BLG-0023
+    title: 'Accept Product Readiness Freshness Incident Response Drill State: product-readiness-freshness-incident-response-drill-v1,
+      product-readiness-freshness-incident-response-v1'
+    priority: p2
+    status: accepted
+    delivery_phase: governance_review
+    sla_status: on_track
+    due_at: '2026-06-27'
+    days_until_due: 10
+    next_review_at: ''
+    refs:
+    - product-readiness-freshness-incident-response-drill-v1
+    - product-readiness-freshness-incident-response-v1
+  - backlog_id: AIP-BLG-0016
+    title: 'Monitor Active Artifact: recommendation-item-cf-v1-active-baseline'
+    priority: p2
+    status: active
+    delivery_phase: release_monitoring
+    sla_status: monitoring
+    due_at: '2026-06-18'
+    days_until_due: 1
+    next_review_at: '2026-06-18'
+    refs:
+    - recommendation-item-cf-v1-active-baseline
+  incidents: []
+- owner_alias: sa-ai-platform
+  owner_roles:
+  - SA AI Platform
+  escalation_roles:
+  - ai-platform-architect
+  item_count: 6
+  overdue_count: 0
+  due_soon_count: 6
+  on_track_count: 0
+  monitoring_count: 0
+  p0_count: 0
+  p1_count: 6
+  p2_count: 0
+  p3_count: 0
+  incident_count: 0
+  open_incident_count: 0
+  p0_incident_count: 0
+  p1_incident_count: 0
+  next_due_at: '2026-06-20'
+  next_review_at: ''
+  by_phase:
+    solution_design: 6
+  backlog_ids:
+  - AIP-BLG-0001
+  - AIP-BLG-0002
+  - AIP-BLG-0003
+  - AIP-BLG-0004
+  - AIP-BLG-0005
+  - AIP-BLG-0006
+  incident_ids: []
+  items:
+  - backlog_id: AIP-BLG-0001
+    title: 'Publish Solution Architecture: enterprise-knowledge-assistant-discovery'
+    priority: p1
+    status: ready
+    delivery_phase: solution_design
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - enterprise-knowledge-assistant-discovery
+  - backlog_id: AIP-BLG-0002
+    title: 'Publish Solution Architecture: lms-at-risk-prediction-baseline'
+    priority: p1
+    status: ready
+    delivery_phase: solution_design
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - lms-at-risk-prediction-baseline
+  - backlog_id: AIP-BLG-0003
+    title: 'Publish Solution Architecture: support-sla-risk-discovery'
+    priority: p1
+    status: ready
+    delivery_phase: solution_design
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - support-sla-risk-discovery
+  - backlog_id: AIP-BLG-0004
+    title: 'Publish Solution Architecture: finance-document-intelligence-discovery'
+    priority: p1
+    status: ready
+    delivery_phase: solution_design
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - finance-document-intelligence-discovery
+  - backlog_id: AIP-BLG-0005
+    title: 'Publish Solution Architecture: operations-routing-optimization-simulator'
+    priority: p1
+    status: ready
+    delivery_phase: solution_design
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - operations-routing-optimization-simulator
+  - backlog_id: AIP-BLG-0006
+    title: 'Publish Solution Architecture: finance-payment-fraud-scoring-discovery'
+    priority: p1
+    status: ready
+    delivery_phase: solution_design
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - finance-payment-fraud-scoring-discovery
+  incidents: []
+- owner_alias: sa-ai-engineering
+  owner_roles:
+  - SA AI Engineer
+  escalation_roles:
+  - ai-engineering-lead
+  item_count: 4
+  overdue_count: 0
+  due_soon_count: 2
+  on_track_count: 0
+  monitoring_count: 2
+  p0_count: 0
+  p1_count: 2
+  p2_count: 2
+  p3_count: 0
+  incident_count: 0
+  open_incident_count: 0
+  p0_incident_count: 0
+  p1_incident_count: 0
+  next_due_at: '2026-06-20'
+  next_review_at: '2026-06-24'
+  by_phase:
+    artifact_evidence: 1
+    evaluation_evidence: 1
+    shadow_monitoring: 2
+  backlog_ids:
+  - AIP-BLG-0013
+  - AIP-BLG-0014
+  - AIP-BLG-0017
+  - AIP-BLG-0018
+  incident_ids: []
+  items:
+  - backlog_id: AIP-BLG-0013
+    title: 'Publish Artifact Manifest: lms-at-risk-baseline-shadow-request'
+    priority: p1
+    status: waiting
+    delivery_phase: artifact_evidence
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - lms-at-risk-baseline-shadow-request
+  - backlog_id: AIP-BLG-0014
+    title: 'Run Required Evaluation: finance-anomaly-shadow-request'
+    priority: p1
+    status: waiting
+    delivery_phase: evaluation_evidence
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - finance-anomaly-shadow-request
+  - backlog_id: AIP-BLG-0017
+    title: 'Keep Shadow Monitoring: course-content-vector-index-shadow'
+    priority: p2
+    status: shadow
+    delivery_phase: shadow_monitoring
+    sla_status: monitoring
+    due_at: '2026-06-24'
+    days_until_due: 7
+    next_review_at: '2026-06-24'
+    refs:
+    - course-content-vector-index-shadow
+  - backlog_id: AIP-BLG-0018
+    title: 'Keep Shadow Monitoring: support-knowledge-vector-index-shadow'
+    priority: p2
+    status: shadow
+    delivery_phase: shadow_monitoring
+    sla_status: monitoring
+    due_at: '2026-06-24'
+    days_until_due: 7
+    next_review_at: '2026-06-24'
+    refs:
+    - support-knowledge-vector-index-shadow
+  incidents: []
+- owner_alias: data-platform-product-owner
+  owner_roles:
+  - Data Platform + Product Owner
+  escalation_roles:
+  - data-platform-lead
+  item_count: 3
+  overdue_count: 0
+  due_soon_count: 0
+  on_track_count: 3
+  monitoring_count: 0
+  p0_count: 0
+  p1_count: 0
+  p2_count: 3
+  p3_count: 0
+  incident_count: 0
+  open_incident_count: 0
+  p0_incident_count: 0
+  p1_incident_count: 0
+  next_due_at: '2026-06-27'
+  next_review_at: ''
+  by_phase:
+    data_contract_hardening: 3
+  backlog_ids:
+  - AIP-BLG-0007
+  - AIP-BLG-0008
+  - AIP-BLG-0009
+  incident_ids: []
+  items:
+  - backlog_id: AIP-BLG-0007
+    title: 'Harden Data Contract For Production: enterprise-knowledge-assistant-discovery'
+    priority: p2
+    status: draft
+    delivery_phase: data_contract_hardening
+    sla_status: on_track
+    due_at: '2026-06-27'
+    days_until_due: 10
+    next_review_at: ''
+    refs:
+    - enterprise-knowledge-assistant-discovery
+  - backlog_id: AIP-BLG-0008
+    title: 'Harden Data Contract For Production: operations-routing-optimization-simulator'
+    priority: p2
+    status: draft
+    delivery_phase: data_contract_hardening
+    sla_status: on_track
+    due_at: '2026-06-27'
+    days_until_due: 10
+    next_review_at: ''
+    refs:
+    - operations-routing-optimization-simulator
+  - backlog_id: AIP-BLG-0009
+    title: 'Harden Data Contract For Production: finance-payment-fraud-scoring-discovery'
+    priority: p2
+    status: draft
+    delivery_phase: data_contract_hardening
+    sla_status: on_track
+    due_at: '2026-06-27'
+    days_until_due: 10
+    next_review_at: ''
+    refs:
+    - finance-payment-fraud-scoring-discovery
+  incidents: []
+- owner_alias: sa-ai-platform-governance
+  owner_roles:
+  - SA AI Platform + Governance Reviewer
+  escalation_roles:
+  - ai-platform-architect
+  item_count: 3
+  overdue_count: 0
+  due_soon_count: 3
+  on_track_count: 0
+  monitoring_count: 0
+  p0_count: 0
+  p1_count: 3
+  p2_count: 0
+  p3_count: 0
+  incident_count: 0
+  open_incident_count: 0
+  p0_incident_count: 0
+  p1_incident_count: 0
+  next_due_at: '2026-06-20'
+  next_review_at: ''
+  by_phase:
+    promotion_review: 3
+  backlog_ids:
+  - AIP-BLG-0010
+  - AIP-BLG-0011
+  - AIP-BLG-0012
+  incident_ids: []
+  items:
+  - backlog_id: AIP-BLG-0010
+    title: 'Review Promotion Request: support-agent-assist-active-request'
+    priority: p1
+    status: ready
+    delivery_phase: promotion_review
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - support-agent-assist-active-request
+  - backlog_id: AIP-BLG-0011
+    title: 'Review Promotion Request: finance-document-intelligence-privacy-request'
+    priority: p1
+    status: ready
+    delivery_phase: promotion_review
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - finance-document-intelligence-privacy-request
+  - backlog_id: AIP-BLG-0012
+    title: 'Review Promotion Request: operations-routing-rl-simulator-request'
+    priority: p1
+    status: ready
+    delivery_phase: promotion_review
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - operations-routing-rl-simulator-request
+  incidents: []
+- owner_alias: admin-ops-governance
+  owner_roles:
+  - Admin/Ops + Governance Reviewer
+  escalation_roles:
+  - ai-platform-ops-lead
+  item_count: 1
+  overdue_count: 0
+  due_soon_count: 1
+  on_track_count: 0
+  monitoring_count: 0
+  p0_count: 0
+  p1_count: 1
+  p2_count: 0
+  p3_count: 0
+  incident_count: 0
+  open_incident_count: 0
+  p0_incident_count: 0
+  p1_incident_count: 0
+  next_due_at: '2026-06-20'
+  next_review_at: ''
+  by_phase:
+    release_activation: 1
+  backlog_ids:
+  - AIP-BLG-0015
+  incident_ids: []
+  items:
+  - backlog_id: AIP-BLG-0015
+    title: 'Activate Approved Artifact: support-agent-assist-baseline-approved'
+    priority: p1
+    status: ready
+    delivery_phase: release_activation
+    sla_status: due_soon
+    due_at: '2026-06-20'
+    days_until_due: 3
+    next_review_at: ''
+    refs:
+    - support-agent-assist-baseline-approved
+  incidents: []

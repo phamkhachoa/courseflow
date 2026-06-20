@@ -1,0 +1,110 @@
+version: 1
+dataset_id: support-sla-risk-golden-v1
+model_id: support-sla-risk-baseline-v1
+product: support-platform
+use_case_id: support-sla-risk
+module: models/classical/support_sla_risk_baseline/support_sla_risk_baseline.py
+feature_contract: contracts/features/support-case-features.v1.yaml
+model_io_contract: contracts/models/support-sla-risk-model-io.v1.yaml
+thresholds:
+  risk_band_accuracy_min: 1.0
+  reason_code_recall_min: 0.85
+  human_review_policy_pass_rate_min: 1.0
+  score_threshold_pass_rate_min: 1.0
+  risk_ordering_pass_rate_min: 1.0
+cases:
+  - case_id: sla-high-capacity
+    input:
+      tenant_id: tenant-support
+      case_id: case-001
+      priority: p1
+      status: open
+      minutes_until_sla_due: 30
+      age_minutes: 780
+      public_comment_count: 7
+      internal_note_count: 0
+      assigned_team_available: false
+      customer_tier: enterprise
+      reopen_count: 1
+      product_area: billing
+    expected:
+      risk_band: high
+      min_risk_score: 0.90
+      max_risk_score: 1.00
+      risk_order: 4
+      requires_human_review: true
+      reason_codes:
+        - HIGH_PRIORITY_CASE
+        - SLA_DUE_SOON
+        - NO_AVAILABLE_TEAM_CAPACITY
+        - NO_INTERNAL_PROGRESS
+  - case_id: sla-medium-progress
+    input:
+      tenant_id: tenant-support
+      case_id: case-002
+      priority: p2
+      status: open
+      minutes_until_sla_due: 90
+      age_minutes: 650
+      public_comment_count: 5
+      internal_note_count: 0
+      assigned_team_available: true
+      customer_tier: standard
+      reopen_count: 0
+      product_area: learning
+    expected:
+      risk_band: medium
+      min_risk_score: 0.45
+      max_risk_score: 0.70
+      risk_order: 2
+      requires_human_review: true
+      reason_codes:
+        - SLA_WINDOW_COMPRESSED
+        - NO_INTERNAL_PROGRESS
+        - CUSTOMER_ACTIVITY_SPIKE
+  - case_id: sla-low-stable
+    input:
+      tenant_id: tenant-support
+      case_id: case-003
+      priority: p3
+      status: open
+      minutes_until_sla_due: 720
+      age_minutes: 45
+      public_comment_count: 1
+      internal_note_count: 2
+      assigned_team_available: true
+      customer_tier: standard
+      reopen_count: 0
+      product_area: general
+    expected:
+      risk_band: low
+      min_risk_score: 0.00
+      max_risk_score: 0.45
+      risk_order: 1
+      requires_human_review: false
+      reason_codes:
+        - SLA_RISK_LOW
+  - case_id: sla-breached-premium
+    input:
+      tenant_id: tenant-support
+      case_id: case-004
+      priority: p2
+      status: pending
+      minutes_until_sla_due: -15
+      age_minutes: 500
+      public_comment_count: 2
+      internal_note_count: 1
+      assigned_team_available: true
+      customer_tier: premium
+      reopen_count: 2
+      product_area: identity
+    expected:
+      risk_band: high
+      min_risk_score: 0.70
+      max_risk_score: 0.90
+      risk_order: 3
+      requires_human_review: true
+      reason_codes:
+        - SLA_ALREADY_BREACHED
+        - PREMIUM_CUSTOMER
+        - REOPENED_CASE

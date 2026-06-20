@@ -1,0 +1,78 @@
+version: 1
+contract_id: prompt-audit-event.v1
+owner: ai-platform
+purpose:
+  - record_sanitized_prompt_gateway_evidence
+  - support_prompt_response_export
+  - support_prompt_response_deletion
+  - enforce_prompt_audit_retention
+schema:
+  required:
+    - event_id
+    - tenant_id
+    - product
+    - use_case_id
+    - gateway_allowed
+    - blocked_reasons
+    - context_ids
+    - estimated_input_tokens
+    - estimated_output_tokens
+    - estimated_total_tokens
+    - sanitized_prompt_hash
+    - sanitized_response_hash
+    - audit_payload
+    - created_at
+    - retention_expires_at
+  fields:
+    event_id:
+      type: string
+      pii: none
+    tenant_id:
+      type: string
+      pii: none
+    product:
+      type: string
+      pii: none
+    use_case_id:
+      type: string
+      pii: none
+    gateway_allowed:
+      type: boolean
+      pii: none
+    blocked_reasons:
+      type: list
+      pii: none
+    context_ids:
+      type: list
+      pii: none
+    estimated_input_tokens:
+      type: integer
+      pii: none
+    estimated_output_tokens:
+      type: integer
+      pii: none
+    estimated_total_tokens:
+      type: integer
+      pii: none
+    sanitized_prompt_hash:
+      type: sha256
+      pii: none
+    sanitized_response_hash:
+      type: sha256
+      pii: none
+    audit_payload:
+      type: json_string
+      pii: sanitized_only
+    created_at:
+      type: timestamp
+      pii: none
+    retention_expires_at:
+      type: timestamp
+      pii: none
+controls:
+  raw_prompt_allowed: false
+  raw_response_allowed: false
+  raw_sensitive_values_allowed: false
+  prompt_response_logs_in_scope_for_deletion_export: true
+  default_retention_days: 30
+  maximum_retention_days: 90

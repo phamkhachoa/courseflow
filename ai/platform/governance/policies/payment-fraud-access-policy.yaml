@@ -1,0 +1,34 @@
+version: 1
+owner: ai-platform
+policy_id: payment-fraud-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  direct_identifier_submission_allowed: false
+  automated_adverse_action_allowed: false
+scope_aliases:
+  score: internal:ai-platform:payment-fraud:score
+  ops: internal:ai-platform:payment-fraud:ops
+principals:
+  - principal_id: service:ai-platform-payment-fraud-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:billing-finance-payment-risk
+    owner_role: Billing Finance payment risk service
+    product: billing-finance
+    scopes:
+      - score
+    tenant_ids:
+      - tenant-billing
+      - tenant-finance
+      - tenant-finance-sandbox
+    product_ids:
+      - billing-finance
+    use_case_ids:
+      - finance-payment-fraud-scoring

@@ -1,0 +1,44 @@
+version: 1
+contract: causal_uplift_model_io
+owner: ai-platform
+product: ai-platform
+use_case: enterprise-experimentation-uplift
+model_id: causal-uplift-baseline-v1
+input:
+  tenant_id: string
+  experiment_id: string
+  outcome_name: string
+  treatment_name: string
+  control_name: string
+  treatment_count: integer
+  treatment_successes: integer
+  control_count: integer
+  control_successes: integer
+  minimum_detectable_lift: number
+  confidence_level: number
+  guardrail_metric_delta: number
+  high_impact: boolean
+  segment_count: integer
+output:
+  model_id: string
+  treatment_rate: number
+  control_rate: number
+  absolute_lift: number
+  relative_lift: number
+  z_score: number
+  confidence_score: number
+  decision_band: string
+  recommendation: string
+  reason_codes:
+    type: array
+  requires_human_review: boolean
+sla:
+  p95_latency_ms: 100
+  fallback_required: true
+  batch_refresh: per_experiment_snapshot
+governance:
+  tenant_isolation_required: true
+  high_impact_decision_requires_human_review: true
+  guardrail_regression_requires_stop: true
+  online_activation_requires_shadow_review: true
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml

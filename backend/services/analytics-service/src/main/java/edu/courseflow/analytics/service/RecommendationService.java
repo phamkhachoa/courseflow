@@ -1,9 +1,12 @@
 package edu.courseflow.analytics.service;
 
 import edu.courseflow.analytics.dto.RecommendationDtos.ManualRelatedCourseDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.MaterializeRecommendationArtifactRequestDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationBatchRequestDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationBatchResponseDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationEventIngestResponseDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationArtifactDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationArtifactRowDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationMlTrainingJobResponseDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecordRecommendationEventRequestDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.ReorderManualRelatedCoursesRequestDto;
@@ -29,9 +32,11 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -48,6 +53,8 @@ public class RecommendationService {
     private static final int MAX_LIMIT_PER_COURSE = 100;
     private static final BigDecimal DEFAULT_MANUAL_WEIGHT = BigDecimal.ONE;
     private static final BigDecimal MAX_WEIGHT = new BigDecimal("999.999");
+    private static final String DP_AI_ARTIFACT_TYPE = "courseflow.lms.related_course_recommendations";
+    private static final int SUPPORTED_DP_AI_ARTIFACT_VERSION = 1;
     private static final List<String> ML_MATERIALIZATION_PENDING_STATUSES = List.of(
             "QUEUED",
             "RUNNING",
@@ -364,6 +371,47 @@ public class RecommendationService {
         return materializeMlTrainingRun(activeModel.trainingRunId(), true, "ML_ACTIVE_MODEL_SYNC");
     }
 
+    @Transactional
+    public RecommendationMlTrainingJobResponseDto materializeRecommendationArtifact(
+            MaterializeRecommendationArtifactRequestDto request) {
+        if (request == null || request.artifact() == null) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_REQUIRED",
+                    "Recommendation artifact is required");
+        }
+        RecommendationArtifactDto artifact = request.artifact();
+        validateArtifact(artifact);
+        Instant generatedAt = artifact.generatedAt();
+        boolean forceReplace = Boolean.TRUE.equals(request.forceReplace());
+        if (!forceReplace && relatedCourses.existsMlReadModelNewerThan(generatedAt)) {
+            return new RecommendationMlTrainingJobResponseDto(
+                    null,
+                    artifact.modelVersion(),
+                    artifact.status(),
+                    null,
+                    artifact.recommendations().size(),
+                    0,
+                    generatedAt,
+                    "DP_AI_ARTIFACT",
+                    "ML_READ_MODEL_NEWER_THAN_ARTIFACT");
+        }
+        relatedCourses.deleteGeneratedReadModel();
+        List<RelatedCourse> rows = toRelatedCourseRows(artifact, generatedAt);
+        if (!rows.isEmpty()) {
+            relatedCourses.saveAll(rows);
+        }
+        return new RecommendationMlTrainingJobResponseDto(
+                null,
+                artifact.modelVersion(),
+                artifact.status(),
+                null,
+                artifact.recommendations().size(),
+                rows.size(),
+                generatedAt,
+                "DP_AI_ARTIFACT",
+                null);
+    }
+
     private RecommendationMlTrainingJobResponseDto materializeMlTrainingRun(UUID trainingRunId,
                                                                             boolean forceReplace,
                                                                             String engine) {
@@ -503,6 +551,144 @@ public class RecommendationService {
                 .toList();
         relatedCourses.saveAll(rows);
         return rows.size();
+    }
+
+    private List<RelatedCourse> toRelatedCourseRows(RecommendationArtifactDto artifact, Instant generatedAt) {
+        Set<CoursePairKey> manuallyCuratedPairs = manuallyCuratedPairs(artifact.recommendations());
+        return artifact.recommendations().stream()
+                .filter(row -> !manuallyCuratedPairs.contains(new CoursePairKey(row.courseId(), row.relatedCourseId())))
+                .map(row -> toRelatedCourse(row, artifact, generatedAt))
+                .toList();
+    }
+
+    private RelatedCourse toRelatedCourse(RecommendationArtifactRowDto row,
+                                          RecommendationArtifactDto artifact,
+                                          Instant generatedAt) {
+        ensureNotSelf(row.courseId(), row.relatedCourseId());
+        RelatedCourse related = new RelatedCourse(UUID.randomUUID(), row.courseId(), row.relatedCourseId());
+        related.updateScore(
+                normalizeArtifactScore(row.score()),
+                "ML",
+                mlReason(row.reasonCode(), row.supportCount()),
+                normalizeText(row.reasonCode(), 80),
+                normalizeText(artifact.modelVersion(), 80),
+                generatedAt);
+        return related;
+    }
+
+    private void validateArtifact(RecommendationArtifactDto artifact) {
+        if (!Integer.valueOf(SUPPORTED_DP_AI_ARTIFACT_VERSION).equals(artifact.artifactVersion())) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_VERSION_UNSUPPORTED",
+                    "Recommendation artifactVersion is not supported");
+        }
+        if (!DP_AI_ARTIFACT_TYPE.equals(artifact.artifactType())) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_TYPE_UNSUPPORTED",
+                    "Recommendation artifactType is not supported");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(artifact.status())) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_NOT_ACTIVE",
+                    "Only ACTIVE recommendation artifacts can be materialized");
+        }
+        if (artifact.modelVersion() == null || artifact.modelVersion().isBlank()) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_MODEL_VERSION_REQUIRED",
+                    "Recommendation artifact modelVersion is required");
+        }
+        if (artifact.generatedAt() == null) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_GENERATED_AT_REQUIRED",
+                    "Recommendation artifact generatedAt is required");
+        }
+        if (artifact.recommendations() == null || artifact.recommendations().isEmpty()) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_EMPTY",
+                    "Recommendation artifact must contain at least one recommendation");
+        }
+        String modelVersion = normalizeText(artifact.modelVersion(), 80);
+        Set<CoursePairKey> seenPairs = new HashSet<>();
+        for (RecommendationArtifactRowDto row : artifact.recommendations()) {
+            if (row == null) {
+                throw BadRequestException.coded(
+                        "ANALYTICS_RECOMMENDATION_ARTIFACT_ROW_INVALID",
+                        "Recommendation artifact rows must not be null");
+            }
+            if (row.courseId() == null || row.relatedCourseId() == null) {
+                throw BadRequestException.coded(
+                        "ANALYTICS_RECOMMENDATION_ARTIFACT_ROW_INVALID",
+                        "Recommendation artifact row must include courseId and relatedCourseId");
+            }
+            ensureNotSelf(row.courseId(), row.relatedCourseId());
+            if (!seenPairs.add(new CoursePairKey(row.courseId(), row.relatedCourseId()))) {
+                throw BadRequestException.coded(
+                        "ANALYTICS_RECOMMENDATION_ARTIFACT_DUPLICATE_PAIR",
+                        "Recommendation artifact contains duplicate course pairs");
+            }
+            if (row.rank() != null && row.rank() <= 0) {
+                throw BadRequestException.coded(
+                        "ANALYTICS_RECOMMENDATION_ARTIFACT_RANK_INVALID",
+                        "Recommendation artifact row rank must be positive");
+            }
+            if (row.supportCount() < 0) {
+                throw BadRequestException.coded(
+                        "ANALYTICS_RECOMMENDATION_ARTIFACT_SUPPORT_INVALID",
+                        "Recommendation artifact row supportCount must not be negative");
+            }
+            validateArtifactScore(row.score());
+            validateUnitInterval("similarity", row.similarity());
+            normalizeText(row.reasonCode(), 80);
+            String rowModelVersion = normalizeText(row.modelVersion(), 80);
+            if (rowModelVersion != null && !rowModelVersion.equals(modelVersion)) {
+                throw BadRequestException.coded(
+                        "ANALYTICS_RECOMMENDATION_ARTIFACT_MODEL_VERSION_MISMATCH",
+                        "Recommendation artifact row modelVersion must match artifact modelVersion");
+            }
+        }
+    }
+
+    private Set<CoursePairKey> manuallyCuratedPairs(List<RecommendationArtifactRowDto> recommendations) {
+        Map<UUID, List<UUID>> relatedIdsByCourse = new HashMap<>();
+        for (RecommendationArtifactRowDto row : recommendations) {
+            relatedIdsByCourse
+                    .computeIfAbsent(row.courseId(), ignored -> new ArrayList<>())
+                    .add(row.relatedCourseId());
+        }
+        Set<CoursePairKey> pairs = new HashSet<>();
+        for (Map.Entry<UUID, List<UUID>> entry : relatedIdsByCourse.entrySet()) {
+            manualRelatedCourses.findByCourseIdAndPlacementAndRelatedCourseIdIn(
+                            entry.getKey(),
+                            ManualRelatedCourse.DEFAULT_PLACEMENT,
+                            entry.getValue())
+                    .stream()
+                    .filter(row -> ManualRelatedCourse.STATUS_ACTIVE.equals(row.getStatus())
+                            || ManualRelatedCourse.STATUS_ARCHIVED.equals(row.getStatus()))
+                    .map(row -> new CoursePairKey(row.getCourseId(), row.getRelatedCourseId()))
+                    .forEach(pairs::add);
+        }
+        return pairs;
+    }
+
+    private static BigDecimal normalizeArtifactScore(double score) {
+        validateArtifactScore(score);
+        return BigDecimal.valueOf(score).setScale(3, RoundingMode.HALF_UP);
+    }
+
+    private static void validateArtifactScore(double score) {
+        if (!Double.isFinite(score) || score <= 0.0 || score > 1.0) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_SCORE_INVALID",
+                    "Recommendation artifact row score must be finite and between 0 and 1");
+        }
+    }
+
+    private static void validateUnitInterval(String field, double value) {
+        if (!Double.isFinite(value) || value < 0.0 || value > 1.0) {
+            throw BadRequestException.coded(
+                    "ANALYTICS_RECOMMENDATION_ARTIFACT_FIELD_INVALID",
+                    "Recommendation artifact row " + field + " must be finite and between 0 and 1");
+        }
     }
 
     private RecommendationMlTrainingJobResponseDto jobResponse(RecommendationMlClient.TrainingResponse response,
@@ -849,5 +1035,8 @@ public class RecommendationService {
             String requestHash,
             String actorId
     ) {
+    }
+
+    private record CoursePairKey(UUID courseId, UUID relatedCourseId) {
     }
 }

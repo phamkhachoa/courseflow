@@ -1,0 +1,56 @@
+version: 1
+evaluation_id: recommendation-item-cf-v1-baseline-eval
+model_id: recommendation-item-cf-v1
+algorithm: IMPLICIT_ITEM_CF_V1
+use_case_id: lms-related-course-recommendation
+product: lms-courseflow
+owner: ai-platform
+evaluation_type: baseline_contract
+status: accepted_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: recommendation-item-cf-golden-v1
+  source: platform/evaluation/datasets/recommendation-item-cf-golden.yaml
+  feature_contract: contracts/features/lms-learning-features.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 3
+metrics:
+  service_contract_tests:
+    passed: true
+    evidence: services/recommendation-ml-service/tests/test_service_contract.py
+  algorithm_tests:
+    passed: true
+    evidence: services/recommendation-ml-service/tests/test_implicit_cf.py
+  security_tests:
+    passed: true
+    evidence: services/recommendation-ml-service/tests/test_security.py
+  telemetry_tests:
+    passed: true
+    evidence: services/recommendation-ml-service/tests/test_telemetry.py
+  offline_recall_at_10:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  offline_ndcg_at_10:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  catalog_coverage:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  gate_file: platform/evaluation/quality-gates/ai-mentor-gates.yaml
+  status: baseline_accepted
+  notes:
+    - Current service gates enforce minimum event, principal, course, pair and quality score thresholds.
+    - Executable golden ranking eval is now available; production promotion still requires binding to a governed dp gold snapshot.
+risks:
+  - cold_start_for_new_courses
+  - no_sequence_awareness
+  - no_parameterized_training
+  - no_text_or_skill_features
+required_next_steps:
+  - bind_training_runs_to_dp_gold_snapshot
+  - add_catalog_coverage_metric
+  - add_shadow_comparison_for_new_recommenders

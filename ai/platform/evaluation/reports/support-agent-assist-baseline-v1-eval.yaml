@@ -1,0 +1,62 @@
+version: 1
+evaluation_id: support-agent-assist-baseline-v1-eval
+model_id: support-agent-assist-baseline-v1
+algorithm: deterministic_rules_baseline
+use_case_id: support-agent-assist
+product: support-platform
+owner: ai-platform
+evaluation_type: baseline_contract
+status: accepted_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: support-agent-assist-golden-v1
+  source: platform/evaluation/datasets/support-agent-assist-golden.yaml
+  feature_contract: contracts/features/support-case-features.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 5
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/llm/support_agent_assist/tests/test_support_agent_assist.py
+  human_review_enforced:
+    passed: true
+    evidence: contracts/models/support-agent-assist-model-io.v1.yaml
+  tenant_required:
+    passed: true
+    evidence: models/llm/support_agent_assist/tests/test_support_agent_assist.py
+  intent_accuracy:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  priority_accuracy:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  human_review_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  retrieval_required_term_coverage:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  golden_dataset_passed:
+    value: true
+    status: passed
+  draft_acceptance_rate:
+    value: null
+    status: pending_agent_feedback_loop
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Baseline passes the support-agent-assist golden dataset and proves the platform can onboard a non-LMS model with contract, tests and evidence.
+    - LLM/RAG upgrade requires golden support cases, prompt redaction, citation quality and cost gate.
+risks:
+  - rule_based_classification
+  - no_knowledge_retrieval
+  - no_llm_quality
+  - no_multilingual_semantics
+required_next_steps:
+  - add_support_embedding_index_artifact
+  - add_llm_prompt_redaction_tests
+  - add_agent_feedback_metrics

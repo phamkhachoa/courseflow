@@ -1,0 +1,288 @@
+contractVersion: 1
+dataProduct:
+  name: gold.finance_benefit_reconciliation
+  layer: GOLD
+  domain: finance
+  product: enterprise-commerce
+  domainOwner: finance-domain-council
+  ownerTeam: data-platform
+  businessOwner: finance-analytics-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Quality-gated finance reconciliation dataset for paid orders, committed discounts, loyalty points, rewards and refunds.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: silver.finance_benefit_transactions
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: settled_at
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that produced or owns this record.
+    - name: source_product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Business product that originated the order or benefit.
+    - name: dataset_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Immutable snapshot identifier used for finance close and audit evidence.
+    - name: reconciliation_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic reconciliation row id.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: order_id
+      type: string
+      nullable: false
+      pii: false
+      description: Commerce order identifier.
+    - name: payment_id
+      type: string
+      nullable: false
+      pii: false
+      description: Payment or settlement identifier.
+    - name: benefit_transaction_id
+      type: string
+      nullable: false
+      pii: false
+      description: Benefit ledger transaction identifier.
+    - name: reconciliation_key
+      type: string
+      nullable: false
+      pii: false
+      description: Business key used to group source evidence for reconciliation.
+    - name: benefit_type
+      type: string
+      nullable: false
+      pii: false
+      description: Benefit category represented by this transaction.
+    - name: entitlement_id
+      type: string
+      nullable: true
+      pii: false
+      description: Optional entitlement or source-right identifier related to the benefit.
+    - name: beneficiary_id_hash
+      type: string
+      nullable: true
+      pii: true
+      description: Tokenized beneficiary identifier for controlled finance support workflows.
+    - name: item_id
+      type: string
+      nullable: true
+      pii: false
+      description: Optional product, content, SKU or service item identifier.
+    - name: currency
+      type: string
+      nullable: false
+      pii: false
+      description: ISO-4217 currency code.
+    - name: expected_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Expected monetary amount for reconciliation in minor currency units.
+    - name: actual_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Actual monetary amount from the source ledger in minor currency units.
+    - name: variance_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Actual monetary amount minus expected monetary amount.
+    - name: expected_points
+      type: long
+      nullable: false
+      pii: false
+      description: Expected loyalty points for reconciliation.
+    - name: actual_points
+      type: long
+      nullable: false
+      pii: false
+      description: Actual loyalty points from the source ledger.
+    - name: variance_points
+      type: long
+      nullable: false
+      pii: false
+      description: Actual loyalty points minus expected loyalty points.
+    - name: list_price_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Original list price in minor currency units.
+    - name: final_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Customer final amount after discounts and rewards.
+    - name: paid_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Amount captured by the payment platform.
+    - name: committed_discount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Discount committed by promotion, coupon or benefit systems.
+    - name: loyalty_points_earned
+      type: long
+      nullable: false
+      pii: false
+      description: Loyalty points earned by the settlement.
+    - name: loyalty_points_burned
+      type: long
+      nullable: false
+      pii: false
+      description: Loyalty points burned by the settlement.
+    - name: reward_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Reward monetary equivalent applied to the order.
+    - name: refund_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Refunded amount in minor currency units.
+    - name: expected_net_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Expected net revenue after refund from the order source of truth.
+    - name: actual_net_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Actual net revenue based on payment settlement.
+    - name: reconciliation_delta_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Actual minus expected net revenue in minor currency units.
+    - name: settlement_status
+      type: string
+      nullable: false
+      pii: false
+      description: Settlement state from the payment source of truth.
+      allowedValues: [SETTLED, PENDING, FAILED, REVERSED]
+    - name: benefit_status
+      type: string
+      nullable: false
+      pii: false
+      description: Benefit ledger state for committed or reversed benefits.
+      allowedValues: [COMMITTED, PENDING, REVERSED, MISSING]
+    - name: reconciliation_status
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise finance reconciliation result.
+      allowedValues: [MATCHED, EXCEPTION, PENDING_SOURCE]
+    - name: reason_code
+      type: string
+      nullable: false
+      pii: false
+      description: Machine-readable reason for the reconciliation status.
+    - name: accounting_date
+      type: date
+      nullable: false
+      pii: false
+      description: Finance accounting date used for close and reconciliation windows.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Original source event id for traceability.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: Source record hash from Bronze evidence.
+    - name: occurred_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Event-time timestamp from the source event.
+    - name: settled_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Settlement business timestamp.
+    - name: built_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the Gold snapshot was built.
+    - name: quality_passed
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether row passed structural Gold quality checks.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: product_id_not_null
+      type: not_null
+      column: product_id
+    - name: snapshot_id_not_null
+      type: not_null
+      column: dataset_snapshot_id
+    - name: reconciliation_key_unique
+      type: unique
+      columns: [dataset_snapshot_id, reconciliation_id]
+    - name: reconciliation_status_allowed
+      type: accepted_values
+      column: reconciliation_status
+      values: [MATCHED, EXCEPTION, PENDING_SOURCE]
+    - name: finance_delta_available
+      type: not_null
+      column: reconciliation_delta_cents
+    - name: gold_snapshot_freshness
+      type: freshness
+      column: built_at
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 2555
+  erasureSupported: true
+  subjectKeys:
+    - name: beneficiary_id_hash
+      column: beneficiary_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: REGULATED_SUBJECT_DELETE
+  legalHoldPolicy: regulated_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [BI, Compliance, ReverseETL]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ComplianceConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

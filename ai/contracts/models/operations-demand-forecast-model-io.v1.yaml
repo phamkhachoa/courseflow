@@ -1,0 +1,43 @@
+version: 1
+contract: operations_demand_forecast_model_io
+owner: ai-platform
+product: enterprise-operations
+use_case: operations-demand-forecasting
+model_id: operations-demand-forecast-baseline-v1
+input:
+  tenant_id: string
+  forecast_id: string
+  queue_id: string
+  historical_demand:
+    type: array
+    items: integer
+  planned_capacity: integer
+  backlog_open_items: integer
+  avg_handle_minutes: integer
+  seasonal_index: number
+  special_event: boolean
+  incident_open: boolean
+  forecast_horizon_days: integer
+  service_level_target: number
+output:
+  model_id: string
+  forecast_units: integer
+  demand_band: string
+  capacity_gap_units: integer
+  utilization_ratio: number
+  staffing_recommendation: string
+  reason_codes:
+    type: array
+  scenario_actions:
+    type: array
+  requires_human_review: boolean
+sla:
+  p95_latency_ms: 150
+  fallback_required: true
+  batch_refresh: daily
+governance:
+  tenant_isolation_required: true
+  staffing_action_requires_human_review: true
+  incident_or_high_shortfall_requires_human_review: true
+  automated_capacity_change_allowed: false
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml

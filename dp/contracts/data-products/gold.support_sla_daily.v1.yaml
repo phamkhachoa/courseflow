@@ -1,0 +1,190 @@
+contractVersion: 1
+dataProduct:
+  name: gold.support_sla_daily
+  layer: GOLD
+  domain: customer
+  product: support-platform
+  domainOwner: customer-domain-council
+  ownerTeam: data-platform
+  businessOwner: customer-experience-lead
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Daily support SLA and customer experience metrics by organization, account, customer, channel and priority.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: silver.support_case
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: report_date
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product that produced the source support signal.
+    - name: dataset_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Immutable snapshot identifier used for audit and release evidence.
+    - name: support_sla_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic aggregate support SLA row id.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: report_date
+      type: date
+      nullable: false
+      pii: false
+      description: Reporting date for the support SLA observation.
+    - name: account_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product-local account identifier used for Customer 360 joins.
+    - name: customer_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized customer subject identifier.
+    - name: channel
+      type: string
+      nullable: false
+      pii: false
+      description: Support intake channel.
+      allowedValues: [WEB, EMAIL, CHAT, PHONE, API, SOCIAL, INTERNAL]
+    - name: priority
+      type: string
+      nullable: false
+      pii: false
+      description: Support case priority.
+      allowedValues: [LOW, NORMAL, HIGH, URGENT, CRITICAL]
+    - name: case_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of support cases in this aggregate slice.
+    - name: open_case_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of open or pending cases.
+    - name: resolved_case_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of resolved or closed cases.
+    - name: first_response_sla_breached_count
+      type: int
+      nullable: false
+      pii: false
+      description: Count of cases breaching first response SLA.
+    - name: resolution_sla_breached_count
+      type: int
+      nullable: false
+      pii: false
+      description: Count of cases breaching resolution SLA.
+    - name: reopened_case_count
+      type: int
+      nullable: false
+      pii: false
+      description: Count of cases reopened at least once.
+    - name: escalated_case_count
+      type: int
+      nullable: false
+      pii: false
+      description: Count of cases escalated at least once.
+    - name: average_first_response_minutes
+      type: double
+      nullable: false
+      pii: false
+      description: Average first response time in minutes.
+    - name: average_resolution_minutes
+      type: double
+      nullable: false
+      pii: false
+      description: Average resolution time in minutes.
+    - name: csat_response_count
+      type: int
+      nullable: false
+      pii: false
+      description: Count of cases with satisfaction score.
+    - name: average_satisfaction_score
+      type: double
+      nullable: true
+      pii: false
+      description: Average satisfaction score from 1 to 5.
+    - name: sla_health_status
+      type: string
+      nullable: false
+      pii: false
+      description: Aggregate SLA health status for dashboard routing.
+      allowedValues: [HEALTHY, WATCH, BREACH]
+    - name: built_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the Gold snapshot was built.
+    - name: quality_passed
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether row passed structural Gold quality checks.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: support_sla_id_not_null
+      type: not_null
+      column: support_sla_id
+    - name: org_id_not_null
+      type: not_null
+      column: org_id
+    - name: sla_health_status_allowed
+      type: accepted_values
+      column: sla_health_status
+      values: [HEALTHY, WATCH, BREACH]
+    - name: support_sla_daily_unique
+      type: unique
+      columns: [dataset_snapshot_id, org_id, report_date, account_id, customer_id_hash, channel, priority]
+    - name: support_sla_snapshot_freshness
+      type: freshness
+      column: built_at
+
+privacy:
+  classification: PII
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: customer_id_hash
+      column: customer_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [BI, ML, Compliance]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ApprovedMLConsumer, ComplianceConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

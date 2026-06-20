@@ -10,11 +10,17 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationBatchRequestDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.MaterializeRecommendationArtifactRequestDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationArtifactDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationArtifactDpSnapshotDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationArtifactMetricsDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationArtifactRowDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecordRecommendationEventRequestDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.UpsertManualRelatedCourseRequestDto;
 import edu.courseflow.analytics.model.ManualRelatedCourse;
 import edu.courseflow.analytics.model.RecommendationMlTrainingJob;
 import edu.courseflow.analytics.model.RecommendationTrackingEvent;
+import edu.courseflow.analytics.model.RelatedCourse;
 import edu.courseflow.analytics.repository.CoursePairStatRepository;
 import edu.courseflow.analytics.repository.ManualRelatedCourseRepository;
 import edu.courseflow.analytics.repository.RecommendationMlTrainingJobRepository;
@@ -240,6 +246,110 @@ class RecommendationServiceTest {
         ArgumentCaptor<RecommendationMlTrainingJob> captor = ArgumentCaptor.forClass(RecommendationMlTrainingJob.class);
         verify(mlTrainingJobs).save(captor.capture());
         assertThat(captor.getValue().getMaterializedAt()).isNotNull();
+    }
+
+    @Test
+    void materializeRecommendationArtifactRefreshesGeneratedReadModelFromDpAiArtifact() {
+        Instant generatedAt = Instant.parse("2026-06-20T01:00:00Z");
+        RecommendationArtifactDto artifact = recommendationArtifact(generatedAt, "ACTIVE");
+        when(relatedCourses.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = service.materializeRecommendationArtifact(
+                new MaterializeRecommendationArtifactRequestDto(artifact, false));
+
+        assertThat(response.engine()).isEqualTo("DP_AI_ARTIFACT");
+        assertThat(response.modelVersion()).isEqualTo("lms-recsys-java-spring-v1");
+        assertThat(response.generatedRelatedRows()).isEqualTo(1);
+        verify(relatedCourses).existsMlReadModelNewerThan(generatedAt);
+        verify(relatedCourses).deleteGeneratedReadModel();
+        ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+        verify(relatedCourses).saveAll(captor.capture());
+        RelatedCourse row = (RelatedCourse) captor.getValue().get(0);
+        assertThat(row.getCourseId()).isEqualTo(COURSE_ID);
+        assertThat(row.getRelatedCourseId()).isEqualTo(RELATED_ID);
+        assertThat(row.getSource()).isEqualTo("ML");
+        assertThat(row.getModelVersion()).isEqualTo("lms-recsys-java-spring-v1");
+        assertThat(row.getReason())
+                .contains("ML model")
+                .doesNotContain("lms-recsys-large-snapshot");
+    }
+
+    @Test
+    void materializeRecommendationArtifactDoesNotOverwriteNewerReadModelWithoutForce() {
+        Instant generatedAt = Instant.parse("2026-06-20T01:00:00Z");
+        RecommendationArtifactDto artifact = recommendationArtifact(generatedAt, "ACTIVE");
+        when(relatedCourses.existsMlReadModelNewerThan(generatedAt)).thenReturn(true);
+
+        var response = service.materializeRecommendationArtifact(
+                new MaterializeRecommendationArtifactRequestDto(artifact, false));
+
+        assertThat(response.generatedRelatedRows()).isZero();
+        assertThat(response.fallbackReason()).isEqualTo("ML_READ_MODEL_NEWER_THAN_ARTIFACT");
+        verify(relatedCourses, never()).deleteGeneratedReadModel();
+        verify(relatedCourses, never()).saveAll(any());
+    }
+
+    @Test
+    void materializeRecommendationArtifactSkipsManuallyCuratedPairs() {
+        Instant generatedAt = Instant.parse("2026-06-20T01:00:00Z");
+        RecommendationArtifactDto artifact = recommendationArtifact(generatedAt, "ACTIVE");
+        when(manualRelatedCourses.findByCourseIdAndPlacementAndRelatedCourseIdIn(
+                COURSE_ID,
+                ManualRelatedCourse.DEFAULT_PLACEMENT,
+                List.of(RELATED_ID)))
+                .thenReturn(List.of(new ManualRelatedCourse(COURSE_ID, RELATED_ID, "user:1")));
+
+        var response = service.materializeRecommendationArtifact(
+                new MaterializeRecommendationArtifactRequestDto(artifact, false));
+
+        assertThat(response.generatedRelatedRows()).isZero();
+        verify(relatedCourses).deleteGeneratedReadModel();
+        verify(relatedCourses, never()).saveAll(any());
+    }
+
+    @Test
+    void materializeRecommendationArtifactRejectsInactiveArtifact() {
+        RecommendationArtifactDto artifact = recommendationArtifact(Instant.now(), "INSUFFICIENT_DATA");
+
+        assertThatThrownBy(() -> service.materializeRecommendationArtifact(
+                new MaterializeRecommendationArtifactRequestDto(artifact, false)))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void materializeRecommendationArtifactRejectsDuplicatePairs() {
+        Instant generatedAt = Instant.parse("2026-06-20T01:00:00Z");
+        RecommendationArtifactDto artifact = recommendationArtifact(
+                generatedAt,
+                "ACTIVE",
+                List.of(
+                        recommendationRow(COURSE_ID, RELATED_ID),
+                        recommendationRow(COURSE_ID, RELATED_ID)));
+
+        assertThatThrownBy(() -> service.materializeRecommendationArtifact(
+                new MaterializeRecommendationArtifactRequestDto(artifact, false)))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void materializeRecommendationArtifactRejectsMismatchedRowModelVersion() {
+        Instant generatedAt = Instant.parse("2026-06-20T01:00:00Z");
+        RecommendationArtifactDto artifact = recommendationArtifact(
+                generatedAt,
+                "ACTIVE",
+                List.of(new RecommendationArtifactRowDto(
+                        COURSE_ID,
+                        RELATED_ID,
+                        1,
+                        0.927,
+                        0.9,
+                        42,
+                        "ML_CO_ENROLLMENT",
+                        "other-model-v1")));
+
+        assertThatThrownBy(() -> service.materializeRecommendationArtifact(
+                new MaterializeRecommendationArtifactRequestDto(artifact, false)))
+                .isInstanceOf(BadRequestException.class);
     }
 
     @Test
@@ -573,5 +683,55 @@ class RecommendationServiceTest {
                 "STARTED",
                 RecommendationMlTrainingJob.STATUS_PENDING_ACTIVATION,
                 RecommendationMlTrainingJob.STATUS_UNAVAILABLE);
+    }
+
+    private static RecommendationArtifactDto recommendationArtifact(Instant generatedAt, String status) {
+        return recommendationArtifact(
+                generatedAt,
+                status,
+                List.of(recommendationRow(COURSE_ID, RELATED_ID)));
+    }
+
+    private static RecommendationArtifactDto recommendationArtifact(
+            Instant generatedAt,
+            String status,
+            List<RecommendationArtifactRowDto> recommendations) {
+        return new RecommendationArtifactDto(
+                1,
+                "courseflow.lms.related_course_recommendations",
+                "lms-recsys-java-spring-v1",
+                status,
+                "IMPLICIT_ITEM_CF_V1",
+                generatedAt,
+                new RecommendationArtifactDpSnapshotDto(
+                        List.of("lms-recsys-large-snapshot"),
+                        "/dp/gold/lms_recommendation_training_interactions.jsonl",
+                        "sha256:training",
+                        "/dp/manifests/lms_recommendation_training.json",
+                        "sha256:manifest",
+                        10_000,
+                        10_000,
+                        0),
+                new RecommendationArtifactMetricsDto(
+                        10_000,
+                        2_000,
+                        300,
+                        1,
+                        0.8,
+                        3,
+                        24),
+                recommendations);
+    }
+
+    private static RecommendationArtifactRowDto recommendationRow(UUID courseId, UUID relatedCourseId) {
+        return new RecommendationArtifactRowDto(
+                courseId,
+                relatedCourseId,
+                1,
+                0.927,
+                0.9,
+                42,
+                "ML_CO_ENROLLMENT",
+                "lms-recsys-java-spring-v1");
     }
 }

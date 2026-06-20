@@ -1,0 +1,154 @@
+version: 1
+dataset_id: finance-payment-fraud-golden-v1
+model_id: finance-payment-fraud-baseline-v1
+product: billing-finance
+use_case_id: finance-payment-fraud-scoring
+module: models/anomaly_fraud/payment_fraud_baseline/payment_fraud_baseline.py
+feature_contract: contracts/features/finance-payment-risk-features.v1.yaml
+model_io_contract: contracts/models/finance-payment-fraud-model-io.v1.yaml
+thresholds:
+  risk_band_accuracy_min: 1.0
+  reason_code_recall_min: 0.85
+  entity_link_recall_min: 0.85
+  human_review_policy_pass_rate_min: 1.0
+  score_threshold_pass_rate_min: 1.0
+  risk_ordering_pass_rate_min: 1.0
+cases:
+  - case_id: fraud-high-entity-network
+    input:
+      tenant_id: tenant-finance
+      payment_id: pay-001
+      account_hash: acct_hash_001
+      counterparty_hash: cp_hash_001
+      amount_minor: 1250000
+      currency: USD
+      payment_method: card_not_present
+      country_code: VN
+      device_fingerprint_hash: dev_hash_001
+      velocity_1h: 6
+      velocity_24h: 16
+      prior_failed_attempts_7d: 4
+      account_age_days: 3
+      verified_payment_methods_count: 0
+      linked_account_count: 6
+      shared_counterparty_count: 5
+      prior_chargeback_count: 2
+      risk_review_outcome: watchlist
+    expected:
+      risk_band: high
+      min_risk_score: 0.95
+      max_risk_score: 1.0
+      risk_order: 4
+      requires_human_review: true
+      automated_adverse_action_allowed: false
+      reason_codes:
+        - HIGH_VALUE_PAYMENT
+        - HIGH_VELOCITY_1H
+        - FAILED_ATTEMPT_SPIKE
+        - SHARED_COUNTERPARTY_NETWORK
+        - PRIOR_CHARGEBACK_HISTORY
+      entity_link_types:
+        - account_counterparty
+        - account_device
+        - linked_account_cluster
+  - case_id: fraud-medium-counterparty-reuse
+    input:
+      tenant_id: tenant-finance
+      payment_id: pay-002
+      account_hash: acct_hash_002
+      counterparty_hash: cp_hash_002
+      amount_minor: 325000
+      currency: USD
+      payment_method: virtual_card
+      country_code: US
+      device_fingerprint_hash: dev_hash_002
+      velocity_1h: 3
+      velocity_24h: 9
+      prior_failed_attempts_7d: 1
+      account_age_days: 24
+      verified_payment_methods_count: 1
+      linked_account_count: 2
+      shared_counterparty_count: 2
+      prior_chargeback_count: 0
+      risk_review_outcome: none
+    expected:
+      risk_band: medium
+      min_risk_score: 0.45
+      max_risk_score: 0.70
+      risk_order: 2
+      requires_human_review: true
+      automated_adverse_action_allowed: false
+      reason_codes:
+        - ELEVATED_PAYMENT_AMOUNT
+        - ELEVATED_VELOCITY_1H
+        - YOUNG_ACCOUNT
+        - COUNTERPARTY_REUSE
+      entity_link_types:
+        - account_counterparty
+  - case_id: fraud-low-established-account
+    input:
+      tenant_id: tenant-finance
+      payment_id: pay-003
+      account_hash: acct_hash_003
+      counterparty_hash: cp_hash_003
+      amount_minor: 18000
+      currency: USD
+      payment_method: ach
+      country_code: US
+      device_fingerprint_hash: dev_hash_003
+      velocity_1h: 1
+      velocity_24h: 2
+      prior_failed_attempts_7d: 0
+      account_age_days: 420
+      verified_payment_methods_count: 2
+      linked_account_count: 1
+      shared_counterparty_count: 0
+      prior_chargeback_count: 0
+      risk_review_outcome: clear
+    expected:
+      risk_band: low
+      min_risk_score: 0.0
+      max_risk_score: 0.45
+      risk_order: 1
+      requires_human_review: false
+      automated_adverse_action_allowed: false
+      reason_codes:
+        - PAYMENT_RISK_LOW
+      entity_link_types:
+        - account_payment
+  - case_id: fraud-high-chargeback-velocity
+    input:
+      tenant_id: tenant-finance
+      payment_id: pay-004
+      account_hash: acct_hash_004
+      counterparty_hash: cp_hash_004
+      amount_minor: 600000
+      currency: USD
+      payment_method: wire
+      country_code: CA
+      device_fingerprint_hash: dev_hash_004
+      velocity_1h: 5
+      velocity_24h: 13
+      prior_failed_attempts_7d: 3
+      account_age_days: 18
+      verified_payment_methods_count: 0
+      linked_account_count: 3
+      shared_counterparty_count: 4
+      prior_chargeback_count: 1
+      risk_review_outcome: manual_review
+    expected:
+      risk_band: high
+      min_risk_score: 0.85
+      max_risk_score: 1.0
+      risk_order: 3
+      requires_human_review: true
+      automated_adverse_action_allowed: false
+      reason_codes:
+        - HIGH_VELOCITY_1H
+        - HIGH_VELOCITY_24H
+        - FAILED_ATTEMPT_SPIKE
+        - UNVERIFIED_PAYMENT_METHOD
+        - SHARED_COUNTERPARTY_NETWORK
+      entity_link_types:
+        - account_counterparty
+        - account_device

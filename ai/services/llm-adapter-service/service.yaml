@@ -1,0 +1,69 @@
+version: 1
+service_id: llm-adapter-service
+name: LLM Adapter Service
+owner: ai-platform
+status: service_package_ready
+description: Provider-neutral LLM adapter service that enforces Prompt Gateway before generation.
+runtime:
+  language: python
+  entrypoint: courseflow_llm_adapter_service.cli:main
+  package: courseflow-llm-adapter-service
+security:
+  default_auth: policy_enforced
+  policies:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/llm-adapter-access-policy.yaml
+    - platform/governance/policies/llm-provider-credential-readiness.yaml
+    - platform/governance/policies/llm-provider-ops-policy.yaml
+    - platform/governance/policies/llm-provider-runtime-probe-policy.yaml
+    - platform/governance/policies/prompt-gateway-access-policy.yaml
+provider_ops:
+  rate_limit: configured_per_principal_tenant_provider_window
+  timeout: configured_per_provider
+  failover: configured_per_provider
+  circuit_breaker: configured_per_provider
+  cost_tracking: configured_per_provider
+observability:
+  credential_readiness: platform/governance/reports/llm-provider-readiness-v1.yaml
+  runtime_probes: platform/operations/reports/llm-provider-runtime-probes-v1.yaml
+  metrics: in_memory_gateway_provider_rate_limit_failover_audit_cost_latency_counters
+routes:
+  - method: POST
+    path: /v1/llm-adapter/generate
+    scope: internal:ai-platform:llm-adapter:generate
+    purpose: prompt_gateway_bound_generation
+  - method: GET
+    path: /v1/llm-adapter/health
+    scope: internal:ai-platform:llm-adapter:ops
+    purpose: llm_adapter_health
+  - method: GET
+    path: /v1/llm-adapter/metrics
+    scope: internal:ai-platform:llm-adapter:ops
+    purpose: llm_adapter_metrics
+artifacts:
+  source:
+    - services/llm-adapter-service/src/courseflow_llm_adapter_service/service.py
+    - services/llm-adapter-service/src/courseflow_llm_adapter_service/cli.py
+    - services/llm-adapter-service/src/courseflow_llm_adapter_service/http_server.py
+    - platform/src/courseflow_ai_platform/llm_provider_adapter.py
+    - platform/src/courseflow_ai_platform/llm_provider_readiness.py
+    - platform/src/courseflow_ai_platform/llm_provider_runtime_probes.py
+  policies:
+    - platform/governance/policies/llm-adapter-access-policy.yaml
+    - platform/governance/policies/llm-provider-credential-readiness.yaml
+    - platform/governance/policies/llm-provider-ops-policy.yaml
+    - platform/governance/policies/llm-provider-runtime-probe-policy.yaml
+    - platform/governance/policies/prompt-gateway-access-policy.yaml
+  evidence:
+    - platform/evaluation/reports/llm-adapter-shadow-gateway-v1-eval.yaml
+    - platform/governance/reports/llm-provider-readiness-v1.yaml
+    - platform/operations/reports/llm-provider-runtime-probes-v1.yaml
+    - services/llm-adapter-service/tests/test_service_contract.py
+quality_gates:
+  - route_scopes_must_match_llm_adapter_access_policy
+  - generation_must_call_prompt_gateway_before_provider
+  - blocked_gateway_requests_must_skip_provider_call
+  - prompt_audit_records_must_not_store_raw_pii_or_secrets
+  - provider_rate_limits_timeouts_circuit_breakers_and_failover_must_be_policy_defined
+  - live_provider_credentials_must_pass_readiness_before_network_enabled
+  - live_provider_runtime_probes_cost_and_latency_must_pass_before_rollout

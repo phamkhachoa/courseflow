@@ -1,0 +1,52 @@
+version: 1
+evaluation_id: course-content-vector-index-v1-eval
+model_id: course-content-vector-index-baseline-v1
+algorithm: deterministic_hash_embedding_baseline_v1
+use_case_id: lms-rag-tutor
+product: lms-courseflow
+owner: ai-platform
+evaluation_type: vector_index_contract
+status: accepted_contract_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: course-content-vector-index-contract-v1
+  source: platform/evaluation/datasets/course-content-vector-index-golden.yaml
+  corpus: platform/evaluation/corpora/course-content-corpus.yaml
+  collection: course_content_chunks
+  case_count: 5
+metrics:
+  chunk_coverage_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  dimension_conformance_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  metadata_conformance_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  tenant_scope_coverage_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  checksum_stable:
+    value: true
+    threshold: true
+    status: passed
+  embedding_dimensions:
+    value: 768
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Course content chunks now have an executable vector index contract gate.
+    - Future semantic embedding and hybrid retrieval implementations must preserve tenant metadata, dimensions and artifact checksum behavior.
+risks:
+  - deterministic_hash_embedding_only
+  - no_ann_vector_store_runtime_yet
+  - no_production_semantic_embedding_model_yet
+required_next_steps:
+  - add_sentence_transformer_course_embedding_model
+  - promote_vector_index_artifact_to_object_store
+  - add_ann_runtime_latency_gate

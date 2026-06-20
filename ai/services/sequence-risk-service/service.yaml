@@ -1,0 +1,45 @@
+version: 1
+service_id: sequence-risk-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_sequence_risk_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/sequence-risk-access-policy.yaml
+observability:
+  metrics: in_memory_score_error_identifier_hitl_counters
+  tenant_safety: cross_tenant_sequence_risk_forbidden
+routes:
+  - method: POST
+    path: /v1/sequence-risk/score
+    scope: internal:ai-platform:sequence-risk:score
+    purpose: recurrent_sequence_risk_scoring
+  - method: GET
+    path: /v1/sequence-risk/health
+    scope: internal:ai-platform:sequence-risk:ops
+    purpose: sequence_risk_health
+  - method: GET
+    path: /v1/sequence-risk/metrics
+    scope: internal:ai-platform:sequence-risk:ops
+    purpose: sequence_risk_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/sequence_risk_service.py
+  model_modules:
+    - models/deep_learning/sequence_risk_baseline/sequence_risk_baseline.py
+  artifacts:
+    - contracts/features/lms-learning-features.v1.yaml
+    - contracts/models/sequence-risk-model-io.v1.yaml
+    - platform/evaluation/reports/sequence-risk-baseline-v1-eval.yaml
+    - platform/artifacts/manifests/sequence-risk-baseline-v1.yaml
+promotion_guardrails:
+  - route_scopes_must_match_sequence_risk_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - direct_learner_identifiers_must_be_rejected
+  - medium_and_high_risk_interventions_must_require_human_review
+  - sequence_risk_quality_gate_must_remain_green

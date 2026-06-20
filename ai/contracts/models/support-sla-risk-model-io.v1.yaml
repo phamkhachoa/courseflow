@@ -1,0 +1,38 @@
+version: 1
+contract: support_sla_risk_model_io
+owner: ai-platform
+product: support-platform
+use_case: support-sla-risk
+model_id: support-sla-risk-baseline-v1
+input:
+  tenant_id: string
+  case_id: string
+  priority: string
+  status: string
+  minutes_until_sla_due: integer
+  age_minutes: integer
+  public_comment_count: integer
+  internal_note_count: integer
+  assigned_team_available: boolean
+  customer_tier_optional: string
+  reopen_count_optional: integer
+  product_area_optional: string
+output:
+  model_id: string
+  risk_score: number
+  risk_band: string
+  reason_codes:
+    type: array
+  recommended_actions:
+    type: array
+  requires_human_review: boolean
+sla:
+  p95_latency_ms: 200
+  fallback_required: true
+  batch_refresh: hourly
+governance:
+  tenant_isolation_required: true
+  raw_customer_identifier_allowed: false
+  human_review_required_for_escalation: true
+  no_automated_adverse_action: true
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml

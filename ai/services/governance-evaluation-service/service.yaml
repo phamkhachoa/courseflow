@@ -1,0 +1,46 @@
+version: 1
+service_id: governance-evaluation-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_governance_evaluation_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/governance-evaluation-access-policy.yaml
+observability:
+  metrics: in_memory_assessment_decision_error_identifier_secret_counters
+  tenant_safety: cross_tenant_governance_assessment_forbidden
+routes:
+  - method: POST
+    path: /v1/governance-evaluation/assess
+    scope: internal:ai-platform:governance-evaluation:assess
+    purpose: release_promotion_safety_evaluation_assessment
+  - method: GET
+    path: /v1/governance-evaluation/health
+    scope: internal:ai-platform:governance-evaluation:ops
+    purpose: governance_evaluation_health
+  - method: GET
+    path: /v1/governance-evaluation/metrics
+    scope: internal:ai-platform:governance-evaluation:ops
+    purpose: governance_evaluation_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/governance_evaluation_service.py
+    - platform/src/courseflow_ai_platform/evaluation.py
+    - platform/src/courseflow_ai_platform/promotion_readiness.py
+  governance_artifacts:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/governance-evaluation-access-policy.yaml
+    - platform/artifacts/promotions/registry.yaml
+    - platform/evaluation/registry.yaml
+promotion_guardrails:
+  - route_scopes_must_match_governance_evaluation_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - required_evaluation_gates_must_pass_before_release_decision
+  - maker_checker_and_rollback_evidence_must_be_projected_into_decision
+  - direct_identifier_and_secret_evidence_must_be_rejected
+  - external_auto_send_must_be_blocked_without_explicit_policy_approval

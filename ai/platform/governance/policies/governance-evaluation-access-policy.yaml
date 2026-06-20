@@ -1,0 +1,106 @@
+version: 1
+owner: ai-platform
+policy_id: governance-evaluation-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  direct_identifier_submission_allowed: false
+  secret_value_submission_allowed: false
+  external_auto_send_allowed: false
+scope_aliases:
+  assess: internal:ai-platform:governance-evaluation:assess
+  ops: internal:ai-platform:governance-evaluation:ops
+principals:
+  - principal_id: service:ai-platform-governance-evaluation-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:ai-platform-governance-evaluation
+    owner_role: AI Platform governance service
+    product: ai-platform
+    scopes:
+      - assess
+      - ops
+    tenant_ids:
+      - tenant-a
+      - tenant-enterprise
+      - tenant-lms
+      - tenant-lms-sandbox
+      - tenant-support
+      - tenant-finance
+      - tenant-ops
+    product_ids:
+      - ai-platform
+      - lms-courseflow
+      - support-platform
+      - billing-finance
+      - enterprise-operations
+    use_case_ids:
+      - platform-llm-safety-gateway
+      - platform-llm-adapter-shadow-gateway
+      - lms-related-course-recommendation
+      - lms-rag-tutor
+      - lms-auto-grading
+      - support-agent-assist
+      - finance-document-intelligence
+      - finance-payment-fraud-scoring
+      - operations-routing-optimization
+
+  - principal_id: service:lms-courseflow-governance-evaluation
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+      - assess
+    tenant_ids:
+      - tenant-a
+      - tenant-lms
+      - tenant-lms-sandbox
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-related-course-recommendation
+      - lms-rag-tutor
+      - lms-auto-grading
+
+  - principal_id: service:support-platform-governance-evaluation
+    owner_role: Support Platform service
+    product: support-platform
+    scopes:
+      - assess
+    tenant_ids:
+      - tenant-a
+      - tenant-support
+    product_ids:
+      - support-platform
+    use_case_ids:
+      - support-agent-assist
+
+  - principal_id: service:finance-governance-evaluation
+    owner_role: Finance Platform service
+    product: billing-finance
+    scopes:
+      - assess
+    tenant_ids:
+      - tenant-finance
+    product_ids:
+      - billing-finance
+    use_case_ids:
+      - finance-document-intelligence
+      - finance-payment-fraud-scoring
+
+  - principal_id: service:enterprise-ops-governance-evaluation
+    owner_role: Enterprise Operations service
+    product: enterprise-operations
+    scopes:
+      - assess
+    tenant_ids:
+      - tenant-ops
+    product_ids:
+      - enterprise-operations
+    use_case_ids:
+      - operations-routing-optimization

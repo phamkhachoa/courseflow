@@ -1,0 +1,30 @@
+version: 1
+artifact_id: support-agent-assist-baseline-v1-source-artifact
+model_id: support-agent-assist-baseline-v1
+algorithm: deterministic_rules_baseline
+model_family: deterministic_baseline
+artifact_type: source_algorithm
+status: baseline_implemented
+owner: ai-platform
+product: support-platform
+use_case_id: support-agent-assist
+created_at: "2026-06-16"
+artifact_uri: models/llm/support_agent_assist/support_agent_assist.py
+artifact_hash:
+  algorithm: sha256
+  value: 4efe70afe3106de136482e73d77113b92fb03352a60c3f3efdde13d9478fcc7e
+lineage:
+  model_code: models/llm/support_agent_assist/support_agent_assist.py
+  feature_contract: contracts/features/support-case-features.v1.yaml
+  model_io_contract: contracts/models/support-agent-assist-model-io.v1.yaml
+  model_card: platform/model-registry/model-cards/support-agent-assist-baseline-v1.md
+  evaluation_report: platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+runtime:
+  package: support_agent_assist
+  optional_extras: []
+  entrypoint: support_agent_assist:SupportAgentAssistBaseline
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  human_in_the_loop_required: true
+  external_reply_auto_send_allowed: false
+  rollback_supported: true

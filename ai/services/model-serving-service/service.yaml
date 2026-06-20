@@ -1,0 +1,54 @@
+version: 1
+service_id: model-serving-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_model_serving_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/model-serving-access-policy.yaml
+observability:
+  metrics_export: platform/operations/reports/model-serving-metrics-export-v1.yaml
+  audit_event_contract: contracts/models/model-audit-event.v1.yaml
+routes:
+  - method: GET
+    path: /v1/models
+    scope: internal:ai-platform:model-serving:catalog
+    purpose: model_catalog
+  - method: POST
+    path: /v1/model-invocations
+    scope: internal:ai-platform:model-serving:invoke
+    purpose: model_invocation
+  - method: GET
+    path: /v1/model-serving/metrics
+    scope: internal:ai-platform:model-serving:ops
+    purpose: serving_metrics
+  - method: GET
+    path: /v1/model-serving/health
+    scope: internal:ai-platform:model-serving:ops
+    purpose: serving_health
+  - method: GET
+    path: /v1/model-serving/cockpit
+    scope: internal:ai-platform:model-serving:ops
+    purpose: operating_cockpit_projection
+  - method: GET
+    path: /v1/model-serving/product-readiness
+    scope: internal:ai-platform:model-serving:ops
+    purpose: runtime_product_readiness_projection
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/model_serving.py
+    - platform/src/courseflow_ai_platform/model_serving_adapter.py
+    - platform/src/courseflow_ai_platform/model_serving_auth.py
+    - platform/src/courseflow_ai_platform/product_readiness.py
+    - platform/src/courseflow_ai_platform/serving_metrics_export.py
+promotion_guardrails:
+  - route_scopes_must_match_ai_governance_policy
+  - principals_must_resolve_from_model_serving_access_policy
+  - invocation_payloads_must_stay_tenant_scoped
+  - metrics_export_must_match_per_model_totals
+  - product_readiness_must_use_ops_scope_and_runtime_metrics

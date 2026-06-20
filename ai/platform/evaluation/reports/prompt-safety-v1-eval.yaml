@@ -1,0 +1,60 @@
+version: 1
+evaluation_id: prompt-safety-v1-eval
+model_id: prompt-safety-baseline-v1
+algorithm: deterministic_prompt_redaction_and_budget_gate
+use_case_id: platform-llm-safety-gateway
+product: ai-platform
+owner: ai-platform
+evaluation_type: prompt_safety_golden_set
+status: accepted_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: prompt-safety-golden-v1
+  source: platform/evaluation/datasets/prompt-safety-golden.yaml
+  contract: contracts/prompts/llm-prompt-envelope.v1.yaml
+  policy: platform/prompt-safety/redaction-policy.yaml
+  case_count: 3
+metrics:
+  pii_redaction_recall:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  secret_redaction_recall:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  expected_token_coverage:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  tenant_context_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  cost_budget_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  audit_safety_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  human_review_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Prompt safety baseline redacts PII/secrets, filters cross-tenant context and checks cost budgets before model calls.
+    - All future LLM/RAG adapters must pass this gate before shadow or production execution.
+risks:
+  - deterministic_redaction_only
+  - hosted_deployment_gate_not_yet_hardened
+  - live_network_provider_activation_not_configured
+  - token_estimation_is_approximate
+required_next_steps:
+  - enable_network_provider_with_secret_manager_refs_when_approved
+  - harden_prompt_gateway_deployment_gate
+  - add_prompt_response_audit_admin_export
+  - add_db_or_object_storage_prompt_audit_adapter

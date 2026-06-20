@@ -1,0 +1,62 @@
+version: 1
+evaluation_id: finance-document-intelligence-v1-eval
+model_id: finance-document-intelligence-baseline-v1
+algorithm: deterministic_ocr_token_document_intelligence
+use_case_id: finance-document-intelligence
+product: billing-finance
+owner: ai-platform
+evaluation_type: service_integrated_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: finance-document-intelligence-golden-v1
+  source: platform/evaluation/datasets/finance-document-intelligence-golden.yaml
+  feature_contract: contracts/features/finance-document-intelligence-features.v1.yaml
+  model_io_contract: contracts/models/finance-document-intelligence-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 4
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/multimodal/document_intelligence_baseline/tests/test_document_intelligence_baseline.py
+  document_type_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  field_recall:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  evidence_term_recall:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  human_review_policy_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  privacy_guardrail_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Media Intelligence Service serves bounded OCR-token document intelligence behind tenant/product/use-case policy.
+    - Raw image/PDF OCR controls are approved but raw document adapter work remains separate from this bounded route.
+    - Raw financial PII signals force human review and are not extracted as output fields.
+risks:
+  - deterministic_ocr_token_rules
+  - no_raw_vision_model_or_ocr_runtime
+  - no_governed_document_snapshot
+  - raw_document_adapter_not_yet_service_route
+required_next_steps:
+  - bind_to_governed_finance_document_snapshot
+  - add_ocr_or_layout_model_artifact_after_privacy_approval
+  - add_shadow_review_queue_for_extracted_fields
+  - add_media_intelligence_service_metrics_to_release_review
+service_evidence:
+  service: services/media-intelligence-service/service.yaml
+  access_policy: platform/governance/policies/media-intelligence-access-policy.yaml
+  service_tests: services/media-intelligence-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_media_intelligence_service.py

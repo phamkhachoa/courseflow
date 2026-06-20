@@ -1,0 +1,47 @@
+version: 1
+service_id: graph-entity-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_graph_entity_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/graph-entity-access-policy.yaml
+observability:
+  metrics: in_memory_analysis_error_identifier_link_strength_counters
+  tenant_safety: cross_tenant_graph_entity_analysis_forbidden
+routes:
+  - method: POST
+    path: /v1/graph-entity/analyze
+    scope: internal:ai-platform:graph-entity:analyze
+    purpose: entity_link_evidence_analysis
+  - method: GET
+    path: /v1/graph-entity/health
+    scope: internal:ai-platform:graph-entity:ops
+    purpose: graph_entity_health
+  - method: GET
+    path: /v1/graph-entity/metrics
+    scope: internal:ai-platform:graph-entity:ops
+    purpose: graph_entity_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/graph_entity_service.py
+  model_modules:
+    - models/anomaly_fraud/payment_fraud_baseline/payment_fraud_baseline.py
+  artifacts:
+    - contracts/features/finance-payment-risk-features.v1.yaml
+    - contracts/models/finance-payment-fraud-model-io.v1.yaml
+    - platform/evaluation/reports/finance-payment-fraud-v1-eval.yaml
+    - platform/artifacts/manifests/finance-payment-fraud-baseline-v1.yaml
+promotion_guardrails:
+  - route_scopes_must_match_graph_entity_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - direct_account_counterparty_customer_user_device_or_contact_identifiers_must_be_rejected
+  - raw_hash_values_must_be_rejected
+  - graph_evidence_must_not_trigger_automated_adverse_action
+  - graph_review_flags_must_be_exposed_in_metrics
+  - entity_link_quality_gate_must_remain_green

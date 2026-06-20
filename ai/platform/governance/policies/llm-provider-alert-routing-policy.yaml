@@ -1,0 +1,49 @@
+version: 1
+owner: ai-platform
+policy_id: llm-provider-alert-routing-policy-v1
+allowed_sink_ref_schemes:
+  - ops-alert://
+allowed_rotation_ref_schemes:
+  - rotation://
+min_budget_threshold_micros_per_day: 1
+max_p95_latency_threshold_ms: 2500
+required_alert_dimensions:
+  - provider_id
+  - product
+  - use_case
+  - tenant_id
+next_actions:
+  - run_llm_provider_alert_delivery_drill
+  - align_live_alert_routes_with_secret_rotation_report_when_network_enabled
+sinks:
+  - sink_id: admin-ops-llm-provider-oncall
+    sink_type: ops_alert_queue
+    destination_ref: ops-alert://ai-platform/admin-ops/llm-provider
+    owner_role: Admin/Ops
+    escalation_policy_ref: ops-alert://ai-platform/escalation/llm-provider-p2
+    tenant_safe: true
+routes:
+  - provider_id: contract-stub-llm-v1
+    sink_id: admin-ops-llm-provider-oncall
+    alert_route_ref: ops-alert://ai-platform/routes/llm-provider/contract-stub-llm-v1
+    budget_threshold_micros_per_day: 500000
+    p95_latency_threshold_ms: 2500
+    rotation_automation_ref: not_required
+    rotation_evidence_ref: not_required
+    alert_dimensions:
+      - provider_id
+      - product
+      - use_case
+      - tenant_id
+  - provider_id: contract-stub-llm-failover-v1
+    sink_id: admin-ops-llm-provider-oncall
+    alert_route_ref: ops-alert://ai-platform/routes/llm-provider/contract-stub-llm-failover-v1
+    budget_threshold_micros_per_day: 500000
+    p95_latency_threshold_ms: 2500
+    rotation_automation_ref: not_required
+    rotation_evidence_ref: not_required
+    alert_dimensions:
+      - provider_id
+      - product
+      - use_case
+      - tenant_id

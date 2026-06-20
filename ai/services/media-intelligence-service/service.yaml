@@ -1,0 +1,54 @@
+version: 1
+service_id: media-intelligence-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_media_intelligence_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/media-privacy-review-policy.yaml
+    - platform/governance/policies/media-intelligence-access-policy.yaml
+observability:
+  metrics: in_memory_document_speech_error_privacy_counters
+  tenant_safety: cross_tenant_media_intelligence_forbidden
+routes:
+  - method: POST
+    path: /v1/media-intelligence/document:analyze
+    scope: internal:ai-platform:media-intelligence:document:analyze
+    purpose: bounded_ocr_token_document_intelligence
+  - method: POST
+    path: /v1/media-intelligence/speech:assess
+    scope: internal:ai-platform:media-intelligence:speech:assess
+    purpose: transcript_segment_speech_quality_assessment
+  - method: GET
+    path: /v1/media-intelligence/health
+    scope: internal:ai-platform:media-intelligence:ops
+    purpose: media_intelligence_health
+  - method: GET
+    path: /v1/media-intelligence/metrics
+    scope: internal:ai-platform:media-intelligence:ops
+    purpose: media_intelligence_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/media_intelligence_service.py
+    - platform/src/courseflow_ai_platform/media_privacy_review.py
+  model_modules:
+    - models/multimodal/document_intelligence_baseline/document_intelligence_baseline.py
+    - models/speech/audio_quality_baseline/audio_quality_baseline.py
+  artifacts:
+    - platform/governance/reports/media-privacy-review-v1.yaml
+    - platform/governance/controls/raw-media-storage-boundary-v1.yaml
+    - platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+    - platform/governance/controls/speech-audio-raw-asr-diarization-controls-v1.yaml
+    - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+    - platform/evaluation/reports/speech-quality-v1-eval.yaml
+promotion_guardrails:
+  - route_scopes_must_match_media_intelligence_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - raw_media_uri_submission_must_be_rejected_by_bounded_routes
+  - media_privacy_review_must_be_approved_before_serving
+  - document_and_speech_baseline_quality_gates_must_remain_green

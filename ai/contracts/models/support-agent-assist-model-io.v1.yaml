@@ -1,0 +1,32 @@
+version: 1
+contract: support_agent_assist_model_io
+owner: ai-platform
+product: support-platform
+use_case: support-agent-assist
+input:
+  tenant_id: string
+  case_id: string
+  subject: string
+  latest_message: string
+  product_area: string_optional
+  priority: string_optional
+  language: string_optional
+output:
+  summary: string
+  intent: string
+  priority_signal: string
+  retrieval_query: string
+  suggested_reply: string
+  confidence: number
+  reason_codes:
+    type: array
+  requires_human_review: boolean
+sla:
+  p95_latency_ms: 500
+  fallback_required: true
+governance:
+  external_reply_auto_send_allowed: false
+  human_review_required: true
+  tenant_isolation_required: true
+  prompt_or_message_retention_policy: platform/governance/policies/ai-governance-policy.yaml
+

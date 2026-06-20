@@ -1,0 +1,135 @@
+version: 1
+report_id: promotion-intake-v1
+owner: ai-platform
+generated_at: '2026-06-16'
+source_registry: platform/artifacts/promotions/requests.yaml
+summary:
+  request_count: 5
+  ready_count: 3
+  waiting_count: 2
+  blocked_count: 2
+  non_lms_count: 4
+  artifact_known_count: 3
+  gate_count: 7
+  ready_gate_count: 5
+by_status:
+  ready_for_approval: 3
+  rejected: 0
+  waiting_for_artifact: 1
+  waiting_for_evaluation: 1
+  waiting_for_privacy_review: 0
+  waiting_for_simulator: 0
+  withdrawn: 0
+action_queue:
+  ready_for_approval:
+  - support-agent-assist-active-request
+  - finance-document-intelligence-privacy-request
+  - operations-routing-rl-simulator-request
+  waiting_for_artifact:
+  - lms-at-risk-baseline-shadow-request
+  waiting_for_evaluation:
+  - finance-anomaly-shadow-request
+  waiting_for_privacy_review: []
+  waiting_for_simulator: []
+  blocked: []
+requests:
+- request_id: support-agent-assist-active-request
+  request_type: activate
+  product: support-platform
+  use_case_id: support-agent-assist
+  artifact_id: support-agent-assist-baseline-v1-source-artifact
+  artifact_manifest: platform/artifacts/manifests/support-agent-assist-baseline-v1.yaml
+  source_promotion_id: support-agent-assist-baseline-approved
+  requested_stage: active
+  status: ready_for_approval
+  submitted_by: support-product
+  business_owner: support-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  artifact_known: true
+  source_promotion_ready: true
+  gate_count: 2
+  ready_gate_count: 2
+  ready_for_approval: true
+  blocking_reasons: []
+- request_id: lms-at-risk-baseline-shadow-request
+  request_type: promote_to_shadow
+  product: lms-courseflow
+  use_case_id: lms-at-risk-prediction
+  artifact_id: lms-at-risk-baseline-v1-source-artifact
+  artifact_manifest: ''
+  source_promotion_id: ''
+  requested_stage: shadow
+  status: waiting_for_artifact
+  submitted_by: courseflow-product
+  business_owner: courseflow-product
+  submitted_at: '2026-06-16'
+  is_non_lms: false
+  artifact_known: false
+  source_promotion_ready: false
+  gate_count: 1
+  ready_gate_count: 0
+  ready_for_approval: false
+  blocking_reasons:
+  - artifact_manifest_missing
+  - model_card_missing
+  - evaluation_gate_missing
+- request_id: finance-anomaly-shadow-request
+  request_type: promote_to_shadow
+  product: billing-finance
+  use_case_id: finance-anomaly-detection
+  artifact_id: finance-anomaly-baseline-v1-source-artifact
+  artifact_manifest: ''
+  source_promotion_id: ''
+  requested_stage: shadow
+  status: waiting_for_evaluation
+  submitted_by: finance-product
+  business_owner: finance-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  artifact_known: false
+  source_promotion_ready: false
+  gate_count: 1
+  ready_gate_count: 0
+  ready_for_approval: false
+  blocking_reasons:
+  - evaluation_gate_missing
+  - governed_finance_snapshot_missing
+- request_id: finance-document-intelligence-privacy-request
+  request_type: promote_to_shadow
+  product: billing-finance
+  use_case_id: finance-document-intelligence
+  artifact_id: finance-document-intelligence-baseline-v1-source-artifact
+  artifact_manifest: platform/artifacts/manifests/finance-document-intelligence-baseline-v1.yaml
+  source_promotion_id: ''
+  requested_stage: shadow
+  status: ready_for_approval
+  submitted_by: finance-product
+  business_owner: finance-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  artifact_known: true
+  source_promotion_ready: false
+  gate_count: 2
+  ready_gate_count: 2
+  ready_for_approval: true
+  blocking_reasons: []
+- request_id: operations-routing-rl-simulator-request
+  request_type: promote_to_shadow
+  product: enterprise-operations
+  use_case_id: operations-routing-optimization
+  artifact_id: operations-routing-policy-simulator-v1-source-artifact
+  artifact_manifest: platform/artifacts/manifests/operations-routing-policy-simulator-v1.yaml
+  source_promotion_id: ''
+  requested_stage: shadow
+  status: ready_for_approval
+  submitted_by: operations-product
+  business_owner: operations-product
+  submitted_at: '2026-06-16'
+  is_non_lms: true
+  artifact_known: true
+  source_promotion_ready: false
+  gate_count: 1
+  ready_gate_count: 1
+  ready_for_approval: true
+  blocking_reasons: []

@@ -1,0 +1,141 @@
+contractVersion: 1
+dataProduct:
+  name: gold.recsys_interactions
+  layer: GOLD
+  domain: recommendation
+  product: lms-courseflow
+  domainOwner: lms-domain-council
+  ownerTeam: data-platform
+  businessOwner: learner-experience-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Quality-gated recommendation interaction dataset for related-course model training.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: silver.learner_activity
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: occurred_at
+
+schema:
+  columns:
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that produced or owns this record.
+    - name: dataset_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Immutable snapshot identifier used by ML training runs.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: learner_id_hash
+      type: string
+      nullable: true
+      pii: true
+      description: Tokenized learner identifier used for collaborative filtering grouping.
+    - name: course_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Source course in the interaction pair.
+    - name: related_course_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Candidate related course in the interaction pair.
+    - name: event_type
+      type: string
+      nullable: false
+      pii: false
+      description: Interaction signal consumed by recommendation ML.
+      allowedValues: [ENROLLMENT, CLICK, IMPRESSION]
+    - name: event_weight
+      type: double
+      nullable: false
+      pii: false
+      description: Numeric model weight derived from event type.
+    - name: occurred_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Event-time timestamp.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Original source event id for traceability.
+    - name: source_activity_id
+      type: string
+      nullable: false
+      pii: false
+      description: Silver learner activity id used to build this row.
+    - name: built_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the Gold snapshot was built.
+    - name: quality_passed
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether row passed Gold quality filters.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: product_id_not_null
+      type: not_null
+      column: product_id
+    - name: snapshot_id_not_null
+      type: not_null
+      column: dataset_snapshot_id
+    - name: interaction_key_unique
+      type: unique
+      columns: [dataset_snapshot_id, source_event_id, course_id, related_course_id]
+    - name: event_type_allowed
+      type: accepted_values
+      column: event_type
+      values: [ENROLLMENT, CLICK, IMPRESSION]
+    - name: no_self_recommendation
+      type: expression
+      expression: course_id != related_course_id
+    - name: gold_snapshot_freshness
+      type: freshness
+      column: built_at
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 730
+  erasureSupported: true
+  subjectKeys:
+    - name: learner_id_hash
+      column: learner_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [ML, BI, ReverseETL]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ApprovedMLConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

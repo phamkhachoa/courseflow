@@ -1,0 +1,41 @@
+version: 1
+owner: ai-platform
+policy_id: llm-provider-ops-policy-v1
+defaults:
+  prompt_gateway_required_before_provider: true
+  live_network_providers_require_credential_ref: true
+  deny_when_rate_limited: true
+providers:
+  - provider_id: contract-stub-llm-v1
+    deployment_readiness: contract_stub
+    credential_ref: local://contract-stub/no-secret
+    request_timeout_ms: 1500
+    max_retries: 0
+    rate_limit:
+      requests_per_minute: 120
+      burst: 20
+    circuit_breaker:
+      failure_threshold: 3
+      cooldown_seconds: 30
+    cost:
+      currency: USD
+      input_micros_per_1k_tokens: 0
+      output_micros_per_1k_tokens: 0
+    failover_provider_ids:
+      - contract-stub-llm-failover-v1
+  - provider_id: contract-stub-llm-failover-v1
+    deployment_readiness: contract_stub_failover
+    credential_ref: local://contract-stub/no-secret
+    request_timeout_ms: 1500
+    max_retries: 0
+    rate_limit:
+      requests_per_minute: 120
+      burst: 20
+    circuit_breaker:
+      failure_threshold: 3
+      cooldown_seconds: 30
+    cost:
+      currency: USD
+      input_micros_per_1k_tokens: 0
+      output_micros_per_1k_tokens: 0
+    failover_provider_ids: []

@@ -1,0 +1,48 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-alerts-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  alert_status: alerts_configured_with_watch
+  trend_status: trend_ready_with_watch
+  watch_count: 1
+  alert_count: 1
+  routed_alert_count: 1
+  p0_alert_count: 0
+  p1_alert_count: 1
+  max_trigger_usage_pct: 87
+  tenant_safe: true
+  raw_identifier_count: 0
+action_queue:
+  routed:
+  - prf-response-slo-drift-route-unreachable-p0
+  next_actions:
+  - exercise_product_readiness_response_slo_drift_alert_drill
+alerts:
+- alert_id: prf-response-slo-drift-route-unreachable-p0
+  scenario_id: route-unreachable-p0
+  condition: product_readiness_runtime_route_unreachable
+  scenario_severity: p0
+  alert_severity: p1
+  owner_role: Admin/Ops
+  route: admin-ops
+  action: triage_product_readiness_response_slo_drift
+  alert_status: routed
+  threshold_pct: 80
+  trigger_metric: recover
+  trigger_usage_pct: 87
+  watch_reasons:
+  - acknowledge_slo_usage_watch
+  - contain_slo_usage_watch
+  - recover_slo_usage_watch
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1

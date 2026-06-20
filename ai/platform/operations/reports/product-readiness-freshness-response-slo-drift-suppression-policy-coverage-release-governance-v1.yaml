@@ -1,0 +1,87 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  release_governance_status: release_governance_attached
+  slo_status: coverage_slo_published
+  coverage_status: coverage_expanded
+  coverage_pct: 100
+  objective_count: 4
+  met_objective_count: 4
+  failed_objective_count: 0
+  release_gate_count: 5
+  attached_release_gate_count: 5
+  failed_release_gate_count: 0
+  review_cadence_days: 30
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  max_raw_identifier_count: 0
+  release_gate_review_cadence_days: 30
+action_queue:
+  attached:
+  - coverage-slo-published-release-gate
+  - coverage-slo-objectives-release-gate
+  - coverage-slo-dashboard-release-gate
+  - coverage-slo-owner-cadence-release-gate
+  - coverage-slo-tenant-safety-release-gate
+  blocked: []
+  next_actions:
+  - exercise_product_readiness_response_slo_drift_suppression_policy_coverage_release_gate_drill
+release_gates:
+- gate_id: coverage-slo-published-release-gate
+  gate_type: slo_publication
+  owner_role: SA AI Platform + Admin/Ops
+  target: slo_status=coverage_slo_published
+  observed: slo_status=coverage_slo_published
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: coverage-slo-objectives-release-gate
+  gate_type: slo_objectives
+  owner_role: SA AI Platform + SA AI Engineer
+  target: met_objective_count == objective_count;failed_objective_count=0
+  observed: met=4/4;failed=0
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: coverage-slo-dashboard-release-gate
+  gate_type: dashboard_visibility
+  owner_role: Admin/Ops
+  target: dashboard_panel=true;readiness_gate=true
+  observed: dashboard_panel=true;readiness_gate=product_readiness_freshness_response_slo_drift_suppression_policy_coverage_slo_published
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: coverage-slo-owner-cadence-release-gate
+  gate_type: owner_cadence
+  owner_role: PO/BA + Admin/Ops
+  target: review_cadence_days<=30
+  observed: review_cadence_days=30
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: coverage-slo-tenant-safety-release-gate
+  gate_type: tenant_safety
+  owner_role: Governance Reviewer
+  target: tenant_safe=true;raw_identifier_count=0
+  observed: tenant_safe=true;raw_identifier_count=0
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html

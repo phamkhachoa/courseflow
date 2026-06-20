@@ -1,0 +1,66 @@
+version: 1
+report_id: model-serving-access-incident-export-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  as_of: '2026-06-17'
+  incident_count: 1
+  open_count: 0
+  watch_count: 1
+  p0_count: 0
+  p1_count: 0
+  p2_count: 1
+  drift_count: 0
+  blocked_apply_count: 0
+  stale_pending_apply_count: 0
+  stale_threshold_days: 2
+  tenant_safe: true
+  raw_identifier_count: 0
+  omitted_sensitive_fields:
+  - principal_ids
+  - tenant_ids
+  - request_ids
+  - credential_values
+by_condition:
+  pending_policy_apply: 1
+by_severity:
+  p2: 1
+by_status:
+  watch: 1
+action_queue:
+  open: []
+  watch:
+  - sai-8640e9419144a5d6-pending-policy-apply
+  p0: []
+  p1: []
+  p2:
+  - sai-8640e9419144a5d6-pending-policy-apply
+  policy_drift: []
+  ledger_invalid: []
+  blocked_policy_apply: []
+  stale_pending_policy_apply: []
+  pending_policy_apply:
+  - sai-8640e9419144a5d6-pending-policy-apply
+  ledger_update_required: []
+incidents:
+- incident_id: sai-8640e9419144a5d6-pending-policy-apply
+  condition: pending_policy_apply
+  severity: p2
+  status: watch
+  owner_role: Admin/Ops
+  action: run_controlled_policy_applier
+  application_ref: application:ef7e80ff924a9bfe
+  ledger_status: approved
+  reconciliation_status: pending_policy_apply
+  age_days: 0
+  stale_threshold_days: 2
+  request_count: 1
+  checksum_refs:
+    active_policy: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+    applied_policy: ''
+    proposed_policy: sha256:b90440fbee21733a26b99b2eb54843590f3cb9203902fe7f8132f2c6e16c1331
+    source_policy: sha256:5f92f22988cd32ab7e4ecf8aca5e83aaeffb8edf1144d843a002f77fc4a4fdf7
+  evidence_refs:
+  - ledger:model-serving-access-policy-apply-ledger-v1
+  - report:model-serving-access-policy-reconciliation-v1
+  reason: Approved policy application is queued for the controlled applier.

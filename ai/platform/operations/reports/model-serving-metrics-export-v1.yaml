@@ -1,0 +1,40 @@
+version: 1
+report_id: model-serving-metrics-export-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+source_adapter: hosted-model-serving-adapter
+summary:
+  export_status: connected
+  request_count: 3
+  success_count: 3
+  fallback_count: 0
+  error_count: 0
+  human_review_count: 2
+  audit_record_count: 3
+  audit_failure_count: 0
+  model_count: 3
+by_model:
+  operations-demand-forecast-baseline-v1:
+    auditFailure: 0
+    auditRecord: 1
+    error: 0
+    fallback: 0
+    humanReview: 1
+    ok: 1
+    request: 1
+  sequence-risk-baseline-v1:
+    auditFailure: 0
+    auditRecord: 1
+    error: 0
+    fallback: 0
+    humanReview: 1
+    ok: 1
+    request: 1
+  support-agent-assist-baseline-v1:
+    auditFailure: 0
+    auditRecord: 1
+    error: 0
+    fallback: 0
+    humanReview: 0
+    ok: 1
+    request: 1

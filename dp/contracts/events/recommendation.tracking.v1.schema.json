@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise.local/dp/contracts/events/recommendation.tracking.v1.schema.json",
+  "title": "Recommendation Tracking Event Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventType",
+    "orgId",
+    "courseId",
+    "occurredAt"
+  ],
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "enum": ["IMPRESSION", "CLICK", "ENROLLMENT"]
+    },
+    "orgId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "learnerIdHash": {
+      "type": ["string", "null"],
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "sessionIdHash": {
+      "type": ["string", "null"],
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "courseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "relatedCourseId": {
+      "type": ["string", "null"],
+      "format": "uuid"
+    },
+    "surface": {
+      "type": ["string", "null"],
+      "maxLength": 80
+    },
+    "position": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 200
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "metadata": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "maxProperties": 30
+    }
+  },
+  "anyOf": [
+    {
+      "required": ["learnerIdHash"],
+      "properties": {
+        "learnerIdHash": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 128
+        }
+      }
+    },
+    {
+      "required": ["sessionIdHash"],
+      "properties": {
+        "sessionIdHash": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 128
+        }
+      }
+    }
+  ]
+}

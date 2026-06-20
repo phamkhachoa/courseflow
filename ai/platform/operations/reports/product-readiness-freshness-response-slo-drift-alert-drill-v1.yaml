@@ -1,0 +1,51 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-alert-drill-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  drill_status: passed
+  alert_status: alerts_configured_with_watch
+  alert_count: 1
+  routed_alert_count: 1
+  scenario_count: 1
+  passed_count: 1
+  failed_count: 0
+  max_trigger_usage_pct: 87
+  tenant_safe: true
+  raw_identifier_count: 0
+action_queue:
+  passed:
+  - prf-response-slo-drift-route-unreachable-p0-drill
+  blocked: []
+  next_actions:
+  - monitor_product_readiness_response_slo_drift_alert_calibration
+scenarios:
+- drill_id: prf-response-slo-drift-route-unreachable-p0-drill
+  alert_id: prf-response-slo-drift-route-unreachable-p0
+  scenario_id: route-unreachable-p0
+  condition: product_readiness_runtime_route_unreachable
+  expected_route: admin-ops
+  observed_route: admin-ops
+  expected_action: triage_product_readiness_response_slo_drift
+  observed_action: triage_product_readiness_response_slo_drift
+  expected_alert_status: routed
+  observed_alert_status: routed
+  expected_alert_severity: p1
+  observed_alert_severity: p1
+  trigger_metric: recover
+  trigger_usage_pct: 87
+  threshold_pct: 80
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alerts-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbook:product-readiness-freshness-incident-response-v1
+  - report:product-readiness-freshness-incident-export-v1
+  - report:ai-platform-product-readiness-freshness-v1

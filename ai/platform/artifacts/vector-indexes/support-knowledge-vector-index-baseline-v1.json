@@ -1,0 +1,53 @@
+{
+  "algorithm": "deterministic_hash_embedding_baseline_v1",
+  "checksum": "2b204eccf1856590473d1f5aeae70d3f7e8665c05245fd3480bd1f64d173739b",
+  "chunkCount": 5,
+  "collection": "support_knowledge_articles",
+  "distance": "cosine",
+  "embeddingDimensions": 768,
+  "entries": [
+    {
+      "accessScope": "public",
+      "chunkId": "support-access-mfa-timeout",
+      "piiClass": "none_or_low",
+      "sourceRef": "kb-support-identity-001",
+      "tenantId": "global",
+      "textHash": "6e4b0dcab9d679e3e135178fc8b44396ab54c341a56e8f9f12da1eb1858c47b5"
+    },
+    {
+      "accessScope": "public",
+      "chunkId": "support-account-admin-email",
+      "piiClass": "none_or_low",
+      "sourceRef": "kb-support-account-001",
+      "tenantId": "global",
+      "textHash": "11ae4af7e8416aa148d168358a3d133556b12e2a8f1cc8cbf4a2fc82b5fcc0f8"
+    },
+    {
+      "accessScope": "public",
+      "chunkId": "support-billing-refund-duplicate-charge",
+      "piiClass": "none_or_low",
+      "sourceRef": "kb-support-billing-001",
+      "tenantId": "global",
+      "textHash": "a3212dd76653ba179423c82559f1c7b6d676076792d8e8afaa61d1568bcd3c0e"
+    },
+    {
+      "accessScope": "public",
+      "chunkId": "support-technical-api-timeout",
+      "piiClass": "none_or_low",
+      "sourceRef": "kb-support-integrations-001",
+      "tenantId": "global",
+      "textHash": "322f405689490b38d4c74782ea5c1100be980c72d0679392fa650492c11a0cc6"
+    },
+    {
+      "accessScope": "tenant",
+      "chunkId": "support-tenant-b-private-mfa",
+      "piiClass": "none_or_low",
+      "sourceRef": "kb-support-tenant-b-001",
+      "tenantId": "tenant-b",
+      "textHash": "bd5a848cfcf332c90d50f1b993746de1c81d5096723ada1b9a0b40bc9120ad46"
+    }
+  ],
+  "indexId": "support-knowledge-vector-index-baseline-v1",
+  "modelId": "support-knowledge-vector-index-baseline-v1",
+  "product": "support-platform"
+}

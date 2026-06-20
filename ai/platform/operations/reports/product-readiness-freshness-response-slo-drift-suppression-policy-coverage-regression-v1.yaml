@@ -1,0 +1,115 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  regression_status: regression_monitored
+  coverage_status: coverage_expanded
+  scenario_class_count: 5
+  covered_scenario_count: 5
+  failed_coverage_count: 0
+  active_policy_scenario_count: 1
+  explicit_non_watch_scenario_count: 4
+  effective_signal_count: 4
+  coverage_pct: 100
+  regression_check_count: 7
+  passed_regression_check_count: 7
+  failed_regression_check_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  min_scenario_class_count: 5
+  min_coverage_pct: 100
+  min_active_policy_scenario_count: 1
+  min_effective_signal_count: 4
+  min_explicit_non_watch_scenario_count: 4
+action_queue:
+  passed:
+  - coverage-status-stable
+  - scenario-class-floor-stable
+  - scenario-coverage-full
+  - coverage-pct-floor-stable
+  - active-policy-watch-guard-stable
+  - explicit-non-watch-exclusions-stable
+  - tenant-safety-stable
+  blocked: []
+  next_actions:
+  - publish_product_readiness_response_slo_drift_suppression_policy_coverage_slo
+checks:
+- check_id: coverage-status-stable
+  check_type: coverage_status
+  expected: coverage_expanded
+  observed: coverage_expanded
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- check_id: scenario-class-floor-stable
+  check_type: scenario_class_floor
+  expected: '>=5'
+  observed: '5'
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- check_id: scenario-coverage-full
+  check_type: scenario_coverage
+  expected: covered_scenario_count == scenario_class_count
+  observed: 5/5
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- check_id: coverage-pct-floor-stable
+  check_type: coverage_pct_floor
+  expected: '>=100'
+  observed: '100'
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- check_id: active-policy-watch-guard-stable
+  check_type: active_policy_watch_guard
+  expected: active>=1;signals>=4
+  observed: active=1;signals=4
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- check_id: explicit-non-watch-exclusions-stable
+  check_type: explicit_non_watch_exclusion_guard
+  expected: '>=4'
+  observed: '4'
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- check_id: tenant-safety-stable
+  check_type: tenant_safety
+  expected: tenant_safe=true; raw_identifier_count=0
+  observed: tenant_safe=true;raw_identifier_count=0
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html

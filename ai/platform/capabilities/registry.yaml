@@ -1,0 +1,1616 @@
+version: 1
+owner: ai-platform
+capabilities:
+  - id: ai-use-case-portfolio
+    name: AI use case portfolio
+    maturity: active_as_registry
+    artifacts:
+      - products/registry.yaml
+      - use-cases/registry.yaml
+      - platform/intake/use-case-requests.yaml
+      - platform/intake/reports/use-case-blueprints-v1.yaml
+      - products/ai-platform/README.md
+      - docs/team/council-meetings/0001-ai-platform-product-council.md
+
+  - id: model-family-taxonomy
+    name: Model family taxonomy
+    maturity: active_as_registry
+    artifacts:
+      - model-families/registry.yaml
+      - model-families/README.md
+      - docs/team/council-meetings/0005-model-family-coverage.md
+    responsibilities:
+      - define_supported_ai_families
+      - validate_use_case_model_family_refs
+      - separate_platform_capability_from_lms_domain
+      - guide_classical_to_genai_to_rl_roadmap
+
+  - id: business-capability-coverage
+    name: AI business capability coverage
+    maturity: active_as_validated_report
+    artifacts:
+      - platform/coverage/business-capability-coverage.yaml
+      - platform/src/courseflow_ai_platform/coverage_taxonomy.py
+      - platform/tests/test_coverage_taxonomy.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0017-business-capability-coverage.md
+      - docs/team/council-meetings/0026-ai-spectrum-runtime-status.md
+      - docs/team/council-meetings/0028-sequence-risk-runtime-baseline.md
+      - docs/team/council-meetings/0029-finance-document-intelligence-baseline.md
+      - docs/team/council-meetings/0030-operations-routing-policy-simulator.md
+      - docs/team/council-meetings/0031-support-sla-risk-baseline.md
+      - docs/team/council-meetings/0032-finance-payment-fraud-baseline.md
+      - docs/team/council-meetings/0033-operations-demand-forecast-baseline.md
+      - docs/team/council-meetings/0057-causal-experimentation-module.md
+      - docs/team/council-meetings/0067-speech-audio-runtime-baseline.md
+    responsibilities:
+      - map_ai_taxonomy_to_lms_and_enterprise_use_cases
+      - prove_classical_to_dl_to_llm_to_rag_to_cv_speech_to_rl_coverage
+      - separate_registry_coverage_from_runtime_readiness
+      - separate_implemented_baselines_from_registered_roadmap
+      - expose_business_friendly_coverage_report
+      - prevent_lms_only_platform_design
+
+  - id: ai-module-catalog
+    name: AI module catalog
+    maturity: active_as_validated_catalog_report
+    artifacts:
+      - platform/coverage/reports/ai-module-catalog-v1.yaml
+      - platform/src/courseflow_ai_platform/ai_module_catalog.py
+      - platform/tests/test_ai_module_catalog.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0053-ai-module-catalog-and-delivery-state-ledger.md
+      - docs/team/council-meetings/0057-causal-experimentation-module.md
+      - docs/team/council-meetings/0067-speech-audio-runtime-baseline.md
+    responsibilities:
+      - answer_full_ai_spectrum_coverage_for_business_and_architecture_review
+      - list_classical_dl_nlp_llm_rag_cv_speech_and_rl_modules_in_order
+      - expose_extended_enterprise_modules_beyond_the_required_ai_spectrum
+      - separate_coverage_from_runtime_readiness
+      - identify_first_runtime_candidates_for_platform_buildout
+
+  - id: ai-capability-taxonomy
+    name: AI capability taxonomy
+    maturity: active_as_validated_platform_taxonomy
+    artifacts:
+      - platform/coverage/ai-capability-taxonomy.yaml
+      - platform/coverage/reports/ai-capability-taxonomy-v1.yaml
+      - platform/src/courseflow_ai_platform/capability_taxonomy.py
+      - platform/tests/test_capability_taxonomy.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0053-ai-module-catalog-and-delivery-state-ledger.md
+      - docs/team/council-meetings/0057-causal-experimentation-module.md
+      - docs/team/council-meetings/0067-speech-audio-runtime-baseline.md
+    responsibilities:
+      - validate_model_capability_areas_and_platform_control_plane_areas_together
+      - require_classical_dl_nlp_llm_rag_cv_speech_rl_responsible_ai_mlops_feature_store_evaluation_and_serving
+      - map_taxonomy_areas_to_capability_registry_entries_and_existing_artifacts
+      - expose_platform_capability_gaps_without_misclassifying_them_as_model_families
+      - keep_ai_platform_independent_from_any_single_lms_use_case
+
+  - id: ai-runtime-roadmap
+    name: AI runtime roadmap
+    maturity: active_as_validated_runtime_gap_report
+    artifacts:
+      - platform/coverage/reports/runtime-roadmap-v1.yaml
+      - platform/src/courseflow_ai_platform/runtime_roadmap.py
+      - platform/tests/test_runtime_roadmap.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0027-ai-runtime-roadmap.md
+      - docs/team/council-meetings/0028-sequence-risk-runtime-baseline.md
+      - docs/team/council-meetings/0029-finance-document-intelligence-baseline.md
+      - docs/team/council-meetings/0030-operations-routing-policy-simulator.md
+      - docs/team/council-meetings/0031-support-sla-risk-baseline.md
+      - docs/team/council-meetings/0032-finance-payment-fraud-baseline.md
+      - docs/team/council-meetings/0033-operations-demand-forecast-baseline.md
+      - docs/team/council-meetings/0057-causal-experimentation-module.md
+      - docs/team/council-meetings/0067-speech-audio-runtime-baseline.md
+    responsibilities:
+      - convert_ai_spectrum_runtime_status_into_prioritized_runtime_work
+      - identify_registry_only_tooling_runtime_library_and_shadow_artifact_gaps
+      - prioritize_cv_speech_and_remaining_runtime_candidates
+      - track_sequence_risk_runtime_library_to_service_integration_path
+      - assign_owner_roles_and_next_actions_for_runtime_artifact_buildout
+      - prevent_ai_platform_coverage_from_being_confused_with_runtime_readiness
+
+  - id: solution-blueprint-intake
+    name: Enterprise use-case solution blueprint intake
+    maturity: active_as_validated_front_door
+    artifacts:
+      - platform/intake/use-case-requests.yaml
+      - platform/intake/reports/use-case-blueprints-v1.yaml
+      - platform/src/courseflow_ai_platform/solution_blueprint.py
+      - platform/tests/test_solution_blueprint.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0020-enterprise-solution-blueprint-intake.md
+      - docs/team/council-meetings/0030-operations-routing-policy-simulator.md
+      - docs/team/council-meetings/0031-support-sla-risk-baseline.md
+      - docs/team/council-meetings/0032-finance-payment-fraud-baseline.md
+      - docs/team/council-meetings/0033-operations-demand-forecast-baseline.md
+    responsibilities:
+      - convert_business_requests_into_ai_solution_blueprints
+      - route_lms_and_non_lms_use_cases_through_one_platform_front_door
+      - map_requests_to_ai_taxonomy_modules
+      - expose_data_contract_evaluation_privacy_simulator_and_platform_build_gaps
+      - assign_po_ba_sa_platform_and_sa_engineer_workstreams
+      - keep_enterprise_ai_platform_a_product_not_an_lms_feature_folder
+
+  - id: platform-operating-cockpit
+    name: AI Platform operating cockpit
+    maturity: active_as_validated_ops_projection
+    artifacts:
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/delivery/reports/delivery-backlog-v1.yaml
+      - platform/delivery/reports/delivery-sla-v1.yaml
+      - platform/delivery/reports/delivery-owner-views-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+      - platform/governance/policies/llm-provider-alert-routing-policy.yaml
+      - platform/governance/policies/llm-provider-secret-rotation-policy.yaml
+      - platform/operations/reports/llm-provider-runtime-probes-v1.yaml
+      - platform/operations/reports/llm-provider-alert-routing-v1.yaml
+      - platform/governance/reports/llm-provider-secret-rotation-v1.yaml
+      - platform/governance/reports/governance-evaluation-service-v1.yaml
+      - platform/governance/reports/governance-evaluation-incident-export-v1.yaml
+      - platform/operations/reports/governance-evaluation-incident-response-drill-v1.yaml
+      - platform/operations/runbooks/governance-evaluation-incident-response-v1.yaml
+      - runbooks/governance-evaluation-incident-response.md
+      - platform/operations/reports/model-serving-metrics-export-v1.yaml
+      - platform/src/courseflow_ai_platform/operating_cockpit.py
+      - platform/src/courseflow_ai_platform/admin_ops_dashboard.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_ops.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_incidents.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_response_drill.py
+      - platform/src/courseflow_ai_platform/delivery_backlog.py
+      - platform/src/courseflow_ai_platform/llm_provider_alerts.py
+      - platform/src/courseflow_ai_platform/llm_provider_secret_rotation.py
+      - platform/src/courseflow_ai_platform/serving_metrics_export.py
+      - platform/tests/test_operating_cockpit.py
+      - platform/tests/test_admin_ops_dashboard.py
+      - platform/tests/test_governance_evaluation_ops.py
+      - platform/tests/test_governance_evaluation_incidents.py
+      - platform/tests/test_governance_evaluation_response_drill.py
+      - platform/tests/test_delivery_backlog.py
+      - platform/tests/test_delivery_sla.py
+      - platform/tests/test_delivery_owner_views.py
+      - platform/tests/test_llm_provider_alerts.py
+      - platform/tests/test_llm_provider_secret_rotation.py
+      - platform/tests/test_serving_metrics_export.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0021-platform-operating-cockpit.md
+      - docs/team/council-meetings/0038-runtime-observability-cockpit.md
+      - docs/team/council-meetings/0048-serving-access-governance-cockpit.md
+      - docs/team/council-meetings/0049-serving-access-incident-export.md
+      - docs/team/council-meetings/0051-admin-ops-dashboard-artifact.md
+      - docs/team/council-meetings/0052-admin-ops-dashboard-freshness-manifest.md
+      - docs/team/council-meetings/0054-model-serving-metrics-export.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0065-llm-provider-alert-routing-policy.md
+      - docs/team/council-meetings/0066-llm-provider-secret-rotation-control-plane.md
+      - docs/team/council-meetings/0080-governance-evaluation-ops-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+      - docs/team/council-meetings/0083-governance-evaluation-incident-export.md
+      - docs/team/council-meetings/0084-governance-evaluation-response-runbook-drill.md
+    responsibilities:
+      - aggregate_solution_blueprint_promotion_intake_and_readiness_queues
+      - project_model_serving_and_audit_runtime_health
+      - project_serving_access_governance_pending_apply_and_drift
+      - expose_platform_delivery_and_release_health
+      - assign_cross_role_next_actions_for_admin_ops
+      - show_non_lms_enterprise_ai_product_momentum
+      - separate_release_ready_from_delivery_attention_required
+      - render_admin_ops_dashboard_from_cockpit_owner_views_and_incidents
+      - publish_dashboard_freshness_manifest
+      - consume_persisted_model_serving_metrics_export
+      - project_llm_provider_cost_latency_alerts_to_cockpit
+      - route_llm_provider_alert_delivery_drill_to_admin_ops
+      - project_llm_provider_secret_rotation_status_to_admin_ops
+      - project_governance_evaluation_release_gate_status_to_admin_ops
+      - route_governance_evaluation_release_gate_alert_drill_to_admin_ops
+      - record_governance_evaluation_alert_drill_acceptance_in_state_ledger
+      - export_repeated_governance_evaluation_failures_as_incidents
+      - project_governance_evaluation_response_runbook_drill_to_admin_ops
+
+  - id: platform-delivery-backlog
+    name: AI Platform delivery backlog
+    maturity: active_as_validated_delivery_projection
+    artifacts:
+      - platform/delivery/reports/delivery-backlog-v1.yaml
+      - platform/src/courseflow_ai_platform/delivery_backlog.py
+      - platform/tests/test_delivery_backlog.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0023-platform-delivery-backlog.md
+      - docs/team/council-meetings/0038-runtime-observability-cockpit.md
+      - docs/team/council-meetings/0048-serving-access-governance-cockpit.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+    responsibilities:
+      - convert_operating_cockpit_actions_into_delivery_work_items
+      - assign_phase_owner_priority_status_and_acceptance_criteria
+      - keep_po_ba_sa_platform_sa_engineer_governance_and_admin_ops_aligned
+      - expose_ready_monitoring_and_blocked_work_counts
+      - include_runtime_observability_work_from_cockpit
+      - include_serving_access_governance_work_from_cockpit
+      - include_llm_provider_alert_configuration_work_from_cockpit
+      - include_governance_evaluation_alert_drill_work_from_cockpit
+      - make_enterprise_ai_platform_delivery_trackable_as_a_product
+
+  - id: platform-delivery-state-ledger
+    name: AI Platform delivery state ledger
+    maturity: active_as_validated_state_projection
+    artifacts:
+      - platform/delivery/ledgers/delivery-state-ledger.yaml
+      - platform/delivery/reports/delivery-state-v1.yaml
+      - platform/src/courseflow_ai_platform/delivery_state_ledger.py
+      - platform/src/courseflow_ai_platform/delivery_backlog.py
+      - platform/tests/test_delivery_state_ledger.py
+      - platform/tests/test_delivery_backlog.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0053-ai-module-catalog-and-delivery-state-ledger.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+    responsibilities:
+      - persist_delivery_state_transitions_by_stable_action_id
+      - project_ready_waiting_or_monitoring_items_to_in_progress_done_or_accepted
+      - keep_generated_backlog_sla_owner_views_and_dashboard_consistent
+      - expose_applied_and_missing_transition_counts
+      - let_admin_ops_track_work_started_without_editing_generated_reports
+      - record_governance_evaluation_alert_drill_acceptance
+
+  - id: platform-delivery-sla
+    name: AI Platform delivery SLA and owner routing
+    maturity: active_as_validated_sla_projection
+    artifacts:
+      - platform/delivery/policies/sla-policy.yaml
+      - platform/delivery/reports/delivery-sla-v1.yaml
+      - platform/src/courseflow_ai_platform/delivery_sla.py
+      - platform/tests/test_delivery_sla.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0024-delivery-sla-owner-routing.md
+      - docs/team/council-meetings/0038-runtime-observability-cockpit.md
+      - docs/team/council-meetings/0048-serving-access-governance-cockpit.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+    responsibilities:
+      - map_delivery_backlog_items_to_owner_aliases
+      - assign_priority_based_due_dates
+      - expose_due_soon_overdue_on_track_and_monitoring_counts
+      - route_runtime_observability_work_to_owner_aliases
+      - route_serving_access_governance_work_to_admin_ops
+      - route_llm_provider_budget_latency_alerts_to_admin_ops
+      - route_governance_evaluation_release_gate_alerts_to_admin_ops
+      - preserve_accepted_governance_evaluation_drills_in_sla_views
+      - route_escalation_roles_for_ai_platform_delivery
+      - make_weekly_platform_execution_measurable
+
+  - id: platform-delivery-owner-views
+    name: AI Platform delivery owner views
+    maturity: active_as_validated_owner_projection
+    artifacts:
+      - platform/delivery/reports/delivery-owner-views-v1.yaml
+      - platform/src/courseflow_ai_platform/delivery_owner_views.py
+      - platform/tests/test_delivery_owner_views.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0025-delivery-owner-views.md
+      - docs/team/council-meetings/0038-runtime-observability-cockpit.md
+      - docs/team/council-meetings/0048-serving-access-governance-cockpit.md
+      - docs/team/council-meetings/0050-serving-access-owner-view-rollup.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+    responsibilities:
+      - group_delivery_sla_items_by_owner_alias
+      - expose_due_soon_overdue_on_track_and_monitoring_counts_per_owner
+      - identify_overloaded_owner_queues
+      - publish_next_due_and_next_review_dates_for_each_owner
+      - show_runtime_observability_work_in_owner_queues
+      - show_serving_access_governance_work_in_owner_queues
+      - show_llm_provider_alert_configuration_in_admin_ops_queue
+      - show_governance_evaluation_alert_drill_in_admin_ops_queue
+      - show_accepted_governance_evaluation_alert_drill_status
+      - roll_up_open_serving_access_incidents_by_owner_alias
+      - prepare_admin_ops_owner_dashboard_for_ai_platform_execution
+
+  - id: admin-ops-dashboard
+    name: Admin/Ops dashboard artifact
+    maturity: active_as_rendered_dashboard_artifact
+    artifacts:
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+      - platform/src/courseflow_ai_platform/admin_ops_dashboard.py
+      - platform/src/courseflow_ai_platform/operating_cockpit.py
+      - platform/src/courseflow_ai_platform/delivery_owner_views.py
+      - platform/src/courseflow_ai_platform/serving_access_incidents.py
+      - platform/tests/test_admin_ops_dashboard.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0051-admin-ops-dashboard-artifact.md
+      - docs/team/council-meetings/0052-admin-ops-dashboard-freshness-manifest.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+    responsibilities:
+      - render_human_readable_admin_ops_dashboard
+      - combine_operating_cockpit_owner_views_and_serving_access_incidents
+      - preserve_tenant_safe_incident_refs_in_rendered_output
+      - expose_admin_ops_delivery_items_open_incidents_and_control_plane_actions
+      - provide_static_html_artifact_without_requiring_a_runtime_server
+      - publish_dashboard_html_and_source_snapshot_freshness
+      - expose_llm_provider_ops_status_and_alert_configuration_queue
+      - expose_governance_evaluation_alert_drill_queue
+      - expose_accepted_governance_evaluation_alert_drill_status
+
+  - id: feature-contracts
+    name: Feature contracts
+    maturity: active_as_validated_data_contract_coverage
+    artifacts:
+      - contracts/features/lms-learning-features.v1.yaml
+      - contracts/features/support-case-features.v1.yaml
+      - contracts/models/support-sla-risk-model-io.v1.yaml
+      - contracts/features/enterprise-knowledge-documents.v1.yaml
+      - contracts/features/finance-payment-risk-features.v1.yaml
+      - contracts/models/finance-payment-fraud-model-io.v1.yaml
+      - contracts/features/finance-document-intelligence-features.v1.yaml
+      - contracts/features/operations-routing-features.v1.yaml
+      - contracts/features/operations-demand-features.v1.yaml
+      - contracts/models/operations-demand-forecast-model-io.v1.yaml
+      - platform/data-contracts/registry.yaml
+      - platform/data-contracts/reports/data-contract-coverage-v1.yaml
+      - platform/src/courseflow_ai_platform/data_contracts.py
+      - platform/tests/test_data_contracts.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0022-data-contract-coverage.md
+    responsibilities:
+      - define_feature_owner
+      - classify_pii
+      - define_freshness
+      - define_training_serving_parity
+      - map_solution_blueprint_data_domains_to_contracts
+      - separate_design_ready_from_production_ready_contracts
+      - expose_privacy_and_simulator_gated_data_contracts
+
+  - id: product-onboarding
+    name: Product onboarding
+    maturity: active_as_registry
+    artifacts:
+      - products/registry.yaml
+      - products/ai-platform/README.md
+      - products/lms-courseflow/README.md
+    responsibilities:
+      - register_product_owner
+      - register_candidate_use_cases
+      - track_platform_readiness
+      - prevent_lms_only_platform_design
+
+  - id: vector-store
+    name: Vector store
+    maturity: active_with_policy_enforced_retrieval_and_rag_answer_service_packages
+    artifacts:
+      - services/retrieval-service/service.yaml
+      - services/retrieval-service/README.md
+      - services/retrieval-service/Dockerfile
+      - services/retrieval-service/Makefile
+      - services/retrieval-service/pyproject.toml
+      - services/retrieval-service/src/courseflow_retrieval_service/service.py
+      - services/retrieval-service/src/courseflow_retrieval_service/cli.py
+      - services/retrieval-service/src/courseflow_retrieval_service/http_server.py
+      - services/retrieval-service/tests/test_service_contract.py
+      - services/rag-answer-service/service.yaml
+      - services/rag-answer-service/README.md
+      - services/rag-answer-service/Dockerfile
+      - services/rag-answer-service/Makefile
+      - services/rag-answer-service/pyproject.toml
+      - services/rag-answer-service/src/courseflow_rag_answer_service/service.py
+      - services/rag-answer-service/src/courseflow_rag_answer_service/cli.py
+      - services/rag-answer-service/src/courseflow_rag_answer_service/http_server.py
+      - services/rag-answer-service/tests/test_service_contract.py
+      - platform/vector-store/collections/course-content.yaml
+      - platform/vector-store/collections/support-knowledge.yaml
+      - platform/governance/policies/retrieval-access-policy.yaml
+      - platform/governance/policies/rag-answer-access-policy.yaml
+      - platform/evaluation/corpora/course-content-corpus.yaml
+      - platform/evaluation/corpora/support-knowledge-corpus.yaml
+      - platform/evaluation/datasets/course-content-retrieval-golden.yaml
+      - platform/evaluation/datasets/support-knowledge-retrieval-golden.yaml
+      - platform/evaluation/datasets/course-content-vector-index-golden.yaml
+      - platform/evaluation/datasets/support-knowledge-vector-index-golden.yaml
+      - platform/evaluation/datasets/course-content-hybrid-retrieval-golden.yaml
+      - platform/evaluation/datasets/support-knowledge-hybrid-retrieval-golden.yaml
+      - platform/evaluation/reports/course-content-vector-index-v1-eval.yaml
+      - platform/evaluation/reports/support-knowledge-vector-index-v1-eval.yaml
+      - platform/evaluation/reports/course-content-hybrid-retrieval-v1-eval.yaml
+      - platform/evaluation/reports/support-knowledge-hybrid-retrieval-v1-eval.yaml
+      - platform/artifacts/vector-indexes/course-content-vector-index-baseline-v1.json
+      - platform/artifacts/vector-indexes/support-knowledge-vector-index-baseline-v1.json
+      - platform/artifacts/manifests/course-content-vector-index-baseline-v1.yaml
+      - platform/artifacts/manifests/support-knowledge-vector-index-baseline-v1.yaml
+      - platform/artifacts/promotions/registry.yaml
+      - platform/src/courseflow_ai_platform/retrieval_service.py
+      - platform/src/courseflow_ai_platform/rag_answer_service.py
+      - platform/src/courseflow_ai_platform/vector_index.py
+      - platform/tests/test_retrieval_service.py
+      - platform/tests/test_rag_answer_service.py
+      - platform/tests/test_vector_index.py
+      - docs/team/council-meetings/0013-vector-index-contract-pipeline.md
+      - docs/team/council-meetings/0014-hybrid-retrieval-shadow-gates.md
+      - docs/team/council-meetings/0015-vector-index-artifact-manifests.md
+      - docs/team/council-meetings/0056-retrieval-service-package.md
+      - docs/team/council-meetings/0077-rag-answer-service-package.md
+    responsibilities:
+      - embedding_collection_schema
+      - deterministic_vector_index_contract
+      - chunk_lineage
+      - retrieval_metadata
+      - vector_index_checksum_gate
+      - vector_index_snapshot_manifest
+      - hybrid_retrieval_shadow_gate
+      - shadow_to_candidate_promotion_evidence
+      - index_quality_checks
+      - tenant_isolation_retrieval_gate
+      - policy_enforced_retrieval_service_boundary
+      - policy_enforced_grounded_answer_service_boundary
+      - lms_and_support_retrieval_service_reuse
+      - lms_support_and_enterprise_rag_answer_reuse
+      - citation_required_grounded_answer_gate
+      - insufficient_context_refusal_gate
+
+  - id: sequence-risk-service
+    name: Sequence risk service
+    maturity: active_with_policy_enforced_sequence_service_package
+    artifacts:
+      - services/sequence-risk-service/service.yaml
+      - services/sequence-risk-service/README.md
+      - services/sequence-risk-service/Dockerfile
+      - services/sequence-risk-service/Makefile
+      - services/sequence-risk-service/pyproject.toml
+      - services/sequence-risk-service/src/courseflow_sequence_risk_service/service.py
+      - services/sequence-risk-service/src/courseflow_sequence_risk_service/cli.py
+      - services/sequence-risk-service/src/courseflow_sequence_risk_service/http_server.py
+      - services/sequence-risk-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/sequence_risk_service.py
+      - platform/governance/policies/sequence-risk-access-policy.yaml
+      - platform/tests/test_sequence_risk_service.py
+      - models/deep_learning/sequence_risk_baseline/sequence_risk_baseline.py
+      - contracts/models/sequence-risk-model-io.v1.yaml
+      - platform/evaluation/reports/sequence-risk-baseline-v1-eval.yaml
+      - docs/team/council-meetings/0071-sequence-risk-service-package.md
+    responsibilities:
+      - serve_recurrent_sequence_risk_scoring
+      - enforce_product_use_case_tenant_sequence_principal_grants
+      - reject_direct_learner_student_user_and_email_identifiers
+      - mark_medium_and_high_risk_outputs_for_human_review
+      - expose_tenant_safe_score_error_identifier_and_hitl_metrics
+      - keep_deep_learning_sequence_runtime_on_platform_service_boundary
+
+  - id: payment-fraud-service
+    name: Payment fraud service
+    maturity: active_with_policy_enforced_payment_fraud_service_package
+    artifacts:
+      - services/payment-fraud-service/service.yaml
+      - services/payment-fraud-service/README.md
+      - services/payment-fraud-service/Dockerfile
+      - services/payment-fraud-service/Makefile
+      - services/payment-fraud-service/pyproject.toml
+      - services/payment-fraud-service/src/courseflow_payment_fraud_service/service.py
+      - services/payment-fraud-service/src/courseflow_payment_fraud_service/cli.py
+      - services/payment-fraud-service/src/courseflow_payment_fraud_service/http_server.py
+      - services/payment-fraud-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/payment_fraud_service.py
+      - platform/governance/policies/payment-fraud-access-policy.yaml
+      - platform/tests/test_payment_fraud_service.py
+      - models/anomaly_fraud/payment_fraud_baseline/payment_fraud_baseline.py
+      - contracts/models/finance-payment-fraud-model-io.v1.yaml
+      - platform/evaluation/reports/finance-payment-fraud-v1-eval.yaml
+      - docs/team/council-meetings/0072-payment-fraud-service-package.md
+    responsibilities:
+      - serve_bounded_payment_fraud_risk_scoring
+      - enforce_product_use_case_tenant_payment_risk_principal_grants
+      - reject_raw_account_counterparty_device_email_phone_and_payer_identifiers
+      - mark_medium_and_high_risk_payment_outputs_for_human_review
+      - keep_automated_adverse_payment_or_account_action_forbidden
+      - expose_tenant_safe_score_error_identifier_hitl_and_entity_link_metrics
+      - keep_non_lms_finance_anomaly_runtime_on_platform_service_boundary
+
+  - id: graph-entity-service
+    name: Graph entity service
+    maturity: active_with_policy_enforced_graph_entity_service_package
+    artifacts:
+      - services/graph-entity-service/service.yaml
+      - services/graph-entity-service/README.md
+      - services/graph-entity-service/Dockerfile
+      - services/graph-entity-service/Makefile
+      - services/graph-entity-service/pyproject.toml
+      - services/graph-entity-service/src/courseflow_graph_entity_service/service.py
+      - services/graph-entity-service/src/courseflow_graph_entity_service/cli.py
+      - services/graph-entity-service/src/courseflow_graph_entity_service/http_server.py
+      - services/graph-entity-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/graph_entity_service.py
+      - platform/governance/policies/graph-entity-access-policy.yaml
+      - platform/tests/test_graph_entity_service.py
+      - models/anomaly_fraud/payment_fraud_baseline/payment_fraud_baseline.py
+      - contracts/models/finance-payment-fraud-model-io.v1.yaml
+      - platform/evaluation/reports/finance-payment-fraud-v1-eval.yaml
+      - docs/team/council-meetings/0076-graph-entity-service-package.md
+    responsibilities:
+      - serve_pseudonymous_entity_link_evidence_analysis
+      - enforce_product_use_case_tenant_graph_entity_principal_grants
+      - reject_direct_account_counterparty_customer_user_device_and_contact_identifiers
+      - reject_raw_hash_values_at_graph_boundary
+      - keep_automated_adverse_action_forbidden
+      - expose_tenant_safe_analysis_error_identifier_link_strength_and_review_metrics
+      - keep_graph_entity_evidence_on_platform_service_boundary
+
+  - id: forecasting-service
+    name: Forecasting service
+    maturity: active_with_policy_enforced_forecasting_service_package
+    artifacts:
+      - services/forecasting-service/service.yaml
+      - services/forecasting-service/README.md
+      - services/forecasting-service/Dockerfile
+      - services/forecasting-service/Makefile
+      - services/forecasting-service/pyproject.toml
+      - services/forecasting-service/src/courseflow_forecasting_service/service.py
+      - services/forecasting-service/src/courseflow_forecasting_service/cli.py
+      - services/forecasting-service/src/courseflow_forecasting_service/http_server.py
+      - services/forecasting-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/forecasting_service.py
+      - platform/governance/policies/forecasting-access-policy.yaml
+      - platform/tests/test_forecasting_service.py
+      - models/forecasting/demand_forecast_baseline/demand_forecast_baseline.py
+      - contracts/models/operations-demand-forecast-model-io.v1.yaml
+      - platform/evaluation/reports/operations-demand-forecast-v1-eval.yaml
+      - docs/team/council-meetings/0073-forecasting-service-package.md
+    responsibilities:
+      - serve_bounded_demand_forecast_and_capacity_planning
+      - enforce_product_use_case_tenant_forecasting_principal_grants
+      - reject_direct_employee_customer_learner_and_contact_identifiers
+      - mark_high_demand_incident_and_capacity_shortfall_outputs_for_human_review
+      - keep_automated_capacity_change_forbidden
+      - expose_tenant_safe_score_error_identifier_capacity_and_hitl_metrics
+      - keep_lms_and_operations_forecasting_on_platform_service_boundary
+
+  - id: routing-policy-service
+    name: Routing policy service
+    maturity: active_with_policy_enforced_routing_policy_service_package
+    artifacts:
+      - services/routing-policy-service/service.yaml
+      - services/routing-policy-service/README.md
+      - services/routing-policy-service/Dockerfile
+      - services/routing-policy-service/Makefile
+      - services/routing-policy-service/pyproject.toml
+      - services/routing-policy-service/src/courseflow_routing_policy_service/service.py
+      - services/routing-policy-service/src/courseflow_routing_policy_service/cli.py
+      - services/routing-policy-service/src/courseflow_routing_policy_service/http_server.py
+      - services/routing-policy-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/routing_policy_service.py
+      - platform/governance/policies/routing-policy-access-policy.yaml
+      - platform/tests/test_routing_policy_service.py
+      - models/bandit_rl/routing_policy_simulator/routing_policy_simulator.py
+      - contracts/models/operations-routing-policy-model-io.v1.yaml
+      - platform/evaluation/reports/operations-routing-policy-v1-eval.yaml
+      - docs/team/council-meetings/0074-routing-policy-service-package.md
+    responsibilities:
+      - serve_constrained_routing_policy_recommendations
+      - enforce_product_use_case_tenant_routing_policy_principal_grants
+      - reject_direct_agent_assignee_customer_learner_and_contact_identifiers
+      - mark_constraint_violations_for_human_review
+      - keep_online_policy_activation_forbidden
+      - expose_tenant_safe_recommendation_error_identifier_constraint_and_exploration_metrics
+      - keep_operations_routing_rl_simulator_on_platform_service_boundary
+
+  - id: causal-uplift-service
+    name: Causal uplift service
+    maturity: active_with_policy_enforced_causal_uplift_service_package
+    artifacts:
+      - services/causal-uplift-service/service.yaml
+      - services/causal-uplift-service/README.md
+      - services/causal-uplift-service/Dockerfile
+      - services/causal-uplift-service/Makefile
+      - services/causal-uplift-service/pyproject.toml
+      - services/causal-uplift-service/src/courseflow_causal_uplift_service/service.py
+      - services/causal-uplift-service/src/courseflow_causal_uplift_service/cli.py
+      - services/causal-uplift-service/src/courseflow_causal_uplift_service/http_server.py
+      - services/causal-uplift-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/causal_uplift_service.py
+      - platform/governance/policies/causal-uplift-access-policy.yaml
+      - platform/tests/test_causal_uplift_service.py
+      - models/causal/causal_uplift_baseline/causal_uplift_baseline.py
+      - contracts/features/causal-experiment-features.v1.yaml
+      - contracts/models/causal-uplift-model-io.v1.yaml
+      - platform/evaluation/reports/causal-uplift-v1-eval.yaml
+      - docs/team/council-meetings/0075-causal-uplift-service-package.md
+    responsibilities:
+      - serve_aggregate_treatment_control_uplift_evaluations
+      - enforce_product_use_case_tenant_causal_uplift_principal_grants
+      - reject_direct_learner_customer_user_participant_and_contact_identifiers
+      - mark_high_impact_and_guardrail_risk_outputs_for_human_review
+      - keep_automated_rollout_forbidden
+      - expose_tenant_safe_evaluation_error_identifier_guardrail_and_hitl_metrics
+      - keep_lms_and_enterprise_experimentation_on_platform_service_boundary
+
+  - id: media-intelligence-service
+    name: Media intelligence service
+    maturity: active_with_policy_enforced_media_service_package
+    artifacts:
+      - services/media-intelligence-service/service.yaml
+      - services/media-intelligence-service/README.md
+      - services/media-intelligence-service/Dockerfile
+      - services/media-intelligence-service/Makefile
+      - services/media-intelligence-service/pyproject.toml
+      - services/media-intelligence-service/src/courseflow_media_intelligence_service/service.py
+      - services/media-intelligence-service/src/courseflow_media_intelligence_service/cli.py
+      - services/media-intelligence-service/src/courseflow_media_intelligence_service/http_server.py
+      - services/media-intelligence-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/media_intelligence_service.py
+      - platform/governance/policies/media-intelligence-access-policy.yaml
+      - platform/governance/policies/media-privacy-review-policy.yaml
+      - platform/governance/controls/raw-media-storage-boundary-v1.yaml
+      - platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+      - platform/governance/controls/speech-audio-raw-asr-diarization-controls-v1.yaml
+      - platform/governance/reports/media-privacy-review-v1.yaml
+      - platform/tests/test_media_intelligence_service.py
+      - models/multimodal/document_intelligence_baseline/document_intelligence_baseline.py
+      - models/speech/audio_quality_baseline/audio_quality_baseline.py
+      - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      - platform/evaluation/reports/speech-quality-v1-eval.yaml
+      - docs/team/council-meetings/0069-raw-media-control-evidence-approval.md
+      - docs/team/council-meetings/0070-media-intelligence-service-package.md
+    responsibilities:
+      - serve_bounded_ocr_token_document_intelligence
+      - serve_transcript_segment_speech_quality_assessment
+      - enforce_product_use_case_tenant_media_principal_grants
+      - reject_raw_document_and_audio_uri_submission_on_bounded_routes
+      - expose_tenant_safe_document_speech_error_hitl_and_privacy_metrics
+      - keep_lms_finance_and_support_media_ai_on_one_platform_boundary
+
+  - id: nlp-understanding-service
+    name: NLP understanding service
+    maturity: active_with_policy_enforced_nlp_service_package
+    artifacts:
+      - services/nlp-understanding-service/service.yaml
+      - services/nlp-understanding-service/README.md
+      - services/nlp-understanding-service/Dockerfile
+      - services/nlp-understanding-service/Makefile
+      - services/nlp-understanding-service/pyproject.toml
+      - services/nlp-understanding-service/src/courseflow_nlp_understanding_service/service.py
+      - services/nlp-understanding-service/src/courseflow_nlp_understanding_service/cli.py
+      - services/nlp-understanding-service/src/courseflow_nlp_understanding_service/http_server.py
+      - services/nlp-understanding-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/nlp_understanding_service.py
+      - platform/governance/policies/nlp-understanding-access-policy.yaml
+      - platform/tests/test_nlp_understanding_service.py
+      - models/llm/support_agent_assist/support_agent_assist.py
+      - platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+      - docs/team/council-meetings/0078-nlp-understanding-service-package.md
+    responsibilities:
+      - intent_classification_service_boundary
+      - semantic_tagging_service_boundary
+      - rubric_feedback_service_boundary
+      - transformer_upgrade_path
+      - direct_identifier_rejection
+      - product_use_case_tenant_scoped_nlp_access
+      - lms_support_and_enterprise_language_understanding_reuse
+
+  - id: model-registry
+    name: Model registry
+    maturity: active_in_recommendation_service
+    service: services/recommendation-ml-service
+    artifacts:
+      - platform/model-registry/model-cards/recommendation-item-cf-v1.md
+      - platform/artifacts/manifests/recommendation-item-cf-v1.yaml
+      - platform/model-registry/model-cards/support-agent-assist-baseline-v1.md
+      - platform/artifacts/manifests/support-agent-assist-baseline-v1.yaml
+      - platform/model-registry/model-cards/support-sla-risk-baseline-v1.md
+      - platform/artifacts/manifests/support-sla-risk-baseline-v1.yaml
+      - contracts/models/support-sla-risk-model-io.v1.yaml
+      - models/classical/support_sla_risk_baseline/support_sla_risk_baseline.py
+      - platform/model-registry/model-cards/finance-payment-fraud-baseline-v1.md
+      - platform/artifacts/manifests/finance-payment-fraud-baseline-v1.yaml
+      - contracts/models/finance-payment-fraud-model-io.v1.yaml
+      - models/anomaly_fraud/payment_fraud_baseline/payment_fraud_baseline.py
+      - platform/model-registry/model-cards/sequence-risk-baseline-v1.md
+      - platform/artifacts/manifests/sequence-risk-baseline-v1.yaml
+      - platform/model-registry/model-cards/finance-document-intelligence-baseline-v1.md
+      - platform/artifacts/manifests/finance-document-intelligence-baseline-v1.yaml
+      - platform/model-registry/model-cards/operations-routing-policy-simulator-v1.md
+      - platform/artifacts/manifests/operations-routing-policy-simulator-v1.yaml
+      - contracts/models/operations-routing-policy-model-io.v1.yaml
+      - models/bandit_rl/routing_policy_simulator/routing_policy_simulator.py
+      - platform/model-registry/model-cards/operations-demand-forecast-baseline-v1.md
+      - platform/artifacts/manifests/operations-demand-forecast-baseline-v1.yaml
+      - contracts/models/operations-demand-forecast-model-io.v1.yaml
+      - models/forecasting/demand_forecast_baseline/demand_forecast_baseline.py
+      - platform/model-registry/model-cards/speech-quality-baseline-v1.md
+      - platform/artifacts/manifests/speech-quality-baseline-v1.yaml
+      - contracts/models/speech-quality-model-io.v1.yaml
+      - contracts/features/speech-audio-features.v1.yaml
+      - models/speech/audio_quality_baseline/audio_quality_baseline.py
+      - docs/team/council-meetings/0028-sequence-risk-runtime-baseline.md
+      - docs/team/council-meetings/0029-finance-document-intelligence-baseline.md
+      - docs/team/council-meetings/0030-operations-routing-policy-simulator.md
+      - docs/team/council-meetings/0031-support-sla-risk-baseline.md
+      - docs/team/council-meetings/0032-finance-payment-fraud-baseline.md
+      - docs/team/council-meetings/0033-operations-demand-forecast-baseline.md
+      - docs/team/council-meetings/0067-speech-audio-runtime-baseline.md
+    responsibilities:
+      - model_version_status
+      - model_metrics
+      - active_model_tracking
+      - audit_evidence
+      - speech_quality_baseline_tracking
+
+  - id: model-evaluation
+    name: Model evaluation and quality gates
+    maturity: active_as_policy_enforced_service_package
+    artifacts:
+      - services/governance-evaluation-service/service.yaml
+      - services/governance-evaluation-service/README.md
+      - services/governance-evaluation-service/Dockerfile
+      - services/governance-evaluation-service/Makefile
+      - services/governance-evaluation-service/pyproject.toml
+      - services/governance-evaluation-service/src/courseflow_governance_evaluation_service/service.py
+      - services/governance-evaluation-service/src/courseflow_governance_evaluation_service/cli.py
+      - services/governance-evaluation-service/src/courseflow_governance_evaluation_service/http_server.py
+      - services/governance-evaluation-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_service.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_ops.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_incidents.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_response_drill.py
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+      - platform/governance/policies/governance-evaluation-incident-policy.yaml
+      - platform/governance/ledgers/governance-evaluation-alert-drill-ledger.yaml
+      - platform/governance/reports/governance-evaluation-service-v1.yaml
+      - platform/governance/reports/governance-evaluation-incident-export-v1.yaml
+      - platform/operations/runbooks/governance-evaluation-incident-response-v1.yaml
+      - platform/operations/reports/governance-evaluation-incident-response-drill-v1.yaml
+      - platform/tests/test_governance_evaluation_service.py
+      - platform/tests/test_governance_evaluation_ops.py
+      - platform/tests/test_governance_evaluation_incidents.py
+      - platform/tests/test_governance_evaluation_response_drill.py
+      - platform/evaluation/registry.yaml
+      - platform/evaluation/corpora/course-content-corpus.yaml
+      - platform/evaluation/corpora/support-knowledge-corpus.yaml
+      - platform/evaluation/datasets/course-rag-answer-golden.yaml
+      - platform/evaluation/datasets/course-content-retrieval-golden.yaml
+      - platform/evaluation/datasets/course-content-vector-index-golden.yaml
+      - platform/evaluation/datasets/course-content-hybrid-retrieval-golden.yaml
+      - platform/evaluation/datasets/prompt-safety-golden.yaml
+      - platform/evaluation/datasets/llm-adapter-shadow-gateway-golden.yaml
+      - platform/evaluation/datasets/recommendation-item-cf-golden.yaml
+      - platform/evaluation/datasets/sequence-risk-baseline-golden.yaml
+      - platform/evaluation/datasets/finance-document-intelligence-golden.yaml
+      - platform/evaluation/datasets/speech-quality-golden.yaml
+      - platform/evaluation/datasets/operations-routing-policy-golden.yaml
+      - platform/evaluation/datasets/operations-demand-forecast-golden.yaml
+      - platform/evaluation/datasets/support-agent-assist-golden.yaml
+      - platform/evaluation/datasets/support-sla-risk-golden.yaml
+      - platform/evaluation/datasets/finance-payment-fraud-golden.yaml
+      - platform/evaluation/datasets/support-rag-answer-golden.yaml
+      - platform/evaluation/datasets/support-knowledge-retrieval-golden.yaml
+      - platform/evaluation/datasets/support-knowledge-vector-index-golden.yaml
+      - platform/evaluation/datasets/support-knowledge-hybrid-retrieval-golden.yaml
+      - platform/evaluation/quality-gates/ai-mentor-gates.yaml
+      - platform/evaluation/reports/course-rag-answer-v1-eval.yaml
+      - platform/evaluation/reports/course-content-retrieval-v1-eval.yaml
+      - platform/evaluation/reports/course-content-vector-index-v1-eval.yaml
+      - platform/evaluation/reports/course-content-hybrid-retrieval-v1-eval.yaml
+      - platform/evaluation/reports/prompt-safety-v1-eval.yaml
+      - platform/evaluation/reports/llm-adapter-shadow-gateway-v1-eval.yaml
+      - platform/evaluation/reports/recommendation-item-cf-v1-eval.yaml
+      - platform/evaluation/reports/sequence-risk-baseline-v1-eval.yaml
+      - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      - platform/evaluation/reports/speech-quality-v1-eval.yaml
+      - platform/evaluation/reports/operations-routing-policy-v1-eval.yaml
+      - platform/evaluation/reports/operations-demand-forecast-v1-eval.yaml
+      - platform/evaluation/reports/support-rag-answer-v1-eval.yaml
+      - platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+      - platform/evaluation/reports/support-sla-risk-v1-eval.yaml
+      - platform/evaluation/reports/finance-payment-fraud-v1-eval.yaml
+      - platform/evaluation/reports/support-knowledge-retrieval-v1-eval.yaml
+      - platform/evaluation/reports/support-knowledge-vector-index-v1-eval.yaml
+      - platform/evaluation/reports/support-knowledge-hybrid-retrieval-v1-eval.yaml
+      - platform/src/courseflow_ai_platform/llm_provider_adapter.py
+      - platform/src/courseflow_ai_platform/evaluation.py
+      - platform/tests/test_llm_provider_adapter.py
+      - platform/tests/test_evaluation.py
+      - docs/team/council-meetings/0007-retrieval-quality-gates.md
+      - docs/team/council-meetings/0008-grounded-answer-gates.md
+      - docs/team/council-meetings/0013-vector-index-contract-pipeline.md
+      - docs/team/council-meetings/0014-hybrid-retrieval-shadow-gates.md
+      - docs/team/council-meetings/0028-sequence-risk-runtime-baseline.md
+      - docs/team/council-meetings/0029-finance-document-intelligence-baseline.md
+      - docs/team/council-meetings/0030-operations-routing-policy-simulator.md
+      - docs/team/council-meetings/0031-support-sla-risk-baseline.md
+      - docs/team/council-meetings/0032-finance-payment-fraud-baseline.md
+      - docs/team/council-meetings/0033-operations-demand-forecast-baseline.md
+      - docs/team/council-meetings/0067-speech-audio-runtime-baseline.md
+      - docs/team/council-meetings/0059-llm-adapter-shadow-gateway.md
+      - docs/team/council-meetings/0060-llm-adapter-service-package.md
+      - docs/team/council-meetings/0079-governance-evaluation-service-package.md
+      - docs/team/council-meetings/0080-governance-evaluation-ops-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+      - docs/team/council-meetings/0083-governance-evaluation-incident-export.md
+      - docs/team/council-meetings/0084-governance-evaluation-response-runbook-drill.md
+    responsibilities:
+      - expose_policy_enforced_governance_evaluation_service_boundary
+      - expose_governance_evaluation_ops_drill_projection
+      - route_governance_evaluation_release_gate_alert_drill_to_sla_queue
+      - persist_governance_evaluation_alert_drill_acceptance
+      - serve_release_promotion_and_safety_gate_decisions
+      - project_required_gate_readiness_into_product_decisions
+      - executable_evaluation_registry
+      - offline_metrics
+      - retrieval_metrics
+      - llm_eval
+      - grounded_answer_metrics
+      - llm_adapter_shadow_gateway_metrics
+      - vector_index_contract_metrics
+      - hybrid_retrieval_shadow_metrics
+      - citation_and_refusal_gate
+      - prompt_safety_gate
+      - llm_adapter_provider_contract_gate
+      - baseline_comparison
+      - promotion_gate
+      - support_sla_risk_runtime_library_gate
+      - sequence_risk_runtime_library_gate
+      - speech_quality_runtime_library_gate
+      - routing_policy_simulator_gate
+      - payment_fraud_risk_runtime_library_gate
+
+  - id: governance-evaluation-service
+    name: Governance evaluation service
+    maturity: active_as_policy_enforced_service_package
+    artifacts:
+      - services/governance-evaluation-service/service.yaml
+      - services/governance-evaluation-service/README.md
+      - services/governance-evaluation-service/Dockerfile
+      - services/governance-evaluation-service/Makefile
+      - services/governance-evaluation-service/pyproject.toml
+      - services/governance-evaluation-service/src/courseflow_governance_evaluation_service/service.py
+      - services/governance-evaluation-service/src/courseflow_governance_evaluation_service/cli.py
+      - services/governance-evaluation-service/src/courseflow_governance_evaluation_service/http_server.py
+      - services/governance-evaluation-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_service.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_ops.py
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+      - platform/governance/reports/governance-evaluation-service-v1.yaml
+      - platform/tests/test_governance_evaluation_service.py
+      - platform/tests/test_governance_evaluation_ops.py
+      - platform/evaluation/registry.yaml
+      - platform/artifacts/promotions/registry.yaml
+      - platform/governance/policies/ai-governance-policy.yaml
+      - docs/team/council-meetings/0079-governance-evaluation-service-package.md
+      - docs/team/council-meetings/0080-governance-evaluation-ops-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+    responsibilities:
+      - policy_enforced_release_decision_api
+      - release_gate_observability_report
+      - admin_ops_cockpit_projection
+      - release_gate_alert_sla_routing
+      - release_gate_alert_drill_state_acceptance
+      - repeated_release_gate_failure_incident_export
+      - release_gate_incident_response_runbook_drill
+      - tenant_product_and_use_case_scoped_governance_principals
+      - promotion_readiness_decision_projection
+      - evaluation_gate_decision_projection
+      - maker_checker_rollback_and_freshness_reason_codes
+      - direct_identifier_and_secret_evidence_rejection
+      - external_auto_send_default_blocking
+      - lms_support_finance_and_operations_governance_reuse
+
+  - id: ai-governance
+    name: AI governance
+    maturity: active_for_recommendation_service_and_serving_adapter
+    artifacts:
+      - services/governance-evaluation-service/service.yaml
+      - services/governance-evaluation-service/src/courseflow_governance_evaluation_service/service.py
+      - services/governance-evaluation-service/tests/test_service_contract.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_service.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_ops.py
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+      - platform/governance/reports/governance-evaluation-service-v1.yaml
+      - platform/tests/test_governance_evaluation_service.py
+      - platform/tests/test_governance_evaluation_ops.py
+      - platform/governance/policies/ai-governance-policy.yaml
+      - platform/governance/policies/model-serving-access-policy.yaml
+      - platform/governance/policies/llm-adapter-access-policy.yaml
+      - platform/governance/policies/llm-provider-credential-readiness.yaml
+      - platform/governance/policies/llm-provider-ops-policy.yaml
+      - platform/governance/policies/llm-provider-runtime-probe-policy.yaml
+      - platform/governance/policies/llm-provider-alert-routing-policy.yaml
+      - platform/governance/policies/llm-provider-secret-rotation-policy.yaml
+      - platform/governance/policies/media-privacy-review-policy.yaml
+      - platform/governance/policies/media-intelligence-access-policy.yaml
+      - platform/governance/controls/raw-media-storage-boundary-v1.yaml
+      - platform/governance/controls/finance-document-raw-ocr-layout-controls-v1.yaml
+      - platform/governance/controls/speech-audio-raw-asr-diarization-controls-v1.yaml
+      - platform/governance/requests/media-privacy-review-requests.yaml
+      - platform/governance/requests/model-serving-access-requests.yaml
+      - platform/governance/ledgers/model-serving-access-policy-apply-ledger.yaml
+      - platform/governance/reports/model-serving-access-review-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-patch-plan-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-apply-ledger-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-apply-report-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-reconciliation-v1.yaml
+      - platform/governance/reports/model-serving-access-incident-export-v1.yaml
+      - platform/governance/reports/llm-provider-readiness-v1.yaml
+      - platform/governance/reports/llm-provider-secret-rotation-v1.yaml
+      - platform/governance/reports/media-privacy-review-v1.yaml
+      - platform/operations/reports/llm-provider-runtime-probes-v1.yaml
+      - platform/operations/reports/llm-provider-alert-routing-v1.yaml
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/delivery/reports/delivery-backlog-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/governance/policies/prompt-gateway-access-policy.yaml
+      - platform/evaluation/reports/llm-adapter-shadow-gateway-v1-eval.yaml
+      - platform/src/courseflow_ai_platform/llm_provider_adapter.py
+      - platform/src/courseflow_ai_platform/llm_provider_alerts.py
+      - platform/src/courseflow_ai_platform/llm_provider_readiness.py
+      - platform/src/courseflow_ai_platform/llm_provider_runtime_probes.py
+      - platform/src/courseflow_ai_platform/llm_provider_secret_rotation.py
+      - platform/src/courseflow_ai_platform/media_privacy_review.py
+      - platform/src/courseflow_ai_platform/media_intelligence_service.py
+      - platform/src/courseflow_ai_platform/model_serving_auth.py
+      - platform/src/courseflow_ai_platform/serving_access_review.py
+      - platform/src/courseflow_ai_platform/serving_access_policy_plan.py
+      - platform/src/courseflow_ai_platform/serving_access_apply_ledger.py
+      - platform/src/courseflow_ai_platform/serving_access_policy_applier.py
+      - platform/src/courseflow_ai_platform/serving_access_policy_reconciliation.py
+      - platform/src/courseflow_ai_platform/serving_access_incidents.py
+      - platform/tests/test_model_serving_auth.py
+      - platform/tests/test_serving_access_review.py
+      - platform/tests/test_serving_access_policy_plan.py
+      - platform/tests/test_serving_access_apply_ledger.py
+      - platform/tests/test_serving_access_policy_applier.py
+      - platform/tests/test_serving_access_policy_reconciliation.py
+      - platform/tests/test_serving_access_incidents.py
+      - platform/tests/test_model_serving_adapter.py
+      - platform/tests/test_llm_provider_adapter.py
+      - platform/tests/test_llm_provider_alerts.py
+      - platform/tests/test_llm_provider_readiness.py
+      - platform/tests/test_llm_provider_runtime_probes.py
+      - platform/tests/test_llm_provider_secret_rotation.py
+      - platform/tests/test_media_privacy_review.py
+      - platform/tests/test_media_intelligence_service.py
+      - platform/tests/test_operating_cockpit.py
+      - platform/tests/test_delivery_backlog.py
+      - platform/tests/test_admin_ops_dashboard.py
+      - docs/team/council-meetings/0040-serving-adapter-auth-policy.md
+      - docs/team/council-meetings/0041-serving-auth-security-telemetry.md
+      - docs/team/council-meetings/0042-model-serving-access-policy.md
+      - docs/team/council-meetings/0043-serving-access-review-governance.md
+      - docs/team/council-meetings/0044-serving-access-policy-patch-plan.md
+      - docs/team/council-meetings/0045-serving-access-apply-ledger.md
+      - docs/team/council-meetings/0046-serving-access-controlled-applier.md
+      - docs/team/council-meetings/0047-serving-access-policy-reconciliation.md
+      - docs/team/council-meetings/0048-serving-access-governance-cockpit.md
+      - docs/team/council-meetings/0049-serving-access-incident-export.md
+      - docs/team/council-meetings/0050-serving-access-owner-view-rollup.md
+      - docs/team/council-meetings/0059-llm-adapter-shadow-gateway.md
+      - docs/team/council-meetings/0060-llm-adapter-service-package.md
+      - docs/team/council-meetings/0061-llm-provider-ops-policy.md
+      - docs/team/council-meetings/0062-llm-provider-credential-readiness.md
+      - docs/team/council-meetings/0063-llm-provider-runtime-probes.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0065-llm-provider-alert-routing-policy.md
+      - docs/team/council-meetings/0066-llm-provider-secret-rotation-control-plane.md
+      - docs/team/council-meetings/0068-media-privacy-review-control-plane.md
+      - docs/team/council-meetings/0069-raw-media-control-evidence-approval.md
+      - docs/team/council-meetings/0070-media-intelligence-service-package.md
+      - docs/team/council-meetings/0079-governance-evaluation-service-package.md
+      - docs/team/council-meetings/0080-governance-evaluation-ops-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+    responsibilities:
+      - expose_policy_enforced_governance_evaluation_service_boundary
+      - expose_governance_evaluation_ops_status_to_admin_ops
+      - route_governance_evaluation_release_gate_drills_to_admin_ops_sla
+      - preserve_governance_evaluation_alert_drill_acceptance_evidence
+      - serve_release_decision_without_raw_identity_or_secret_evidence
+      - block_external_auto_send_without_explicit_policy_approval
+      - maker_checker_activation
+      - human_in_the_loop
+      - retention
+      - privacy
+      - rollback
+      - serving_route_scope_authorization
+      - serving_tenant_isolation
+      - serving_model_allowlist
+      - wildcard_scope_rejection
+      - serving_auth_denial_telemetry
+      - policy_as_data_serving_principal_grants
+      - serving_access_change_request_review
+      - serving_access_required_approval_routing
+      - block_cross_product_serving_model_grants
+      - generate_reviewable_serving_access_policy_patch_plan
+      - record_policy_apply_reviewer_checksums
+      - controlled_policy_apply_report_and_explicit_target_write
+      - reconcile_active_policy_against_apply_ledger
+      - surface_serving_access_governance_in_operating_cockpit
+      - export_tenant_safe_serving_access_incident_handoffs
+      - surface_open_serving_access_incidents_in_owner_views
+      - require_prompt_gateway_before_llm_shadow_generation
+      - scope_llm_provider_access_by_product_use_case_tenant_and_provider
+      - validate_live_provider_credential_refs_without_plaintext_secrets
+      - validate_live_provider_runtime_secret_probes_cost_and_latency
+      - project_llm_provider_runtime_probe_status_into_cockpit_and_admin_ops
+      - validate_llm_provider_alert_routes_and_rotation_evidence_refs
+      - validate_live_provider_secret_rotation_control_plane
+      - validate_raw_media_privacy_review_controls
+      - attach_raw_media_control_evidence_for_document_and_audio
+      - approve_raw_media_processing_without_speaker_biometrics
+      - project_media_privacy_review_gaps_into_cockpit_and_backlog
+
+  - id: prompt-safety
+    name: Prompt safety gateway
+    maturity: active_as_policy_enforced_service_package
+    artifacts:
+      - services/prompt-gateway-service/service.yaml
+      - services/prompt-gateway-service/README.md
+      - services/prompt-gateway-service/Dockerfile
+      - services/prompt-gateway-service/Makefile
+      - services/prompt-gateway-service/pyproject.toml
+      - services/prompt-gateway-service/src/courseflow_prompt_gateway_service/service.py
+      - services/prompt-gateway-service/src/courseflow_prompt_gateway_service/cli.py
+      - services/prompt-gateway-service/src/courseflow_prompt_gateway_service/http_server.py
+      - services/prompt-gateway-service/tests/test_service_contract.py
+      - contracts/prompts/llm-prompt-envelope.v1.yaml
+      - platform/prompt-safety/redaction-policy.yaml
+      - platform/governance/policies/prompt-gateway-access-policy.yaml
+      - platform/evaluation/datasets/prompt-safety-golden.yaml
+      - platform/evaluation/datasets/llm-adapter-shadow-gateway-golden.yaml
+      - platform/evaluation/reports/prompt-safety-v1-eval.yaml
+      - platform/evaluation/reports/llm-adapter-shadow-gateway-v1-eval.yaml
+      - platform/src/courseflow_ai_platform/prompt_gateway_service.py
+      - platform/src/courseflow_ai_platform/prompt_gateway.py
+      - platform/tests/test_prompt_gateway.py
+      - platform/tests/test_evaluation.py
+      - docs/team/council-meetings/0009-prompt-safety-gateway.md
+      - docs/team/council-meetings/0010-runtime-prompt-gateway.md
+      - docs/team/council-meetings/0058-prompt-gateway-service-package.md
+      - docs/team/council-meetings/0059-llm-adapter-shadow-gateway.md
+    responsibilities:
+      - redact_pii_and_secrets
+      - filter_cross_tenant_context
+      - enforce_llm_cost_budget
+      - require_human_review_for_external_outputs
+      - keep_audit_payloads_secret_free
+      - expose_policy_enforced_prompt_gateway_service_boundary
+      - scope_prompt_gateway_principals_by_product_use_case_and_tenant
+      - block_generation_when_prompt_gateway_denies_shadow_case
+
+  - id: llm-provider-adapter
+    name: LLM provider adapter
+    maturity: active_as_policy_enforced_service_package
+    artifacts:
+      - services/llm-adapter-service/service.yaml
+      - services/llm-adapter-service/README.md
+      - services/llm-adapter-service/Dockerfile
+      - services/llm-adapter-service/Makefile
+      - services/llm-adapter-service/pyproject.toml
+      - services/llm-adapter-service/src/courseflow_llm_adapter_service/service.py
+      - services/llm-adapter-service/src/courseflow_llm_adapter_service/cli.py
+      - services/llm-adapter-service/src/courseflow_llm_adapter_service/http_server.py
+      - services/llm-adapter-service/tests/test_service_contract.py
+      - platform/governance/policies/llm-adapter-access-policy.yaml
+      - platform/governance/policies/llm-provider-credential-readiness.yaml
+      - platform/governance/policies/llm-provider-ops-policy.yaml
+      - platform/governance/policies/llm-provider-runtime-probe-policy.yaml
+      - platform/governance/policies/llm-provider-alert-routing-policy.yaml
+      - platform/governance/policies/llm-provider-secret-rotation-policy.yaml
+      - platform/governance/reports/llm-provider-readiness-v1.yaml
+      - platform/governance/reports/llm-provider-secret-rotation-v1.yaml
+      - platform/operations/reports/llm-provider-runtime-probes-v1.yaml
+      - platform/operations/reports/llm-provider-alert-routing-v1.yaml
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/delivery/reports/delivery-backlog-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/governance/policies/prompt-gateway-access-policy.yaml
+      - platform/src/courseflow_ai_platform/llm_provider_adapter.py
+      - platform/src/courseflow_ai_platform/llm_provider_alerts.py
+      - platform/src/courseflow_ai_platform/llm_provider_readiness.py
+      - platform/src/courseflow_ai_platform/llm_provider_runtime_probes.py
+      - platform/src/courseflow_ai_platform/llm_provider_secret_rotation.py
+      - platform/src/courseflow_ai_platform/prompt_gateway_service.py
+      - platform/src/courseflow_ai_platform/prompt_audit.py
+      - platform/tests/test_llm_provider_adapter.py
+      - platform/tests/test_llm_provider_alerts.py
+      - platform/tests/test_llm_provider_readiness.py
+      - platform/tests/test_llm_provider_runtime_probes.py
+      - platform/tests/test_llm_provider_secret_rotation.py
+      - platform/tests/test_operating_cockpit.py
+      - platform/tests/test_delivery_backlog.py
+      - platform/tests/test_admin_ops_dashboard.py
+      - platform/evaluation/datasets/llm-adapter-shadow-gateway-golden.yaml
+      - platform/evaluation/reports/llm-adapter-shadow-gateway-v1-eval.yaml
+      - docs/team/council-meetings/0059-llm-adapter-shadow-gateway.md
+      - docs/team/council-meetings/0060-llm-adapter-service-package.md
+      - docs/team/council-meetings/0061-llm-provider-ops-policy.md
+      - docs/team/council-meetings/0062-llm-provider-credential-readiness.md
+      - docs/team/council-meetings/0063-llm-provider-runtime-probes.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0065-llm-provider-alert-routing-policy.md
+      - docs/team/council-meetings/0066-llm-provider-secret-rotation-control-plane.md
+    responsibilities:
+      - provider_neutral_llm_adapter_boundary
+      - require_prompt_gateway_before_provider_call
+      - skip_provider_when_prompt_gateway_blocks
+      - scope_provider_access_by_product_use_case_tenant_and_provider
+      - map_product_principals_to_prompt_gateway_principals
+      - record_sanitized_prompt_audit_for_adapter_calls
+      - expose_generate_health_and_metrics_routes
+      - enforce_provider_rate_limits_before_provider_calls
+      - configure_provider_timeouts_circuit_breakers_and_failover
+      - block_plaintext_live_provider_credentials
+      - expose_live_provider_credential_readiness_report
+      - expose_live_provider_runtime_probe_report
+      - export_provider_cost_latency_metrics
+      - block_live_rollout_without_runtime_secret_probe
+      - keep_external_provider_contract_ci_safe_with_stub_provider
+      - project_llm_provider_cost_latency_metrics_to_operating_cockpit
+      - validate_provider_alert_routes_before_live_activation
+      - validate_provider_secret_rotation_controls_before_live_activation
+      - leave_live_network_provider_activation_as_next_step
+
+  - id: prompt-audit
+    name: Prompt and response audit ledger
+    maturity: active_as_runtime_library_with_jsonl_storage_adapter
+    artifacts:
+      - contracts/prompts/prompt-audit-event.v1.yaml
+      - platform/src/courseflow_ai_platform/prompt_audit.py
+      - platform/tests/test_prompt_audit.py
+      - docs/team/council-meetings/0011-prompt-audit-ledger.md
+      - docs/team/council-meetings/0012-prompt-audit-storage-adapter.md
+    responsibilities:
+      - record_sanitized_prompt_gateway_evidence
+      - persist_prompt_audit_jsonl_adapter
+      - hash_sanitized_prompt_and_response
+      - export_prompt_audit_by_tenant
+      - delete_prompt_audit_by_tenant
+      - purge_prompt_audit_by_retention
+
+  - id: model-serving
+    name: Model serving
+    maturity: active_as_manifest_backed_gateway_with_hosted_adapter
+    artifacts:
+      - services/model-serving-service/service.yaml
+      - services/model-serving-service/README.md
+      - services/model-serving-service/Dockerfile
+      - services/model-serving-service/Makefile
+      - services/model-serving-service/pyproject.toml
+      - services/model-serving-service/src/courseflow_model_serving_service/service.py
+      - services/model-serving-service/src/courseflow_model_serving_service/cli.py
+      - services/model-serving-service/src/courseflow_model_serving_service/http_server.py
+      - services/model-serving-service/tests/test_service_contract.py
+      - services/prompt-gateway-service/service.yaml
+      - services/prompt-gateway-service/README.md
+      - services/prompt-gateway-service/src/courseflow_prompt_gateway_service/service.py
+      - services/prompt-gateway-service/tests/test_service_contract.py
+      - services/llm-adapter-service/service.yaml
+      - services/llm-adapter-service/README.md
+      - services/llm-adapter-service/src/courseflow_llm_adapter_service/service.py
+      - services/llm-adapter-service/tests/test_service_contract.py
+      - platform/governance/policies/llm-provider-ops-policy.yaml
+      - platform/governance/policies/llm-provider-credential-readiness.yaml
+      - platform/governance/policies/llm-provider-runtime-probe-policy.yaml
+      - platform/governance/policies/llm-provider-alert-routing-policy.yaml
+      - platform/governance/policies/llm-provider-secret-rotation-policy.yaml
+      - platform/governance/reports/llm-provider-readiness-v1.yaml
+      - platform/governance/reports/llm-provider-secret-rotation-v1.yaml
+      - platform/operations/reports/llm-provider-runtime-probes-v1.yaml
+      - platform/operations/reports/llm-provider-alert-routing-v1.yaml
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/src/courseflow_ai_platform/model_serving.py
+      - platform/src/courseflow_ai_platform/model_serving_adapter.py
+      - platform/src/courseflow_ai_platform/model_serving_auth.py
+      - platform/src/courseflow_ai_platform/prompt_gateway_service.py
+      - platform/src/courseflow_ai_platform/llm_provider_adapter.py
+      - platform/src/courseflow_ai_platform/llm_provider_alerts.py
+      - platform/src/courseflow_ai_platform/llm_provider_readiness.py
+      - platform/src/courseflow_ai_platform/llm_provider_runtime_probes.py
+      - platform/src/courseflow_ai_platform/llm_provider_secret_rotation.py
+      - platform/src/courseflow_ai_platform/serving_access_review.py
+      - platform/src/courseflow_ai_platform/serving_access_policy_plan.py
+      - platform/src/courseflow_ai_platform/serving_access_apply_ledger.py
+      - platform/src/courseflow_ai_platform/serving_access_policy_applier.py
+      - platform/src/courseflow_ai_platform/serving_access_policy_reconciliation.py
+      - platform/src/courseflow_ai_platform/serving_access_incidents.py
+      - platform/src/courseflow_ai_platform/model_audit.py
+      - platform/src/courseflow_ai_platform/serving_metrics_export.py
+      - platform/operations/reports/model-serving-metrics-export-v1.yaml
+      - platform/governance/policies/ai-governance-policy.yaml
+      - platform/governance/policies/model-serving-access-policy.yaml
+      - platform/governance/policies/prompt-gateway-access-policy.yaml
+      - platform/governance/policies/llm-adapter-access-policy.yaml
+      - platform/evaluation/reports/llm-adapter-shadow-gateway-v1-eval.yaml
+      - platform/governance/requests/model-serving-access-requests.yaml
+      - platform/governance/ledgers/model-serving-access-policy-apply-ledger.yaml
+      - platform/governance/reports/model-serving-access-review-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-patch-plan-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-apply-ledger-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-apply-report-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-reconciliation-v1.yaml
+      - platform/governance/reports/model-serving-access-incident-export-v1.yaml
+      - platform/tests/test_model_serving.py
+      - platform/tests/test_model_serving_adapter.py
+      - platform/tests/test_model_serving_auth.py
+      - platform/tests/test_llm_provider_adapter.py
+      - platform/tests/test_llm_provider_alerts.py
+      - platform/tests/test_llm_provider_readiness.py
+      - platform/tests/test_llm_provider_runtime_probes.py
+      - platform/tests/test_llm_provider_secret_rotation.py
+      - platform/tests/test_serving_access_review.py
+      - platform/tests/test_serving_access_policy_plan.py
+      - platform/tests/test_serving_access_apply_ledger.py
+      - platform/tests/test_serving_access_policy_applier.py
+      - platform/tests/test_serving_access_policy_reconciliation.py
+      - platform/tests/test_serving_access_incidents.py
+      - platform/tests/test_model_audit.py
+      - platform/tests/test_serving_metrics_export.py
+      - docs/team/council-meetings/0034-model-serving-facade.md
+      - docs/team/council-meetings/0035-model-serving-gateway-envelope.md
+      - docs/team/council-meetings/0037-audit-bound-serving-gateway.md
+      - docs/team/council-meetings/0039-hosted-model-serving-adapter.md
+      - docs/team/council-meetings/0040-serving-adapter-auth-policy.md
+      - docs/team/council-meetings/0041-serving-auth-security-telemetry.md
+      - docs/team/council-meetings/0042-model-serving-access-policy.md
+      - docs/team/council-meetings/0043-serving-access-review-governance.md
+      - docs/team/council-meetings/0044-serving-access-policy-patch-plan.md
+      - docs/team/council-meetings/0045-serving-access-apply-ledger.md
+      - docs/team/council-meetings/0046-serving-access-controlled-applier.md
+      - docs/team/council-meetings/0047-serving-access-policy-reconciliation.md
+      - docs/team/council-meetings/0048-serving-access-governance-cockpit.md
+      - docs/team/council-meetings/0049-serving-access-incident-export.md
+      - docs/team/council-meetings/0050-serving-access-owner-view-rollup.md
+      - docs/team/council-meetings/0054-model-serving-metrics-export.md
+      - docs/team/council-meetings/0055-model-serving-service-package.md
+      - docs/team/council-meetings/0058-prompt-gateway-service-package.md
+      - docs/team/council-meetings/0059-llm-adapter-shadow-gateway.md
+      - docs/team/council-meetings/0060-llm-adapter-service-package.md
+      - docs/team/council-meetings/0061-llm-provider-ops-policy.md
+      - docs/team/council-meetings/0062-llm-provider-credential-readiness.md
+      - docs/team/council-meetings/0063-llm-provider-runtime-probes.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0065-llm-provider-alert-routing-policy.md
+      - docs/team/council-meetings/0066-llm-provider-secret-rotation-control-plane.md
+    responsibilities:
+      - internal_api
+      - batch_inference
+      - online_inference
+      - fallback
+      - canary_shadow_future
+      - prompt_gateway_before_llm_call
+      - manifest_backed_runtime_entrypoint_loading
+      - model_id_to_runtime_dispatch
+      - normalized_inference_response_envelope
+      - request_id_and_tenant_scoped_gateway_envelope
+      - fallback_and_error_response_metadata
+      - per_model_in_memory_serving_metrics
+      - configurable_model_audit_store
+      - fail_open_or_fail_closed_audit_mode
+      - audit_record_and_audit_failure_metrics
+      - framework_neutral_serving_adapter
+      - http_style_model_catalog_invoke_metrics_health_and_cockpit_routes
+      - route_scope_authorization
+      - tenant_isolated_model_invocation
+      - model_allowlist_authorization
+      - wildcard_scope_rejection
+      - bounded_authorization_denial_telemetry
+      - policy_as_data_product_tenant_model_grants
+      - change_controlled_serving_access_requests
+      - approval_gated_serving_access_projection
+      - cross_product_model_grant_blocking
+      - reviewable_policy_patch_plan_for_ready_access_requests
+      - checksum_bound_policy_apply_ledger
+      - controlled_policy_applier_requires_explicit_target_path
+      - applied_state_reconciliation_for_serving_access_policy
+      - serving_access_governance_cockpit_and_delivery_queue
+      - tenant_safe_serving_access_incident_export
+      - serving_access_incident_owner_view_rollup
+      - persisted_serving_metrics_export_for_operating_cockpit
+      - independently_runnable_model_serving_service_package
+      - independently_runnable_prompt_gateway_service_package
+      - prompt_gateway_bound_llm_adapter_shadow_evaluation
+      - independently_runnable_llm_adapter_service_package
+      - live_provider_credential_readiness_gate
+      - live_provider_secret_rotation_control_plane
+      - live_provider_runtime_probe_gate
+      - llm_provider_cost_latency_metrics
+      - llm_provider_cost_latency_cockpit_projection
+      - llm_provider_alert_route_gate
+
+  - id: ai-observability
+    name: AI observability
+    maturity: active_for_serving_metrics_prompt_and_model_audit
+    artifacts:
+      - contracts/models/model-audit-event.v1.yaml
+      - platform/operations/reports/model-serving-metrics-export-v1.yaml
+      - platform/operations/reports/llm-provider-runtime-probes-v1.yaml
+      - platform/operations/reports/llm-provider-alert-routing-v1.yaml
+      - platform/governance/reports/llm-provider-secret-rotation-v1.yaml
+      - platform/governance/reports/governance-evaluation-service-v1.yaml
+      - platform/governance/reports/governance-evaluation-incident-export-v1.yaml
+      - platform/operations/reports/governance-evaluation-incident-response-drill-v1.yaml
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/src/courseflow_ai_platform/model_audit.py
+      - platform/src/courseflow_ai_platform/model_serving.py
+      - platform/src/courseflow_ai_platform/model_serving_adapter.py
+      - platform/src/courseflow_ai_platform/serving_metrics_export.py
+      - platform/src/courseflow_ai_platform/llm_provider_runtime_probes.py
+      - platform/src/courseflow_ai_platform/llm_provider_alerts.py
+      - platform/src/courseflow_ai_platform/llm_provider_secret_rotation.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_ops.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_incidents.py
+      - platform/src/courseflow_ai_platform/governance_evaluation_response_drill.py
+      - platform/src/courseflow_ai_platform/operating_cockpit.py
+      - platform/src/courseflow_ai_platform/admin_ops_dashboard.py
+      - platform/tests/test_model_audit.py
+      - platform/tests/test_model_serving.py
+      - platform/tests/test_model_serving_adapter.py
+      - platform/tests/test_serving_metrics_export.py
+      - platform/tests/test_llm_provider_runtime_probes.py
+      - platform/tests/test_llm_provider_alerts.py
+      - platform/tests/test_llm_provider_secret_rotation.py
+      - platform/tests/test_governance_evaluation_ops.py
+      - platform/tests/test_governance_evaluation_incidents.py
+      - platform/tests/test_governance_evaluation_response_drill.py
+      - platform/tests/test_operating_cockpit.py
+      - platform/tests/test_admin_ops_dashboard.py
+      - docs/team/council-meetings/0036-model-audit-ledger.md
+      - docs/team/council-meetings/0037-audit-bound-serving-gateway.md
+      - docs/team/council-meetings/0038-runtime-observability-cockpit.md
+      - docs/team/council-meetings/0039-hosted-model-serving-adapter.md
+      - docs/team/council-meetings/0041-serving-auth-security-telemetry.md
+      - docs/team/council-meetings/0054-model-serving-metrics-export.md
+      - docs/team/council-meetings/0064-llm-provider-alert-projection.md
+      - docs/team/council-meetings/0065-llm-provider-alert-routing-policy.md
+      - docs/team/council-meetings/0066-llm-provider-secret-rotation-control-plane.md
+      - docs/team/council-meetings/0080-governance-evaluation-ops-projection.md
+      - docs/team/council-meetings/0081-governance-evaluation-alert-sla-routing.md
+      - docs/team/council-meetings/0082-governance-evaluation-alert-drill-state-ledger.md
+      - docs/team/council-meetings/0083-governance-evaluation-incident-export.md
+      - docs/team/council-meetings/0084-governance-evaluation-response-runbook-drill.md
+    responsibilities:
+      - latency
+      - error_rate
+      - model_age
+      - drift_future
+      - cost_future
+      - fallback_rate
+      - prompt_audit_events
+      - sanitized_model_prediction_audit
+      - hash_model_payload_and_output
+      - export_model_audit_by_tenant
+      - delete_model_audit_by_tenant
+      - purge_model_audit_by_retention
+      - connect_model_serving_gateway_to_audit_evidence
+      - count_model_audit_record_and_failure_events
+      - project_serving_health_into_operating_cockpit
+      - expose_serving_metrics_health_and_cockpit_adapter_routes
+      - expose_serving_security_telemetry
+      - persist_model_serving_metrics_export_snapshot
+      - project_llm_provider_cost_latency_status_into_ops_dashboard
+      - validate_tenant_safe_llm_provider_alert_routes
+      - project_llm_provider_secret_rotation_status_into_ops_dashboard
+      - project_governance_evaluation_release_gate_status_into_ops_dashboard
+      - route_governance_evaluation_release_gate_alert_drill_into_owner_views
+      - expose_governance_evaluation_alert_drill_acceptance_evidence
+      - expose_governance_evaluation_repeated_failure_incident_export
+      - expose_governance_evaluation_response_runbook_drill_status
+
+  - id: platform-registry-validation
+    name: Platform registry validation
+    maturity: active_as_tooling
+    artifacts:
+      - platform/pyproject.toml
+      - platform/src/courseflow_ai_platform/registry.py
+      - platform/tests/test_registry.py
+    responsibilities:
+      - validate_product_registry
+      - validate_use_case_registry
+      - validate_capability_artifacts
+      - enforce_non_lms_portfolio
+
+  - id: model-evidence-validation
+    name: Artifact evidence validation
+    maturity: active_for_source_vector_index_and_promotion_artifacts
+    artifacts:
+      - platform/artifacts/manifests/recommendation-item-cf-v1.yaml
+      - platform/artifacts/manifests/sequence-risk-baseline-v1.yaml
+      - platform/artifacts/manifests/finance-document-intelligence-baseline-v1.yaml
+      - platform/artifacts/manifests/operations-routing-policy-simulator-v1.yaml
+      - platform/artifacts/manifests/operations-demand-forecast-baseline-v1.yaml
+      - platform/artifacts/manifests/support-agent-assist-baseline-v1.yaml
+      - platform/artifacts/manifests/support-sla-risk-baseline-v1.yaml
+      - platform/artifacts/manifests/finance-payment-fraud-baseline-v1.yaml
+      - platform/artifacts/manifests/speech-quality-baseline-v1.yaml
+      - platform/artifacts/manifests/course-content-vector-index-baseline-v1.yaml
+      - platform/artifacts/manifests/support-knowledge-vector-index-baseline-v1.yaml
+      - platform/artifacts/vector-indexes/course-content-vector-index-baseline-v1.json
+      - platform/artifacts/vector-indexes/support-knowledge-vector-index-baseline-v1.json
+      - platform/artifacts/promotions/registry.yaml
+      - platform/artifacts/promotions/requests.yaml
+      - platform/artifacts/promotions/reports/promotion-readiness-v1.yaml
+      - platform/artifacts/promotions/reports/promotion-intake-v1.yaml
+      - platform/model-registry/model-cards/recommendation-item-cf-v1.md
+      - platform/model-registry/model-cards/sequence-risk-baseline-v1.md
+      - platform/model-registry/model-cards/finance-document-intelligence-baseline-v1.md
+      - platform/model-registry/model-cards/operations-routing-policy-simulator-v1.md
+      - platform/model-registry/model-cards/operations-demand-forecast-baseline-v1.md
+      - platform/model-registry/model-cards/support-agent-assist-baseline-v1.md
+      - platform/model-registry/model-cards/support-sla-risk-baseline-v1.md
+      - platform/model-registry/model-cards/finance-payment-fraud-baseline-v1.md
+      - platform/model-registry/model-cards/speech-quality-baseline-v1.md
+      - platform/evaluation/reports/recommendation-item-cf-v1-eval.yaml
+      - platform/evaluation/reports/sequence-risk-baseline-v1-eval.yaml
+      - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      - platform/evaluation/reports/operations-routing-policy-v1-eval.yaml
+      - platform/evaluation/reports/operations-demand-forecast-v1-eval.yaml
+      - platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+      - platform/evaluation/reports/support-sla-risk-v1-eval.yaml
+      - platform/evaluation/reports/finance-payment-fraud-v1-eval.yaml
+      - platform/evaluation/reports/speech-quality-v1-eval.yaml
+      - platform/evaluation/reports/course-content-vector-index-v1-eval.yaml
+      - platform/evaluation/reports/support-knowledge-vector-index-v1-eval.yaml
+      - platform/src/courseflow_ai_platform/evidence.py
+      - platform/src/courseflow_ai_platform/promotion_intake.py
+      - platform/src/courseflow_ai_platform/promotion_readiness.py
+      - platform/tests/test_evidence.py
+      - platform/tests/test_promotion_intake.py
+      - platform/tests/test_promotion_readiness.py
+      - docs/team/council-meetings/0015-vector-index-artifact-manifests.md
+      - docs/team/council-meetings/0016-artifact-promotion-registry.md
+      - docs/team/council-meetings/0018-promotion-readiness-projection.md
+      - docs/team/council-meetings/0028-sequence-risk-runtime-baseline.md
+      - docs/team/council-meetings/0029-finance-document-intelligence-baseline.md
+      - docs/team/council-meetings/0030-operations-routing-policy-simulator.md
+      - docs/team/council-meetings/0031-support-sla-risk-baseline.md
+      - docs/team/council-meetings/0032-finance-payment-fraud-baseline.md
+      - docs/team/council-meetings/0033-operations-demand-forecast-baseline.md
+      - docs/team/council-meetings/0067-speech-audio-runtime-baseline.md
+    responsibilities:
+      - validate_artifact_manifest
+      - validate_model_card_link
+      - validate_evaluation_report_link
+      - validate_source_artifact_hash
+      - validate_vector_index_snapshot_hash
+      - validate_vector_index_snapshot_payload
+      - validate_artifact_promotion_registry
+      - validate_maker_checker_promotion_policy
+
+  - id: promotion-intake
+    name: AI promotion request intake
+    maturity: active_as_validated_queue
+    artifacts:
+      - platform/artifacts/promotions/requests.yaml
+      - platform/artifacts/promotions/reports/promotion-intake-v1.yaml
+      - platform/src/courseflow_ai_platform/promotion_intake.py
+      - platform/tests/test_promotion_intake.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0019-promotion-request-intake.md
+      - docs/team/council-meetings/0029-finance-document-intelligence-baseline.md
+      - docs/team/council-meetings/0030-operations-routing-policy-simulator.md
+    responsibilities:
+      - collect_cross_domain_artifact_promotion_requests
+      - validate_product_and_use_case_scope_for_requests
+      - separate_ready_for_approval_from_waiting_work
+      - expose_waiting_for_artifact_evaluation_privacy_and_simulator_queues
+      - prove_release_pipeline_extends_beyond_lms
+
+  - id: promotion-readiness
+    name: Admin/Ops promotion readiness
+    maturity: active_as_validated_projection
+    artifacts:
+      - platform/artifacts/promotions/registry.yaml
+      - platform/artifacts/promotions/reports/promotion-readiness-v1.yaml
+      - platform/src/courseflow_ai_platform/promotion_readiness.py
+      - platform/tests/test_promotion_readiness.py
+      - platform/tests/test_cli.py
+      - docs/team/council-meetings/0018-promotion-readiness-projection.md
+    responsibilities:
+      - project_artifact_stage_readiness_for_admin_ops
+      - generate_promotion_readiness_snapshot_report
+      - expose_gate_rollback_and_maker_checker_health
+      - block_release_on_stale_gate_evidence
+      - block_release_on_stale_artifact_evidence
+      - distinguish_ready_from_blocked_promotions
+      - publish_release_action_queue
+      - show_non_lms_promotion_coverage
+      - prepare_admin_ops_release_dashboard
+
+  - id: support-agent-assist-baseline
+    name: Support agent assist baseline
+    maturity: baseline_implemented
+    artifacts:
+      - products/support-platform/README.md
+      - use-cases/support-agent-assist/README.md
+      - contracts/features/support-case-features.v1.yaml
+      - contracts/models/support-agent-assist-model-io.v1.yaml
+      - models/llm/support_agent_assist/support_agent_assist.py
+      - models/llm/support_agent_assist/tests/test_support_agent_assist.py
+      - platform/vector-store/collections/support-knowledge.yaml
+    responsibilities:
+      - prove_non_lms_platform_reuse
+      - provide_deterministic_support_baseline
+      - enforce_human_review_for_external_replies
+      - prepare_llm_rag_upgrade_path
+
+  - id: support-sla-risk-baseline
+    name: Support SLA risk baseline
+    maturity: runtime_library_baseline
+    artifacts:
+      - use-cases/registry.yaml
+      - contracts/features/support-case-features.v1.yaml
+      - contracts/models/support-sla-risk-model-io.v1.yaml
+      - models/classical/support_sla_risk_baseline/support_sla_risk_baseline.py
+      - models/classical/support_sla_risk_baseline/tests/test_support_sla_risk_baseline.py
+      - platform/evaluation/datasets/support-sla-risk-golden.yaml
+      - platform/evaluation/reports/support-sla-risk-v1-eval.yaml
+      - platform/model-registry/model-cards/support-sla-risk-baseline-v1.md
+      - platform/artifacts/manifests/support-sla-risk-baseline-v1.yaml
+      - docs/team/council-meetings/0031-support-sla-risk-baseline.md
+    responsibilities:
+      - prove_non_lms_classical_ml_platform_reuse
+      - provide_explainable_support_sla_breach_risk_baseline
+      - enforce_human_review_for_escalation
+      - unblock_support_sla_risk_solution_blueprint
+      - prepare_trained_tabular_classifier_upgrade_path
+
+  - id: finance-payment-fraud-baseline
+    name: Finance payment fraud baseline
+    maturity: service_integrated_baseline
+    artifacts:
+      - use-cases/registry.yaml
+      - contracts/features/finance-payment-risk-features.v1.yaml
+      - contracts/models/finance-payment-fraud-model-io.v1.yaml
+      - models/anomaly_fraud/payment_fraud_baseline/payment_fraud_baseline.py
+      - models/anomaly_fraud/payment_fraud_baseline/tests/test_payment_fraud_baseline.py
+      - platform/evaluation/datasets/finance-payment-fraud-golden.yaml
+      - platform/evaluation/reports/finance-payment-fraud-v1-eval.yaml
+      - platform/model-registry/model-cards/finance-payment-fraud-baseline-v1.md
+      - platform/artifacts/manifests/finance-payment-fraud-baseline-v1.yaml
+      - services/payment-fraud-service/service.yaml
+      - platform/src/courseflow_ai_platform/payment_fraud_service.py
+      - platform/governance/policies/payment-fraud-access-policy.yaml
+      - platform/tests/test_payment_fraud_service.py
+      - docs/team/council-meetings/0032-finance-payment-fraud-baseline.md
+      - docs/team/council-meetings/0072-payment-fraud-service-package.md
+    responsibilities:
+      - prove_non_lms_finance_risk_platform_reuse
+      - provide_explainable_payment_fraud_risk_baseline
+      - provide_entity_link_evidence_for_graph_risk_triage
+      - enforce_human_review_before_payment_hold_or_account_action
+      - enforce_policy_bound_payment_fraud_service_boundary
+      - unblock_finance_payment_fraud_solution_blueprint
+
+  - id: operations-demand-forecast-baseline
+    name: Operations demand forecast baseline
+    maturity: service_integrated_baseline
+    artifacts:
+      - use-cases/registry.yaml
+      - contracts/features/operations-demand-features.v1.yaml
+      - contracts/models/operations-demand-forecast-model-io.v1.yaml
+      - models/forecasting/demand_forecast_baseline/demand_forecast_baseline.py
+      - models/forecasting/demand_forecast_baseline/tests/test_demand_forecast_baseline.py
+      - platform/evaluation/datasets/operations-demand-forecast-golden.yaml
+      - platform/evaluation/reports/operations-demand-forecast-v1-eval.yaml
+      - platform/model-registry/model-cards/operations-demand-forecast-baseline-v1.md
+      - platform/artifacts/manifests/operations-demand-forecast-baseline-v1.yaml
+      - services/forecasting-service/service.yaml
+      - platform/src/courseflow_ai_platform/forecasting_service.py
+      - platform/governance/policies/forecasting-access-policy.yaml
+      - platform/tests/test_forecasting_service.py
+      - docs/team/council-meetings/0033-operations-demand-forecast-baseline.md
+      - docs/team/council-meetings/0073-forecasting-service-package.md
+    responsibilities:
+      - prove_non_lms_forecasting_platform_reuse
+      - provide_explainable_workload_demand_forecast_baseline
+      - estimate_capacity_gap_and_staffing_scenario_actions
+      - enforce_human_review_for_staffing_or_sla_impacting_action
+      - enforce_policy_bound_forecasting_service_boundary
+      - prepare_trained_time_series_and_causal_planning_upgrade_path

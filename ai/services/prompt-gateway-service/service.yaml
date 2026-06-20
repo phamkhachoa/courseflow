@@ -1,0 +1,44 @@
+version: 1
+service_id: prompt-gateway-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_prompt_gateway_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/prompt-gateway-access-policy.yaml
+observability:
+  metrics: in_memory_prompt_evaluation_block_error_counters
+  tenant_safety: cross_tenant_context_filtered_before_prompt_assembly
+routes:
+  - method: POST
+    path: /v1/prompt-gateway/evaluate
+    scope: internal:ai-platform:prompt-gateway:evaluate
+    purpose: prompt_redaction_budget_context_and_human_review_gate
+  - method: GET
+    path: /v1/prompt-gateway/health
+    scope: internal:ai-platform:prompt-gateway:ops
+    purpose: prompt_gateway_health
+  - method: GET
+    path: /v1/prompt-gateway/metrics
+    scope: internal:ai-platform:prompt-gateway:ops
+    purpose: prompt_gateway_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/prompt_gateway.py
+    - platform/src/courseflow_ai_platform/prompt_gateway_service.py
+  artifacts:
+    - contracts/prompts/llm-prompt-envelope.v1.yaml
+    - platform/prompt-safety/redaction-policy.yaml
+    - platform/evaluation/datasets/prompt-safety-golden.yaml
+    - platform/evaluation/reports/prompt-safety-v1-eval.yaml
+promotion_guardrails:
+  - route_scopes_must_match_prompt_gateway_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - cross_tenant_context_must_be_filtered_before_prompt_assembly
+  - external_auto_send_must_remain_blocked_by_default
+  - prompt_audit_payloads_must_be_secret_free

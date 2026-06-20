@@ -1,0 +1,46 @@
+version: 1
+owner: ai-platform
+policy_id: forecasting-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  direct_identifier_submission_allowed: false
+  automated_capacity_change_allowed: false
+scope_aliases:
+  score: internal:ai-platform:forecasting:score
+  ops: internal:ai-platform:forecasting:ops
+principals:
+  - principal_id: service:ai-platform-forecasting-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:enterprise-operations-forecasting
+    owner_role: Enterprise Operations planning service
+    product: enterprise-operations
+    scopes:
+      - score
+    tenant_ids:
+      - tenant-ops
+      - tenant-ops-sandbox
+    product_ids:
+      - enterprise-operations
+    use_case_ids:
+      - operations-demand-forecasting
+
+  - principal_id: service:lms-courseflow-planning
+    owner_role: CourseFlow LMS planning service
+    product: lms-courseflow
+    scopes:
+      - score
+    tenant_ids:
+      - tenant-lms
+      - tenant-lms-sandbox
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-cohort-demand-forecasting

@@ -1,0 +1,41 @@
+version: 1
+owner: ai-platform
+policy_id: retrieval-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+scope_aliases:
+  catalog: internal:ai-platform:retrieval:catalog
+  search: internal:ai-platform:retrieval:search
+  ops: internal:ai-platform:retrieval:ops
+principals:
+  - principal_id: service:ai-platform-retrieval-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - catalog
+      - ops
+    tenant_ids: []
+    collection_ids: []
+
+  - principal_id: service:lms-courseflow-retrieval
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+      - catalog
+      - search
+    tenant_ids:
+      - tenant-a
+    collection_ids:
+      - course_content_chunks
+
+  - principal_id: service:support-platform-retrieval
+    owner_role: Support Platform service
+    product: support-platform
+    scopes:
+      - catalog
+      - search
+    tenant_ids:
+      - tenant-a
+    collection_ids:
+      - support_knowledge_articles

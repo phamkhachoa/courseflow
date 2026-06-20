@@ -1,0 +1,80 @@
+version: 1
+corpus_id: course-content-corpus-v1
+owner: ai-platform
+collection: course_content_chunks
+product: lms-courseflow
+chunks:
+  - chunk_id: course-python-loops-lesson
+    tenant_id: tenant-a
+    source_ref: course-python-101/module-1/lesson-loops
+    source_type: lesson
+    course_id: "40000000-0000-0000-0000-000000000001"
+    language: en
+    access_scope: tenant
+    pii_class: none_or_low
+    title: Python loops and control flow
+    text: This lesson explains Python for loops, while loops, loop variables, break, continue and practical iteration patterns for beginners.
+    tags:
+      - python
+      - loops
+      - control flow
+
+  - chunk_id: course-sql-join-lesson
+    tenant_id: tenant-a
+    source_ref: course-sql-analytics/module-2/lesson-joins
+    source_type: lesson
+    course_id: "40000000-0000-0000-0000-000000000002"
+    language: en
+    access_scope: tenant
+    pii_class: none_or_low
+    title: SQL joins for analytics
+    text: Learners compare inner join, left join and full outer join patterns for analytics tables, customer records and enrollment facts.
+    tags:
+      - sql
+      - joins
+      - analytics
+
+  - chunk_id: course-recsys-collaborative-filtering
+    tenant_id: tenant-a
+    source_ref: course-ml-recsys/module-3/lesson-item-cf
+    source_type: lesson
+    course_id: "40000000-0000-0000-0000-000000000003"
+    language: en
+    access_scope: tenant
+    pii_class: none_or_low
+    title: Collaborative filtering recommendation
+    text: Item-item collaborative filtering recommends related courses by comparing implicit learner-course interactions and co-enrollment similarity.
+    tags:
+      - recommendation
+      - collaborative filtering
+      - implicit feedback
+
+  - chunk_id: course-rag-grounded-answer
+    tenant_id: tenant-a
+    source_ref: course-ai-platform/module-4/lesson-rag
+    source_type: lesson
+    course_id: "40000000-0000-0000-0000-000000000004"
+    language: en
+    access_scope: tenant
+    pii_class: none_or_low
+    title: RAG grounded answers with citations
+    text: Retrieval augmented generation should retrieve trusted content chunks, attach citations and refuse or ask for clarification when retrieval confidence is low.
+    tags:
+      - rag
+      - citations
+      - grounded answers
+
+  - chunk_id: course-tenant-b-private-sql
+    tenant_id: tenant-b
+    source_ref: tenant-b/course-private-sql/lesson-joins
+    source_type: lesson
+    course_id: "40000000-0000-0000-0000-000000000005"
+    language: en
+    access_scope: tenant
+    pii_class: none_or_low
+    title: Tenant B private SQL joins
+    text: Tenant B private SQL join content contains tenant-specific data examples and must not appear in tenant A retrieval results.
+    tags:
+      - sql
+      - joins
+      - tenant private

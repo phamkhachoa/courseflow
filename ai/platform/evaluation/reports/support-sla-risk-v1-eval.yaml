@@ -1,0 +1,56 @@
+version: 1
+evaluation_id: support-sla-risk-v1-eval
+model_id: support-sla-risk-baseline-v1
+algorithm: deterministic_tabular_sla_risk_scorer
+use_case_id: support-sla-risk
+product: support-platform
+owner: ai-platform
+evaluation_type: runtime_library_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: support-sla-risk-golden-v1
+  source: platform/evaluation/datasets/support-sla-risk-golden.yaml
+  feature_contract: contracts/features/support-case-features.v1.yaml
+  model_io_contract: contracts/models/support-sla-risk-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 4
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/classical/support_sla_risk_baseline/tests/test_support_sla_risk_baseline.py
+  risk_band_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  reason_code_recall:
+    value: 1.00
+    threshold: 0.85
+    status: passed
+  human_review_policy_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  score_threshold_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  risk_ordering_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Runtime library proves support SLA risk model IO, reason-code and human-review behavior for a non-LMS operational risk use case.
+    - This is a deterministic tabular baseline, not a trained gradient-boosted or neural model.
+    - Future promotion must bind to governed support case snapshots and compare false-positive rate before supervisor workflow activation.
+risks:
+  - deterministic_rules_baseline
+  - no_governed_support_snapshot
+  - no_service_integration_yet
+  - no_supervisor_feedback_loop
+required_next_steps:
+  - bind_to_governed_support_case_snapshot
+  - compare_against_gradient_boosted_classifier
+  - add_shadow_supervisor_feedback_metrics

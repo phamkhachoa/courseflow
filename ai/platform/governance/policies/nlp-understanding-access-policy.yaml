@@ -1,0 +1,62 @@
+version: 1
+owner: ai-platform
+policy_id: nlp-understanding-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  direct_identifier_submission_allowed: false
+scope_aliases:
+  analyze: internal:ai-platform:nlp-understanding:analyze
+  ops: internal:ai-platform:nlp-understanding:ops
+principals:
+  - principal_id: service:ai-platform-nlp-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:lms-courseflow-nlp
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+      - analyze
+    tenant_ids:
+      - tenant-a
+      - tenant-lms
+      - tenant-lms-sandbox
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-semantic-search
+      - lms-auto-grading
+      - lms-knowledge-tracing
+
+  - principal_id: service:support-platform-nlp
+    owner_role: Support Platform service
+    product: support-platform
+    scopes:
+      - analyze
+    tenant_ids:
+      - tenant-a
+      - tenant-support
+    product_ids:
+      - support-platform
+    use_case_ids:
+      - support-agent-assist
+      - support-speech-quality-assurance
+
+  - principal_id: service:enterprise-knowledge-nlp
+    owner_role: Enterprise Knowledge service
+    product: ai-platform
+    scopes:
+      - analyze
+    tenant_ids:
+      - tenant-a
+      - tenant-enterprise
+    product_ids:
+      - ai-platform
+    use_case_ids:
+      - enterprise-knowledge-assistant

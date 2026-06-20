@@ -594,12 +594,10 @@ if [ "${COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS:-900}" -lt 30 ] \
   || [ "${COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS:-900}" -gt 900 ]; then
   fail "COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS must be between 30 and 900 seconds"
 fi
-check_secret RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET 32 \
-  courseflow-local-recommendation-ml-principal-hash-secret-change-me-32 \
-  courseflow-local-internal-jwt-secret-change-me-32 \
-  courseflow \
-  password \
-  admin
+check_value RECOMMENDATION_ML_SERVICE_URI
+check_http_url_not_local RECOMMENDATION_ML_SERVICE_URI
+check_value RECOMMENDATION_ML_SERVICE_URL
+check_http_url_not_local RECOMMENDATION_ML_SERVICE_URL
 check_sts_allowed_clients
 check_sts_allowed_service_scopes
 check_sts_client_policy
@@ -749,8 +747,6 @@ if [ "$validate_compose" -eq 1 ]; then
   trap 'rm -f "$config_json"' EXIT
 
   compose_args=(
-    --profile ml-worker
-    --profile migration
     -f "$docker_dir/docker-compose.yml"
     -f "$docker_dir/docker-compose.services.yml"
   )
@@ -773,7 +769,6 @@ if [ "$validate_compose" -eq 1 ]; then
   fi
 
   ALLOWED_PORT_SERVICES="$allowed_ports" \
-  RECOMMENDATION_ML_DOCKERFILE="$backend_dir/services/recommendation-ml-service/Dockerfile" \
     node - "$config_json" <<'EOF_NODE'
 const fs = require("fs");
 
@@ -1196,111 +1191,50 @@ if (!tokenConverter) {
   }
 }
 
-function commandText(service) {
-  return Array.isArray(service?.command) ? service.command.join(" ") : String(service?.command ?? "");
+for (const name of ["recommendation-ml-service", "recommendation-ml-worker", "recommendation-ml-migrator"]) {
+  if (services[name]) {
+    recommendationMlViolations.push(`${name} must run in the independent AI Compose project, not backend prod Compose`);
+  }
 }
 
-function serviceProfiles(service) {
-  return Array.isArray(service?.profiles) ? service.profiles.map((profile) => String(profile)) : [];
-}
-
-function assertRecommendationMlService(name, expectedMigrationFlag) {
-  const service = services[name];
-  if (!service) {
-    recommendationMlViolations.push(`${name} service is missing`);
+function validateRecommendationMlUrl(serviceName, key, rawValue) {
+  const value = String(rawValue ?? "").trim();
+  if (!value) {
+    recommendationMlViolations.push(`${serviceName} must set ${key}`);
     return;
   }
-  const serviceEnv = new Map(envEntries(service.environment));
-  const runMigrations = (serviceEnv.get("RECOMMENDATION_ML_RUN_MIGRATIONS") ?? "").trim().toLowerCase();
-  const docsEnabled = (serviceEnv.get("RECOMMENDATION_ML_DOCS_ENABLED") ?? "false").trim().toLowerCase();
-  const activeModelRequired = (
-    serviceEnv.get("RECOMMENDATION_ML_REQUIRE_ACTIVE_MODEL_READY") ?? "false"
-  ).trim().toLowerCase();
-  const autoActivateModels = (
-    serviceEnv.get("RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS") ?? "true"
-  ).trim().toLowerCase();
-  const syncTrainingEnabled = (
-    serviceEnv.get("RECOMMENDATION_ML_SYNC_TRAINING_ENABLED") ?? "true"
-  ).trim().toLowerCase();
-  const retentionDaysRaw = (
-    serviceEnv.get("RECOMMENDATION_ML_TRAINING_PAYLOAD_RETENTION_DAYS") ?? ""
-  ).trim();
-  const retentionDays = Number(retentionDaysRaw);
-  const scrubIntervalRaw = (
-    serviceEnv.get("RECOMMENDATION_ML_PAYLOAD_SCRUB_INTERVAL_SECONDS") ?? ""
-  ).trim();
-  const scrubIntervalSeconds = Number(scrubIntervalRaw);
-  if (runMigrations !== expectedMigrationFlag) {
-    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_RUN_MIGRATIONS=${expectedMigrationFlag}`);
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    recommendationMlViolations.push(`${serviceName}.${key} must be an HTTP(S) URL`);
+    return;
   }
-  if (docsEnabled !== "false") {
-    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_DOCS_ENABLED=false in prod`);
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    recommendationMlViolations.push(`${serviceName}.${key} must be an HTTP(S) URL`);
   }
-  if (activeModelRequired !== "true") {
-    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_REQUIRE_ACTIVE_MODEL_READY=true in prod`);
-  }
-  if (autoActivateModels !== "false") {
-    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS=false in prod`);
-  }
-  if (syncTrainingEnabled !== "false") {
-    recommendationMlViolations.push(`${name} must set RECOMMENDATION_ML_SYNC_TRAINING_ENABLED=false in prod`);
-  }
-  if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 30) {
-    recommendationMlViolations.push(
-      `${name} must set RECOMMENDATION_ML_TRAINING_PAYLOAD_RETENTION_DAYS between 1 and 30 in prod`
-    );
-  }
+  const host = parsed.hostname.toLowerCase();
   if (
-    !Number.isInteger(scrubIntervalSeconds)
-    || scrubIntervalSeconds < 300
-    || scrubIntervalSeconds > 86400
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host === "::1" ||
+    host === "[::1]" ||
+    host === "host.docker.internal" ||
+    host === "recommendation-ml-service"
   ) {
-    recommendationMlViolations.push(
-      `${name} must set RECOMMENDATION_ML_PAYLOAD_SCRUB_INTERVAL_SECONDS between 300 and 86400 in prod`
-    );
+    recommendationMlViolations.push(`${serviceName}.${key} must point to the external AI platform endpoint in prod`);
   }
 }
 
-assertRecommendationMlService("recommendation-ml-service", "false");
-assertRecommendationMlService("recommendation-ml-worker", "false");
-assertRecommendationMlService("recommendation-ml-migrator", "false");
-
-const recommendationMlWorker = services["recommendation-ml-worker"];
-if (recommendationMlWorker && !/\bcourseflow-ml\s+worker\b/.test(commandText(recommendationMlWorker))) {
-  recommendationMlViolations.push("recommendation-ml-worker must run courseflow-ml worker");
-}
-
-const recommendationMlMigrator = services["recommendation-ml-migrator"];
-if (!recommendationMlMigrator) {
-  recommendationMlViolations.push("recommendation-ml-migrator service is missing");
-} else {
-  const profiles = serviceProfiles(recommendationMlMigrator);
-  if (!profiles.includes("migration")) {
-    recommendationMlViolations.push("recommendation-ml-migrator must be isolated behind the migration profile");
+for (const serviceName of ["api-gateway", "analytics-service"]) {
+  const service = services[serviceName];
+  if (!service) {
+    continue;
   }
-  if (!/\balembic\s+upgrade\s+head\b/.test(commandText(recommendationMlMigrator))) {
-    recommendationMlViolations.push("recommendation-ml-migrator must run alembic upgrade head");
-  }
-  const ports = Array.isArray(recommendationMlMigrator.ports) ? recommendationMlMigrator.ports : [];
-  if (ports.length > 0) {
-    recommendationMlViolations.push("recommendation-ml-migrator must not publish ports");
-  }
-}
-
-const recommendationMlDockerfilePath = process.env.RECOMMENDATION_ML_DOCKERFILE;
-if (!recommendationMlDockerfilePath || !fs.existsSync(recommendationMlDockerfilePath)) {
-  recommendationMlViolations.push("recommendation-ml-service Dockerfile is missing");
-} else {
-  const dockerfile = fs.readFileSync(recommendationMlDockerfilePath, "utf8");
-  if (!/USER\s+courseflow\b/.test(dockerfile)) {
-    recommendationMlViolations.push("recommendation-ml-service Dockerfile must run as non-root courseflow user");
-  }
-  if (!/HEALTHCHECK[\s\S]*\/health/.test(dockerfile)) {
-    recommendationMlViolations.push("recommendation-ml-service Dockerfile healthcheck must use /health liveness");
-  }
-  if (/HEALTHCHECK[\s\S]*\/actuator\/health/.test(dockerfile)) {
-    recommendationMlViolations.push("recommendation-ml-service Dockerfile healthcheck must not use readiness /actuator/health");
-  }
+  const env = new Map(envEntries(service.environment));
+  validateRecommendationMlUrl(serviceName, "RECOMMENDATION_ML_SERVICE_URI", env.get("RECOMMENDATION_ML_SERVICE_URI"));
+  validateRecommendationMlUrl(serviceName, "RECOMMENDATION_ML_SERVICE_URL", env.get("RECOMMENDATION_ML_SERVICE_URL"));
 }
 
 for (const [serviceName, service] of Object.entries(services)) {

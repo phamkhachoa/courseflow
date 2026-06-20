@@ -1,0 +1,47 @@
+version: 1
+service_id: causal-uplift-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_causal_uplift_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/causal-uplift-access-policy.yaml
+observability:
+  metrics: in_memory_evaluation_error_identifier_guardrail_hitl_counters
+  tenant_safety: cross_tenant_causal_uplift_forbidden
+routes:
+  - method: POST
+    path: /v1/causal-uplift/evaluate
+    scope: internal:ai-platform:causal-uplift:evaluate
+    purpose: aggregate_experiment_uplift_evaluation
+  - method: GET
+    path: /v1/causal-uplift/health
+    scope: internal:ai-platform:causal-uplift:ops
+    purpose: causal_uplift_health
+  - method: GET
+    path: /v1/causal-uplift/metrics
+    scope: internal:ai-platform:causal-uplift:ops
+    purpose: causal_uplift_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/causal_uplift_service.py
+  model_modules:
+    - models/causal/causal_uplift_baseline/causal_uplift_baseline.py
+  artifacts:
+    - contracts/features/causal-experiment-features.v1.yaml
+    - contracts/models/causal-uplift-model-io.v1.yaml
+    - platform/evaluation/reports/causal-uplift-v1-eval.yaml
+    - platform/artifacts/manifests/causal-uplift-baseline-v1.yaml
+promotion_guardrails:
+  - route_scopes_must_match_causal_uplift_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - direct_learner_customer_user_or_contact_identifiers_must_be_rejected
+  - high_impact_or_guardrail_risk_outputs_must_require_human_review
+  - automated_rollout_must_remain_forbidden
+  - aggregate_snapshot_contract_must_remain_green
+  - causal_uplift_quality_gate_must_remain_green

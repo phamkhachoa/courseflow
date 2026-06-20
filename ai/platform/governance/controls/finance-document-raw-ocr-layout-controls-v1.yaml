@@ -1,0 +1,58 @@
+version: 1
+control_id: finance-document-raw-ocr-layout-controls-v1
+status: accepted_control
+owner: billing-finance-governance
+applies_to_reviews:
+  - finance-document-raw-ocr-review
+product: billing-finance
+use_case_id: finance-document-intelligence
+taxonomy_module_id: computer-vision-document-ai
+control_ids:
+  - deletion_export_impact_review
+  - source_document_access_policy
+  - layout_region_redaction
+processing_modes:
+  - raw_document_ocr
+  - layout_extraction
+requirements:
+  source_document_access_policy:
+    tenant_scope_required: true
+    vendor_master_join_scope: approved_finance_operator_only
+    raw_source_uri_in_ai_payload: forbidden
+    access_review_cadence: quarterly
+  deletion_export_impact_review:
+    data_subject_export_includes:
+      - source_document_reference_hash
+      - extracted_field_values
+      - human_review_decision
+      - audit_event_ids
+    deletion_cascade_targets:
+      - raw_media_workspace
+      - derived_ocr_tokens
+      - layout_region_features
+      - exception_reason_codes
+  layout_region_redaction:
+    redact_before_model_output:
+      - full_payment_account_number
+      - tax_identifier
+      - handwritten_signature
+      - unneeded_address_lines
+    retain_minimal_layout_regions:
+      - invoice_number_region
+      - receipt_total_region
+      - due_date_region
+      - vendor_name_region
+human_review:
+  required_for:
+    - low_confidence_extraction
+    - payment_or_tax_identifier_detected
+    - financial_adjustment_recommendation
+audit:
+  event_required: true
+  reason_codes_required: true
+evidence_refs:
+  - contracts/features/finance-document-intelligence-features.v1.yaml
+  - contracts/models/finance-document-intelligence-model-io.v1.yaml
+  - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+  - platform/model-registry/model-cards/finance-document-intelligence-baseline-v1.md
+

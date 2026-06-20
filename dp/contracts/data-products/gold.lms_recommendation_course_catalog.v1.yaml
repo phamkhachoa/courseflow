@@ -1,0 +1,140 @@
+contractVersion: 1
+dataProduct:
+  name: gold.lms_recommendation_course_catalog
+  layer: GOLD
+  domain: recommendation
+  product: lms-courseflow
+  domainOwner: lms-domain-council
+  ownerTeam: data-platform
+  businessOwner: learner-experience-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Publishable LMS course catalog snapshot used to constrain AI recommendation candidates.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: bronze.events_course_published
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: course_published_at
+
+schema:
+  columns:
+    - name: dataset_snapshot_id
+      type: string
+      nullable: false
+      pii: false
+      description: Immutable feature snapshot identifier.
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Enterprise product code that owns this catalog entry.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: true
+      description: Organization boundary used for tenant isolation.
+    - name: course_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Published course id eligible for recommendation.
+    - name: course_slug
+      type: string
+      nullable: true
+      pii: false
+      description: Public or internal course slug.
+    - name: catalog_visibility
+      type: string
+      nullable: false
+      pii: false
+      description: Catalog visibility at snapshot time.
+      allowedValues: [PUBLIC, PRIVATE, ORG_ONLY]
+    - name: title
+      type: string
+      nullable: true
+      pii: false
+      description: Course title from LMS catalog metadata.
+    - name: topic
+      type: string
+      nullable: true
+      pii: false
+      description: Primary catalog topic for explainability and fallback ranking.
+    - name: level
+      type: string
+      nullable: true
+      pii: false
+      description: Course difficulty or learner level.
+    - name: skill_tags
+      type: json
+      nullable: true
+      pii: false
+      description: JSON array of normalized skill tags attached to the course.
+    - name: course_published_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Business time when the course was published.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Source event id used for lineage.
+    - name: built_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the Gold catalog snapshot was built.
+    - name: quality_passed
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether this row passed catalog feature checks.
+
+quality:
+  freshnessSloMinutes: 240
+  checks:
+    - name: course_id_not_null
+      type: not_null
+      column: course_id
+    - name: course_catalog_key_unique
+      type: unique
+      columns: [dataset_snapshot_id, course_id]
+    - name: catalog_visibility_allowed
+      type: accepted_values
+      column: catalog_visibility
+      values: [PUBLIC, PRIVATE, ORG_ONLY]
+    - name: course_catalog_snapshot_freshness
+      type: freshness
+      column: built_at
+
+privacy:
+  classification: CONFIDENTIAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 730
+  erasureSupported: true
+  subjectKeys:
+    - name: org_id
+      column: org_id
+      type: organization_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [ML, BI]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedMLConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

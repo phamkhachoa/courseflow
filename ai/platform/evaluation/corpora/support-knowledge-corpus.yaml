@@ -1,0 +1,81 @@
+version: 1
+corpus_id: support-knowledge-corpus-v1
+owner: ai-platform
+collection: support_knowledge_articles
+product: support-platform
+chunks:
+  - chunk_id: support-billing-refund-duplicate-charge
+    tenant_id: global
+    source_ref: kb-support-billing-001
+    source_type: knowledge_article
+    product_area: billing
+    language: en
+    access_scope: public
+    pii_class: none_or_low
+    title: Refund duplicate charges
+    text: Customers who paid twice can request a duplicate charge refund. Agents should verify the invoice, payment timestamp and account ledger before drafting the refund response.
+    tags:
+      - billing
+      - refund
+      - duplicate charge
+
+  - chunk_id: support-access-mfa-timeout
+    tenant_id: global
+    source_ref: kb-support-identity-001
+    source_type: troubleshooting_guide
+    product_area: identity
+    language: en
+    access_scope: public
+    pii_class: none_or_low
+    title: MFA timeout and blocked administrator login
+    text: When administrators are blocked by MFA timeout errors, confirm identity provider status, check the MFA policy, and provide the safe recovery steps for access restoration.
+    tags:
+      - access
+      - mfa
+      - timeout
+
+  - chunk_id: support-technical-api-timeout
+    tenant_id: global
+    source_ref: kb-support-integrations-001
+    source_type: troubleshooting_guide
+    product_area: integrations
+    language: en
+    access_scope: public
+    pii_class: none_or_low
+    title: API integration timeout troubleshooting
+    text: Integration jobs that fail with API timeout errors should be checked for retry policy, request payload size, endpoint status and sync job duration limits.
+    tags:
+      - technical
+      - api
+      - timeout
+      - integration
+
+  - chunk_id: support-account-admin-email
+    tenant_id: global
+    source_ref: kb-support-account-001
+    source_type: knowledge_article
+    product_area: account
+    language: en
+    access_scope: public
+    pii_class: none_or_low
+    title: Change organization admin email
+    text: To update an organization admin profile email, verify account ownership, confirm the replacement email and record the audit trail before making the account change.
+    tags:
+      - account
+      - email
+      - profile
+
+  - chunk_id: support-tenant-b-private-mfa
+    tenant_id: tenant-b
+    source_ref: kb-support-tenant-b-001
+    source_type: runbook
+    product_area: identity
+    language: en
+    access_scope: tenant
+    pii_class: none_or_low
+    title: Tenant B private MFA outage runbook
+    text: Tenant B private MFA timeout recovery steps include tenant-specific identity routing details that must never be returned to another tenant.
+    tags:
+      - access
+      - mfa
+      - tenant private

@@ -1,0 +1,45 @@
+version: 1
+collection: course_content_chunks
+owner: ai-platform
+product: lms-courseflow
+purpose:
+  - semantic_search
+  - course_cold_start
+  - rag_tutor
+embedding:
+  model_family: multilingual_sentence_embedding
+  dimensions: 768
+  distance: cosine
+chunking:
+  source_types:
+    - course
+    - module
+    - lesson
+    - quiz_explanation
+    - transcript
+  max_tokens: 500
+  overlap_tokens: 80
+metadata_schema:
+  tenant_id: string
+  course_id: uuid
+  module_id: uuid_optional
+  lesson_id: uuid_optional
+  source_type: string
+  language: string
+  content_version: string
+  published_at: timestamp
+  access_scope: string
+  pii_class: none_or_low
+quality_checks:
+  require_non_empty_text: true
+  require_source_reference: true
+  require_published_content: true
+  require_tenant_scope: true
+  max_duplicate_chunk_ratio: 0.10
+serving:
+  top_k_default: 10
+  top_k_max: 50
+  min_similarity_for_rag: 0.72
+retention:
+  delete_when_course_unpublished: true
+  rebuild_on_content_version_change: true

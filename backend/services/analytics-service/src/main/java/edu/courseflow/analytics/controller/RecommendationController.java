@@ -1,6 +1,7 @@
 package edu.courseflow.analytics.controller;
 
 import edu.courseflow.analytics.dto.RecommendationDtos.ManualRelatedCourseDto;
+import edu.courseflow.analytics.dto.RecommendationDtos.MaterializeRecommendationArtifactRequestDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationBatchRequestDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationBatchResponseDto;
 import edu.courseflow.analytics.dto.RecommendationDtos.RecommendationEventIngestResponseDto;
@@ -163,6 +164,17 @@ public class RecommendationController {
                 InternalScopes.ANALYTICS_MODEL_WRITE,
                 "Requires platform admin or analytics model service access");
         return recommendations.syncActiveMlModelReadModel();
+    }
+
+    @PostMapping("/internal/analytics/recommendations/batch/related-course-pairs/artifact/materialize")
+    public RecommendationMlTrainingJobResponseDto materializeRecommendationArtifact(
+            @Valid @RequestBody MaterializeRecommendationArtifactRequestDto request,
+            CurrentUser user) {
+        requirePlatformAdminOrServiceScope(
+                user,
+                InternalScopes.ANALYTICS_MODEL_WRITE,
+                "Requires platform admin or analytics model service access");
+        return recommendations.materializeRecommendationArtifact(request);
     }
 
     private RecommendationEventIngestResponseDto recordRecommendationEvent(

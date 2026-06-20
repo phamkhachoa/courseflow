@@ -1,0 +1,31 @@
+version: 1
+artifact_id: finance-document-intelligence-baseline-v1-source-artifact
+model_id: finance-document-intelligence-baseline-v1
+algorithm: deterministic_ocr_token_document_intelligence
+model_family: multimodal
+artifact_type: source_algorithm
+status: runtime_library_baseline
+owner: ai-platform
+product: billing-finance
+use_case_id: finance-document-intelligence
+created_at: "2026-06-17"
+artifact_uri: models/multimodal/document_intelligence_baseline/document_intelligence_baseline.py
+artifact_hash:
+  algorithm: sha256
+  value: 6299eb4efeee4721a2b69a558fb49fcb1fb90bfb28f1813924697b637ffec0da
+lineage:
+  model_code: models/multimodal/document_intelligence_baseline/document_intelligence_baseline.py
+  feature_contract: contracts/features/finance-document-intelligence-features.v1.yaml
+  model_io_contract: contracts/models/finance-document-intelligence-model-io.v1.yaml
+  model_card: platform/model-registry/model-cards/finance-document-intelligence-baseline-v1.md
+  evaluation_report: platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+runtime:
+  package: document_intelligence_baseline
+  optional_extras: []
+  entrypoint: document_intelligence_baseline:DocumentIntelligenceBaseline
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  human_in_the_loop_required: true
+  raw_document_processing_allowed: false
+  financial_adjustment_auto_apply_allowed: false
+  rollback_supported: true

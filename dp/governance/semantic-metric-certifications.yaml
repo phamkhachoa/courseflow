@@ -1,0 +1,243 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+owner: enterprise-reporting
+description: >
+  Maker-checker certification ledger for governed semantic metrics. A metric may be marked
+  certified in platform/serving/semantic-metrics.yaml only when this registry has an approved
+  certification covering its formula, source lineage, quality dependencies, diff and impact.
+certifications:
+  - certificationId: certify_finance_metrics_20260617
+    status: approved
+    changeType: initial_certification
+    metricIds:
+      - revenue_net
+      - revenue_gross
+      - recognized_revenue_amount
+      - deferred_revenue_amount
+      - refund_amount
+      - billing_transaction_count
+      - committed_discount_amount
+      - points_earned
+      - points_reversed
+      - unreconciled_benefit_count
+      - benefit_reconciliation_gap
+    requestedBy: finance-analytics-po
+    requestedAt: "2026-06-17T09:00:00Z"
+    approvedBy: enterprise-data-steward
+    approvedAt: "2026-06-17T10:00:00Z"
+    approverRole: data_steward
+    reason: Finance and reconciliation KPIs are required for enterprise executive scorecard and benefit settlement review.
+    evidence:
+      metricOwnerApprovalUri: governance://semantic-metrics/finance/owner-approval-20260617
+      formulaReviewUri: governance://semantic-metrics/finance/formula-review-20260617
+      sourceLineageUri: governance://semantic-metrics/finance/source-lineage-20260617
+      qualityDependencyUri: governance://semantic-metrics/finance/quality-dependencies-20260617
+      impactAnalysisUri: governance://semantic-metrics/finance/impact-analysis-20260617
+    diff:
+      baseline: no_prior_certification
+      changedFields:
+        - status
+        - source
+        - grain
+        - dimensions
+        - calculation
+        - filters
+        - serving
+      impactSummary: Initial certification of finance metrics over revenue and benefit reconciliation Gold products.
+    impact:
+      useCases:
+        - enterprise-kpi-scorecard
+        - enterprise-revenue-intelligence
+        - finance-benefit-reconciliation
+      consumers:
+        - ApprovedBIConsumer
+        - ComplianceConsumer
+        - DomainDataOwner
+        - ExecutiveConsumer
+      sourceDataProducts:
+        - gold.finance_benefit_reconciliation
+        - gold.finance_revenue_daily
+
+  - certificationId: certify_customer_metrics_20260617
+    status: approved
+    changeType: initial_certification
+    metricIds:
+      - customer_profile_count
+      - at_risk_customer_account_count
+      - average_customer_health_score
+      - consented_customer_profile_count
+      - support_case_count
+      - first_response_sla_breach_count
+      - resolution_sla_breach_count
+      - average_support_satisfaction_score
+    requestedBy: customer-analytics-po
+    requestedAt: "2026-06-17T09:05:00Z"
+    approvedBy: customer-domain-owner
+    approvedAt: "2026-06-17T10:05:00Z"
+    approverRole: domain_owner
+    reason: Customer 360 and support SLA metrics are required for account-health and service-experience governance.
+    evidence:
+      metricOwnerApprovalUri: governance://semantic-metrics/customer/owner-approval-20260617
+      formulaReviewUri: governance://semantic-metrics/customer/formula-review-20260617
+      sourceLineageUri: governance://semantic-metrics/customer/source-lineage-20260617
+      qualityDependencyUri: governance://semantic-metrics/customer/quality-dependencies-20260617
+      impactAnalysisUri: governance://semantic-metrics/customer/impact-analysis-20260617
+    diff:
+      baseline: no_prior_certification
+      changedFields:
+        - status
+        - source
+        - grain
+        - dimensions
+        - calculation
+        - filters
+        - serving
+      impactSummary: Initial certification of customer and support metrics over Customer 360 and support SLA Gold products.
+    impact:
+      useCases:
+        - customer-account-health
+        - customer-support-experience-intelligence
+        - enterprise-kpi-scorecard
+      consumers:
+        - ApprovedBIConsumer
+        - ApprovedMLConsumer
+        - ComplianceConsumer
+        - DomainDataOwner
+        - ExecutiveConsumer
+      sourceDataProducts:
+        - gold.customer_360_profile
+        - gold.support_sla_daily
+
+  - certificationId: certify_compliance_metrics_20260617
+    status: approved
+    changeType: initial_certification
+    metricIds:
+      - access_risk_subject_count
+      - critical_access_risk_subject_count
+      - privileged_access_subject_count
+      - mfa_gap_subject_count
+      - deprovisioned_with_access_count
+    requestedBy: compliance-analytics-po
+    requestedAt: "2026-06-17T09:10:00Z"
+    approvedBy: security-owner
+    approvedAt: "2026-06-17T10:10:00Z"
+    approverRole: domain_owner
+    reason: Access-risk metrics are required for compliance, risk and executive reporting.
+    evidence:
+      metricOwnerApprovalUri: governance://semantic-metrics/compliance/owner-approval-20260617
+      formulaReviewUri: governance://semantic-metrics/compliance/formula-review-20260617
+      sourceLineageUri: governance://semantic-metrics/compliance/source-lineage-20260617
+      qualityDependencyUri: governance://semantic-metrics/compliance/quality-dependencies-20260617
+      impactAnalysisUri: governance://semantic-metrics/compliance/impact-analysis-20260617
+    diff:
+      baseline: no_prior_certification
+      changedFields:
+        - status
+        - source
+        - grain
+        - dimensions
+        - calculation
+        - filters
+        - serving
+      impactSummary: Initial certification of identity and access-risk metrics over certified compliance Gold output.
+    impact:
+      useCases:
+        - enterprise-kpi-scorecard
+        - identity-access-governance
+      consumers:
+        - ApprovedBIConsumer
+        - ComplianceConsumer
+        - DomainDataOwner
+        - ExecutiveConsumer
+        - RiskOperator
+      sourceDataProducts:
+        - gold.access_risk_daily
+
+  - certificationId: certify_enterprise_reporting_metrics_20260617
+    status: approved
+    changeType: initial_certification
+    metricIds:
+      - p0_data_product_blocker_count
+      - contract_compliance_rate
+      - quality_sla_breach_count
+      - runtime_lineage_gap_count
+    requestedBy: enterprise-reporting-po
+    requestedAt: "2026-06-17T09:15:00Z"
+    approvedBy: enterprise-data-council
+    approvedAt: "2026-06-17T10:15:00Z"
+    approverRole: enterprise_data_council
+    reason: Control Tower and executive reporting metrics are required for data-product release governance.
+    evidence:
+      metricOwnerApprovalUri: governance://semantic-metrics/enterprise-reporting/owner-approval-20260617
+      formulaReviewUri: governance://semantic-metrics/enterprise-reporting/formula-review-20260617
+      sourceLineageUri: governance://semantic-metrics/enterprise-reporting/source-lineage-20260617
+      qualityDependencyUri: governance://semantic-metrics/enterprise-reporting/quality-dependencies-20260617
+      impactAnalysisUri: governance://semantic-metrics/enterprise-reporting/impact-analysis-20260617
+    diff:
+      baseline: no_prior_certification
+      changedFields:
+        - status
+        - source
+        - grain
+        - dimensions
+        - calculation
+        - filters
+        - serving
+      impactSummary: Initial certification of Control Tower semantic metrics for data-product governance dashboards.
+    impact:
+      useCases:
+        - data-product-control-tower
+        - enterprise-kpi-scorecard
+      consumers:
+        - ApprovedBIConsumer
+        - ComplianceConsumer
+        - DataPlatformOperator
+        - DomainDataOwner
+        - ExecutiveConsumer
+      sourceDataProducts:
+        - gold.contract_compliance_daily
+        - gold.data_product_inventory
+        - gold.lineage_coverage_daily
+        - gold.quality_sla_daily
+
+  - certificationId: certify_recommendation_ml_metrics_20260617
+    status: approved
+    changeType: initial_certification
+    metricIds:
+      - recommendation_interaction_count
+      - training_snapshot_count
+      - feature_freshness_minutes
+    requestedBy: ml-platform-po
+    requestedAt: "2026-06-17T09:20:00Z"
+    approvedBy: ml-governance-lead
+    approvedAt: "2026-06-17T10:20:00Z"
+    approverRole: platform_owner
+    reason: Recommendation and ML feature metrics are required for governed model-input monitoring.
+    evidence:
+      metricOwnerApprovalUri: governance://semantic-metrics/ml-ai/owner-approval-20260617
+      formulaReviewUri: governance://semantic-metrics/ml-ai/formula-review-20260617
+      sourceLineageUri: governance://semantic-metrics/ml-ai/source-lineage-20260617
+      qualityDependencyUri: governance://semantic-metrics/ml-ai/quality-dependencies-20260617
+      impactAnalysisUri: governance://semantic-metrics/ml-ai/impact-analysis-20260617
+    diff:
+      baseline: no_prior_certification
+      changedFields:
+        - status
+        - source
+        - grain
+        - dimensions
+        - calculation
+        - filters
+        - serving
+      impactSummary: Initial certification of recommendation interaction and ML feature governance metrics.
+    impact:
+      useCases:
+        - enterprise-kpi-scorecard
+        - ml-feature-governance
+      consumers:
+        - ApprovedBIConsumer
+        - ApprovedMLConsumer
+        - DomainDataOwner
+        - ExecutiveConsumer
+      sourceDataProducts:
+        - gold.recsys_interactions

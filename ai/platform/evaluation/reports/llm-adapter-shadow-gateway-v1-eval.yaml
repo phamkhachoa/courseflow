@@ -1,0 +1,66 @@
+version: 1
+evaluation_id: llm-adapter-shadow-gateway-v1-eval
+model_id: llm-adapter-shadow-gateway-v1
+algorithm: deterministic_prompt_gateway_bound_llm_adapter_shadow
+use_case_id: platform-llm-adapter-shadow-gateway
+product: ai-platform
+owner: ai-platform
+evaluation_type: llm_adapter_shadow_gateway
+status: accepted_shadow_gate
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: llm-adapter-shadow-gateway-golden-v1
+  source: platform/evaluation/datasets/llm-adapter-shadow-gateway-golden.yaml
+  prompt_gateway_policy: platform/governance/policies/prompt-gateway-access-policy.yaml
+  contract: contracts/prompts/llm-prompt-envelope.v1.yaml
+  case_count: 4
+metrics:
+  prompt_gateway_expected_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  allowed_generation_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  blocked_generation_skip_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  groundedness:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  citation_precision:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  refusal_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  audit_safety_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  context_filter_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  gateway_evaluation_count:
+    value: 4
+    threshold: 4
+    status: passed
+quality_gate:
+  status: shadow_gate_accepted
+  notes:
+    - LLM/RAG adapter shadow execution must resolve a prompt-gateway principal and evaluate the prompt before generation.
+    - Blocked gateway cases skip generation; allowed cases must remain grounded, cited, human-reviewed and tenant-safe.
+risks:
+  - deterministic_generation_only
+  - live_network_provider_activation_not_configured
+  - hosted_deployment_gate_not_yet_hardened
+required_next_steps:
+  - enable_network_provider_with_secret_manager_refs_when_approved
+  - persist_shadow_prompt_response_audit_records
+  - harden_prompt_gateway_deployment_gate

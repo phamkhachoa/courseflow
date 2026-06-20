@@ -1,0 +1,96 @@
+version: 1
+contract_id: model-audit-event.v1
+owner: ai-platform
+purpose:
+  - record_sanitized_model_serving_evidence
+  - support_model_prediction_export
+  - support_model_prediction_deletion
+  - enforce_model_audit_retention
+schema:
+  required:
+    - event_id
+    - request_id
+    - tenant_id
+    - model_id
+    - status
+    - artifact_id
+    - artifact_manifest
+    - method
+    - latency_ms
+    - model_latency_ms
+    - requires_human_review
+    - fallback_used
+    - error_code
+    - payload_hash
+    - output_hash
+    - audit_payload
+    - created_at
+    - retention_expires_at
+  fields:
+    event_id:
+      type: string
+      pii: none
+    request_id:
+      type: string
+      pii: none
+    tenant_id:
+      type: string
+      pii: none
+    model_id:
+      type: string
+      pii: none
+    status:
+      type: enum
+      allowed_values:
+        - ok
+        - fallback
+        - error
+      pii: none
+    artifact_id:
+      type: string
+      pii: none
+    artifact_manifest:
+      type: path
+      pii: none
+    method:
+      type: string
+      pii: none
+    latency_ms:
+      type: number
+      pii: none
+    model_latency_ms:
+      type: number
+      pii: none
+    requires_human_review:
+      type: boolean
+      pii: none
+    fallback_used:
+      type: boolean
+      pii: none
+    error_code:
+      type: string
+      pii: none
+    payload_hash:
+      type: sha256
+      pii: none
+    output_hash:
+      type: sha256
+      pii: none
+    audit_payload:
+      type: json_string
+      pii: sanitized_only
+    created_at:
+      type: timestamp
+      pii: none
+    retention_expires_at:
+      type: timestamp
+      pii: none
+controls:
+  raw_model_payload_allowed: false
+  raw_model_output_allowed: false
+  raw_sensitive_values_allowed: false
+  model_prediction_logs_in_scope_for_deletion_export: true
+  artifact_lineage_required: true
+  tenant_scoped_request_required: true
+  default_retention_days: 30
+  maximum_retention_days: 180

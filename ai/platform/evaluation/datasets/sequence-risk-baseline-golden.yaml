@@ -1,0 +1,105 @@
+version: 1
+dataset_id: sequence-risk-baseline-golden-v1
+model_id: sequence-risk-baseline-v1
+product: lms-courseflow
+use_case_id: lms-at-risk-prediction
+module: models/deep_learning/sequence_risk_baseline/sequence_risk_baseline.py
+feature_contract: contracts/features/lms-learning-features.v1.yaml
+model_io_contract: contracts/models/sequence-risk-model-io.v1.yaml
+thresholds:
+  risk_band_accuracy_min: 1.0
+  reason_code_recall_min: 0.8
+  score_threshold_pass_rate_min: 1.0
+  risk_ordering_pass_rate_min: 1.0
+cases:
+  - case_id: high-risk-recent-deadline-and-low-score
+    input:
+      tenant_id: tenant-a
+      learner_principal_hash: learner-hash-001
+      course_id: course-python
+      feature_snapshot_at: "2026-06-17T00:00:00Z"
+      events:
+        - event_type: missed_deadline
+          days_ago: 1
+        - event_type: low_quiz_score
+          days_ago: 2
+          score: 0.38
+        - event_type: inactive_day
+          days_ago: 2
+        - event_type: late_submission
+          days_ago: 4
+    expected:
+      risk_band: high
+      min_risk_score: 0.7
+      risk_order: 4
+      reason_codes:
+        - MISSED_DEADLINE
+        - LOW_ASSESSMENT_SCORE
+        - RECENT_INACTIVITY
+
+  - case_id: medium-risk-help-request-and-recovery
+    input:
+      tenant_id: tenant-a
+      learner_principal_hash: learner-hash-002
+      course_id: course-python
+      feature_snapshot_at: "2026-06-17T00:00:00Z"
+      events:
+        - event_type: low_quiz_score
+          days_ago: 5
+          score: 0.55
+        - event_type: help_request
+          days_ago: 2
+        - event_type: quiz_passed
+          days_ago: 1
+          score: 0.74
+    expected:
+      risk_band: medium
+      min_risk_score: 0.45
+      max_risk_score: 0.7
+      risk_order: 3
+      reason_codes:
+        - LOW_ASSESSMENT_SCORE
+        - HELP_REQUEST_SPIKE
+
+  - case_id: low-risk-stale-negative-signal-with-recovery
+    input:
+      tenant_id: tenant-a
+      learner_principal_hash: learner-hash-003
+      course_id: course-python
+      feature_snapshot_at: "2026-06-17T00:00:00Z"
+      events:
+        - event_type: missed_deadline
+          days_ago: 14
+        - event_type: assignment_submitted
+          days_ago: 3
+        - event_type: video_completed
+          days_ago: 2
+          engagement_minutes: 35
+    expected:
+      risk_band: low
+      max_risk_score: 0.45
+      risk_order: 2
+      reason_codes:
+        - MISSED_DEADLINE
+
+  - case_id: low-risk-positive-progress
+    input:
+      tenant_id: tenant-a
+      learner_principal_hash: learner-hash-004
+      course_id: course-python
+      feature_snapshot_at: "2026-06-17T00:00:00Z"
+      events:
+        - event_type: video_completed
+          days_ago: 1
+          engagement_minutes: 50
+        - event_type: quiz_passed
+          days_ago: 1
+          score: 0.92
+        - event_type: assignment_submitted
+          days_ago: 2
+    expected:
+      risk_band: low
+      max_risk_score: 0.45
+      risk_order: 1
+      reason_codes:
+        - POSITIVE_PROGRESS

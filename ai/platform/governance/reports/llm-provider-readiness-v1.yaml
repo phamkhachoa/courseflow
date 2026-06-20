@@ -1,0 +1,44 @@
+version: 1
+report_id: llm-provider-readiness-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+policy_id: llm-provider-credential-readiness-v1
+summary:
+  readiness_status: contract_stub_ready
+  active_provider_count: 2
+  contract_stub_count: 2
+  live_provider_ready_count: 0
+  blocked_provider_count: 0
+  missing_provider_count: 0
+  plaintext_secret_count: 0
+  rotation_required_count: 0
+  deployment_check_count: 4
+next_actions:
+- connect_live_provider_secret_ref_without_plaintext_secret
+- validate_secret_rotation_control_plane_before_live_activation
+- run_provider_alert_delivery_drill_before_live_activation
+items:
+- provider_id: contract-stub-llm-failover-v1
+  active_provider: true
+  network_enabled: false
+  credential_mode: local_stub
+  credential_ref_scheme: local://
+  rotation_required: false
+  rotation_days: 0
+  deployment_checks:
+  - contract_stub_no_network
+  - prompt_gateway_mandatory_in_service_path
+  readiness_status: contract_stub_ready
+  validation_errors: []
+- provider_id: contract-stub-llm-v1
+  active_provider: true
+  network_enabled: false
+  credential_mode: local_stub
+  credential_ref_scheme: local://
+  rotation_required: false
+  rotation_days: 0
+  deployment_checks:
+  - contract_stub_no_network
+  - prompt_gateway_mandatory_in_service_path
+  readiness_status: contract_stub_ready
+  validation_errors: []

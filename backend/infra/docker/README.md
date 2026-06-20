@@ -84,20 +84,15 @@ KEYCLOAK_SETUP_EMAIL_REDIRECT_URI="https://admin.example.com/login/callback" \
 KEYCLOAK_ISSUER_URI="https://auth.example.com/realms/courseflow" \
 KEYCLOAK_JWK_SET_URI="https://auth.example.com/realms/courseflow/protocol/openid-connect/certs" \
 KEYCLOAK_AUDIENCE="courseflow-api" \
+RECOMMENDATION_ML_SERVICE_URI="https://ai.example.com" \
+RECOMMENDATION_ML_SERVICE_URL="https://ai.example.com" \
   scripts/validate-prod-profile.sh --compose
 ```
 
-For Recommendation ML releases, run Alembic through the dedicated one-shot migration profile before
-starting or rolling the API/worker containers:
-
-```bash
-docker compose \
-  -f infra/docker/docker-compose.yml \
-  -f infra/docker/docker-compose.services.yml \
-  -f infra/docker/docker-compose.prod.yml \
-  --profile migration \
-  run --rm recommendation-ml-migrator
-```
+Recommendation ML is operated by the independent AI Compose project under repo-root
+`ai/infra/docker`.
+Run its migrator/API/worker from the AI cluster, then point backend variables
+`RECOMMENDATION_ML_SERVICE_URI` and `RECOMMENDATION_ML_SERVICE_URL` at that runtime.
 
 Render or start the prod-shaped backend cluster from `backend/`:
 
@@ -220,17 +215,12 @@ Restore-check one dump into a temporary database:
 
 ```bash
 scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_promotion
-scripts/postgres-backup-drill.sh restore-check backups/postgres/<timestamp> cf_recommendation_ml
 ```
 
 For promotion retention approvals, use the generated
 `backups/postgres/<timestamp>/restore-check-cf_promotion.json` as the source for the restore-drill
 registration fields, including `artifactHash` and `checkedAt`.
 
-For Recommendation ML releases, retain
-`backups/postgres/<timestamp>/restore-check-cf_recommendation_ml.json`. Its restore probe verifies
-the restored database can be opened and that the expected ML Alembic revision plus core ML tables are
-present.
 
 ## Trust boundary
 

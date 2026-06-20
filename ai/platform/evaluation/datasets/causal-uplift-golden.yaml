@@ -1,0 +1,99 @@
+version: 1
+dataset_id: causal-uplift-golden-v1
+model_id: causal-uplift-baseline-v1
+product: ai-platform
+use_case_id: enterprise-experimentation-uplift
+module: models/causal/causal_uplift_baseline/causal_uplift_baseline.py
+feature_contract: contracts/features/causal-experiment-features.v1.yaml
+model_io_contract: contracts/models/causal-uplift-model-io.v1.yaml
+thresholds:
+  decision_band_accuracy_min: 1.0
+  recommendation_accuracy_min: 1.0
+  reason_code_recall_min: 0.85
+  human_review_policy_pass_rate_min: 1.0
+  guardrail_stop_pass_rate_min: 1.0
+  deterministic_replay_rate_min: 1.0
+cases:
+  - case_id: lms-coach-nudge-positive-lift
+    input:
+      tenant_id: tenant-lms
+      experiment_id: exp-intervention-coach-v1
+      outcome_name: course_completion
+      treatment_name: coach_nudge
+      control_name: standard_notification
+      treatment_count: 1000
+      treatment_successes: 620
+      control_count: 1000
+      control_successes: 520
+      minimum_detectable_lift: 0.04
+      confidence_level: 0.95
+      guardrail_metric_delta: 0.004
+      high_impact: true
+      segment_count: 4
+    expected:
+      decision_band: positive_lift
+      recommendation: promote_to_shadow_review
+      requires_human_review: true
+      min_absolute_lift: 0.09
+      max_absolute_lift: 0.11
+      reason_codes:
+        - OBSERVED_POSITIVE_LIFT
+        - MEETS_MINIMUM_DETECTABLE_LIFT
+        - STATISTICALLY_CONFIDENT
+        - HIGH_IMPACT_REVIEW
+
+  - case_id: commerce-copy-inconclusive
+    input:
+      tenant_id: tenant-commerce
+      experiment_id: exp-rank-copy-v1
+      outcome_name: conversion
+      treatment_name: new_ranker_copy
+      control_name: current_ranker_copy
+      treatment_count: 1000
+      treatment_successes: 505
+      control_count: 1000
+      control_successes: 500
+      minimum_detectable_lift: 0.03
+      confidence_level: 0.95
+      guardrail_metric_delta: 0.0
+      high_impact: false
+      segment_count: 3
+    expected:
+      decision_band: inconclusive
+      recommendation: continue_experiment
+      requires_human_review: false
+      min_absolute_lift: 0.004
+      max_absolute_lift: 0.006
+      reason_codes:
+        - OBSERVED_POSITIVE_LIFT
+        - BELOW_MINIMUM_DETECTABLE_LIFT
+        - NEEDS_MORE_SAMPLE
+
+  - case_id: operations-policy-guardrail-regression
+    input:
+      tenant_id: tenant-ops
+      experiment_id: exp-routing-policy-v2
+      outcome_name: resolved_within_sla
+      treatment_name: policy_v2
+      control_name: policy_v1
+      treatment_count: 1000
+      treatment_successes: 410
+      control_count: 1000
+      control_successes: 480
+      minimum_detectable_lift: 0.03
+      confidence_level: 0.95
+      guardrail_metric_delta: -0.04
+      high_impact: false
+      segment_count: 12
+    expected:
+      decision_band: guardrail_risk
+      recommendation: stop_or_redesign
+      requires_human_review: true
+      min_absolute_lift: -0.08
+      max_absolute_lift: -0.06
+      reason_codes:
+        - OBSERVED_NEGATIVE_LIFT
+        - MEETS_MINIMUM_DETECTABLE_LIFT
+        - STATISTICALLY_CONFIDENT
+        - GUARDRAIL_REGRESSION
+        - SEGMENT_MULTIPLICITY_REVIEW

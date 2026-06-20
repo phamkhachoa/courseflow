@@ -1,0 +1,131 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  drill_status: passed
+  release_governance_status: release_governance_attached
+  release_gate_count: 5
+  attached_release_gate_count: 5
+  failed_release_gate_count: 0
+  scenario_count: 5
+  passed_count: 5
+  failed_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+action_queue:
+  passed:
+  - coverage-slo-published-release-gate-drill
+  - coverage-slo-objectives-release-gate-drill
+  - coverage-slo-dashboard-release-gate-drill
+  - coverage-slo-owner-cadence-release-gate-drill
+  - coverage-slo-tenant-safety-release-gate-drill
+  blocked: []
+  next_actions:
+  - monitor_product_readiness_response_slo_drift_suppression_policy_coverage_release_gate_effectiveness
+scenarios:
+- drill_id: coverage-slo-published-release-gate-drill
+  gate_id: coverage-slo-published-release-gate
+  gate_type: slo_publication
+  owner_role: SA AI Platform + Admin/Ops
+  drill_case: slo_publication_replay
+  expected_release_governance_status: release_governance_attached
+  observed_release_governance_status: release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 3
+  observed_evidence_ref_count: 3
+  expected_outcome: release_gate_holds
+  observed_outcome: release_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: coverage-slo-objectives-release-gate-drill
+  gate_id: coverage-slo-objectives-release-gate
+  gate_type: slo_objectives
+  owner_role: SA AI Platform + SA AI Engineer
+  drill_case: slo_objectives_replay
+  expected_release_governance_status: release_governance_attached
+  observed_release_governance_status: release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 3
+  observed_evidence_ref_count: 3
+  expected_outcome: release_gate_holds
+  observed_outcome: release_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: coverage-slo-dashboard-release-gate-drill
+  gate_id: coverage-slo-dashboard-release-gate
+  gate_type: dashboard_visibility
+  owner_role: Admin/Ops
+  drill_case: dashboard_visibility_replay
+  expected_release_governance_status: release_governance_attached
+  observed_release_governance_status: release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 3
+  observed_evidence_ref_count: 3
+  expected_outcome: release_gate_holds
+  observed_outcome: release_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: coverage-slo-owner-cadence-release-gate-drill
+  gate_id: coverage-slo-owner-cadence-release-gate
+  gate_type: owner_cadence
+  owner_role: PO/BA + Admin/Ops
+  drill_case: owner_cadence_replay
+  expected_release_governance_status: release_governance_attached
+  observed_release_governance_status: release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 3
+  observed_evidence_ref_count: 3
+  expected_outcome: release_gate_holds
+  observed_outcome: release_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: coverage-slo-tenant-safety-release-gate-drill
+  gate_id: coverage-slo-tenant-safety-release-gate
+  gate_type: tenant_safety
+  owner_role: Governance Reviewer
+  drill_case: tenant_safety_replay
+  expected_release_governance_status: release_governance_attached
+  observed_release_governance_status: release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 3
+  observed_evidence_ref_count: 3
+  expected_outcome: release_gate_holds
+  observed_outcome: release_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html

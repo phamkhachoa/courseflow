@@ -1,0 +1,31 @@
+version: 1
+policy_id: governance-evaluation-incident-policy-v1
+owner: ai-platform
+repeated_failure_threshold: 2
+incident_routes:
+  blocked_by_release_gate_drill_mismatch:
+    condition: governance_evaluation_release_gate_mismatch
+    severity: p0
+    owner_role: Admin/Ops
+    action: escalate_governance_evaluation_release_gate_mismatch
+  blocked_by_unexpected_governance_evaluation_error:
+    condition: governance_evaluation_unexpected_error
+    severity: p0
+    owner_role: Admin/Ops
+    action: triage_governance_evaluation_runtime_error
+  attention_required_guardrail_drill_gap:
+    condition: governance_evaluation_guardrail_gap
+    severity: p1
+    owner_role: Admin/Ops
+    action: complete_governance_evaluation_guardrail_drills
+tenant_safety:
+  omitted_sensitive_fields:
+    - principal_ids
+    - tenant_ids
+    - request_bodies
+    - credential_values
+    - raw_drill_payloads
+  exported_identifiers:
+    - hashed_platform_ref
+    - report_id
+    - policy_id

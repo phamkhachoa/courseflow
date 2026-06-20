@@ -1,0 +1,144 @@
+version: 1
+owner: data-platform-team
+registryScope: group_enterprise_data_platform_runtime_iac
+profiles:
+  - profileId: local-compose
+    environment: local
+    type: docker_compose
+    path: platform/runtime/local/docker-compose.yaml
+    state: runnable_skeleton
+    readinessClaim: local_preflight_only
+    requiredEvidence:
+      - compose_config_validated
+      - local_healthchecks_defined
+      - synthetic_data_only
+  - profileId: staging-opentofu
+    environment: staging
+    type: opentofu
+    path: platform/runtime/iac/staging/main.tf
+    state: declared_not_applied
+    readinessClaim: opentofu_contract_declared_not_live_apply
+    requiredEvidence:
+      - plan_artifact
+      - service_identity_audit
+      - secrets_manager_policy
+      - private_network_policy
+  - profileId: prod-opentofu
+    environment: prod
+    type: opentofu
+    path: platform/runtime/iac/prod/main.tf
+    state: declared_not_applied
+    readinessClaim: opentofu_contract_declared_not_live_apply
+    requiredEvidence:
+      - approved_plan_artifact
+      - apply_evidence
+      - service_identity_audit
+      - secrets_manager_policy
+      - private_network_policy
+      - dr_exercise_report
+modules:
+  - moduleId: event-backbone
+    serviceIds: [event_backbone]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [private_network, acl, encryption, service_identity, metrics]
+  - moduleId: outbox-relay
+    serviceIds: [outbox_relay]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [idempotency, retry, dead_letter_queue, service_identity, audit]
+  - moduleId: cdc-connect
+    serviceIds: [cdc]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [offset_storage, schema_history, secret_reference, restart_policy, metrics]
+  - moduleId: schema-registry
+    serviceIds: [schema_registry]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [compatibility_policy, backup, service_identity, private_network, audit]
+  - moduleId: object-storage
+    serviceIds: [object_storage]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [encryption, lifecycle, versioning, private_endpoint, access_policy]
+  - moduleId: lakehouse-catalog
+    serviceIds: [table_format]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [snapshot_evidence, catalog_backup, table_policy, service_identity, audit]
+  - moduleId: batch-processing
+    serviceIds: [batch_processing]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [retry, job_identity, artifact_version, event_log, metrics]
+  - moduleId: sql-transform
+    serviceIds: [sql_transform]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [manifest_artifact, test_artifact, job_identity, rollback, audit]
+  - moduleId: orchestration
+    serviceIds: [orchestration]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [scheduler_ha, run_history_backup, retry_policy, service_identity, alerts]
+  - moduleId: data-quality
+    serviceIds: [data_quality]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [blocking_gate, quarantine_output, evidence_export, service_identity, audit]
+  - moduleId: lakehouse-sql
+    serviceIds: [lakehouse_sql]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [row_level_security, workload_metrics, private_endpoint, service_identity, audit]
+  - moduleId: observability
+    serviceIds: [observability]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/modules/runtime-service-contract
+    requiredControls: [slo_dashboard, alert_rules, metrics_retention, oncall_route, audit]
+  - moduleId: catalog-lineage
+    serviceIds: [catalog_lineage]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: skeleton
+    path: platform/runtime/iac/README.md
+    requiredControls: [metadata_backup, lineage_ingest, access_audit, service_identity, glossary_policy]
+  - moduleId: semantic-lakehouse
+    serviceIds: [semantic_lakehouse]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: candidate
+    path: platform/runtime/iac/README.md
+    requiredControls: [semantic_view_as_code, reflection_slo, row_level_security, benchmark, audit]
+  - moduleId: distributed-htap
+    serviceIds: [distributed_htap]
+    profileIds: [local-compose, staging-opentofu, prod-opentofu]
+    owner: platform-engineering
+    state: conditional_future
+    path: platform/runtime/iac/README.md
+    requiredControls: [migration_plan, backup, replication, service_slo, audit]

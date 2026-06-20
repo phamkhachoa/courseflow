@@ -1,0 +1,33 @@
+version: 1
+policy_id: prompt-redaction-policy-v1
+owner: ai-platform
+applies_to:
+  - llm
+  - genai
+  - rag
+  - prompt_audit
+redaction_tokens:
+  email: "[REDACTED_EMAIL]"
+  phone: "[REDACTED_PHONE]"
+  secret: "[REDACTED_SECRET]"
+  learner_identifier: "[REDACTED_IDENTIFIER]"
+patterns:
+  email:
+    description: Email addresses in user input, context or audit payloads.
+    token: "[REDACTED_EMAIL]"
+  phone:
+    description: Phone-like numbers with separators.
+    token: "[REDACTED_PHONE]"
+  secret:
+    description: API keys, bearer tokens, JWTs and token assignments.
+    token: "[REDACTED_SECRET]"
+  learner_identifier:
+    description: Raw learner or principal identifiers before hashing.
+    token: "[REDACTED_IDENTIFIER]"
+requirements:
+  raw_sensitive_values_allowed_in_prompt: false
+  raw_sensitive_values_allowed_in_audit: false
+  cross_tenant_context_allowed: false
+  cost_budget_required_before_model_call: true
+  human_review_required_for_external_reply: true
+  external_auto_send_default: false

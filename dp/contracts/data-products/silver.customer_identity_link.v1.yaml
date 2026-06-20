@@ -1,0 +1,158 @@
+contractVersion: 1
+dataProduct:
+  name: silver.customer_identity_link
+  layer: SILVER
+  domain: customer
+  product: crm-sales
+  domainOwner: customer-domain-council
+  ownerTeam: data-platform
+  businessOwner: customer-success-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Conformed customer identity link table connecting product-local accounts to tokenized enterprise customer subjects.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: bronze.events_customer_account_changed
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: changed_at
+
+schema:
+  columns:
+    - name: customer_identity_link_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic identity-link row id.
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product that produced the source account signal.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: account_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product-local account identifier.
+    - name: customer_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized customer subject identifier.
+    - name: external_account_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized external account identifier.
+    - name: source_system_record_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized source record identifier used for DSAR replay and lineage.
+    - name: source_system
+      type: string
+      nullable: false
+      pii: false
+      description: Logical source system.
+    - name: account_type
+      type: string
+      nullable: false
+      pii: false
+      description: Account category.
+      allowedValues: [BUSINESS, INDIVIDUAL, PUBLIC_SECTOR, PARTNER, UNKNOWN]
+    - name: lifecycle_stage
+      type: string
+      nullable: false
+      pii: false
+      description: Customer lifecycle stage.
+      allowedValues: [PROSPECT, TRIAL, ACTIVE_CUSTOMER, EXPANSION, RENEWAL, DORMANT, CHURNED]
+    - name: account_status
+      type: string
+      nullable: false
+      pii: false
+      description: Current account state.
+      allowedValues: [ACTIVE, INACTIVE, TRIAL, AT_RISK, CHURNED, SUSPENDED]
+    - name: consent_status
+      type: string
+      nullable: false
+      pii: false
+      description: Consent state for analytics and activation use.
+      allowedValues: [OPTED_IN, OPTED_OUT, UNKNOWN, NOT_APPLICABLE]
+    - name: identity_confidence_score
+      type: int
+      nullable: false
+      pii: false
+      description: Deterministic confidence score for the link produced by this source slice.
+    - name: link_status
+      type: string
+      nullable: false
+      pii: false
+      description: Link state for downstream entity-resolution workflows.
+      allowedValues: [CURRENT, STALE, CONFLICTED]
+    - name: valid_from
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Source business timestamp for this link.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Original source event id for lineage.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: Bronze source record hash.
+
+quality:
+  freshnessSloMinutes: 120
+  checks:
+    - name: customer_identity_link_id_not_null
+      type: not_null
+      column: customer_identity_link_id
+    - name: customer_identity_link_id_unique
+      type: unique
+      columns: [customer_identity_link_id]
+    - name: customer_id_hash_not_null
+      type: not_null
+      column: customer_id_hash
+    - name: org_id_not_null
+      type: not_null
+      column: org_id
+
+privacy:
+  classification: PII
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: customer_id_hash
+      column: customer_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [DataPlatform, BI, ML, ReverseETL]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ApprovedMLConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

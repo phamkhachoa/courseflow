@@ -1,0 +1,176 @@
+version: 1
+runbook_id: product-readiness-freshness-incident-response-v1
+owner: admin-ops
+summary: Tenant-safe response runbook for AI Platform Product Readiness Freshness incidents.
+incident_scope:
+  report_id: product-readiness-freshness-incident-export-v1
+  source_report: platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  conditions:
+    - product_readiness_freshness_report_missing
+    - product_readiness_freshness_report_stale
+    - product_readiness_runtime_route_unreachable
+    - product_readiness_static_snapshot_stale
+    - product_readiness_runtime_error_or_audit_failure
+    - product_readiness_runtime_audit_gap
+required_steps:
+  - step_id: detect
+    owner_role: Admin/Ops
+    evidence_ref: report:product-readiness-freshness-incident-export-v1
+    description: Confirm the open Product Readiness Freshness incident without copying raw tenant, principal or runtime payloads.
+  - step_id: acknowledge
+    owner_role: Admin/Ops
+    evidence_ref: platform/operations/reports/admin-ops-dashboard-v1.html
+    description: Acknowledge the incident in the Admin/Ops dashboard using the exported incident ID.
+  - step_id: assign
+    owner_role: Admin/Ops
+    evidence_ref: platform/delivery/reports/delivery-owner-views-v1.yaml
+    description: Assign Admin/Ops owner and SA AI Platform/Engineer support using role aliases only.
+  - step_id: contain
+    owner_role: SA AI Platform
+    evidence_ref: platform/product/reports/ai-platform-product-readiness-v1.yaml
+    description: Hold product readiness sign-off until the freshness report, runtime route and audit counters are reliable.
+  - step_id: remediate
+    owner_role: SA AI Engineer
+    evidence_ref: platform/product/reports/ai-platform-product-readiness-freshness-v1.yaml
+    description: Refresh stale snapshots, restore route health or repair serving audit coverage based on the incident action.
+  - step_id: verify
+    owner_role: Admin/Ops
+    evidence_ref: platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+    description: Re-run freshness and incident exports until open product freshness incident count is zero.
+  - step_id: communicate
+    owner_role: PO/BA
+    evidence_ref: docs/team/council-meetings
+    description: Publish product readiness impact and recovery evidence without raw tenant, service or credential values.
+  - step_id: close
+    owner_role: Admin/Ops
+    evidence_ref: platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+    description: Close or downgrade only after drill evidence proves the response path and tenant safety are intact.
+scenario_expectations:
+  - scenario_id: report-stale-p1
+    condition: product_readiness_freshness_report_stale
+    severity: p1
+    owner_role: Admin/Ops
+    action: refresh_product_readiness_freshness_report
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+  - scenario_id: route-unreachable-p0
+    condition: product_readiness_runtime_route_unreachable
+    severity: p0
+    owner_role: Admin/Ops
+    action: triage_product_readiness_runtime_route
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+  - scenario_id: static-snapshot-stale-p1
+    condition: product_readiness_static_snapshot_stale
+    severity: p1
+    owner_role: Admin/Ops
+    action: refresh_product_readiness_snapshots
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+  - scenario_id: runtime-error-audit-failure-p1
+    condition: product_readiness_runtime_error_or_audit_failure
+    severity: p1
+    owner_role: Admin/Ops
+    action: triage_product_readiness_runtime_metrics
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+  - scenario_id: runtime-audit-gap-p1
+    condition: product_readiness_runtime_audit_gap
+    severity: p1
+    owner_role: Admin/Ops
+    action: restore_product_readiness_audit_coverage
+    required_steps:
+      - detect
+      - acknowledge
+      - assign
+      - contain
+      - remediate
+      - verify
+      - communicate
+      - close
+tenant_safety:
+  omitted_sensitive_fields:
+    - tenant_ids
+    - principal_ids
+    - request_bodies
+    - credential_values
+    - raw_runtime_payloads
+  exported_identifiers:
+    - incident_id
+    - product_readiness_hash_ref
+    - role_alias
+response_metrics:
+  severity_slos:
+    p0:
+      acknowledge_minutes: 5
+      contain_minutes: 15
+      recover_minutes: 60
+      close_minutes: 90
+    p1:
+      acknowledge_minutes: 15
+      contain_minutes: 45
+      recover_minutes: 240
+      close_minutes: 300
+  synthetic_observations:
+    product_readiness_freshness_report_stale:
+      acknowledge_minutes: 10
+      contain_minutes: 24
+      remediate_minutes: 110
+      verify_minutes: 130
+      close_minutes: 170
+    product_readiness_runtime_route_unreachable:
+      acknowledge_minutes: 4
+      contain_minutes: 12
+      remediate_minutes: 42
+      verify_minutes: 52
+      close_minutes: 70
+    product_readiness_static_snapshot_stale:
+      acknowledge_minutes: 9
+      contain_minutes: 22
+      remediate_minutes: 100
+      verify_minutes: 118
+      close_minutes: 158
+    product_readiness_runtime_error_or_audit_failure:
+      acknowledge_minutes: 11
+      contain_minutes: 30
+      remediate_minutes: 145
+      verify_minutes: 170
+      close_minutes: 210
+    product_readiness_runtime_audit_gap:
+      acknowledge_minutes: 8
+      contain_minutes: 20
+      remediate_minutes: 90
+      verify_minutes: 112
+      close_minutes: 150
+  next_actions:
+    - exercise_product_readiness_response_slo_drift_alert_drill
+next_actions:
+  - exercise_product_readiness_response_slo_drift_alert_drill

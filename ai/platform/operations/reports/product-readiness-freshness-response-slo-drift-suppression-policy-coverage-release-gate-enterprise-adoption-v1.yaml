@@ -1,0 +1,98 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  adoption_status: adoption_monitored
+  enterprise_pattern_status: enterprise_pattern_expanded
+  blueprint_count: 6
+  assigned_use_case_count: 6
+  non_lms_blueprint_count: 5
+  non_lms_product_count: 4
+  taxonomy_area_count: 9
+  target_module_count: 13
+  executable_module_count: 13
+  evaluation_gate_count: 36
+  signal_count: 6
+  adopted_signal_count: 6
+  blocked_signal_count: 0
+  adoption_pct: 100
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  min_non_lms_blueprint_count: 5
+  min_non_lms_product_count: 4
+  min_taxonomy_area_count: 8
+  min_evaluation_gate_count: 30
+action_queue:
+  adopted:
+  - enterprise-pattern-expanded-signal
+  - enterprise-pattern-assignment-coverage-signal
+  - enterprise-pattern-product-span-signal
+  - enterprise-pattern-taxonomy-evaluation-span-signal
+  - enterprise-pattern-tenant-safety-signal
+  - enterprise-pattern-adoption-followup-signal
+  blocked: []
+  next_actions:
+  - publish_enterprise_release_gate_pattern_adoption_slo
+signals:
+- signal_id: enterprise-pattern-expanded-signal
+  signal_type: enterprise_pattern_status
+  condition: enterprise release gate pattern must be expanded first
+  expected: enterprise_pattern_expanded
+  observed: enterprise_pattern_expanded
+  adopted: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+- signal_id: enterprise-pattern-assignment-coverage-signal
+  signal_type: assignment_coverage
+  condition: all ready solution blueprints must be assigned
+  expected: 6/6 assigned
+  observed: 6/6 assigned; 0 blocked
+  adopted: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+- signal_id: enterprise-pattern-product-span-signal
+  signal_type: enterprise_product_span
+  condition: adoption must cover non-LMS blueprints and products
+  expected: '>=5 non-LMS blueprints and >=4 non-LMS products'
+  observed: 5 non-LMS blueprints; 4 non-LMS products
+  adopted: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+- signal_id: enterprise-pattern-taxonomy-evaluation-span-signal
+  signal_type: taxonomy_evaluation_span
+  condition: adoption must span enough taxonomy areas and eval gates
+  expected: '>=8 taxonomy areas and >=30 evaluation gates'
+  observed: 9 taxonomy areas; 36 evaluation gates
+  adopted: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+- signal_id: enterprise-pattern-tenant-safety-signal
+  signal_type: tenant_safety
+  condition: adoption evidence must be tenant-safe
+  expected: tenant_safe=true raw_identifier_count=0
+  observed: tenant_safe=true raw_identifier_count=0
+  adopted: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- signal_id: enterprise-pattern-adoption-followup-signal
+  signal_type: adoption_followup
+  condition: Product Readiness must track enterprise adoption monitoring
+  expected: monitor_enterprise_release_gate_pattern_adoption
+  observed: monitor_enterprise_release_gate_pattern_adoption
+  adopted: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml

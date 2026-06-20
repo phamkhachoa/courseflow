@@ -1,0 +1,601 @@
+version: 1
+report_id: ai-platform-product-readiness-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+product:
+  product_id: ai-platform
+  product_name: Enterprise AI Platform
+summary:
+  readiness_status: stakeholder_ready_with_followups
+  stakeholder_visibility_status: current_with_response_acceptance
+  platform_status: attention_required
+  delivery_status: ready_work_available
+  release_status: release_ready
+  serving_status: healthy
+  serving_metrics_connected: true
+  serving_request_count: 3
+  serving_audit_record_count: 3
+  serving_error_count: 0
+  serving_audit_failure_count: 0
+  dashboard_freshness_status: current
+  governance_response_drill_status: passed
+  product_readiness_freshness_response_drill_status: passed
+  product_readiness_freshness_response_metrics_status: slo_met
+  product_readiness_freshness_response_metrics_ingest_status: live_ingest_connected
+  product_readiness_freshness_response_trend_status: trend_ready_with_watch
+  product_readiness_freshness_response_alert_status: alerts_configured_with_watch
+  product_readiness_freshness_response_alert_drill_status: passed
+  product_readiness_freshness_response_alert_calibration_status: calibrated_with_watch
+  product_readiness_freshness_response_alert_suppression_policy_status: suppression_policy_codified
+  product_readiness_freshness_response_alert_suppression_policy_drill_status: passed
+  product_readiness_freshness_response_alert_suppression_policy_effectiveness_status: effectiveness_monitored
+  product_readiness_freshness_response_alert_suppression_policy_coverage_status: coverage_expanded
+  product_readiness_freshness_response_alert_suppression_policy_regression_status: regression_monitored
+  product_readiness_freshness_response_alert_suppression_policy_coverage_slo_status: coverage_slo_published
+  product_readiness_freshness_response_alert_suppression_policy_release_governance_status: release_governance_attached
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_drill_status: passed
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_effectiveness_status: effectiveness_monitored
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_pattern_status: enterprise_pattern_expanded
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_status: adoption_monitored
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_status: adoption_slo_published
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_status
+  : enterprise_adoption_slo_release_governance_attached
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_drill_status
+  : passed
+  governance_response_runbook_accepted: true
+  product_readiness_freshness_response_drill_accepted: true
+  product_readiness_freshness_response_metrics_breach_count: 0
+  product_readiness_freshness_response_metrics_live_observation_count: 5
+  product_readiness_freshness_response_trend_watch_count: 1
+  product_readiness_freshness_response_alert_count: 1
+  product_readiness_freshness_response_alert_routed_count: 1
+  product_readiness_freshness_response_alert_drill_scenario_count: 1
+  product_readiness_freshness_response_alert_drill_passed_count: 1
+  product_readiness_freshness_response_alert_calibrated_count: 1
+  product_readiness_freshness_response_alert_noisy_count: 0
+  product_readiness_freshness_response_alert_suppression_rule_count: 1
+  product_readiness_freshness_response_alert_suppression_active_rule_count: 1
+  product_readiness_freshness_response_alert_suppression_policy_drill_scenario_count: 4
+  product_readiness_freshness_response_alert_suppression_policy_drill_passed_count: 4
+  product_readiness_freshness_response_alert_suppression_policy_effective_signal_count: 4
+  product_readiness_freshness_response_alert_suppression_policy_suppression_effectiveness_pct: 100
+  product_readiness_freshness_response_alert_suppression_policy_escalation_preservation_pct: 100
+  product_readiness_freshness_response_alert_suppression_policy_coverage_scenario_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_covered_scenario_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_coverage_pct: 100
+  product_readiness_freshness_response_alert_suppression_policy_regression_check_count: 7
+  product_readiness_freshness_response_alert_suppression_policy_passed_regression_check_count: 7
+  product_readiness_freshness_response_alert_suppression_policy_coverage_slo_objective_count: 4
+  product_readiness_freshness_response_alert_suppression_policy_coverage_slo_met_objective_count: 4
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_attached_release_gate_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_drill_scenario_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_drill_passed_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_effectiveness_signal_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_effective_signal_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_effectiveness_pct: 100
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_pattern_blueprint_count: 6
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_pattern_non_lms_blueprint_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_pattern_non_lms_product_count: 4
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_pattern_taxonomy_area_count: 9
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_signal_count: 6
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adopted_signal_count: 6
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_pct: 100
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_objective_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_met_objective_count: 5
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_target_pct: 100
+  product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_review_cadence_days: 30
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_gate_count
+  : 5
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_attached_gate_count
+  : 5
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_failed_gate_count
+  : 0
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_review_cadence_days
+  : 30
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_drill_scenario_count
+  : 5
+  ? product_readiness_freshness_response_alert_suppression_policy_release_gate_enterprise_adoption_slo_release_governance_drill_passed_count
+  : 5
+  tenant_safe: true
+  open_incident_count: 0
+  watch_incident_count: 1
+  required_gate_count: 30
+  passed_required_gate_count: 30
+  failed_required_gate_count: 0
+  followup_count: 1
+  action_required_count: 0
+action_queue:
+  blocked: []
+  passed:
+  - platform_product_registered
+  - required_ai_spectrum_covered
+  - evaluation_gates_passed
+  - release_ready
+  - serving_metrics_healthy
+  - admin_ops_dashboard_current
+  - tenant_safe_incident_exports
+  - governance_response_runbook_accepted
+  - product_readiness_freshness_response_drill_passed
+  - product_readiness_freshness_response_drill_accepted
+  - product_readiness_freshness_live_response_metrics_ingest_connected
+  - product_readiness_freshness_response_metrics_slo_met
+  - product_readiness_freshness_response_slo_trend_ready
+  - product_readiness_freshness_response_slo_drift_alerts_configured
+  - product_readiness_freshness_response_slo_drift_alert_drill_passed
+  - product_readiness_freshness_response_slo_drift_alert_calibration_monitored
+  - product_readiness_freshness_response_slo_drift_alert_suppression_policy_codified
+  - product_readiness_freshness_response_slo_drift_suppression_policy_drill_passed
+  - product_readiness_freshness_response_slo_drift_suppression_policy_effectiveness_monitored
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_expanded
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_regression_monitored
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_slo_published
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_governance_attached
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_drill_passed
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_effectiveness_monitored
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_pattern_expanded_to_enterprise_use_cases
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_monitored
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_published
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_release_governance_attached
+  - product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_release_governance_drill_passed
+  tracked_followups:
+  - monitor_enterprise_release_gate_pattern_adoption_slo_release_governance_effectiveness
+source_reports:
+- products/registry.yaml
+- platform/operations/reports/operating-cockpit-v1.yaml
+- platform/delivery/reports/delivery-state-v1.yaml
+- services/model-serving-service/service.yaml
+- platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+- platform/governance/reports/model-serving-access-incident-export-v1.yaml
+- platform/governance/reports/governance-evaluation-incident-export-v1.yaml
+- platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+- platform/operations/reports/governance-evaluation-incident-response-drill-v1.yaml
+- platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+- platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-alerts-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-drill-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-calibration-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-suppression-policy-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-drill-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-v1.yaml
+- platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-drill-v1.yaml
+- platform/intake/reports/use-case-blueprints-v1.yaml
+- platform/product/reports/ai-platform-product-readiness-freshness-v1.yaml
+gates:
+- gate_id: platform_product_registered
+  title: AI Platform product is registered
+  owner_role: PO/BA
+  required: true
+  status: passed
+  reason: AI Platform is registered as the platform product.
+  evidence_refs:
+  - products/registry.yaml
+  - products/ai-platform/README.md
+- gate_id: required_ai_spectrum_covered
+  title: Required AI spectrum is covered
+  owner_role: SA AI Platform
+  required: true
+  status: passed
+  reason: 14 modules cover all required AI areas.
+  evidence_refs:
+  - platform/coverage/reports/ai-module-catalog-v1.yaml
+  - platform/coverage/reports/ai-capability-taxonomy-v1.yaml
+- gate_id: evaluation_gates_passed
+  title: Required evaluation gates pass
+  owner_role: SA AI Engineer
+  required: true
+  status: passed
+  reason: 20/20 required evaluations passed.
+  evidence_refs:
+  - platform/evaluation/registry.yaml
+- gate_id: release_ready
+  title: Release health is ready
+  owner_role: SA AI Platform + Governance Reviewer
+  required: true
+  status: passed
+  reason: Operating cockpit release status is release_ready.
+  evidence_refs:
+  - platform/operations/reports/operating-cockpit-v1.yaml
+- gate_id: serving_metrics_healthy
+  title: Serving metrics are healthy
+  owner_role: Admin/Ops
+  required: true
+  status: passed
+  reason: Serving metrics are connected with status healthy.
+  evidence_refs:
+  - platform/operations/reports/model-serving-metrics-export-v1.yaml
+  - platform/operations/reports/operating-cockpit-v1.yaml
+- gate_id: admin_ops_dashboard_current
+  title: Admin/Ops dashboard is current
+  owner_role: Admin/Ops
+  required: true
+  status: passed
+  reason: Dashboard freshness status is current with 27/27 current sources.
+  evidence_refs:
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+- gate_id: tenant_safe_incident_exports
+  title: Incident exports are tenant-safe and quiet
+  owner_role: Governance Reviewer
+  required: true
+  status: passed
+  reason: 0 open incidents, 1 watch incidents and tenant_safe=True.
+  evidence_refs:
+  - platform/governance/reports/model-serving-access-incident-export-v1.yaml
+  - platform/governance/reports/governance-evaluation-incident-export-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+- gate_id: governance_response_runbook_accepted
+  title: Governance Evaluation response runbook is accepted
+  owner_role: Admin/Ops
+  required: true
+  status: passed
+  reason: Response drill status is passed; delivery acceptance=True.
+  evidence_refs:
+  - platform/delivery/ledgers/delivery-state-ledger.yaml
+  - platform/delivery/reports/delivery-state-v1.yaml
+  - platform/operations/runbooks/governance-evaluation-incident-response-v1.yaml
+  - platform/operations/reports/governance-evaluation-incident-response-drill-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+  - docs/team/council-meetings/0084-governance-evaluation-response-runbook-drill.md
+- gate_id: product_readiness_freshness_response_drill_passed
+  title: Product Readiness Freshness response drill passed
+  owner_role: Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response drill status is passed with 5/5 scenarios
+    passed.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - runbooks/product-readiness-freshness-incident-response.md
+- gate_id: product_readiness_freshness_response_drill_accepted
+  title: Product Readiness Freshness response drill is accepted
+  owner_role: Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response drill status is passed; delivery acceptance=True.
+  evidence_refs:
+  - platform/delivery/ledgers/delivery-state-ledger.yaml
+  - platform/delivery/reports/delivery-state-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbooks/product-readiness-freshness-incident-response.md
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+  - docs/team/council-meetings/0092-product-readiness-freshness-response-state-acceptance.md
+- gate_id: product_readiness_freshness_live_response_metrics_ingest_connected
+  title: Product Readiness Freshness live response metrics ingest is connected
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response metrics ingest status is live_ingest_connected
+    with 5/5 live observations.
+  evidence_refs:
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+- gate_id: product_readiness_freshness_response_metrics_slo_met
+  title: Product Readiness Freshness response metrics meet SLO
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response metrics status is slo_met with 0 SLO
+    breaches.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+- gate_id: product_readiness_freshness_response_slo_trend_ready
+  title: Product Readiness Freshness response SLO trend is ready
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response trend status is trend_ready_with_watch
+    across 1 owner roles with 1 watch scenarios and 0 SLO breaches.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+- gate_id: product_readiness_freshness_response_slo_drift_alerts_configured
+  title: Product Readiness Freshness response SLO drift alerts are configured
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift alert status is alerts_configured_with_watch
+    with 1/1 watch scenarios routed.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alerts-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_alert_drill_passed
+  title: Product Readiness Freshness response SLO drift alert drill passed
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift alert drill status is passed
+    with 1/1 alert paths passed.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alerts-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_alert_calibration_monitored
+  title: Product Readiness Freshness response SLO drift alert calibration is monitored
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift alert calibration status
+    is calibrated_with_watch with 1/1 alert calibrations passing and 0 noisy alerts.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-calibration-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-drill-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_alert_suppression_policy_codified
+  title: Product Readiness Freshness response SLO drift alert suppression policy is
+    codified
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift alert suppression policy
+    status is suppression_policy_codified with 1/1 active rules.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-suppression-policy-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-calibration-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_drill_passed
+  title: Product Readiness Freshness response SLO drift suppression policy drill passed
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy drill
+    status is passed with 4/4 policy scenarios passed.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alert-suppression-policy-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_effectiveness_monitored
+  title: Product Readiness Freshness response SLO drift suppression policy effectiveness
+    is monitored
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy effectiveness
+    status is effectiveness_monitored with suppression 100% and escalation preservation
+    100%.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-drill-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_expanded
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    is expanded
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    status is coverage_expanded with 5/5 scenario classes covered.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_regression_monitored
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    regression is monitored
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    regression status is regression_monitored with 7/7 regression checks passed.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_slo_published
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    SLO is published
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    SLO status is coverage_slo_published with 4/4 objectives met.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_governance_attached
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release governance is attached
+  owner_role: SA AI Platform + Governance Reviewer
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release governance status is release_governance_attached with 5/5 release gates
+    attached.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_drill_passed
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate drill passed
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate drill status is passed with 5/5 release gate drill scenarios passed.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_effectiveness_monitored
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate effectiveness is monitored
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate effectiveness status is effectiveness_monitored with 5/5 signals
+    effective and 100% release gate effectiveness.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_pattern_expanded_to_enterprise_use_cases
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate pattern is expanded to enterprise use cases
+  owner_role: SA AI Platform + PO/BA + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise pattern status is enterprise_pattern_expanded across 6/6
+    blueprints, 5 non-LMS use cases and 9 taxonomy areas.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_monitored
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption is monitored
+  owner_role: SA AI Platform + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption status is adoption_monitored with 6/6 signals
+    adopted and 100% adoption.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_published
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption SLO is published
+  owner_role: SA AI Platform + PO/BA + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption SLO status is adoption_slo_published with 5/5
+    objectives met and 100% enterprise adoption.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_release_governance_attached
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption SLO release governance is attached
+  owner_role: SA AI Platform + Governance Reviewer + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption SLO release governance status is enterprise_adoption_slo_release_governance_attached
+    with 5/5 release governance gates attached.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_release_governance_drill_passed
+  title: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption SLO release governance drill passed
+  owner_role: SA AI Platform + Governance Reviewer + Admin/Ops
+  required: true
+  status: passed
+  reason: Product Readiness Freshness response SLO drift suppression policy coverage
+    release gate enterprise adoption SLO release governance drill status is passed
+    with 5/5 scenarios passed.
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+followups:
+- followup_id: monitor_enterprise_release_gate_pattern_adoption_slo_release_governance_effectiveness
+  title: Monitor enterprise adoption SLO release governance effectiveness
+  owner_role: SA AI Platform + Governance Reviewer + Admin/Ops
+  priority: p3
+  status: tracked
+  reason: Enterprise adoption SLO release governance drill passed; monitor effectiveness
+    so future enterprise use-case promotions continue proving the release gate blocks
+    adoption drift.
+  evidence_refs:
+  - services/model-serving-service/service.yaml
+  - platform/src/courseflow_ai_platform/model_serving_adapter.py
+  - platform/src/courseflow_ai_platform/product_readiness.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_incidents.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_drill.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_metrics.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_trends.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_alerts.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_alert_drill.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_alert_calibration.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_alert_suppression_policy.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_drill.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_effectiveness.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_regression.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_slo.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_governance.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_drill.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_effectiveness.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_pattern.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_release_governance.py
+  - platform/src/courseflow_ai_platform/product_readiness_freshness_response_slo_drift_suppression_policy_coverage_release_gate_enterprise_adoption_slo_release_governance_drill.py
+  - platform/operations/metrics/product-readiness-freshness-live-response-metrics-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-freshness-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-metrics-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-trends-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-alerts-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-drill-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/delivery/ledgers/delivery-state-ledger.yaml
+  - platform/delivery/reports/delivery-state-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-regression-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-governance-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-drill-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-drill-v1.yaml
+  - platform/intake/reports/use-case-blueprints-v1.yaml

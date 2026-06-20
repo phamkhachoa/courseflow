@@ -1,0 +1,1136 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+grants:
+  - id: grant_recsys_gold_bi_2026
+    status: active
+    product: lms-courseflow
+    domain: recommendation
+    dataProduct: gold.recsys_interactions
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: recommendation_performance_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: product-analytics-lead
+    approver: recommendation-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-RECSYS-GOLD-BI-2026
+      businessPurpose: Track course recommendation effectiveness and content discovery outcomes.
+      ticketUrl: governance://access-requests/CAR-RECSYS-GOLD-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_recsys_gold_ml_2026
+    status: active
+    product: lms-courseflow
+    domain: recommendation
+    dataProduct: gold.recsys_interactions
+    consumer: ml-feature-platform
+    consumerType: ML
+    persona: ApprovedMLConsumer
+    purpose: recommendation_feature_training
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: ml-ai-platform-owner
+    approver: recommendation-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-RECSYS-GOLD-ML-2026
+      businessPurpose: Build approved recommendation features for enterprise ML use cases.
+      ticketUrl: governance://access-requests/CAR-RECSYS-GOLD-ML-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_learner_activity_silver_bi_2026
+    status: active
+    product: lms-courseflow
+    domain: customer
+    dataProduct: silver.learner_activity
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: learner_activity_analysis
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: learning-analytics-lead
+    approver: learning-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-LEARNER-ACTIVITY-SILVER-BI-2026
+      businessPurpose: Analyze learner engagement and activity trends.
+      ticketUrl: governance://access-requests/CAR-LEARNER-ACTIVITY-SILVER-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_learner_activity_silver_ml_2026
+    status: active
+    product: lms-courseflow
+    domain: ml-ai
+    dataProduct: silver.learner_activity
+    consumer: ml-feature-platform
+    consumerType: ML
+    persona: ApprovedMLConsumer
+    purpose: learner_activity_feature_training
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: ml-ai-platform-owner
+    approver: learning-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-LEARNER-ACTIVITY-SILVER-ML-2026
+      businessPurpose: Create approved learner activity features for ML workloads.
+      ticketUrl: governance://access-requests/CAR-LEARNER-ACTIVITY-SILVER-ML-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_benefit_silver_bi_2026
+    status: active
+    product: enterprise-commerce
+    domain: finance
+    dataProduct: silver.finance_benefit_transactions
+    consumer: finance-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: finance_benefit_transaction_monitoring
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: finance-analytics-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-BENEFIT-SILVER-BI-2026
+      businessPurpose: Monitor finance benefit transactions and reconciliation preparation.
+      ticketUrl: governance://access-requests/CAR-FINANCE-BENEFIT-SILVER-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_benefit_gold_bi_2026
+    status: active
+    product: enterprise-commerce
+    domain: finance
+    dataProduct: gold.finance_benefit_reconciliation
+    consumer: finance-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: finance_benefit_reconciliation_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: finance-analytics-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-BENEFIT-GOLD-BI-2026
+      businessPurpose: Produce finance benefit reconciliation reports and exception monitoring.
+      ticketUrl: governance://access-requests/CAR-FINANCE-BENEFIT-GOLD-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_benefit_gold_compliance_2026
+    status: active
+    product: enterprise-commerce
+    domain: finance
+    dataProduct: gold.finance_benefit_reconciliation
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: finance_benefit_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-BENEFIT-GOLD-COMPLIANCE-2026
+      businessPurpose: Review finance benefit reconciliation exceptions for compliance controls.
+      ticketUrl: governance://access-requests/CAR-FINANCE-BENEFIT-GOLD-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_billing_silver_bi_2026
+    status: active
+    product: billing-platform
+    domain: finance
+    dataProduct: silver.finance_billing_transactions
+    consumer: finance-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: finance_billing_transaction_monitoring
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: finance-analytics-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-BILLING-SILVER-BI-2026
+      businessPurpose: Monitor governed billing transaction facts for revenue analytics preparation.
+      ticketUrl: governance://access-requests/CAR-FINANCE-BILLING-SILVER-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_billing_silver_compliance_2026
+    status: active
+    product: billing-platform
+    domain: finance
+    dataProduct: silver.finance_billing_transactions
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: finance_billing_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-BILLING-SILVER-COMPLIANCE-2026
+      businessPurpose: Review governed billing transactions for finance compliance and audit support.
+      ticketUrl: governance://access-requests/CAR-FINANCE-BILLING-SILVER-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_revenue_gold_bi_2026
+    status: active
+    product: billing-platform
+    domain: finance
+    dataProduct: gold.finance_revenue_daily
+    consumer: finance-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: enterprise_revenue_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: finance-analytics-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-REVENUE-GOLD-BI-2026
+      businessPurpose: Produce certified daily enterprise revenue reporting.
+      ticketUrl: governance://access-requests/CAR-FINANCE-REVENUE-GOLD-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_revenue_gold_compliance_2026
+    status: active
+    product: billing-platform
+    domain: finance
+    dataProduct: gold.finance_revenue_daily
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: enterprise_revenue_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-REVENUE-GOLD-COMPLIANCE-2026
+      businessPurpose: Review certified revenue aggregates for finance controls and audit support.
+      ticketUrl: governance://access-requests/CAR-FINANCE-REVENUE-GOLD-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_finance_revenue_gold_executive_2026
+    status: active
+    product: billing-platform
+    domain: finance
+    dataProduct: gold.finance_revenue_daily
+    consumer: executive-scorecard
+    consumerType: Reporting
+    persona: ExecutiveConsumer
+    purpose: executive_revenue_scorecard
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: strategy-and-operations-lead
+    approver: finance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-FINANCE-REVENUE-GOLD-EXECUTIVE-2026
+      businessPurpose: Publish non-personal certified daily revenue aggregates into executive scorecards.
+      ticketUrl: governance://access-requests/CAR-FINANCE-REVENUE-GOLD-EXECUTIVE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_access_risk_gold_compliance_2026
+    status: active
+    product: identity-platform
+    domain: compliance
+    dataProduct: gold.access_risk_daily
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: identity_access_governance_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: security-compliance-lead
+    approver: compliance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-ACCESS-RISK-GOLD-COMPLIANCE-2026
+      businessPurpose: Review identity subject access risk and policy exceptions for audit and compliance workflows.
+      ticketUrl: governance://access-requests/CAR-ACCESS-RISK-GOLD-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_access_risk_gold_risk_2026
+    status: active
+    product: identity-platform
+    domain: compliance
+    dataProduct: gold.access_risk_daily
+    consumer: risk-operations
+    consumerType: Risk
+    persona: RiskOperator
+    purpose: identity_access_risk_exception_triage
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: risk-operations-lead
+    approver: compliance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-ACCESS-RISK-GOLD-RISK-2026
+      businessPurpose: Triage privileged, deprovisioned and MFA-related access risk exceptions.
+      ticketUrl: governance://access-requests/CAR-ACCESS-RISK-GOLD-RISK-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_customer_360_gold_bi_2026
+    status: active
+    product: crm-sales
+    domain: customer
+    dataProduct: gold.customer_360_profile
+    consumer: customer-success-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: customer_account_health_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: customer-success-lead
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CUSTOMER-360-GOLD-BI-2026
+      businessPurpose: Report customer profile, lifecycle and account-health signals for customer success operations.
+      ticketUrl: governance://access-requests/CAR-CUSTOMER-360-GOLD-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_customer_360_gold_ml_2026
+    status: active
+    product: crm-sales
+    domain: customer
+    dataProduct: gold.customer_360_profile
+    consumer: ml-feature-platform
+    consumerType: ML
+    persona: ApprovedMLConsumer
+    purpose: customer_health_feature_training
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: ml-ai-platform-owner
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CUSTOMER-360-GOLD-ML-2026
+      businessPurpose: Build approved account-health and customer lifecycle features for churn, retention and next-best-action models.
+      ticketUrl: governance://access-requests/CAR-CUSTOMER-360-GOLD-ML-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_support_sla_gold_bi_2026
+    status: active
+    product: support-platform
+    domain: customer
+    dataProduct: gold.support_sla_daily
+    consumer: support-operations-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: support_sla_operations_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: customer-experience-lead
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-SUPPORT-SLA-GOLD-BI-2026
+      businessPurpose: Monitor support SLA, backlog, escalation and customer experience outcomes.
+      ticketUrl: governance://access-requests/CAR-SUPPORT-SLA-GOLD-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_support_sla_gold_compliance_2026
+    status: active
+    product: support-platform
+    domain: customer
+    dataProduct: gold.support_sla_daily
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: support_sla_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-SUPPORT-SLA-GOLD-COMPLIANCE-2026
+      businessPurpose: Review support SLA evidence for customer commitments and audit workflows.
+      ticketUrl: governance://access-requests/CAR-SUPPORT-SLA-GOLD-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_support_sla_gold_ml_2026
+    status: active
+    product: support-platform
+    domain: customer
+    dataProduct: gold.support_sla_daily
+    consumer: ml-feature-platform
+    consumerType: ML
+    persona: ApprovedMLConsumer
+    purpose: support_experience_feature_training
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: ml-ai-platform-owner
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-SUPPORT-SLA-GOLD-ML-2026
+      businessPurpose: Build approved support experience and churn-risk features for account health models.
+      ticketUrl: governance://access-requests/CAR-SUPPORT-SLA-GOLD-ML-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_inventory_bi_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.data_product_inventory
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: control_tower_data_product_inventory_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-INVENTORY-BI-2026
+      businessPurpose: Monitor governed enterprise data product inventory and production blockers.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-INVENTORY-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_inventory_compliance_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.data_product_inventory
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: control_tower_inventory_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-INVENTORY-COMPLIANCE-2026
+      businessPurpose: Review control tower inventory and ownership evidence for audit.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-INVENTORY-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_inventory_executive_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.data_product_inventory
+    consumer: executive-reporting
+    consumerType: Reporting
+    persona: ExecutiveConsumer
+    purpose: control_tower_executive_health_overview
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-INVENTORY-EXECUTIVE-2026
+      businessPurpose: Present enterprise data product health summary to executive consumers.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-INVENTORY-EXECUTIVE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_contract_bi_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.contract_compliance_daily
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: control_tower_contract_compliance_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-CONTRACT-BI-2026
+      businessPurpose: Monitor contract, schema, access and retention compliance.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-CONTRACT-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_contract_compliance_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.contract_compliance_daily
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: control_tower_contract_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-CONTRACT-COMPLIANCE-2026
+      businessPurpose: Review contract and access compliance blockers for audit.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-CONTRACT-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_contract_executive_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.contract_compliance_daily
+    consumer: executive-reporting
+    consumerType: Reporting
+    persona: ExecutiveConsumer
+    purpose: control_tower_contract_executive_summary
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-CONTRACT-EXECUTIVE-2026
+      businessPurpose: Summarize enterprise contract compliance for executive reporting.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-CONTRACT-EXECUTIVE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_quality_bi_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.quality_sla_daily
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: control_tower_quality_sla_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-QUALITY-BI-2026
+      businessPurpose: Monitor quality and SLA status across enterprise data products.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-QUALITY-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_quality_compliance_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.quality_sla_daily
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: control_tower_quality_sla_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-QUALITY-COMPLIANCE-2026
+      businessPurpose: Review quality and SLA blockers for compliance evidence.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-QUALITY-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_quality_executive_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.quality_sla_daily
+    consumer: executive-reporting
+    consumerType: Reporting
+    persona: ExecutiveConsumer
+    purpose: control_tower_quality_executive_summary
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-QUALITY-EXECUTIVE-2026
+      businessPurpose: Summarize enterprise quality and SLA health for executives.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-QUALITY-EXECUTIVE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_lineage_bi_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.lineage_coverage_daily
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: control_tower_lineage_coverage_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-LINEAGE-BI-2026
+      businessPurpose: Monitor lineage coverage and missing runtime lineage evidence.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-LINEAGE-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_lineage_compliance_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.lineage_coverage_daily
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: control_tower_lineage_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-LINEAGE-COMPLIANCE-2026
+      businessPurpose: Review lineage coverage and downstream impact for audit evidence.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-LINEAGE-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_control_tower_lineage_executive_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.lineage_coverage_daily
+    consumer: executive-reporting
+    consumerType: Reporting
+    persona: ExecutiveConsumer
+    purpose: control_tower_lineage_executive_summary
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CONTROL-TOWER-LINEAGE-EXECUTIVE-2026
+      businessPurpose: Summarize lineage coverage and impact severity for executives.
+      ticketUrl: governance://access-requests/CAR-CONTROL-TOWER-LINEAGE-EXECUTIVE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_enterprise_kpi_gold_bi_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.enterprise_kpi_daily
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: enterprise_kpi_scorecard_analysis
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-ENTERPRISE-KPI-GOLD-BI-2026
+      businessPurpose: Analyze governed cross-domain KPI facts for operating reviews and executive scorecards.
+      ticketUrl: governance://access-requests/CAR-ENTERPRISE-KPI-GOLD-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_enterprise_kpi_gold_executive_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.enterprise_kpi_daily
+    consumer: executive-reporting
+    consumerType: Reporting
+    persona: ExecutiveConsumer
+    purpose: enterprise_kpi_executive_summary
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-ENTERPRISE-KPI-GOLD-EXECUTIVE-2026
+      businessPurpose: Present non-PII cross-domain KPI facts to executive consumers with certified metric lineage.
+      ticketUrl: governance://access-requests/CAR-ENTERPRISE-KPI-GOLD-EXECUTIVE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_executive_scorecard_gold_bi_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.executive_scorecard_daily
+    consumer: enterprise-bi
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: executive_scorecard_analysis
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-EXECUTIVE-SCORECARD-GOLD-BI-2026
+      businessPurpose: Analyze executive scorecard rows and certified KPI lineage for leadership reporting.
+      ticketUrl: governance://access-requests/CAR-EXECUTIVE-SCORECARD-GOLD-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_executive_scorecard_gold_executive_2026
+    status: active
+    product: enterprise-data-platform
+    domain: enterprise-reporting
+    dataProduct: gold.executive_scorecard_daily
+    consumer: executive-reporting
+    consumerType: Reporting
+    persona: ExecutiveConsumer
+    purpose: executive_scorecard_leadership_readout
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: enterprise-reporting-lead
+    approver: enterprise-data-platform-po
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-EXECUTIVE-SCORECARD-GOLD-EXECUTIVE-2026
+      businessPurpose: Present non-PII enterprise scorecard rows to executive leadership for operating reviews.
+      ticketUrl: governance://access-requests/CAR-EXECUTIVE-SCORECARD-GOLD-EXECUTIVE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_customer_identity_link_silver_bi_2026
+    status: active
+    product: crm-sales
+    domain: customer
+    dataProduct: silver.customer_identity_link
+    consumer: customer-success-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: customer_identity_link_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: customer-success-analytics-lead
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CUSTOMER-IDENTITY-LINK-SILVER-BI-2026
+      businessPurpose: Analyze governed customer identity links for customer account health and entity-resolution quality.
+      ticketUrl: governance://access-requests/CAR-CUSTOMER-IDENTITY-LINK-SILVER-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_customer_identity_link_silver_ml_2026
+    status: active
+    product: crm-sales
+    domain: customer
+    dataProduct: silver.customer_identity_link
+    consumer: ml-feature-platform
+    consumerType: ML
+    persona: ApprovedMLConsumer
+    purpose: customer_identity_link_feature_training
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: ml-ai-platform-owner
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-CUSTOMER-IDENTITY-LINK-SILVER-ML-2026
+      businessPurpose: Build approved account-health and entity-resolution features from tokenized customer identity links.
+      ticketUrl: governance://access-requests/CAR-CUSTOMER-IDENTITY-LINK-SILVER-ML-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_identity_subject_silver_compliance_2026
+    status: active
+    product: identity-platform
+    domain: compliance
+    dataProduct: silver.identity_subject
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: identity_subject_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: compliance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-IDENTITY-SUBJECT-SILVER-COMPLIANCE-2026
+      businessPurpose: Review governed identity subject state for access governance, audit and compliance controls.
+      ticketUrl: governance://access-requests/CAR-IDENTITY-SUBJECT-SILVER-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_identity_subject_silver_risk_2026
+    status: active
+    product: identity-platform
+    domain: compliance
+    dataProduct: silver.identity_subject
+    consumer: risk-operations
+    consumerType: Risk
+    persona: RiskOperator
+    purpose: identity_subject_risk_exception_triage
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: risk-operations-lead
+    approver: compliance-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-IDENTITY-SUBJECT-SILVER-RISK-2026
+      businessPurpose: Triage identity lifecycle, entitlement and MFA risk signals from governed subject state.
+      ticketUrl: governance://access-requests/CAR-IDENTITY-SUBJECT-SILVER-RISK-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_support_case_silver_bi_2026
+    status: active
+    product: support-platform
+    domain: customer
+    dataProduct: silver.support_case
+    consumer: support-operations-analytics
+    consumerType: BI
+    persona: ApprovedBIConsumer
+    purpose: support_case_operations_reporting
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: customer-experience-lead
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-SUPPORT-CASE-SILVER-BI-2026
+      businessPurpose: Analyze governed support case state for backlog, SLA and account health reporting.
+      ticketUrl: governance://access-requests/CAR-SUPPORT-CASE-SILVER-BI-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_support_case_silver_ml_2026
+    status: active
+    product: support-platform
+    domain: customer
+    dataProduct: silver.support_case
+    consumer: ml-feature-platform
+    consumerType: ML
+    persona: ApprovedMLConsumer
+    purpose: support_case_feature_training
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: ml-ai-platform-owner
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-SUPPORT-CASE-SILVER-ML-2026
+      businessPurpose: Build approved support experience and churn-risk features from governed support case state.
+      ticketUrl: governance://access-requests/CAR-SUPPORT-CASE-SILVER-ML-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false
+
+  - id: grant_support_case_silver_compliance_2026
+    status: active
+    product: support-platform
+    domain: customer
+    dataProduct: silver.support_case
+    consumer: compliance-office
+    consumerType: Compliance
+    persona: ComplianceConsumer
+    purpose: support_case_compliance_review
+    accessMode: read
+    accessPolicy: row_level_org_isolation
+    consumerContract: catalog_registered_access_request_required
+    requester: compliance-ops-lead
+    approver: customer-domain-owner
+    stewardApproval: enterprise-data-steward
+    approvedAt: "2026-01-01T00:00:00Z"
+    expiresAt: "2027-01-01T00:00:00Z"
+    reviewCadenceDays: 90
+    evidence:
+      catalogAccessRequestId: CAR-SUPPORT-CASE-SILVER-COMPLIANCE-2026
+      businessPurpose: Review support case state for customer commitment, regulated audit and escalation controls.
+      ticketUrl: governance://access-requests/CAR-SUPPORT-CASE-SILVER-COMPLIANCE-2026
+    constraints:
+      orgScoped: true
+      exportAllowed: false
+      redistributionAllowed: false

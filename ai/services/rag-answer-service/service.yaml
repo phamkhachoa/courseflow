@@ -1,0 +1,52 @@
+version: 1
+service_id: rag-answer-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_rag_answer_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/rag-answer-access-policy.yaml
+observability:
+  metrics: in_memory_answer_refusal_error_human_review_counters
+  tenant_safety: cross_tenant_grounded_answer_forbidden
+routes:
+  - method: POST
+    path: /v1/rag-answer/answer
+    scope: internal:ai-platform:rag-answer:answer
+    purpose: grounded_answer_with_required_citations
+  - method: GET
+    path: /v1/rag-answer/health
+    scope: internal:ai-platform:rag-answer:ops
+    purpose: rag_answer_health
+  - method: GET
+    path: /v1/rag-answer/metrics
+    scope: internal:ai-platform:rag-answer:ops
+    purpose: rag_answer_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/rag_answer_service.py
+    - platform/src/courseflow_ai_platform/retrieval_service.py
+    - platform/src/courseflow_ai_platform/prompt_gateway_service.py
+    - platform/src/courseflow_ai_platform/vector_index.py
+  artifacts:
+    - platform/governance/policies/rag-answer-access-policy.yaml
+    - platform/governance/policies/retrieval-access-policy.yaml
+    - platform/governance/policies/prompt-gateway-access-policy.yaml
+    - platform/evaluation/reports/course-rag-answer-v1-eval.yaml
+    - platform/evaluation/reports/support-rag-answer-v1-eval.yaml
+    - platform/vector-store/collections/course-content.yaml
+    - platform/vector-store/collections/support-knowledge.yaml
+promotion_guardrails:
+  - route_scopes_must_match_rag_answer_access_policy
+  - principals_must_be_product_use_case_collection_and_tenant_scoped
+  - citations_are_required_for_grounded_answers
+  - insufficient_retrieval_confidence_must_refuse
+  - direct_learner_customer_contact_or_account_identifiers_must_be_rejected
+  - external_auto_send_must_remain_forbidden
+  - human_review_must_be_required_for_baseline_answers
+  - grounded_answer_quality_gates_must_remain_green

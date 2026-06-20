@@ -1,0 +1,85 @@
+version: 1
+owner: ai-platform
+policy_id: llm-adapter-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  prompt_gateway_required: true
+  network_enabled_by_default: false
+scope_aliases:
+  generate: internal:ai-platform:llm-adapter:generate
+  ops: internal:ai-platform:llm-adapter:ops
+providers:
+  - provider_id: contract-stub-llm-v1
+    provider_type: external_contract_stub
+    model_id: contract-stub-grounded-answer-v1
+    network_enabled: false
+    purpose: CI-safe provider adapter contract for external LLM integrations.
+  - provider_id: contract-stub-llm-failover-v1
+    provider_type: external_contract_stub
+    model_id: contract-stub-grounded-answer-failover-v1
+    network_enabled: false
+    purpose: CI-safe failover provider contract for external LLM integrations.
+principals:
+  - principal_id: service:ai-platform-llm-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+    provider_ids: []
+    prompt_gateway_principal_id: service:ai-platform-prompt-ops
+
+  - principal_id: service:lms-courseflow-llm
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+      - generate
+    tenant_ids:
+      - tenant-a
+      - tenant-lms
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-rag-tutor
+      - lms-auto-grading
+    provider_ids:
+      - contract-stub-llm-v1
+      - contract-stub-llm-failover-v1
+    prompt_gateway_principal_id: service:lms-courseflow-prompt
+
+  - principal_id: service:support-platform-llm
+    owner_role: Support Platform service
+    product: support-platform
+    scopes:
+      - generate
+    tenant_ids:
+      - tenant-a
+      - tenant-support
+    product_ids:
+      - support-platform
+    use_case_ids:
+      - support-agent-assist
+    provider_ids:
+      - contract-stub-llm-v1
+      - contract-stub-llm-failover-v1
+    prompt_gateway_principal_id: service:support-platform-prompt
+
+  - principal_id: service:finance-platform-llm
+    owner_role: Billing/Finance service
+    product: billing-finance
+    scopes:
+      - generate
+    tenant_ids:
+      - tenant-finance
+    product_ids:
+      - billing-finance
+    use_case_ids:
+      - finance-reconciliation-assistant
+      - finance-document-intelligence
+    provider_ids:
+      - contract-stub-llm-v1
+      - contract-stub-llm-failover-v1
+    prompt_gateway_principal_id: service:finance-platform-prompt

@@ -1,0 +1,77 @@
+version: 1
+policy:
+  protected_paths:
+    - platform/**
+    - catalog/**
+    - governance/**
+    - templates/**
+    - src/enterprise_dp/**
+  ignored_paths:
+    - governance/scope-guardrails.yaml
+    - src/enterprise_dp/structure.py
+  description: >
+    Shared platform areas must not silently absorb product-specific identity. Product examples are
+    allowed only when they are explicit pilot evidence or a documented compatibility path.
+guardrails:
+  - id: no_product_pilot_identity_in_shared_platform
+    status: active
+    owner: enterprise-data-platform-architect
+    severity: error
+    rationale: >
+      CourseFlow LMS is the first onboarded product, not the identity of the enterprise data
+      platform. Shared platform code and docs must use neutral enterprise terminology unless a
+      product-specific pilot reference is deliberately allowed.
+    patterns:
+      - "(?i)\\bcourseflow\\b"
+      - "\\blms-courseflow\\b"
+      - "\\bcourseflow_lms_contribution\\b"
+      - "https://courseflow\\.local"
+    allowed_paths:
+      - platform/ingestion/bronze-landing.md
+      - platform/ingestion/schema-registry.md
+      - platform/ingestion/source-registry.yaml
+      - platform/ingestion/source-offset-hash-idempotency.md
+      - platform/ingestion/source-systems.md
+      - platform/ingestion/README.md
+      - governance/access-grants.yaml
+      - governance/change-requests.yaml
+      - platform/lakehouse/iceberg-table-standards.md
+      - platform/orchestration/local-recommendation-slice.md
+      - platform/orchestration/pipeline-registry.yaml
+      - platform/orchestration/README.md
+      - platform/serving/semantic-metrics.yaml
+      - platform/environments/local/README.md
+      - src/enterprise_dp/portfolio_release_smoke.py
+      - src/enterprise_dp/pipelines/recommendation.py
+      - docs/architecture/**
+      - docs/adr/**
+  - id: no_lms_pilot_vocabulary_as_shared_standard
+    status: active
+    owner: enterprise-data-platform-architect
+    severity: error
+    rationale: >
+      LMS terms are valid in product contracts and explicit pilot appendices, but shared platform
+      standards must not teach future enterprise products that learner, course, enrollment or
+      gradebook are platform primitives.
+    patterns:
+      - "(?i)\\blearner\\b"
+      - "(?i)\\bcourse\\b"
+      - "(?i)\\benrollment\\b"
+      - "(?i)\\bgradebook\\b"
+      - "(?i)\\bstudent\\b"
+    allowed_paths:
+      - governance/access-grants.yaml
+      - governance/change-requests.yaml
+      - platform/ingestion/source-registry.yaml
+      - platform/ingestion/source-systems.md
+      - platform/ingestion/schema-registry.md
+      - platform/ingestion/source-offset-hash-idempotency.md
+      - platform/ingestion/local-bronze-ingestion.md
+      - platform/orchestration/local-recommendation-slice.md
+      - platform/orchestration/pipeline-registry.yaml
+      - platform/orchestration/README.md
+      - src/enterprise_dp/portfolio_release_smoke.py
+      - src/enterprise_dp/pipelines/recommendation.py
+      - src/enterprise_dp/release.py
+      - docs/architecture/**
+      - docs/adr/**

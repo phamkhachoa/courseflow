@@ -1,0 +1,52 @@
+version: 1
+report_id: governance-evaluation-service-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  ops_status: release_gate_observable
+  policy_id: governance-evaluation-access-policy-v1
+  route_count: 3
+  evaluation_count: 20
+  promotion_count: 4
+  assessment_count: 3
+  approved_count: 1
+  review_required_count: 1
+  blocked_count: 1
+  direct_identifier_rejection_count: 1
+  secret_value_rejection_count: 1
+  unexpected_error_count: 0
+by_product:
+  lms-courseflow: 1
+  support-platform: 2
+by_use_case:
+  lms-related-course-recommendation: 1
+  support-agent-assist: 2
+drills:
+- scenario_id: lms-recommendation-active-baseline
+  product: lms-courseflow
+  use_case_id: lms-related-course-recommendation
+  expected_decision: approved
+  decision: approved
+  ready_for_release: true
+  requires_human_review: false
+  blocked_reasons: []
+  passed: true
+- scenario_id: support-agent-assist-approved-baseline
+  product: support-platform
+  use_case_id: support-agent-assist
+  expected_decision: review_required
+  decision: review_required
+  ready_for_release: true
+  requires_human_review: true
+  blocked_reasons: []
+  passed: true
+- scenario_id: support-agent-assist-external-auto-send
+  product: support-platform
+  use_case_id: support-agent-assist
+  expected_decision: blocked
+  decision: blocked
+  ready_for_release: false
+  requires_human_review: true
+  blocked_reasons:
+  - external_auto_send_forbidden
+  passed: true

@@ -1,0 +1,143 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-drill-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  drill_status: passed
+  release_governance_status: enterprise_adoption_slo_release_governance_attached
+  release_gate_count: 5
+  attached_release_gate_count: 5
+  failed_release_gate_count: 0
+  scenario_count: 5
+  passed_count: 5
+  failed_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  min_evidence_ref_count: 5
+action_queue:
+  passed:
+  - enterprise-adoption-slo-published-release-governance-gate-drill
+  - enterprise-adoption-slo-objectives-release-governance-gate-drill
+  - enterprise-adoption-slo-enterprise-span-release-governance-gate-drill
+  - enterprise-adoption-slo-owner-cadence-release-governance-gate-drill
+  - enterprise-adoption-slo-tenant-safety-release-governance-gate-drill
+  blocked: []
+  next_actions:
+  - monitor_enterprise_release_gate_pattern_adoption_slo_release_governance_effectiveness
+scenarios:
+- drill_id: enterprise-adoption-slo-published-release-governance-gate-drill
+  gate_id: enterprise-adoption-slo-published-release-governance-gate
+  gate_type: slo_publication
+  owner_role: SA AI Platform + Admin/Ops
+  drill_case: slo_publication_release_governance_replay
+  expected_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  observed_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 5
+  observed_evidence_ref_count: 5
+  expected_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  observed_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: enterprise-adoption-slo-objectives-release-governance-gate-drill
+  gate_id: enterprise-adoption-slo-objectives-release-governance-gate
+  gate_type: slo_objectives
+  owner_role: SA AI Platform + SA AI Engineer
+  drill_case: slo_objectives_release_governance_replay
+  expected_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  observed_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 5
+  observed_evidence_ref_count: 5
+  expected_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  observed_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: enterprise-adoption-slo-enterprise-span-release-governance-gate-drill
+  gate_id: enterprise-adoption-slo-enterprise-span-release-governance-gate
+  gate_type: enterprise_span
+  owner_role: PO/BA + SA AI Platform
+  drill_case: enterprise_span_release_governance_replay
+  expected_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  observed_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 5
+  observed_evidence_ref_count: 5
+  expected_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  observed_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: enterprise-adoption-slo-owner-cadence-release-governance-gate-drill
+  gate_id: enterprise-adoption-slo-owner-cadence-release-governance-gate
+  gate_type: owner_cadence
+  owner_role: PO/BA + Admin/Ops
+  drill_case: owner_cadence_release_governance_replay
+  expected_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  observed_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 5
+  observed_evidence_ref_count: 5
+  expected_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  observed_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- drill_id: enterprise-adoption-slo-tenant-safety-release-governance-gate-drill
+  gate_id: enterprise-adoption-slo-tenant-safety-release-governance-gate
+  gate_type: tenant_safety
+  owner_role: Governance Reviewer
+  drill_case: tenant_safety_release_governance_replay
+  expected_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  observed_release_governance_status: enterprise_adoption_slo_release_governance_attached
+  expected_gate_attached: true
+  observed_gate_attached: true
+  expected_validation_error_count: 0
+  observed_validation_error_count: 0
+  expected_evidence_ref_count: 5
+  observed_evidence_ref_count: 5
+  expected_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  observed_outcome: enterprise_adoption_slo_release_governance_gate_holds
+  passed: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html

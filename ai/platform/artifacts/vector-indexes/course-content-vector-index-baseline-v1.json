@@ -1,0 +1,53 @@
+{
+  "algorithm": "deterministic_hash_embedding_baseline_v1",
+  "checksum": "952fccc493696254da8f416b2b6e9add519e9ae0cfff745ac1904a4f10ace5d3",
+  "chunkCount": 5,
+  "collection": "course_content_chunks",
+  "distance": "cosine",
+  "embeddingDimensions": 768,
+  "entries": [
+    {
+      "accessScope": "tenant",
+      "chunkId": "course-python-loops-lesson",
+      "piiClass": "none_or_low",
+      "sourceRef": "course-python-101/module-1/lesson-loops",
+      "tenantId": "tenant-a",
+      "textHash": "4e10b002c7bce000007333f3ed400f18a7d5fc2f9c20df30407372c50d3672a0"
+    },
+    {
+      "accessScope": "tenant",
+      "chunkId": "course-rag-grounded-answer",
+      "piiClass": "none_or_low",
+      "sourceRef": "course-ai-platform/module-4/lesson-rag",
+      "tenantId": "tenant-a",
+      "textHash": "1709ab499c8549f7af85ab991c2ee2faedb18adc19a1fe2669ea8cf3df8725b0"
+    },
+    {
+      "accessScope": "tenant",
+      "chunkId": "course-recsys-collaborative-filtering",
+      "piiClass": "none_or_low",
+      "sourceRef": "course-ml-recsys/module-3/lesson-item-cf",
+      "tenantId": "tenant-a",
+      "textHash": "05908f027b2d574bb3bd3abe969d42c746cb7e6d18958b7dd5fdbc82df01da6a"
+    },
+    {
+      "accessScope": "tenant",
+      "chunkId": "course-sql-join-lesson",
+      "piiClass": "none_or_low",
+      "sourceRef": "course-sql-analytics/module-2/lesson-joins",
+      "tenantId": "tenant-a",
+      "textHash": "9b8fad75e9c028656c358680cfae9afee881884bcaa70194f22ef587860c254d"
+    },
+    {
+      "accessScope": "tenant",
+      "chunkId": "course-tenant-b-private-sql",
+      "piiClass": "none_or_low",
+      "sourceRef": "tenant-b/course-private-sql/lesson-joins",
+      "tenantId": "tenant-b",
+      "textHash": "ba5e8d17128e7fc68adb36b8053e9902f49b1e8f59d86c155a69ce12b78587a6"
+    }
+  ],
+  "indexId": "course-content-vector-index-baseline-v1",
+  "modelId": "course-content-vector-index-baseline-v1",
+  "product": "lms-courseflow"
+}

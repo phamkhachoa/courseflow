@@ -1,0 +1,888 @@
+version: 1
+portfolio_scope: group-enterprise-data-platform
+useCases:
+  - id: finance-benefit-reconciliation
+    name: Finance Benefit Reconciliation
+    domain: finance
+    priority: P0
+    status: pilot
+    owner: finance-analytics-po
+    businessOutcome: Reconcile paid orders, discounts, loyalty earn or burn, reward reversals, refunds and close-period finance outcomes across enterprise products.
+    primaryConsumers:
+      - fp-and-a
+      - accounting
+      - revenue-operations
+      - finance-controls
+    sourceProducts:
+      - lms-courseflow
+      - enterprise-commerce
+      - billing-platform
+    sourceSystems:
+      - enrollment-service
+      - promotion-service
+      - loyalty-service
+      - payment-platform
+      - billing-service
+      - revenue-recognition-service
+    dataProducts:
+      - name: bronze.events_enrollment_completed
+        layer: BRONZE
+        contractStatus: existing
+      - name: bronze.events_benefit_settled
+        layer: BRONZE
+        contractStatus: existing
+      - name: silver.finance_benefit_transactions
+        layer: SILVER
+        contractStatus: existing
+      - name: gold.finance_benefit_reconciliation
+        layer: GOLD
+        contractStatus: existing
+    kpis:
+      - committed_discount_amount
+      - points_earned
+      - points_reversed
+      - unreconciled_benefit_count
+      - reconciliation_sla_age
+    accessPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - data-contracts
+      - bronze-ingestion
+      - financial-reconciliation-quality
+      - lineage-catalog
+      - semantic-metrics
+    pipelineRunners:
+      - finance.benefit_reconciliation.from_approved_bronze.v1
+    implementation:
+      pipelines:
+        - runnerId: finance.benefit_reconciliation.from_approved_bronze.v1
+          inputTopics:
+            - finance.benefit_settled.v1
+          inputDataProducts:
+            - bronze.events_benefit_settled
+          outputDataProducts:
+            - silver.finance_benefit_transactions
+            - gold.finance_benefit_reconciliation
+          primaryOutput: gold.finance_benefit_reconciliation
+          qualityProfile: p0-finance-benefit-reconciliation
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - contract_compatibility
+      - quality_checks_must_pass
+      - lineage_registered
+      - access_policy_reviewed
+
+  - id: enterprise-revenue-intelligence
+    name: Enterprise Revenue Intelligence
+    domain: finance
+    priority: P0
+    status: pilot
+    owner: finance-analytics-po
+    businessOutcome: Provide certified gross, net, recognized, deferred and refunded revenue facts from the Billing Platform for FP&A, accounting, revenue operations and executive scorecards.
+    primaryConsumers:
+      - fp-and-a
+      - accounting
+      - revenue-operations
+      - enterprise-reporting
+      - executive-leadership
+      - compliance-office
+    sourceProducts:
+      - billing-platform
+      - enterprise-commerce
+      - lms-courseflow
+      - support-platform
+    sourceSystems:
+      - billing-service
+      - subscription-service
+      - invoice-service
+      - revenue-recognition-service
+      - payment-platform
+    dataProducts:
+      - name: bronze.events_billing_transaction_settled
+        layer: BRONZE
+        contractStatus: existing
+      - name: silver.finance_billing_transactions
+        layer: SILVER
+        contractStatus: existing
+      - name: gold.finance_revenue_daily
+        layer: GOLD
+        contractStatus: existing
+    kpis:
+      - revenue_gross
+      - revenue_net
+      - recognized_revenue_amount
+      - deferred_revenue_amount
+      - refund_amount
+      - billing_transaction_count
+    accessPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+      - ExecutiveConsumer
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - data-contracts
+      - bronze-ingestion
+      - revenue-grade-quality
+      - row-level-security
+      - semantic-metrics
+      - lineage-catalog
+    pipelineRunners:
+      - billing.revenue_daily.from_approved_bronze.v1
+    implementation:
+      pipelines:
+        - runnerId: billing.revenue_daily.from_approved_bronze.v1
+          inputTopics:
+            - finance.billing_transaction.settled.v1
+          inputDataProducts:
+            - bronze.events_billing_transaction_settled
+          outputDataProducts:
+            - silver.finance_billing_transactions
+            - gold.finance_revenue_daily
+          primaryOutput: gold.finance_revenue_daily
+          qualityProfile: p0-enterprise-revenue-intelligence
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - contract_compatibility
+      - quality_checks_must_pass
+      - lineage_registered
+      - access_policy_reviewed
+      - retention_erasure_ready
+
+  - id: identity-access-governance
+    name: Identity Access Governance
+    domain: compliance
+    priority: P0
+    status: pilot
+    owner: security-platform-lead
+    businessOutcome: Provide governed identity subject state and access-risk evidence so Customer 360, workforce, compliance, risk and executive scorecards share one tenant-safe subject foundation.
+    primaryConsumers:
+      - security-compliance
+      - risk-operations
+      - internal-audit
+      - customer-success
+      - workforce-analytics
+    sourceProducts:
+      - identity-platform
+    sourceSystems:
+      - identity-directory
+      - access-control-service
+      - user-management-service
+    dataProducts:
+      - name: bronze.events_identity_subject_changed
+        layer: BRONZE
+        contractStatus: existing
+      - name: silver.identity_subject
+        layer: SILVER
+        contractStatus: existing
+      - name: gold.access_risk_daily
+        layer: GOLD
+        contractStatus: existing
+    kpis:
+      - active_subject_count
+      - privileged_subject_count
+      - high_risk_subject_count
+      - deprovisioned_with_access_count
+      - mfa_gap_count
+      - access_risk_score
+    accessPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ComplianceConsumer
+      - RiskOperator
+    governance:
+      classification: PII
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - data-contracts
+      - bronze-ingestion
+      - row-level-security
+      - access-privacy-evidence
+      - lineage-catalog
+    pipelineRunners:
+      - identity.access_governance.from_approved_bronze.v1
+    implementation:
+      pipelines:
+        - runnerId: identity.access_governance.from_approved_bronze.v1
+          inputTopics:
+            - compliance.identity_subject.changed.v1
+          inputDataProducts:
+            - bronze.events_identity_subject_changed
+          outputDataProducts:
+            - silver.identity_subject
+            - gold.access_risk_daily
+          primaryOutput: gold.access_risk_daily
+          qualityProfile: p0-identity-access-governance
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - contract_compatibility
+      - quality_checks_must_pass
+      - lineage_registered
+      - access_policy_reviewed
+      - retention_erasure_ready
+
+  - id: enterprise-kpi-scorecard
+    name: Enterprise KPI Scorecard
+    domain: enterprise-reporting
+    priority: P0
+    status: pilot
+    owner: enterprise-reporting-po
+    businessOutcome: Provide a governed executive metric layer with one definition for revenue, customer health, product adoption, workforce, risk and compliance KPIs.
+    primaryConsumers:
+      - executive-leadership
+      - strategy-and-operations
+      - product-leadership
+      - finance
+    sourceProducts:
+      - enterprise-data-platform
+      - lms-courseflow
+      - enterprise-commerce
+      - billing-platform
+      - crm-sales
+      - identity-platform
+      - support-platform
+    sourceSystems:
+      - semantic-metric-registry
+      - data-product-control-tower
+      - billing-service
+      - crm-account-service
+      - support-case-service
+      - access-control-service
+      - recommendation-service
+    dataProducts:
+      - name: gold.finance_revenue_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.finance_benefit_reconciliation
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.customer_360_profile
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.access_risk_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.support_sla_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.recsys_interactions
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.data_product_inventory
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.contract_compliance_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.quality_sla_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.lineage_coverage_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.enterprise_kpi_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.executive_scorecard_daily
+        layer: GOLD
+        contractStatus: existing
+    kpis:
+      - revenue_net
+      - recognized_revenue_amount
+      - refund_amount
+      - benefit_reconciliation_gap
+      - customer_profile_count
+      - average_customer_health_score
+      - at_risk_customer_account_count
+      - support_case_count
+      - first_response_sla_breach_count
+      - resolution_sla_breach_count
+      - critical_access_risk_subject_count
+      - deprovisioned_with_access_count
+      - recommendation_interaction_count
+      - p0_data_product_blocker_count
+      - contract_compliance_rate
+      - quality_sla_breach_count
+      - runtime_lineage_gap_count
+    accessPersonas:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ExecutiveConsumer
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: false
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - semantic-metrics
+      - data-product-control-tower
+      - catalog-discovery
+      - dashboard-serving
+      - row-level-security
+      - release-evidence
+    pipelineRunners:
+      - enterprise_reporting.executive_scorecard.from_semantic_snapshot.v1
+    implementation:
+      pipelines:
+        - runnerId: enterprise_reporting.executive_scorecard.from_semantic_snapshot.v1
+          inputDataProducts:
+            - gold.finance_revenue_daily
+            - gold.finance_benefit_reconciliation
+            - gold.customer_360_profile
+            - gold.access_risk_daily
+            - gold.support_sla_daily
+            - gold.recsys_interactions
+            - gold.data_product_inventory
+            - gold.contract_compliance_daily
+            - gold.quality_sla_daily
+            - gold.lineage_coverage_daily
+          outputDataProducts:
+            - gold.enterprise_kpi_daily
+            - gold.executive_scorecard_daily
+          primaryOutput: gold.executive_scorecard_daily
+          qualityProfile: p0-enterprise-kpi-scorecard
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - metric_owner_approved
+      - lineage_registered
+      - quality_checks_must_pass
+      - access_policy_reviewed
+
+  - id: data-product-control-tower
+    name: Data Product Control Tower
+    domain: enterprise-reporting
+    priority: P0
+    status: pilot
+    owner: enterprise-data-platform-po
+    businessOutcome: Provide one operational view of enterprise data product inventory, contract compliance, quality/SLA health, lineage coverage, release evidence and platform blockers.
+    primaryConsumers:
+      - data-platform-operators
+      - domain-data-owners
+      - governance-office
+      - security-compliance
+      - enterprise-reporting
+      - executive-leadership
+    sourceProducts:
+      - enterprise-data-platform
+      - lms-courseflow
+      - enterprise-commerce
+      - billing-platform
+      - crm-sales
+      - hris-workforce
+      - identity-platform
+      - support-platform
+    sourceSystems:
+      - enterprise-dp-cli
+      - catalog-bundle-export
+      - openlineage-export
+      - capability-maturity-report
+      - release-evidence-store
+      - access-control-service
+      - observability-stack
+    dataProducts:
+      - name: gold.data_product_inventory
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.contract_compliance_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.quality_sla_daily
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.lineage_coverage_daily
+        layer: GOLD
+        contractStatus: existing
+    kpis:
+      - p0_data_product_blocker_count
+      - active_gold_without_evidence_count
+      - contract_compliance_rate
+      - quality_sla_breach_count
+      - runtime_lineage_coverage_rate
+      - p0_capability_target_gap_count
+    accessPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+      - ComplianceConsumer
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: false
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - data-product-inventory
+      - contract-compliance
+      - quality-slo-board
+      - lineage-coverage
+      - release-evidence
+      - access-privacy-evidence
+      - capability-maturity
+    pipelineRunners:
+      - control_tower.materialize_gold.from_report.v1
+    implementation:
+      pipelines:
+        - runnerId: control_tower.materialize_gold.from_report.v1
+          outputDataProducts:
+            - gold.data_product_inventory
+            - gold.contract_compliance_daily
+            - gold.quality_sla_daily
+            - gold.lineage_coverage_daily
+          primaryOutput: gold.data_product_inventory
+          qualityProfile: p0-data-product-control-tower
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - contract_compatibility
+      - quality_checks_must_pass
+      - lineage_registered
+      - access_policy_reviewed
+      - release_evidence_attached
+      - p0_capability_targets_met
+
+  - id: ml-feature-governance
+    name: ML Feature Governance
+    domain: ml-ai
+    priority: P0
+    status: pilot
+    owner: ml-platform-po
+    businessOutcome: Ensure ML training and scoring use versioned Gold or feature datasets with lineage, quality and reproducibility.
+    primaryConsumers:
+      - data-science
+      - ml-platform
+      - product-teams
+      - risk-operations
+    sourceProducts:
+      - lms-courseflow
+    sourceSystems:
+      - analytics-service
+      - web-next-learning
+      - recommendation-service
+    dataProducts:
+      - name: bronze.events_recommendation_tracking
+        layer: BRONZE
+        contractStatus: existing
+      - name: silver.learner_activity
+        layer: SILVER
+        contractStatus: existing
+      - name: gold.recsys_interactions
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.lms_recommendation_course_catalog
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.lms_recommendation_training_interactions
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.ml_feature_snapshot
+        layer: GOLD
+        contractStatus: planned
+    kpis:
+      - training_snapshot_count
+      - feature_freshness_minutes
+      - model_training_success_rate
+      - feature_drift_alert_count
+    accessPersonas:
+      - DataPlatformOperator
+      - ApprovedMLConsumer
+      - DomainDataOwner
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - gold-snapshot-handoff
+      - feature-store
+      - model-lineage
+      - quality-gates
+    pipelineRunners:
+      - recommendation.from_approved_bronze.v1
+      - lms.recommendation_training.from_bronze.v1
+    implementation:
+      pipelines:
+        - runnerId: recommendation.from_approved_bronze.v1
+          inputTopics:
+            - recommendation.tracking.v1
+          inputDataProducts:
+            - bronze.events_recommendation_tracking
+          outputDataProducts:
+            - silver.learner_activity
+            - gold.recsys_interactions
+          primaryOutput: gold.recsys_interactions
+          qualityProfile: p0-gold-ml-feature
+          releaseEvidenceProfile: local-medallion-release.v1
+        - runnerId: lms.recommendation_training.from_bronze.v1
+          inputTopics:
+            - course.published.v1
+            - enrollment.completed.v1
+          inputDataProducts:
+            - bronze.events_course_published
+            - bronze.events_enrollment_completed
+          outputDataProducts:
+            - gold.lms_recommendation_course_catalog
+            - gold.lms_recommendation_training_interactions
+          primaryOutput: gold.lms_recommendation_training_interactions
+          qualityProfile: p0-gold-ml-feature
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - contract_compatibility
+      - quality_checks_must_pass
+      - model_lineage_registered
+      - access_policy_reviewed
+
+  - id: customer-account-health
+    name: Customer Account Health
+    domain: customer
+    priority: P0
+    status: pilot
+    owner: customer-success-po
+    businessOutcome: Combine customer, organization, usage, billing, contract and support signals into account health, retention and expansion insights.
+    primaryConsumers:
+      - customer-success
+      - growth-analytics
+      - account-management
+    sourceProducts:
+      - lms-courseflow
+      - crm-sales
+      - billing-platform
+      - support-platform
+      - enterprise-commerce
+    sourceSystems:
+      - enrollment-service
+      - notification-service
+      - review-service
+      - crm-account-service
+      - sales-opportunity-service
+      - billing-service
+      - support-case-service
+    dataProducts:
+      - name: bronze.events_customer_account_changed
+        layer: BRONZE
+        contractStatus: existing
+      - name: silver.customer_identity_link
+        layer: SILVER
+        contractStatus: existing
+      - name: gold.customer_360_profile
+        layer: GOLD
+        contractStatus: existing
+      - name: gold.customer_engagement_daily
+        layer: GOLD
+        contractStatus: planned
+    kpis:
+      - account_health_score
+      - active_org_user_count
+      - engagement_trend
+      - churn_risk_score
+      - customer_profile_count
+      - at_risk_customer_account_count
+    accessPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - identity-resolution
+      - silver-conformed-dimensions
+      - row-level-security
+      - reverse-etl
+      - semantic-metrics
+    pipelineRunners:
+      - customer.account_health.from_approved_bronze.v1
+    implementation:
+      pipelines:
+        - runnerId: customer.account_health.from_approved_bronze.v1
+          inputTopics:
+            - customer.account.changed.v1
+          inputDataProducts:
+            - bronze.events_customer_account_changed
+          outputDataProducts:
+            - silver.customer_identity_link
+            - gold.customer_360_profile
+          primaryOutput: gold.customer_360_profile
+          qualityProfile: p0-customer-account-health
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - identity_mapping_reviewed
+      - quality_checks_must_pass
+      - lineage_registered
+      - access_policy_reviewed
+      - retention_erasure_ready
+
+  - id: customer-support-experience-intelligence
+    name: Customer Support Experience Intelligence
+    domain: customer
+    priority: P1
+    status: pilot
+    owner: support-platform-po
+    businessOutcome: Measure support SLA, backlog, escalation, reopen and satisfaction signals, then publish governed support rollups for Customer 360 and customer experience operations.
+    primaryConsumers:
+      - customer-experience
+      - support-operations
+      - customer-success
+      - enterprise-reporting
+      - compliance-office
+    sourceProducts:
+      - support-platform
+      - crm-sales
+      - identity-platform
+    sourceSystems:
+      - support-case-service
+      - customer-feedback-service
+      - crm-account-service
+      - identity-directory
+    dataProducts:
+      - name: bronze.events_support_case_changed
+        layer: BRONZE
+        contractStatus: existing
+      - name: silver.support_case
+        layer: SILVER
+        contractStatus: existing
+      - name: gold.support_sla_daily
+        layer: GOLD
+        contractStatus: existing
+    kpis:
+      - support_case_count
+      - first_response_sla_breach_count
+      - resolution_sla_breach_count
+      - average_first_response_minutes
+      - average_resolution_minutes
+      - average_support_satisfaction_score
+    accessPersonas:
+      - DataPlatformOperator
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ApprovedMLConsumer
+      - ComplianceConsumer
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - support-sla-monitoring
+      - silver-conformed-dimensions
+      - row-level-security
+      - semantic-metrics
+      - lineage-catalog
+    pipelineRunners:
+      - support.sla.from_approved_bronze.v1
+    implementation:
+      pipelines:
+        - runnerId: support.sla.from_approved_bronze.v1
+          inputTopics:
+            - customer.support_case.changed.v1
+          inputDataProducts:
+            - bronze.events_support_case_changed
+          outputDataProducts:
+            - silver.support_case
+            - gold.support_sla_daily
+          primaryOutput: gold.support_sla_daily
+          qualityProfile: p1-customer-support-experience
+          releaseEvidenceProfile: local-medallion-release.v1
+    releaseGates:
+      - contract_compatibility
+      - quality_checks_must_pass
+      - lineage_registered
+      - access_policy_reviewed
+      - retention_erasure_ready
+
+  - id: workforce-training-compliance
+    name: Workforce Training Compliance
+    domain: workforce
+    priority: P1
+    status: planned
+    owner: workforce-analytics-po
+    businessOutcome: Track skills coverage, mandatory learning, certification, staffing capacity and workforce readiness across employee groups.
+    primaryConsumers:
+      - people-operations
+      - learning-and-development
+      - managers
+      - compliance-office
+    sourceProducts:
+      - lms-courseflow
+      - hris-workforce
+      - identity-platform
+    sourceSystems:
+      - course-service
+      - enrollment-service
+      - gradebook-service
+      - certificate-service
+      - employee-profile-service
+      - org-hierarchy-service
+      - skill-taxonomy-service
+      - access-control-service
+    dataProducts:
+      - name: silver.learner_activity
+        layer: SILVER
+        contractStatus: existing
+      - name: gold.training_compliance_status
+        layer: GOLD
+        contractStatus: planned
+      - name: gold.workforce_skill_profile
+        layer: GOLD
+        contractStatus: planned
+    kpis:
+      - mandatory_training_completion_rate
+      - certification_eligibility_count
+      - skill_gap_count
+      - overdue_training_count
+    accessPersonas:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ComplianceConsumer
+    governance:
+      classification: SENSITIVE
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - conformed-activity
+      - hris-connector
+      - semantic-metrics
+      - access-audit
+    releaseGates:
+      - quality_checks_must_pass
+      - lineage_registered
+      - privacy_reviewed
+      - access_policy_reviewed
+
+  - id: risk-control-exception-monitoring
+    name: Risk Control Exception Monitoring
+    domain: risk-compliance
+    priority: P1
+    status: planned
+    owner: risk-operations-po
+    businessOutcome: Detect abnormal payment, billing, entitlement, identity, support, learning and financial-control patterns that need case review.
+    primaryConsumers:
+      - risk-operations
+      - trust-and-safety
+      - finance-controls
+      - internal-audit
+    sourceProducts:
+      - lms-courseflow
+      - enterprise-commerce
+      - billing-platform
+      - identity-platform
+      - support-platform
+    sourceSystems:
+      - promotion-service
+      - loyalty-service
+      - gradebook-service
+      - certificate-service
+      - access-control-service
+      - payment-platform
+      - billing-service
+      - support-case-service
+    dataProducts:
+      - name: gold.risk_signal_daily
+        layer: GOLD
+        contractStatus: planned
+      - name: gold.fraud_case_queue
+        layer: GOLD
+        contractStatus: planned
+      - name: gold.control_exception_daily
+        layer: GOLD
+        contractStatus: planned
+    kpis:
+      - exception_count
+      - high_risk_adjustment_count
+      - unresolved_case_age
+      - control_breach_rate
+    accessPersonas:
+      - RiskOperator
+      - DomainDataOwner
+      - ComplianceConsumer
+    governance:
+      classification: SENSITIVE
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - anomaly-signal-pipeline
+      - case-queue-export
+      - audit-lineage
+      - maker-checker-evidence
+    releaseGates:
+      - quality_checks_must_pass
+      - lineage_registered
+      - privacy_reviewed
+      - maker_checker_policy_reviewed
+
+  - id: product-usage-funnel
+    name: Product Usage Funnel
+    domain: product-analytics
+    priority: P1
+    status: planned
+    owner: product-analytics-po
+    businessOutcome: Measure acquisition, activation, engagement, feature adoption and experimentation across web, mobile and admin surfaces.
+    primaryConsumers:
+      - product-management
+      - ux-research
+      - growth-analytics
+      - engineering-leads
+    sourceProducts:
+      - lms-courseflow
+      - enterprise-commerce
+      - crm-sales
+      - support-platform
+    sourceSystems:
+      - web-next-learning
+      - analytics-service
+      - admin-portal
+      - mobile-apps
+      - customer-portal
+      - commerce-web
+      - support-portal
+    dataProducts:
+      - name: gold.product_usage_daily
+        layer: GOLD
+        contractStatus: planned
+      - name: gold.experiment_metrics_daily
+        layer: GOLD
+        contractStatus: planned
+      - name: gold.feature_adoption_daily
+        layer: GOLD
+        contractStatus: planned
+    kpis:
+      - activation_rate
+      - funnel_conversion_rate
+      - feature_adoption_rate
+      - retention_cohort_rate
+    accessPersonas:
+      - DomainDataOwner
+      - ApprovedBIConsumer
+      - ProductAnalyst
+    governance:
+      classification: CONFIDENTIAL
+      dataResidency: REGION_CONTROLLED
+      containsPii: true
+      tenantIsolation: REQUIRED
+    platformCapabilities:
+      - event-collector
+      - sessionization
+      - semantic-metrics
+      - experiment-analysis
+    releaseGates:
+      - tracking_plan_approved
+      - quality_checks_must_pass
+      - lineage_registered
+      - access_policy_reviewed

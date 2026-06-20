@@ -1,0 +1,46 @@
+version: 1
+contract: speech_quality_model_io
+owner: ai-platform
+product: support-platform
+use_case: support-speech-quality-assurance
+model_id: speech-quality-baseline-v1
+input:
+  tenant_id: string
+  audio_id: string
+  audio_checksum: string
+  transcript_language: string
+  duration_seconds: integer
+  consent_captured: boolean
+  raw_audio_uri_optional: string
+  segments:
+    type: array
+    item:
+      speaker_role: string
+      text: string
+      start_ms: integer
+      end_ms: integer
+      confidence: number
+output:
+  model_id: string
+  intent: string
+  quality_band: string
+  compliance_risk: string
+  transcript_summary_terms:
+    type: array
+  evidence_terms:
+    type: array
+  confidence: number
+  reason_codes:
+    type: array
+  requires_human_review: boolean
+sla:
+  p95_latency_ms: 250
+  fallback_required: true
+  batch_refresh: on_close
+governance:
+  tenant_isolation_required: true
+  raw_audio_processing_allowed: false
+  transcript_segments_must_be_bounded: true
+  raw_pii_allowed_in_output: false
+  human_review_required_for_low_quality_or_pii: true
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml

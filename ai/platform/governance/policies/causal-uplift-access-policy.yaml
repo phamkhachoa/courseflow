@@ -1,0 +1,46 @@
+version: 1
+owner: ai-platform
+policy_id: causal-uplift-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  direct_identifier_submission_allowed: false
+  automated_rollout_allowed: false
+scope_aliases:
+  evaluate: internal:ai-platform:causal-uplift:evaluate
+  ops: internal:ai-platform:causal-uplift:ops
+principals:
+  - principal_id: service:ai-platform-causal-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:ai-platform-experimentation
+    owner_role: AI Platform experimentation service
+    product: ai-platform
+    scopes:
+      - evaluate
+    tenant_ids:
+      - tenant-ai
+      - tenant-ai-sandbox
+    product_ids:
+      - ai-platform
+    use_case_ids:
+      - enterprise-experimentation-uplift
+
+  - principal_id: service:lms-experimentation-uplift
+    owner_role: LMS experimentation service
+    product: lms-courseflow
+    scopes:
+      - evaluate
+    tenant_ids:
+      - tenant-lms
+      - tenant-lms-sandbox
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-intervention-effectiveness

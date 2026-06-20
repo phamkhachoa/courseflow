@@ -1,0 +1,68 @@
+version: 1
+evaluation_id: operations-routing-policy-v1-eval
+model_id: operations-routing-policy-simulator-v1
+algorithm: deterministic_constrained_routing_policy_simulator
+use_case_id: operations-routing-optimization
+product: enterprise-operations
+owner: ai-platform
+evaluation_type: service_integrated_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: operations-routing-policy-golden-v1
+  source: platform/evaluation/datasets/operations-routing-policy-golden.yaml
+  feature_contract: contracts/features/operations-routing-features.v1.yaml
+  model_io_contract: contracts/models/operations-routing-policy-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 4
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/bandit_rl/routing_policy_simulator/tests/test_routing_policy_simulator.py
+  assignment_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  constraint_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  baseline_lift_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  reason_code_recall:
+    value: 1.00
+    threshold: 0.80
+    status: passed
+  exploration_budget_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  deterministic_replay_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Routing Policy Service serves constrained routing policy IO, offline replay and exploration budget behavior.
+    - This is a deterministic simulator behind a service boundary, not an online RL learner.
+    - Any online policy must compare against this baseline and pass safety review.
+risks:
+  - deterministic_policy_scoring
+  - no_online_learning
+  - no_live_queue_feedback_loop
+  - no_counterfactual_logged_policy_dataset
+required_next_steps:
+  - bind_to_governed_operations_routing_snapshot
+  - add_counterfactual_logged_policy_dataset
+  - define_shadow_policy_review_queue
+  - add_online_experiment_guardrails_before_activation
+  - add_routing_policy_service_metrics_to_release_review
+service_evidence:
+  service: services/routing-policy-service/service.yaml
+  platform_runtime: platform/src/courseflow_ai_platform/routing_policy_service.py
+  service_tests: services/routing-policy-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_routing_policy_service.py
+  policy: platform/governance/policies/routing-policy-access-policy.yaml

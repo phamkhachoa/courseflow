@@ -27,7 +27,8 @@ x-service-env: &service-env
   EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL:-http://localhost:3000/verify-email}
   COURSEFLOW_ENTITLEMENT_ENROLLMENT_SERVICE_URL: http://enrollment-service:8080
   COURSEFLOW_ENTITLEMENT_COURSE_SERVICE_URL: http://course-service:8080
-  RECOMMENDATION_ML_SERVICE_URI: ${RECOMMENDATION_ML_SERVICE_URI:-http://recommendation-ml-service:8080}
+  RECOMMENDATION_ML_SERVICE_URI: ${RECOMMENDATION_ML_SERVICE_URI:-http://host.docker.internal:18088}
+  RECOMMENDATION_ML_SERVICE_URL: ${RECOMMENDATION_ML_SERVICE_URL:-http://host.docker.internal:18088}
   ACCESS_CONTROL_SERVICE_URI: http://access-control-service:8080
   USER_MANAGEMENT_SERVICE_URI: http://user-management-service:8080
   KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://localhost:18080/realms/courseflow}
@@ -76,7 +77,6 @@ x-service-env: &service-env
   NOTIFICATION_DB_URL: jdbc:postgresql://postgres:5432/cf_notification
   MEDIA_DB_URL: jdbc:postgresql://postgres:5432/cf_media
   ANALYTICS_DB_URL: jdbc:postgresql://postgres:5432/cf_analytics
-  RECOMMENDATION_ML_DB_URL: jdbc:postgresql://postgres:5432/cf_recommendation_ml
   GRADEBOOK_DB_URL: jdbc:postgresql://postgres:5432/cf_gradebook
   QUIZ_DB_URL: jdbc:postgresql://postgres:5432/cf_quiz
   CERTIFICATE_DB_URL: jdbc:postgresql://postgres:5432/cf_certificate
@@ -110,8 +110,6 @@ x-service-env: &service-env
   MEDIA_DB_PASSWORD: courseflow
   ANALYTICS_DB_USERNAME: courseflow
   ANALYTICS_DB_PASSWORD: courseflow
-  RECOMMENDATION_ML_DB_USERNAME: courseflow
-  RECOMMENDATION_ML_DB_PASSWORD: courseflow
   GRADEBOOK_DB_USERNAME: courseflow
   GRADEBOOK_DB_PASSWORD: courseflow
   QUIZ_DB_USERNAME: courseflow
@@ -293,30 +291,6 @@ services:
       <<: *build-common
       args:
         MODULE: services/analytics-service
-
-  recommendation-ml-service:
-    <<: *service-common
-    environment:
-      <<: *service-env
-      RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET: ${RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET:-courseflow-local-recommendation-ml-principal-hash-secret-change-me-32}
-      RECOMMENDATION_ML_RUN_MIGRATIONS: ${RECOMMENDATION_ML_RUN_MIGRATIONS:-true}
-    build:
-      context: ../..
-      dockerfile: services/recommendation-ml-service/Dockerfile
-
-  recommendation-ml-worker:
-    <<: *service-common
-    profiles:
-      - ml-worker
-    expose: []
-    environment:
-      <<: *service-env
-      RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET: ${RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET:-courseflow-local-recommendation-ml-principal-hash-secret-change-me-32}
-      RECOMMENDATION_ML_RUN_MIGRATIONS: "false"
-    build:
-      context: ../..
-      dockerfile: services/recommendation-ml-service/Dockerfile
-    command: ["courseflow-ml", "worker", "--worker-id", "recommendation-ml-worker"]
 
   gradebook-service:
     <<: *service-common

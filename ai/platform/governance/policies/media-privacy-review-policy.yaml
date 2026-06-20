@@ -1,0 +1,76 @@
+version: 1
+policy_id: media-privacy-review-policy-v1
+owner: ai-platform
+allowed_statuses:
+  - approved
+  - ready_for_approval
+  - waiting_for_controls
+  - blocked
+allowed_media_types:
+  - transcript
+  - document_image
+  - pdf_document
+  - audio
+  - video
+allowed_processing_modes:
+  - transcript_only
+  - ocr_tokens_only
+  - raw_document_ocr
+  - layout_extraction
+  - raw_audio_asr
+  - speaker_diarization
+  - speaker_biometric
+blocked_processing_modes:
+  - speaker_biometric
+raw_media_modes:
+  - raw_document_ocr
+  - layout_extraction
+  - raw_audio_asr
+  - speaker_diarization
+  - speaker_biometric
+global_required_controls:
+  - tenant_isolation
+  - retention_policy
+  - deletion_export_impact_review
+  - human_review_routing
+  - audit_logging
+mode_required_controls:
+  transcript_only:
+    - transcript_redaction
+    - consent_or_notice
+  ocr_tokens_only:
+    - source_checksum
+    - pii_redaction
+    - reviewer_override_queue
+  raw_document_ocr:
+    - source_document_access_policy
+    - pii_redaction
+    - reviewer_override_queue
+    - raw_media_storage_boundary
+  layout_extraction:
+    - source_document_access_policy
+    - layout_region_redaction
+    - reviewer_override_queue
+    - raw_media_storage_boundary
+  raw_audio_asr:
+    - consent_or_notice
+    - raw_audio_access_policy
+    - transcript_redaction
+    - raw_media_storage_boundary
+  speaker_diarization:
+    - consent_or_notice
+    - speaker_role_minimization
+    - raw_audio_access_policy
+    - raw_media_storage_boundary
+  speaker_biometric:
+    - biometric_processing_approval
+    - explicit_consent
+    - retention_policy
+decision_policy:
+  approved_requires_all_controls: true
+  blocked_modes_block_review: true
+  raw_media_requires_governance_reviewer: true
+next_actions:
+  - attach_missing_control_evidence_before_raw_media_approval
+  - keep_transcript_and_ocr_token_baselines_runtime_safe
+  - reject_speaker_biometrics_until_explicit_policy_is_approved

@@ -1,0 +1,97 @@
+version: 1
+dataset_id: support-agent-assist-golden-v1
+owner: ai-platform
+product: support-platform
+use_case_id: support-agent-assist
+model_id: support-agent-assist-baseline-v1
+description: Golden support cases for deterministic support-agent-assist baseline evaluation.
+thresholds:
+  intent_accuracy_min: 0.80
+  priority_accuracy_min: 0.80
+  human_review_rate_min: 1.00
+  retrieval_required_term_coverage_min: 0.80
+cases:
+  - case_id: support-golden-001
+    input:
+      tenant_id: tenant-a
+      case_id: case-001
+      subject: Refund request for duplicate charge
+      latest_message: The customer paid twice and needs a refund before month end.
+      product_area: billing
+      priority: normal
+      language: en
+    expected:
+      intent: billing
+      priority_signal: normal
+      requires_human_review: true
+      retrieval_terms:
+        - billing
+        - Refund
+
+  - case_id: support-golden-002
+    input:
+      tenant_id: tenant-a
+      case_id: case-002
+      subject: Urgent login outage
+      latest_message: All admins are blocked by MFA timeout errors.
+      product_area: identity
+      priority: urgent
+      language: en
+    expected:
+      intent: access
+      priority_signal: high
+      requires_human_review: true
+      retrieval_terms:
+        - access
+        - Urgent
+
+  - case_id: support-golden-003
+    input:
+      tenant_id: tenant-b
+      case_id: case-003
+      subject: API timeout while syncing records
+      latest_message: Integration jobs fail with timeout errors after five minutes.
+      product_area: integrations
+      priority: normal
+      language: en
+    expected:
+      intent: technical
+      priority_signal: medium
+      requires_human_review: true
+      retrieval_terms:
+        - technical
+        - timeout
+
+  - case_id: support-golden-004
+    input:
+      tenant_id: tenant-b
+      case_id: case-004
+      subject: Change account email
+      latest_message: Please help update the organization admin profile email.
+      product_area: account
+      priority: low
+      language: en
+    expected:
+      intent: account
+      priority_signal: normal
+      requires_human_review: true
+      retrieval_terms:
+        - account
+        - Change
+
+  - case_id: support-golden-005
+    input:
+      tenant_id: tenant-c
+      case_id: case-005
+      subject: General question about setup
+      latest_message: We need guidance on the best next step for onboarding.
+      product_area: onboarding
+      priority: normal
+      language: en
+    expected:
+      intent: general
+      priority_signal: normal
+      requires_human_review: true
+      retrieval_terms:
+        - general
+        - General

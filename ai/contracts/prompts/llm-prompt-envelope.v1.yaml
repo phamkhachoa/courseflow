@@ -1,0 +1,70 @@
+version: 1
+contract_id: llm-prompt-envelope.v1
+owner: ai-platform
+purpose:
+  - standardize_llm_prompt_payloads
+  - enforce_prompt_redaction
+  - enforce_tenant_context_boundary
+  - estimate_cost_before_model_call
+schema:
+  required:
+    - tenant_id
+    - product
+    - use_case_id
+    - system_prompt
+    - user_input
+    - retrieved_context
+    - output_policy
+    - cost_budget
+  fields:
+    tenant_id:
+      type: string
+      pii: none
+    product:
+      type: string
+      pii: none
+    use_case_id:
+      type: string
+      pii: none
+    system_prompt:
+      type: string
+      pii: none_or_low
+    user_input:
+      type: string
+      pii: may_contain_sensitive
+      redaction_required: true
+    retrieved_context:
+      type: list
+      item_schema:
+        context_id: string
+        tenant_id: string
+        source_ref: string
+        text: string
+      tenant_boundary: same_tenant_or_global_only
+      redaction_required: true
+    output_policy:
+      type: mapping
+      fields:
+        require_human_review: boolean
+        allow_external_auto_send: boolean
+        require_citations: boolean
+    cost_budget:
+      type: mapping
+      fields:
+        max_estimated_input_tokens: integer
+        max_estimated_output_tokens: integer
+        max_estimated_total_tokens: integer
+controls:
+  redaction:
+    required_tokens:
+      email: "[REDACTED_EMAIL]"
+      phone: "[REDACTED_PHONE]"
+      secret: "[REDACTED_SECRET]"
+      learner_identifier: "[REDACTED_IDENTIFIER]"
+  audit:
+    raw_sensitive_values_allowed: false
+    prompt_response_logs_in_scope_for_deletion_export: true
+  serving:
+    block_when_cost_budget_exceeded: true
+    block_cross_tenant_context: true
+    require_human_review_for_external_reply: true

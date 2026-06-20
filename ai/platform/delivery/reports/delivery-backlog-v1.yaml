@@ -1,0 +1,469 @@
+version: 1
+report_id: delivery-backlog-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  item_count: 23
+  ready_to_start_count: 16
+  monitoring_count: 3
+  blocked_count: 0
+  p0_count: 0
+  p1_count: 13
+  p2_count: 10
+  p3_count: 0
+by_source:
+  data_contract_coverage: 3
+  governance_evaluation_ops: 1
+  governance_evaluation_response_drill: 1
+  llm_provider_ops: 1
+  product_readiness_freshness_response_drill: 1
+  promotion_intake: 5
+  promotion_readiness: 4
+  serving_access_governance: 1
+  solution_blueprint: 6
+by_phase:
+  artifact_evidence: 1
+  data_contract_hardening: 3
+  evaluation_evidence: 1
+  governance_review: 3
+  promotion_review: 3
+  release_activation: 1
+  release_monitoring: 1
+  runtime_observability: 1
+  serving_access_governance: 1
+  shadow_monitoring: 2
+  solution_design: 6
+by_owner_role:
+  Admin/Ops: 6
+  Admin/Ops + Governance Reviewer: 1
+  Data Platform + Product Owner: 3
+  SA AI Engineer: 4
+  SA AI Platform: 6
+  SA AI Platform + Governance Reviewer: 3
+by_status:
+  accepted: 3
+  active: 1
+  draft: 3
+  in_progress: 1
+  ready: 11
+  shadow: 2
+  waiting: 2
+items:
+- backlog_id: AIP-BLG-0001
+  title: 'Publish Solution Architecture: enterprise-knowledge-assistant-discovery'
+  source: solution_blueprint
+  action_id: solution_blueprint:publish_solution_architecture:enterprise-knowledge-assistant-discovery
+  action_type: publish_solution_architecture
+  delivery_phase: solution_design
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - enterprise-knowledge-assistant-discovery
+  acceptance_criteria:
+  - Solution architecture is linked to the request.
+  - Data, evaluation, artifact and serving paths are identified.
+  - Backlog items exist for the next implementation slice.
+- backlog_id: AIP-BLG-0002
+  title: 'Publish Solution Architecture: lms-at-risk-prediction-baseline'
+  source: solution_blueprint
+  action_id: solution_blueprint:publish_solution_architecture:lms-at-risk-prediction-baseline
+  action_type: publish_solution_architecture
+  delivery_phase: solution_design
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - lms-at-risk-prediction-baseline
+  acceptance_criteria:
+  - Solution architecture is linked to the request.
+  - Data, evaluation, artifact and serving paths are identified.
+  - Backlog items exist for the next implementation slice.
+- backlog_id: AIP-BLG-0003
+  title: 'Publish Solution Architecture: support-sla-risk-discovery'
+  source: solution_blueprint
+  action_id: solution_blueprint:publish_solution_architecture:support-sla-risk-discovery
+  action_type: publish_solution_architecture
+  delivery_phase: solution_design
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - support-sla-risk-discovery
+  acceptance_criteria:
+  - Solution architecture is linked to the request.
+  - Data, evaluation, artifact and serving paths are identified.
+  - Backlog items exist for the next implementation slice.
+- backlog_id: AIP-BLG-0004
+  title: 'Publish Solution Architecture: finance-document-intelligence-discovery'
+  source: solution_blueprint
+  action_id: solution_blueprint:publish_solution_architecture:finance-document-intelligence-discovery
+  action_type: publish_solution_architecture
+  delivery_phase: solution_design
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - finance-document-intelligence-discovery
+  acceptance_criteria:
+  - Solution architecture is linked to the request.
+  - Data, evaluation, artifact and serving paths are identified.
+  - Backlog items exist for the next implementation slice.
+- backlog_id: AIP-BLG-0005
+  title: 'Publish Solution Architecture: operations-routing-optimization-simulator'
+  source: solution_blueprint
+  action_id: solution_blueprint:publish_solution_architecture:operations-routing-optimization-simulator
+  action_type: publish_solution_architecture
+  delivery_phase: solution_design
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - operations-routing-optimization-simulator
+  acceptance_criteria:
+  - Solution architecture is linked to the request.
+  - Data, evaluation, artifact and serving paths are identified.
+  - Backlog items exist for the next implementation slice.
+- backlog_id: AIP-BLG-0006
+  title: 'Publish Solution Architecture: finance-payment-fraud-scoring-discovery'
+  source: solution_blueprint
+  action_id: solution_blueprint:publish_solution_architecture:finance-payment-fraud-scoring-discovery
+  action_type: publish_solution_architecture
+  delivery_phase: solution_design
+  owner_role: SA AI Platform
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - finance-payment-fraud-scoring-discovery
+  acceptance_criteria:
+  - Solution architecture is linked to the request.
+  - Data, evaluation, artifact and serving paths are identified.
+  - Backlog items exist for the next implementation slice.
+- backlog_id: AIP-BLG-0007
+  title: 'Harden Data Contract For Production: enterprise-knowledge-assistant-discovery'
+  source: data_contract_coverage
+  action_id: data_contract_coverage:harden_data_contract_for_production:enterprise-knowledge-assistant-discovery
+  action_type: harden_data_contract_for_production
+  delivery_phase: data_contract_hardening
+  owner_role: Data Platform + Product Owner
+  priority: p2
+  status: draft
+  ready_to_start: true
+  monitoring_item: false
+  blocker: data contract is sufficient for design but not production-ready
+  refs:
+  - enterprise-knowledge-assistant-discovery
+  acceptance_criteria:
+  - Draft contract reaches active or an explicit gated status.
+  - Freshness and parity evidence is attached.
+  - Owner-on-failure and production data lineage are documented.
+- backlog_id: AIP-BLG-0008
+  title: 'Harden Data Contract For Production: operations-routing-optimization-simulator'
+  source: data_contract_coverage
+  action_id: data_contract_coverage:harden_data_contract_for_production:operations-routing-optimization-simulator
+  action_type: harden_data_contract_for_production
+  delivery_phase: data_contract_hardening
+  owner_role: Data Platform + Product Owner
+  priority: p2
+  status: draft
+  ready_to_start: true
+  monitoring_item: false
+  blocker: data contract is sufficient for design but not production-ready
+  refs:
+  - operations-routing-optimization-simulator
+  acceptance_criteria:
+  - Draft contract reaches active or an explicit gated status.
+  - Freshness and parity evidence is attached.
+  - Owner-on-failure and production data lineage are documented.
+- backlog_id: AIP-BLG-0009
+  title: 'Harden Data Contract For Production: finance-payment-fraud-scoring-discovery'
+  source: data_contract_coverage
+  action_id: data_contract_coverage:harden_data_contract_for_production:finance-payment-fraud-scoring-discovery
+  action_type: harden_data_contract_for_production
+  delivery_phase: data_contract_hardening
+  owner_role: Data Platform + Product Owner
+  priority: p2
+  status: draft
+  ready_to_start: true
+  monitoring_item: false
+  blocker: data contract is sufficient for design but not production-ready
+  refs:
+  - finance-payment-fraud-scoring-discovery
+  acceptance_criteria:
+  - Draft contract reaches active or an explicit gated status.
+  - Freshness and parity evidence is attached.
+  - Owner-on-failure and production data lineage are documented.
+- backlog_id: AIP-BLG-0010
+  title: 'Review Promotion Request: support-agent-assist-active-request'
+  source: promotion_intake
+  action_id: promotion_intake:review_promotion_request:support-agent-assist-active-request
+  action_type: review_promotion_request
+  delivery_phase: promotion_review
+  owner_role: SA AI Platform + Governance Reviewer
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - support-agent-assist-active-request
+  acceptance_criteria:
+  - Maker-checker review decision is recorded.
+  - Required gates and rollback evidence are accepted or blocked with reasons.
+  - Promotion registry is updated when the request is approved.
+- backlog_id: AIP-BLG-0011
+  title: 'Review Promotion Request: finance-document-intelligence-privacy-request'
+  source: promotion_intake
+  action_id: promotion_intake:review_promotion_request:finance-document-intelligence-privacy-request
+  action_type: review_promotion_request
+  delivery_phase: promotion_review
+  owner_role: SA AI Platform + Governance Reviewer
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - finance-document-intelligence-privacy-request
+  acceptance_criteria:
+  - Maker-checker review decision is recorded.
+  - Required gates and rollback evidence are accepted or blocked with reasons.
+  - Promotion registry is updated when the request is approved.
+- backlog_id: AIP-BLG-0012
+  title: 'Review Promotion Request: operations-routing-rl-simulator-request'
+  source: promotion_intake
+  action_id: promotion_intake:review_promotion_request:operations-routing-rl-simulator-request
+  action_type: review_promotion_request
+  delivery_phase: promotion_review
+  owner_role: SA AI Platform + Governance Reviewer
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - operations-routing-rl-simulator-request
+  acceptance_criteria:
+  - Maker-checker review decision is recorded.
+  - Required gates and rollback evidence are accepted or blocked with reasons.
+  - Promotion registry is updated when the request is approved.
+- backlog_id: AIP-BLG-0013
+  title: 'Publish Artifact Manifest: lms-at-risk-baseline-shadow-request'
+  source: promotion_intake
+  action_id: promotion_intake:publish_artifact_manifest:lms-at-risk-baseline-shadow-request
+  action_type: publish_artifact_manifest
+  delivery_phase: artifact_evidence
+  owner_role: SA AI Engineer
+  priority: p1
+  status: waiting
+  ready_to_start: true
+  monitoring_item: false
+  blocker: promotion request is missing model or artifact evidence
+  refs:
+  - lms-at-risk-baseline-shadow-request
+  acceptance_criteria:
+  - Artifact manifest exists with checksum and model/use-case lineage.
+  - Model card or vector-index manifest is linked.
+  - Promotion intake can resolve the artifact blocker.
+- backlog_id: AIP-BLG-0014
+  title: 'Run Required Evaluation: finance-anomaly-shadow-request'
+  source: promotion_intake
+  action_id: promotion_intake:run_required_evaluation:finance-anomaly-shadow-request
+  action_type: run_required_evaluation
+  delivery_phase: evaluation_evidence
+  owner_role: SA AI Engineer
+  priority: p1
+  status: waiting
+  ready_to_start: true
+  monitoring_item: false
+  blocker: promotion request is missing accepted evaluation evidence
+  refs:
+  - finance-anomaly-shadow-request
+  acceptance_criteria:
+  - Required evaluation report exists and passes thresholds.
+  - Dataset or snapshot lineage is linked.
+  - Promotion intake can resolve the evaluation blocker.
+- backlog_id: AIP-BLG-0015
+  title: 'Activate Approved Artifact: support-agent-assist-baseline-approved'
+  source: promotion_readiness
+  action_id: promotion_readiness:activate_approved_artifact:support-agent-assist-baseline-approved
+  action_type: activate_approved_artifact
+  delivery_phase: release_activation
+  owner_role: Admin/Ops + Governance Reviewer
+  priority: p1
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - support-agent-assist-baseline-approved
+  acceptance_criteria:
+  - Activation decision is recorded with approver and timestamp.
+  - Rollback target remains valid after activation.
+  - Operating cockpit moves the artifact into active monitoring.
+- backlog_id: AIP-BLG-0016
+  title: 'Monitor Active Artifact: recommendation-item-cf-v1-active-baseline'
+  source: promotion_readiness
+  action_id: promotion_readiness:monitor_active_artifact:recommendation-item-cf-v1-active-baseline
+  action_type: monitor_active_artifact
+  delivery_phase: release_monitoring
+  owner_role: Admin/Ops
+  priority: p2
+  status: active
+  ready_to_start: false
+  monitoring_item: true
+  blocker: ''
+  refs:
+  - recommendation-item-cf-v1-active-baseline
+  acceptance_criteria:
+  - Latency, error, fallback and quality signals are monitored.
+  - Rollback target remains available.
+  - Incidents create follow-up backlog items.
+- backlog_id: AIP-BLG-0017
+  title: 'Keep Shadow Monitoring: course-content-vector-index-shadow'
+  source: promotion_readiness
+  action_id: promotion_readiness:keep_shadow_monitoring:course-content-vector-index-shadow
+  action_type: keep_shadow_monitoring
+  delivery_phase: shadow_monitoring
+  owner_role: SA AI Engineer
+  priority: p2
+  status: shadow
+  ready_to_start: false
+  monitoring_item: true
+  blocker: ''
+  refs:
+  - course-content-vector-index-shadow
+  acceptance_criteria:
+  - Shadow metrics are collected against the required gates.
+  - Regression or tenant-isolation findings are triaged.
+  - Promotion intake is created if the shadow artifact is ready to advance.
+- backlog_id: AIP-BLG-0018
+  title: 'Keep Shadow Monitoring: support-knowledge-vector-index-shadow'
+  source: promotion_readiness
+  action_id: promotion_readiness:keep_shadow_monitoring:support-knowledge-vector-index-shadow
+  action_type: keep_shadow_monitoring
+  delivery_phase: shadow_monitoring
+  owner_role: SA AI Engineer
+  priority: p2
+  status: shadow
+  ready_to_start: false
+  monitoring_item: true
+  blocker: ''
+  refs:
+  - support-knowledge-vector-index-shadow
+  acceptance_criteria:
+  - Shadow metrics are collected against the required gates.
+  - Regression or tenant-isolation findings are triaged.
+  - Promotion intake is created if the shadow artifact is ready to advance.
+- backlog_id: AIP-BLG-0019
+  title: 'Run Controlled Policy Applier: lms-sequence-risk-sandbox-tenant-apply-20260617'
+  source: serving_access_governance
+  action_id: serving_access_governance:run_controlled_policy_applier:lms-sequence-risk-sandbox-tenant-apply-20260617
+  action_type: run_controlled_policy_applier
+  delivery_phase: serving_access_governance
+  owner_role: Admin/Ops
+  priority: p1
+  status: in_progress
+  ready_to_start: false
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - lms-sequence-risk-sandbox-tenant-apply-20260617
+  acceptance_criteria:
+  - Controlled applier writes the proposed policy to an explicit target.
+  - Source and proposed policy checksums match the apply ledger.
+  - Reconciliation report moves the application out of pending apply.
+- backlog_id: AIP-BLG-0020
+  title: 'Run Llm Provider Alert Delivery Drill: llm-provider-alert-routing-v1'
+  source: llm_provider_ops
+  action_id: llm_provider_ops:run_llm_provider_alert_delivery_drill:llm-provider-alert-routing-v1
+  action_type: run_llm_provider_alert_delivery_drill
+  delivery_phase: runtime_observability
+  owner_role: Admin/Ops
+  priority: p2
+  status: ready
+  ready_to_start: true
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - llm-provider-alert-routing-v1
+  acceptance_criteria:
+  - Provider alert routes are configured for every observable LLM provider.
+  - Admin/Ops can trigger or simulate the provider budget/latency route.
+  - Alert evidence remains tenant-safe and excludes credential or prompt payloads.
+- backlog_id: AIP-BLG-0021
+  title: 'Run Governance Evaluation Release Gate Alert Drill: governance-evaluation-service-v1'
+  source: governance_evaluation_ops
+  action_id: governance_evaluation_ops:run_governance_evaluation_release_gate_alert_drill:governance-evaluation-service-v1
+  action_type: run_governance_evaluation_release_gate_alert_drill
+  delivery_phase: governance_review
+  owner_role: Admin/Ops
+  priority: p2
+  status: accepted
+  ready_to_start: false
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - governance-evaluation-service-v1
+  acceptance_criteria:
+  - Governance evaluation release-gate alert path is triggered or simulated.
+  - Approved, review-required and blocked decisions route to the expected owner.
+  - Alert evidence remains tenant-safe and excludes identity or secret payloads.
+- backlog_id: AIP-BLG-0022
+  title: 'Accept Governance Evaluation Incident Response Runbook Drill: governance-evaluation-incident-response-drill-v1,
+    governance-evaluation-incident-response-v1'
+  source: governance_evaluation_response_drill
+  action_id: governance_evaluation_response_drill:accept_governance_evaluation_incident_response_runbook_drill:governance-evaluation-incident-response-drill-v1
+  action_type: accept_governance_evaluation_incident_response_runbook_drill
+  delivery_phase: governance_review
+  owner_role: Admin/Ops
+  priority: p2
+  status: accepted
+  ready_to_start: false
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - governance-evaluation-incident-response-drill-v1
+  - governance-evaluation-incident-response-v1
+  acceptance_criteria:
+  - Governance Evaluation incident response drill report is current and passed.
+  - P0/P1 repeated-failure scenarios map to Admin/Ops actions and runbook steps.
+  - Acceptance evidence excludes raw tenant, principal, request and credential values.
+- backlog_id: AIP-BLG-0023
+  title: 'Accept Product Readiness Freshness Incident Response Drill State: product-readiness-freshness-incident-response-drill-v1,
+    product-readiness-freshness-incident-response-v1'
+  source: product_readiness_freshness_response_drill
+  action_id: product_readiness_freshness_response_drill:accept_product_readiness_freshness_incident_response_drill_state:product-readiness-freshness-incident-response-drill-v1
+  action_type: accept_product_readiness_freshness_incident_response_drill_state
+  delivery_phase: governance_review
+  owner_role: Admin/Ops
+  priority: p2
+  status: accepted
+  ready_to_start: false
+  monitoring_item: false
+  blocker: ''
+  refs:
+  - product-readiness-freshness-incident-response-drill-v1
+  - product-readiness-freshness-incident-response-v1
+  acceptance_criteria:
+  - Product Readiness Freshness incident response drill report is current and passed.
+  - P0/P1 freshness, route, snapshot and audit-gap scenarios map to runbook steps.
+  - Acceptance evidence excludes raw tenant, principal, request and credential values.

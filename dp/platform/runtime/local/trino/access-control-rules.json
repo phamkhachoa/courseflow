@@ -1,0 +1,81 @@
+{
+  "catalogs": [
+    {
+      "user": "trino",
+      "catalog": ".*",
+      "allow": "all"
+    },
+    {
+      "user": "dp_allowed",
+      "catalog": "iceberg",
+      "allow": "read-only"
+    },
+    {
+      "user": "dp_denied",
+      "catalog": "iceberg",
+      "allow": "read-only"
+    },
+    {
+      "user": "dp_row_filter",
+      "catalog": "iceberg",
+      "allow": "read-only"
+    },
+    {
+      "user": "dp_masked",
+      "catalog": "iceberg",
+      "allow": "read-only"
+    }
+  ],
+  "schemas": [
+    {
+      "user": "trino",
+      "catalog": ".*",
+      "schema": ".*",
+      "owner": true
+    }
+  ],
+  "tables": [
+    {
+      "user": "trino",
+      "catalog": ".*",
+      "schema": ".*",
+      "table": ".*",
+      "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE", "OWNERSHIP", "GRANT_SELECT"]
+    },
+    {
+      "user": "dp_allowed",
+      "catalog": "iceberg",
+      "schema": "finance_iceberg_smoke",
+      "table": "finance_benefit_reconciliation",
+      "privileges": ["SELECT"]
+    },
+    {
+      "user": "dp_denied",
+      "catalog": "iceberg",
+      "schema": "finance_iceberg_smoke",
+      "table": "finance_benefit_reconciliation",
+      "privileges": []
+    },
+    {
+      "user": "dp_row_filter",
+      "catalog": "iceberg",
+      "schema": "finance_iceberg_smoke",
+      "table": "finance_benefit_security_probe",
+      "privileges": ["SELECT"],
+      "filter": "org_id = 'org-allowed'"
+    },
+    {
+      "user": "dp_masked",
+      "catalog": "iceberg",
+      "schema": "finance_iceberg_smoke",
+      "table": "finance_benefit_security_probe",
+      "privileges": ["SELECT"],
+      "columns": [
+        {
+          "name": "beneficiary_id_hash",
+          "mask": "'MASKED'"
+        }
+      ]
+    }
+  ]
+}

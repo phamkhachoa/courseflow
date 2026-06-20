@@ -1,0 +1,40 @@
+version: 1
+dataset_id: support-knowledge-retrieval-golden-v1
+owner: ai-platform
+product: support-platform
+use_case_id: support-agent-assist
+model_id: support-knowledge-retrieval-baseline-v1
+collection: support_knowledge_articles
+corpus: platform/evaluation/corpora/support-knowledge-corpus.yaml
+description: Golden support knowledge retrieval queries for RAG and agent-assist grounding.
+config:
+  k: 3
+thresholds:
+  recall_at_k_min: 1.00
+  hit_rate_at_k_min: 1.00
+  citation_precision_at_k_min: 0.60
+  tenant_isolation_rate_min: 1.00
+queries:
+  - query_id: support-retrieval-001
+    tenant_id: tenant-a
+    query: duplicate payment refund invoice charge
+    expected_chunk_ids:
+      - support-billing-refund-duplicate-charge
+
+  - query_id: support-retrieval-002
+    tenant_id: tenant-a
+    query: administrators blocked by MFA timeout login
+    expected_chunk_ids:
+      - support-access-mfa-timeout
+
+  - query_id: support-retrieval-003
+    tenant_id: tenant-a
+    query: API integration jobs fail after timeout
+    expected_chunk_ids:
+      - support-technical-api-timeout
+
+  - query_id: support-retrieval-004
+    tenant_id: tenant-a
+    query: update organization admin profile email
+    expected_chunk_ids:
+      - support-account-admin-email

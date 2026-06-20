@@ -1,0 +1,30 @@
+version: 1
+artifact_id: support-sla-risk-baseline-v1-source-artifact
+model_id: support-sla-risk-baseline-v1
+algorithm: deterministic_tabular_sla_risk_scorer
+model_family: classical_ml
+artifact_type: source_algorithm
+status: runtime_library_baseline
+owner: ai-platform
+product: support-platform
+use_case_id: support-sla-risk
+created_at: "2026-06-17"
+artifact_uri: models/classical/support_sla_risk_baseline/support_sla_risk_baseline.py
+artifact_hash:
+  algorithm: sha256
+  value: 1cffaa5be5be3d475dd8d7e88159cb010c4c2cb80969b3f4310cd2127888485c
+lineage:
+  model_code: models/classical/support_sla_risk_baseline/support_sla_risk_baseline.py
+  feature_contract: contracts/features/support-case-features.v1.yaml
+  model_io_contract: contracts/models/support-sla-risk-model-io.v1.yaml
+  model_card: platform/model-registry/model-cards/support-sla-risk-baseline-v1.md
+  evaluation_report: platform/evaluation/reports/support-sla-risk-v1-eval.yaml
+runtime:
+  package: support_sla_risk_baseline
+  optional_extras: []
+  entrypoint: support_sla_risk_baseline:SupportSlaRiskBaseline
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  human_in_the_loop_required: true
+  automated_adverse_action_allowed: false
+  rollback_supported: true

@@ -1,0 +1,112 @@
+version: 1
+report_id: delivery-state-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  transition_count: 4
+  applied_count: 4
+  missing_action_count: 0
+  in_progress_count: 1
+  done_count: 0
+  accepted_count: 3
+by_target_status:
+  accepted: 3
+  in_progress: 1
+by_transition_status:
+  applied: 4
+action_queue:
+  applied:
+  - serving-access-policy-applier-started-20260617
+  - governance-evaluation-alert-drill-accepted-20260617
+  - governance-evaluation-response-runbook-drill-accepted-20260617
+  - product-readiness-freshness-response-drill-accepted-20260617
+  missing_action: []
+  in_progress:
+  - serving-access-policy-applier-started-20260617
+  done: []
+  accepted:
+  - governance-evaluation-alert-drill-accepted-20260617
+  - governance-evaluation-response-runbook-drill-accepted-20260617
+  - product-readiness-freshness-response-drill-accepted-20260617
+items:
+- transition_id: serving-access-policy-applier-started-20260617
+  action_id: serving_access_governance:run_controlled_policy_applier:lms-sequence-risk-sandbox-tenant-apply-20260617
+  previous_status: ready
+  target_status: in_progress
+  applied_status: in_progress
+  transition_status: applied
+  item_found: true
+  backlog_id: AIP-BLG-0019
+  owner_role: Admin/Ops
+  delivery_phase: serving_access_governance
+  updated_at: '2026-06-17T11:15:00Z'
+  updated_by: adminops-ai-platform
+  reason: Admin/Ops started the controlled apply handoff for the approved LMS sandbox
+    serving-access policy proposal.
+  evidence_refs:
+  - platform/governance/reports/model-serving-access-policy-apply-report-v1.yaml
+  - platform/governance/reports/model-serving-access-policy-reconciliation-v1.yaml
+- transition_id: governance-evaluation-alert-drill-accepted-20260617
+  action_id: governance_evaluation_ops:run_governance_evaluation_release_gate_alert_drill:governance-evaluation-service-v1
+  previous_status: ready
+  target_status: accepted
+  applied_status: accepted
+  transition_status: applied
+  item_found: true
+  backlog_id: AIP-BLG-0021
+  owner_role: Admin/Ops
+  delivery_phase: governance_review
+  updated_at: '2026-06-17T14:30:00Z'
+  updated_by: adminops-ai-platform
+  reason: Admin/Ops accepted the Governance Evaluation release-gate alert drill after
+    verifying approved, review-required, blocked and privacy-rejection paths are observable.
+  evidence_refs:
+  - platform/governance/reports/governance-evaluation-service-v1.yaml
+  - platform/operations/reports/operating-cockpit-v1.yaml
+  - platform/delivery/reports/delivery-backlog-v1.yaml
+  - platform/delivery/reports/delivery-owner-views-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- transition_id: governance-evaluation-response-runbook-drill-accepted-20260617
+  action_id: governance_evaluation_response_drill:accept_governance_evaluation_incident_response_runbook_drill:governance-evaluation-incident-response-drill-v1
+  previous_status: ready
+  target_status: accepted
+  applied_status: accepted
+  transition_status: applied
+  item_found: true
+  backlog_id: AIP-BLG-0022
+  owner_role: Admin/Ops
+  delivery_phase: governance_review
+  updated_at: '2026-06-17T15:30:00Z'
+  updated_by: adminops-ai-platform
+  reason: Admin/Ops accepted the Governance Evaluation incident response runbook drill
+    after verifying P0/P1 repeated-failure scenarios, runbook steps and tenant-safe
+    evidence.
+  evidence_refs:
+  - platform/operations/runbooks/governance-evaluation-incident-response-v1.yaml
+  - platform/operations/reports/governance-evaluation-incident-response-drill-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+  - docs/team/council-meetings/0084-governance-evaluation-response-runbook-drill.md
+- transition_id: product-readiness-freshness-response-drill-accepted-20260617
+  action_id: product_readiness_freshness_response_drill:accept_product_readiness_freshness_incident_response_drill_state:product-readiness-freshness-incident-response-drill-v1
+  previous_status: ready
+  target_status: accepted
+  applied_status: accepted
+  transition_status: applied
+  item_found: true
+  backlog_id: AIP-BLG-0023
+  owner_role: Admin/Ops
+  delivery_phase: governance_review
+  updated_at: '2026-06-17T16:10:00Z'
+  updated_by: adminops-ai-platform
+  reason: Admin/Ops accepted the Product Readiness Freshness incident response drill
+    after verifying stale report, route outage, static snapshot, runtime error and
+    audit-gap scenarios with tenant-safe evidence.
+  evidence_refs:
+  - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+  - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+  - runbooks/product-readiness-freshness-incident-response.md
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+  - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+  - docs/team/council-meetings/0092-product-readiness-freshness-response-state-acceptance.md

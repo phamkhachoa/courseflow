@@ -1,0 +1,197 @@
+contractVersion: 1
+dataProduct:
+  name: silver.support_case
+  layer: SILVER
+  domain: customer
+  product: support-platform
+  domainOwner: customer-domain-council
+  ownerTeam: data-platform
+  businessOwner: customer-experience-lead
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Conformed support case state used for customer experience, account health and SLA analytics.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: bronze.events_support_case_changed
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: changed_at
+
+schema:
+  columns:
+    - name: support_case_state_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic support case state row id.
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product that produced the source support signal.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: account_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product-local account identifier used for Customer 360 joins.
+    - name: customer_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized customer subject identifier.
+    - name: case_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product-local support case identifier.
+    - name: channel
+      type: string
+      nullable: false
+      pii: false
+      description: Support intake channel.
+      allowedValues: [WEB, EMAIL, CHAT, PHONE, API, SOCIAL, INTERNAL]
+    - name: priority
+      type: string
+      nullable: false
+      pii: false
+      description: Support case priority.
+      allowedValues: [LOW, NORMAL, HIGH, URGENT, CRITICAL]
+    - name: case_type
+      type: string
+      nullable: false
+      pii: false
+      description: Support case category.
+      allowedValues: [INCIDENT, QUESTION, BILLING, TECHNICAL, ACCOUNT, FEATURE_REQUEST, OTHER]
+    - name: case_status
+      type: string
+      nullable: false
+      pii: false
+      description: Support case state.
+      allowedValues: [OPEN, PENDING, RESOLVED, CLOSED, ESCALATED]
+    - name: created_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Time the case was created.
+    - name: first_response_at
+      type: timestamp
+      nullable: true
+      pii: false
+      description: Time of first public support response.
+    - name: resolved_at
+      type: timestamp
+      nullable: true
+      pii: false
+      description: Time the case was resolved or closed.
+    - name: first_response_sla_target_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: First response SLA target in minutes.
+    - name: resolution_sla_target_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Resolution SLA target in minutes.
+    - name: first_response_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Minutes from case creation to first response.
+    - name: resolution_minutes
+      type: int
+      nullable: false
+      pii: false
+      description: Minutes from case creation to resolution.
+    - name: first_response_sla_breached
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether first response exceeded the SLA target.
+    - name: resolution_sla_breached
+      type: boolean
+      nullable: false
+      pii: false
+      description: Whether resolution exceeded the SLA target.
+    - name: reopened_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of times the case was reopened.
+    - name: escalation_count
+      type: int
+      nullable: false
+      pii: false
+      description: Number of support escalations.
+    - name: satisfaction_score
+      type: int
+      nullable: true
+      pii: false
+      description: Optional customer satisfaction score from 1 to 5.
+    - name: changed_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Source business timestamp for this support case state.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Original source event id for lineage.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: Bronze source record hash.
+
+quality:
+  freshnessSloMinutes: 120
+  checks:
+    - name: support_case_state_id_not_null
+      type: not_null
+      column: support_case_state_id
+    - name: support_case_state_id_unique
+      type: unique
+      columns: [support_case_state_id]
+    - name: customer_id_hash_not_null
+      type: not_null
+      column: customer_id_hash
+    - name: org_id_not_null
+      type: not_null
+      column: org_id
+
+privacy:
+  classification: PII
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: true
+  subjectKeys:
+    - name: customer_id_hash
+      column: customer_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: SUBJECT_DELETE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [DataPlatform, BI, ML, Compliance]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ApprovedMLConsumer, ComplianceConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

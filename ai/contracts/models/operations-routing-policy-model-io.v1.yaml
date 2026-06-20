@@ -1,0 +1,52 @@
+version: 1
+contract: operations_routing_policy_model_io
+owner: ai-platform
+product: enterprise-operations
+use_case: operations-routing-optimization
+model_id: operations-routing-policy-simulator-v1
+input:
+  tenant_id: string
+  policy_id: string
+  safe_exploration_budget: number
+  baseline_queue_id_optional: string
+  work_item:
+    work_item_id: string
+    work_type: string
+    priority: string
+    required_skill_ids:
+      type: array
+    expected_effort_minutes: integer
+    customer_segment_optional: string
+  queues:
+    type: array
+    item:
+      queue_id: string
+      available_agent_count: integer
+      backlog_count: integer
+      average_handle_time_minutes: integer
+      skill_ids:
+        type: array
+      max_concurrency: integer
+output:
+  model_id: string
+  assigned_queue_id: string
+  policy_score: number
+  expected_sla_success: number
+  baseline_queue_id: string
+  baseline_score_delta: number
+  exploration_budget_used: number
+  constraint_violations:
+    type: array
+  reason_codes:
+    type: array
+  requires_human_review: boolean
+sla:
+  p95_latency_ms: 250
+  fallback_required: true
+  batch_replay: daily
+governance:
+  tenant_isolation_required: true
+  safe_exploration_budget_required: true
+  no_unreviewed_adverse_routing_required: true
+  simulator_required_before_online_policy: true
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml

@@ -1,0 +1,16 @@
+version: 1
+dataset_id: support-knowledge-vector-index-contract-v1
+model_id: support-knowledge-vector-index-baseline-v1
+collection: support_knowledge_articles
+product: support-platform
+use_case_id: support-agent-assist
+corpus: platform/evaluation/corpora/support-knowledge-corpus.yaml
+collection_schema: platform/vector-store/collections/support-knowledge.yaml
+config:
+  index_id: support-knowledge-vector-index-baseline-v1
+  algorithm: deterministic_hash_embedding_baseline_v1
+thresholds:
+  chunk_coverage_min: 1.00
+  dimension_conformance_min: 1.00
+  metadata_conformance_min: 1.00
+  tenant_scope_coverage_min: 1.00

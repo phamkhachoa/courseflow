@@ -1,0 +1,16 @@
+version: 1
+ledger_id: governance-evaluation-alert-drill-ledger-v1
+owner: ai-platform
+events:
+  - event_id: governance-evaluation-alert-drill-accepted-20260617
+    occurred_at: "2026-06-17T14:30:00Z"
+    ops_status: release_gate_observable
+    failed_drill_count: 0
+    unexpected_error_count: 0
+    transition_id: governance-evaluation-alert-drill-accepted-20260617
+    evidence_refs:
+      - platform/governance/reports/governance-evaluation-service-v1.yaml
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/delivery/reports/delivery-backlog-v1.yaml
+      - platform/delivery/reports/delivery-owner-views-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html

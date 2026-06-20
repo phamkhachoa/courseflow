@@ -1,0 +1,68 @@
+version: 1
+evaluation_id: causal-uplift-v1-eval
+model_id: causal-uplift-baseline-v1
+algorithm: deterministic_two_proportion_uplift_gate
+use_case_id: enterprise-experimentation-uplift
+product: ai-platform
+owner: ai-platform
+evaluation_type: service_integrated_contract
+status: accepted_baseline
+evaluated_at: "2026-06-17"
+dataset:
+  dataset_id: causal-uplift-golden-v1
+  source: platform/evaluation/datasets/causal-uplift-golden.yaml
+  feature_contract: contracts/features/causal-experiment-features.v1.yaml
+  model_io_contract: contracts/models/causal-uplift-model-io.v1.yaml
+  snapshot_id: golden_v1
+  case_count: 3
+metrics:
+  unit_tests:
+    passed: true
+    evidence: models/causal/causal_uplift_baseline/tests/test_causal_uplift_baseline.py
+  decision_band_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  recommendation_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  reason_code_recall:
+    value: 1.00
+    threshold: 0.85
+    status: passed
+  human_review_policy_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  guardrail_stop_pass_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  deterministic_replay_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Baseline proves cross-domain treatment/control uplift, confidence and guardrail review.
+    - It covers positive lift, inconclusive lift and guardrail regression scenarios.
+    - Causal Uplift Service serves aggregate uplift evaluation behind tenant/product/use-case grants.
+    - It remains deterministic decision-support evidence, not an automated rollout or online experimentation allocator.
+service_evidence:
+  service: services/causal-uplift-service/service.yaml
+  runtime: platform/src/courseflow_ai_platform/causal_uplift_service.py
+  access_policy: platform/governance/policies/causal-uplift-access-policy.yaml
+  service_tests: services/causal-uplift-service/tests/test_service_contract.py
+  platform_tests: platform/tests/test_causal_uplift_service.py
+risks:
+  - aggregate_two_arm_only
+  - no_covariate_adjustment
+  - no_randomization_audit
+  - no_multiple_testing_correction_beyond_review_flag
+required_next_steps:
+  - connect_to_governed_experiment_assignment_snapshot
+  - add randomization and sample-ratio-mismatch checks
+  - add covariate-adjusted uplift estimator
+  - connect service metrics to experiment registry release review

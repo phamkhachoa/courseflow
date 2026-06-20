@@ -1,0 +1,981 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+target_maturity:
+  P0: L3
+  P1: L2
+  P2: L1
+reference_models:
+  - id: apache-iceberg
+    name: Apache Iceberg table specification
+    url: https://iceberg.apache.org/spec/
+    adoptedPattern: Open table format with snapshots, manifests, schema evolution and partition evolution.
+  - id: openlineage
+    name: OpenLineage object model
+    url: https://openlineage.io/docs/spec/object-model/
+    adoptedPattern: Runtime lineage modeled as jobs, runs and datasets with extensible facets.
+  - id: datahub
+    name: DataHub metadata platform
+    url: https://docs.datahub.com/docs/features
+    adoptedPattern: Discovery, lineage, profiling, governance, data contracts and collaborative metadata.
+  - id: dagster-assets
+    name: Dagster software-defined assets
+    url: https://dagster.io/glossary/software-defined-assets
+    adoptedPattern: Orchestration should model produced assets, dependencies and materialization state.
+  - id: kafka-connect
+    name: Apache Kafka Connect
+    url: https://kafka.apache.org/documentation/
+    adoptedPattern: Reusable source and sink connector model for enterprise event movement.
+  - id: dbt-semantic-layer
+    name: dbt Semantic Layer
+    url: https://docs.getdbt.com/docs/use-dbt-semantic-layer/dbt-sl
+    adoptedPattern: Centralized, governed metric definitions for consistent downstream consumption.
+  - id: feast-feature-store
+    name: Feast feature store
+    url: https://docs.feast.dev/
+    adoptedPattern: Production ML feature definition, validation and online/offline serving.
+  - id: great-expectations
+    name: Great Expectations checkpoints
+    url: https://docs.greatexpectations.io/docs/reference/api/Checkpoint_class
+    adoptedPattern: Production data validation checkpoints with validation results and actions.
+
+capabilities:
+  - id: source-onboarding
+    name: Product Source Onboarding
+    category: ingestion
+    phase: P0
+    owner: data-platform-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Register product sources, ownership, canonical topics, bridge mode, privacy and production evidence requirements.
+    enterpriseOutcome: Every product joins the foundation through the same governed source path.
+    platformScope:
+      - product onboarding
+      - source inventory
+      - canonical topic mapping
+      - source readiness
+    referenceModels:
+      - kafka-connect
+      - datahub
+    domainBindings:
+      - finance
+      - customer
+      - ml-ai
+      - enterprise-reporting
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - ml-feature-governance
+      - customer-account-health
+    productionGates:
+      - source_readiness_report_passed
+      - schema_subject_registered
+      - replay_proof_attached
+      - change_control_approved
+    requiredEvidence:
+      - source registry entry
+      - product onboarding metadata
+      - source-to-Bronze readiness report
+      - change-control evidence
+    evidenceArtifacts:
+      - path: products/README.md
+        type: product_onboarding_standard
+        purpose: Defines the repeatable product onboarding boundary.
+        requiredForCurrentLevel: true
+      - path: platform/ingestion/source-registry.yaml
+        type: source_registry
+        purpose: Registers source systems, canonical topics and production evidence requirements.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/source_registry.py
+        type: validator
+        purpose: Emits and validates source readiness evidence.
+        requiredForCurrentLevel: true
+    gaps:
+      - Production connector runtime is not deployed as live infrastructure.
+      - Several pilot sources still depend on planned bridges or normalizers.
+    nextMilestones:
+      - Deploy staging source connector and registry integration for one non-LMS product.
+      - Require source readiness evidence before enabling production Bronze ingestion.
+
+  - id: event-cdc-ingestion-runtime
+    name: Event and CDC Ingestion Runtime
+    category: ingestion
+    phase: P0
+    owner: data-platform-team
+    status: integrated_runtime
+    currentLevel: L2
+    targetLevel: L3
+    productAgnostic: true
+    description: Live Kafka, outbox, CDC and batch connector runtime for Bronze source movement.
+    enterpriseOutcome: Product data moves into the foundation reliably without direct OLTP reads by BI or ML.
+    platformScope:
+      - Kafka topics
+      - outbox relay
+      - Debezium CDC
+      - connector operations
+    referenceModels:
+      - kafka-connect
+      - openlineage
+    domainBindings:
+      - finance
+      - customer
+      - product-analytics
+      - workforce
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - product-usage-funnel
+      - workforce-training-compliance
+    productionGates:
+      - ingestion_lag_slo_green
+      - dlt_policy_enabled
+      - backpressure_test_passed
+      - offset_ledger_recorded
+      - control_tower_ingestion_runtime_passed
+    requiredEvidence:
+      - connector deployment manifest
+      - lag metrics
+      - DLT operations evidence
+      - source offset ledger
+    evidenceArtifacts:
+      - path: platform/ingestion/event-cdc-ingestion-runtime.md
+        type: production_gate_standard
+        purpose: Defines the runtime evidence contract and P0 blocker rules.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/ingestion_runtime.py
+        type: production_gate_cli
+        purpose: Normalizes runtime exports into ingestion_runtime_evidence.v1 and produces event_cdc_ingestion_runtime_report.v1.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/control_tower.py
+        type: control_tower_gate
+        purpose: Blocks production signoff when ingestion runtime evidence is missing, mismatched or failing.
+        requiredForCurrentLevel: true
+      - path: tests/test_ingestion_runtime.py
+        type: verification_suite
+        purpose: Covers local preflight, production evidence, connector lag, DLT, backpressure and stale evidence gates.
+        requiredForCurrentLevel: true
+      - path: tests/test_control_tower.py
+        type: verification_suite
+        purpose: Covers Control Tower ingestion runtime blocker, environment mismatch and CLI attachment.
+        requiredForCurrentLevel: true
+      - path: platform/environments/prod/manifest.yaml
+        type: environment_manifest
+        purpose: Declares required production runtime services and current readiness.
+        requiredForCurrentLevel: true
+      - path: platform/ingestion/local-bronze-ingestion.md
+        type: local_preflight
+        purpose: Documents local ingestion flow before live runtime exists.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/event_backbone_smoke.py
+        type: local_runtime_smoke
+        purpose: Starts local Redpanda, produces and consumes contracted finance events, then feeds consumed records into the data-plane smoke.
+        requiredForCurrentLevel: true
+      - path: tests/test_event_backbone_smoke.py
+        type: verification_suite
+        purpose: Covers local Redpanda round-trip evidence generation and downstream data-plane smoke binding.
+        requiredForCurrentLevel: true
+      - path: platform/runtime/local-event-backbone-smoke.md
+        type: local_runtime_runbook
+        purpose: Documents the local Redpanda event-backbone smoke and remaining production connector gaps.
+        requiredForCurrentLevel: true
+    gaps:
+      - Local Redpanda round-trip is wired into make ci, but Kafka Connect/Debezium or transactional-outbox source connectors are not writing Bronze in a live runtime yet.
+      - Runtime DLT, backpressure, ACL/topic and consumer lag evidence is not collected automatically from live monitoring yet.
+      - Production manifest declares topology, but deployed connector runtime still needs live environment evidence for L3.
+    nextMilestones:
+      - Wire Kafka Connect, Debezium or transactional-outbox source connectors into Bronze ingestion and ingestion_runtime_evidence.v1 generation.
+      - Attach broker ACL/topic, consumer lag, DLT, backpressure and Prometheus exporter evidence to the local runtime gate.
+      - Attach live staging and production evidence to Control Tower signoff.
+
+  - id: schema-registry-compatibility
+    name: Schema Registry and Compatibility
+    category: governance
+    phase: P0
+    owner: data-platform-team
+    status: integrated_runtime
+    currentLevel: L2
+    targetLevel: L3
+    productAgnostic: true
+    description: Enforce event schema subjects, compatibility mode and producer or normalizer compliance.
+    enterpriseOutcome: Source changes cannot silently break consumers or Bronze ingestion.
+    platformScope:
+      - JSON schema contracts
+      - subject naming
+      - backward-transitive compatibility
+      - release evidence
+    referenceModels:
+      - kafka-connect
+      - datahub
+    domainBindings:
+      - finance
+      - recommendation
+      - product-analytics
+      - compliance
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - ml-feature-governance
+      - product-usage-funnel
+    productionGates:
+      - schema_registry_report_passed
+      - producer_schema_id_present
+      - backward_transitive_ci_passed
+      - schema_registry_ops_passed
+    requiredEvidence:
+      - topic contract
+      - payload schema
+      - compatibility report
+      - schema registry operations report
+      - schema registry publication manifest
+      - external attestation for production
+    evidenceArtifacts:
+      - path: platform/ingestion/schema-registry.md
+        type: standard
+        purpose: Defines subject naming and compatibility policy.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/schema_registry.py
+        type: production_gate_cli
+        purpose: Produces local compatibility and production schema registry ops reports with signed attestation checks.
+        requiredForCurrentLevel: true
+      - path: tests/test_schema_registry.py
+        type: verification_suite
+        purpose: Covers local compatibility, production publication evidence, producer enforcement and attestation gates.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/schema_registry_runtime_smoke.py
+        type: local_runtime_smoke
+        purpose: Starts local Apicurio Registry, publishes topic payload schemas through the Confluent-compatible v7 API and verifies read-back hashes.
+        requiredForCurrentLevel: true
+      - path: tests/test_schema_registry_runtime_smoke.py
+        type: verification_suite
+        purpose: Covers Apicurio publication/read-back success and read-back hash mismatch failure handling.
+        requiredForCurrentLevel: true
+      - path: tests/test_control_tower.py
+        type: verification_suite
+        purpose: Proves Control Tower consumes schema_registry_ops_report.v1 as a P0 production gate.
+        requiredForCurrentLevel: true
+      - path: contracts/event-envelope.v1.schema.json
+        type: schema
+        purpose: Shared enterprise event envelope.
+        requiredForCurrentLevel: true
+      - path: platform/control-tower/README.md
+        type: operating_model
+        purpose: Defines schema registry operations as a Control Tower P0 blocker.
+        requiredForCurrentLevel: true
+    gaps:
+      - Local Apicurio Confluent-compatible publication and read-back are wired into make ci, but production registry authentication, authorization, HA storage and signed attestation are not deployed.
+      - Producer-side schema id enforcement is not collected from live producers; rpk schema-id encoding still needs registry root/proxy or native registry configuration.
+      - Broker/sink validation is evidence-backed, not collected from live ingestion runtime yet.
+    nextMilestones:
+      - Configure a Confluent-compatible registry root/proxy or native Redpanda registry path so live producers can use rpk --schema-id in runtime smoke.
+      - Collect producer schema id and broker/sink rejection evidence from live ingestion runtime.
+      - Deploy production registry auth/RBAC, HA storage, backup and signed publication attestation.
+      - Enforce schema_registry_ops_report.v1 in release promotion for staging/prod.
+
+  - id: bronze-lakehouse-evidence
+    name: Bronze Lakehouse Evidence
+    category: lakehouse
+    phase: P0
+    owner: data-platform-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Immutable Bronze records with source-position idempotency, hashes and offset ledger binding.
+    enterpriseOutcome: Every landed record is replayable, auditable and tied to source positions.
+    platformScope:
+      - Bronze landing
+      - source offset ledger
+      - replay idempotency
+      - quarantine evidence
+    referenceModels:
+      - apache-iceberg
+      - openlineage
+    domainBindings:
+      - finance
+      - recommendation
+      - product-analytics
+      - compliance
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - ml-feature-governance
+    productionGates:
+      - source_offset_ledger_passed
+      - quarantine_rows_within_policy
+      - iceberg_commit_evidence_present
+      - bronze_lakehouse_ops_passed
+    requiredEvidence:
+      - Bronze ingestion manifest
+      - source offset ledger
+      - source record hash bindings
+      - quarantine summary
+      - Bronze lakehouse maintenance evidence
+    evidenceArtifacts:
+      - path: platform/lakehouse/bronze-lakehouse-ops.md
+        type: production_gate_standard
+        purpose: Defines Bronze lakehouse ops report and maintenance evidence requirements.
+        requiredForCurrentLevel: true
+      - path: platform/ingestion/bronze-landing.md
+        type: standard
+        purpose: Defines Bronze landing and PII handling rules.
+        requiredForCurrentLevel: true
+      - path: platform/ingestion/source-offset-hash-idempotency.md
+        type: standard
+        purpose: Defines source offset and hash idempotency policy.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/offset_ledger.py
+        type: evidence_cli
+        purpose: Emits source offset ledger evidence.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/lakehouse_ops.py
+        type: production_gate_cli
+        purpose: Emits Bronze lakehouse operations report from offset ledgers and maintenance evidence.
+        requiredForCurrentLevel: true
+      - path: tests/test_lakehouse_ops.py
+        type: verification_suite
+        purpose: Covers local preflight, production-like ledger and maintenance gates.
+        requiredForCurrentLevel: true
+      - path: tests/test_control_tower.py
+        type: verification_suite
+        purpose: Covers Control Tower Bronze lakehouse blocker, environment mismatch and CLI attachment.
+        requiredForCurrentLevel: true
+    gaps:
+      - Iceberg sink runtime is not yet deployed as live staging or production infrastructure.
+      - Append-only enforcement and compaction can be checked from evidence artifacts but are not emitted by live runtime yet.
+    nextMilestones:
+      - Persist offset ledger and Bronze maintenance evidence to immutable evidence storage.
+      - Connect live Bronze commits to Iceberg metadata snapshots and table maintenance exporters.
+      - Enforce bronze_lakehouse_ops_report.v1 in CI/CD and release promotion for staging/prod.
+
+  - id: silver-gold-publication
+    name: Silver and Gold Publication
+    category: lakehouse
+    phase: P0
+    owner: data-platform-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Conformed Silver and business-ready Gold products with snapshot, lineage, quality and active pointer evidence.
+    enterpriseOutcome: BI, ML and reverse ETL consume only trusted data product snapshots.
+    platformScope:
+      - Silver conformance
+      - Gold marts
+      - release promotion
+      - active pointer
+    referenceModels:
+      - apache-iceberg
+      - dagster-assets
+    domainBindings:
+      - finance
+      - enterprise-reporting
+      - ml-ai
+      - customer
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - enterprise-kpi-scorecard
+      - data-product-control-tower
+      - ml-feature-governance
+    productionGates:
+      - lakehouse_snapshot_evidence_passed
+      - release_promotion_approved
+      - active_pointer_updated
+      - rollback_target_present
+      - silver_gold_publication_ops_passed
+    requiredEvidence:
+      - pipeline manifest
+      - lakehouse snapshot evidence
+      - release evidence
+      - activation manifest
+      - active pointer state
+      - rollback target evidence
+    evidenceArtifacts:
+      - path: platform/lakehouse/silver-gold-publication-ops.md
+        type: production_gate_standard
+        purpose: Defines Silver/Gold publication ops report, active pointer and rollback requirements.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/snapshot_evidence.py
+        type: evidence_cli
+        purpose: Binds Silver and Gold outputs to Iceberg snapshot metadata.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/promotion.py
+        type: activation_cli
+        purpose: Writes promotion and activation manifests with active pointer state.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/publication_ops.py
+        type: production_gate_cli
+        purpose: Emits silver_gold_publication_ops_report.v1 from release, promotion, activation and active pointer evidence.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/control_tower.py
+        type: control_tower_gate
+        purpose: Blocks production signoff when Silver/Gold publication evidence is missing, mismatched or failing.
+        requiredForCurrentLevel: true
+      - path: platform/lakehouse/iceberg-table-standards.md
+        type: standard
+        purpose: Defines Iceberg table, partition and retention standards.
+        requiredForCurrentLevel: true
+      - path: tests/test_publication_ops.py
+        type: verification_suite
+        purpose: Covers local preflight, production-like release/promotion/activation/pointer gates, drift and rollback failures.
+        requiredForCurrentLevel: true
+      - path: tests/test_control_tower.py
+        type: verification_suite
+        purpose: Covers Control Tower Silver/Gold publication blocker, environment mismatch and CLI attachment.
+        requiredForCurrentLevel: true
+    gaps:
+      - Live staging or production orchestration does not yet emit immutable publication ops evidence from actual release jobs.
+      - Active pointer and rollback checks are evidence-backed, but not enforced by CI/CD or production exposure controls.
+      - Catalog/Iceberg active snapshot drift is not collected directly from live serving runtime.
+    nextMilestones:
+      - Persist active pointer state and publication reports to immutable evidence storage.
+      - Connect publication ops to live Iceberg/catalog active snapshot exports.
+      - Enforce silver_gold_publication_ops_report.v1 in CI/CD and release promotion for staging/prod.
+
+  - id: catalog-lineage-control-plane
+    name: Catalog and Lineage Control Plane
+    category: catalog_lineage
+    phase: P0
+    owner: data-platform-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Publish metadata, lineage, ownership and runtime evidence into the enterprise catalog.
+    enterpriseOutcome: Users can discover trusted data and understand upstream/downstream impact.
+    platformScope:
+      - catalog bundle
+      - OpenLineage export
+      - publish manifest
+      - owner and steward metadata
+    referenceModels:
+      - datahub
+      - openlineage
+    domainBindings:
+      - finance
+      - enterprise-reporting
+      - compliance
+      - ml-ai
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - enterprise-kpi-scorecard
+      - ml-feature-governance
+    productionGates:
+      - catalog_publish_manifest_passed
+      - catalog_lineage_ops_passed
+      - lineage_edges_complete
+      - owner_steward_visible
+    requiredEvidence:
+      - catalog bundle
+      - OpenLineage events
+      - catalog publish manifest
+      - catalog lineage operations report
+      - publish receipt for production-like environments
+      - change-control evidence
+    evidenceArtifacts:
+      - path: platform/lineage/catalog-lineage-ops.md
+        type: production_gate_standard
+        purpose: Defines catalog lineage ops report, publish receipt and Control Tower blocker rules.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/catalog.py
+        type: catalog_export
+        purpose: Exports catalog and lineage metadata from contracts and manifests.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/openlineage.py
+        type: lineage_export
+        purpose: Exports OpenLineage-style runtime events.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/catalog_publish.py
+        type: publish_manifest
+        purpose: Produces auditable DataHub/OpenMetadata publish manifest.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/catalog_lineage_ops.py
+        type: production_gate_cli
+        purpose: Emits catalog_lineage_ops_report.v1 from catalog, publish, OpenLineage and publish receipt evidence.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/control_tower.py
+        type: data_product_control_tower_report
+        purpose: Aggregates catalog lineage ops, quality, access, release and capability evidence into a production-readiness decision report.
+        requiredForCurrentLevel: true
+      - path: tests/test_catalog_lineage_ops.py
+        type: verification_suite
+        purpose: Covers local preflight, production-like missing evidence, invalid OpenLineage and CLI behavior.
+        requiredForCurrentLevel: true
+      - path: tests/test_control_tower.py
+        type: verification_suite
+        purpose: Covers Control Tower catalog lineage ops blocker, hash drift, CLI attachment and Gold lineage materialization.
+        requiredForCurrentLevel: true
+      - path: platform/control-tower/README.md
+        type: operating_model
+        purpose: Defines the Data Product Control Tower operating view, personas, gates and escalation model.
+        requiredForCurrentLevel: true
+    gaps:
+      - Catalog publish and publish receipt are artifact-backed, not emitted by live DataHub/OpenMetadata jobs.
+      - OpenLineage events are generated from saved manifests, not collected from a live orchestrator or collector.
+      - Catalog visibility in a real UI is not proven by the local ops report.
+    nextMilestones:
+      - Push catalog bundle to DataHub or OpenMetadata in staging and persist catalog_publish_receipt.v1.
+      - Collect OpenLineage events from actual orchestration jobs and validate collector receipt evidence.
+      - Enforce catalog_lineage_ops_report.v1 in CI/CD and release promotion for staging/prod.
+
+  - id: quality-slo-release-gates
+    name: Quality, SLO and Release Gates
+    category: quality
+    phase: P0
+    owner: data-platform-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Data quality profiles, freshness, ingestion lag, evidence profile and release gate decisions.
+    enterpriseOutcome: Bad, stale or unevidenced data cannot become active enterprise data.
+    platformScope:
+      - quality profiles
+      - freshness SLO
+      - release evidence profiles
+      - operations runbooks
+    referenceModels:
+      - great-expectations
+      - dagster-assets
+    domainBindings:
+      - finance
+      - ml-ai
+      - enterprise-reporting
+      - risk-compliance
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - ml-feature-governance
+      - risk-control-exception-monitoring
+    productionGates:
+      - quality_profile_passed
+      - ingestion_lag_slo_green
+      - freshness_slo_green
+      - release_evidence_profile_passed
+      - quality_slo_release_gates_ops_passed
+    requiredEvidence:
+      - quality profile
+      - release evidence profile
+      - release evidence report
+      - quality/SLO release gates operations report
+      - runtime quality evidence
+      - SLO alert evidence
+      - SLO runbook
+    evidenceArtifacts:
+      - path: platform/quality/profiles.yaml
+        type: quality_profile_registry
+        purpose: Defines reusable quality gates by use case and output.
+        requiredForCurrentLevel: true
+      - path: platform/observability/production-slo-release-gates.md
+        type: release_gate_spec
+        purpose: Defines P0 SLO and release gate policy.
+        requiredForCurrentLevel: true
+      - path: platform/observability/quality-slo-release-gates-ops.md
+        type: operations_gate_spec
+        purpose: Defines the quality_slo_release_gates_ops_report.v1 artifact and runtime evidence contracts.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/release.py
+        type: release_gate_engine
+        purpose: Evaluates release evidence gates.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/quality_slo_ops.py
+        type: operations_gate_engine
+        purpose: Builds artifact-backed quality/SLO release gates operations reports for Control Tower.
+        requiredForCurrentLevel: true
+      - path: tests/test_quality_slo_ops.py
+        type: automated_tests
+        purpose: Proves local/prod evidence behavior, runtime freshness, writer and CLI behavior.
+        requiredForCurrentLevel: true
+      - path: tests/test_control_tower.py
+        type: automated_tests
+        purpose: Proves Control Tower consumes the quality/SLO ops report as a P0 production gate.
+        requiredForCurrentLevel: true
+    gaps:
+      - Great Expectations, Soda or dbt runtime artifacts are evidence-contract backed, not emitted by live production jobs yet.
+      - Alerting, incident burn-rate and paging state are evidence-contract backed, not pulled from live SRE systems yet.
+      - CI/CD and release promotion do not yet require quality_slo_release_gates_ops_report.v1.
+    nextMilestones:
+      - Wire Great Expectations/Soda/dbt runtime exporters to quality_runtime_evidence.v1.
+      - Wire Prometheus/Alertmanager/SRE exports to slo_alert_evidence.v1.
+      - Enforce quality_slo_release_gates_ops_report.v1 in CI/CD and release promotion for staging/prod.
+
+  - id: access-privacy-enforcement
+    name: Access, Privacy and Retention Enforcement
+    category: access_privacy
+    phase: P0
+    owner: data-platform-security
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Row-level access, masking, tokenization, audit, retention, erasure and legal-hold evidence.
+    enterpriseOutcome: Sensitive enterprise data remains isolated, auditable and compliant across products.
+    platformScope:
+      - access policies
+      - access grants
+      - retention policies
+      - external attestations
+    referenceModels:
+      - datahub
+      - dbt-semantic-layer
+    domainBindings:
+      - compliance
+      - finance
+      - customer
+      - workforce
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - enterprise-kpi-scorecard
+      - customer-account-health
+      - workforce-training-compliance
+    productionGates:
+      - access_policy_report_passed
+      - access_grant_evidence_passed
+      - retention_erasure_evidence_passed
+      - audit_identity_bound
+    requiredEvidence:
+      - access policy registry
+      - access grant registry
+      - retention policy registry
+      - signed external attestations
+    evidenceArtifacts:
+      - path: contracts/policies/access-policies.yaml
+        type: policy_registry
+        purpose: Defines access policy controls.
+        requiredForCurrentLevel: true
+      - path: governance/access-grants.yaml
+        type: grant_registry
+        purpose: Defines approved data access grants.
+        requiredForCurrentLevel: true
+      - path: contracts/policies/retention-policies.yaml
+        type: retention_registry
+        purpose: Defines retention and erasure controls.
+        requiredForCurrentLevel: true
+    gaps:
+      - Query-engine RLS and masking enforcement are not deployed.
+      - Access audit logs are generated as evidence, not collected from live query runtime.
+    nextMilestones:
+      - Bind Trino or Dremio policies to access-control decisions.
+      - Capture runtime access decisions from the serving plane.
+
+  - id: semantic-metric-serving
+    name: Semantic Metrics and Serving
+    category: semantic_serving
+    phase: P0
+    owner: enterprise-reporting-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Certified metrics and generated Trino or Dremio semantic views over approved Gold data products.
+    enterpriseOutcome: Executives and product teams use one metric definition across BI and data apps.
+    platformScope:
+      - semantic metric registry
+      - certified Gold binding
+      - view generation
+      - BI serving
+    referenceModels:
+      - dbt-semantic-layer
+      - datahub
+    domainBindings:
+      - enterprise-reporting
+      - finance
+      - product-analytics
+      - customer
+    useCaseBindings:
+      - enterprise-kpi-scorecard
+      - finance-benefit-reconciliation
+      - product-usage-funnel
+    productionGates:
+      - metric_owner_approved
+      - metric_certification_report_passed
+      - source_gold_certified
+      - semantic_view_manifest_passed
+      - metric_lineage_registered
+      - semantic_metric_serving_ops_passed
+    requiredEvidence:
+      - semantic metric registry
+      - semantic metric certification registry
+      - semantic metric certification report
+      - semantic view manifest
+      - semantic metric serving operations report
+      - semantic serving deployment evidence
+      - semantic metric usage evidence
+      - access policy evidence
+      - catalog lineage
+    evidenceArtifacts:
+      - path: platform/serving/semantic-metrics.yaml
+        type: metric_registry
+        purpose: Defines governed semantic metrics.
+        requiredForCurrentLevel: true
+      - path: governance/semantic-metric-certifications.yaml
+        type: certification_registry
+        purpose: Records maker-checker approvals, evidence, diff and impact analysis for certified metrics.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/semantic_metric_certification.py
+        type: certification_gate_engine
+        purpose: Builds semantic_metric_certification_report.v1 and validates maker-checker certification evidence.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/semantic_views.py
+        type: semantic_view_export
+        purpose: Generates Trino and Dremio view SQL manifest.
+        requiredForCurrentLevel: true
+      - path: platform/serving/semantic-metric-serving-ops.md
+        type: operations_gate_spec
+        purpose: Defines the semantic_metric_serving_ops_report.v1 artifact and serving evidence contracts.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/semantic_serving_ops.py
+        type: operations_gate_engine
+        purpose: Builds artifact-backed semantic metric serving operations reports for Control Tower.
+        requiredForCurrentLevel: true
+      - path: tests/test_semantic_serving_ops.py
+        type: automated_tests
+        purpose: Proves local/prod behavior, manifest hash binding, writer and CLI behavior.
+        requiredForCurrentLevel: true
+      - path: tests/test_semantic_metric_certification.py
+        type: automated_tests
+        purpose: Proves metric certification, maker-checker separation, diff and impact analysis checks.
+        requiredForCurrentLevel: true
+      - path: tests/test_control_tower.py
+        type: automated_tests
+        purpose: Proves Control Tower consumes the semantic serving ops report as a P0 production gate.
+        requiredForCurrentLevel: true
+    gaps:
+      - BI tool integration and metric usage analytics are evidence-contract backed, not deployed live.
+      - Semantic view deployment and smoke-test evidence is artifact-backed, not emitted by a live query-engine deployment job.
+    nextMilestones:
+      - Publish Trino semantic views to a staging query engine and persist semantic_serving_deployment_evidence.v1.
+      - Export BI/query usage telemetry into semantic_metric_usage_evidence.v1.
+
+  - id: ml-feature-store-governance
+    name: ML Feature Store Governance
+    category: ml_ai
+    phase: P1
+    owner: ml-platform-team
+    status: documented
+    currentLevel: L0
+    targetLevel: L2
+    productAgnostic: true
+    description: Govern feature datasets, point-in-time training snapshots, offline/online parity and drift or freshness gates.
+    enterpriseOutcome: ML teams can reuse trustworthy features without reading product OLTP databases.
+    platformScope:
+      - feature datasets
+      - model lineage
+      - feature freshness
+      - drift monitoring
+    referenceModels:
+      - feast-feature-store
+      - openlineage
+    domainBindings:
+      - ml-ai
+      - recommendation
+      - risk-compliance
+      - customer
+    useCaseBindings:
+      - ml-feature-governance
+      - customer-account-health
+      - risk-control-exception-monitoring
+    productionGates:
+      - point_in_time_correctness_passed
+      - offline_online_parity_checked
+      - feature_freshness_slo_green
+      - model_lineage_registered
+    requiredEvidence:
+      - feature registry
+      - training snapshot evidence
+      - online materialization evidence
+      - drift report
+    evidenceArtifacts:
+      - path: domains/ml-ai/README.md
+        type: domain_plan
+        purpose: Defines ML and AI data domain direction.
+        requiredForCurrentLevel: true
+      - path: use-cases/registry.yaml
+        type: use_case_registry
+        purpose: Registers ML feature governance as a platform use case.
+        requiredForCurrentLevel: true
+    gaps:
+      - Feast or equivalent feature registry is not implemented.
+      - Online feature serving and drift reports are planned only.
+    nextMilestones:
+      - Add feature registry scaffold and point-in-time dataset manifest.
+      - Attach model and feature lineage to catalog export.
+
+  - id: backfill-change-governance
+    name: Backfill, Replay and Change Governance
+    category: governance
+    phase: P0
+    owner: data-platform-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Govern production-impacting backfill, replay, correction, release and rollback workflows.
+    enterpriseOutcome: Historical rebuilds cannot silently corrupt finance, BI, ML or compliance outputs.
+    platformScope:
+      - change requests
+      - backfill readiness
+      - active pointer drift guard
+      - rollback evidence
+    referenceModels:
+      - apache-iceberg
+      - openlineage
+    domainBindings:
+      - finance
+      - compliance
+      - enterprise-reporting
+      - ml-ai
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - enterprise-kpi-scorecard
+      - ml-feature-governance
+    productionGates:
+      - change_control_approved
+      - backfill_readiness_passed
+      - active_pointer_matches_baseline
+      - rollback_target_verified
+    requiredEvidence:
+      - change-control evidence
+      - backfill readiness report
+      - data diff report
+      - active pointer evidence
+    evidenceArtifacts:
+      - path: governance/change-requests.yaml
+        type: change_registry
+        purpose: Registers production-impacting data platform changes.
+        requiredForCurrentLevel: true
+      - path: governance/backfill-requests.yaml
+        type: backfill_registry
+        purpose: Registers bounded backfill and replay requests.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/backfill.py
+        type: readiness_cli
+        purpose: Emits backfill readiness report with active pointer drift guard.
+        requiredForCurrentLevel: true
+    gaps:
+      - Production workflow is not integrated with a ticketing or approval system.
+      - Concurrent lock enforcement is represented as evidence, not live locking.
+    nextMilestones:
+      - Bind change requests to enterprise ITSM workflow.
+      - Enforce backfill locks in orchestration runtime.
+
+  - id: platform-runtime-iac
+    name: Platform Runtime and IaC
+    category: orchestration
+    phase: P0
+    owner: platform-engineering
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L3
+    productAgnostic: true
+    description: Deploy highly available data plane services with service identity, secrets, network, HA and DR controls.
+    enterpriseOutcome: The data platform runs as reliable enterprise infrastructure, not only local tooling.
+    platformScope:
+      - environment manifests
+      - service identity
+      - secrets
+      - HA and DR
+      - orchestration runtime
+    referenceModels:
+      - dagster-assets
+      - kafka-connect
+    domainBindings:
+      - compliance
+      - finance
+      - enterprise-reporting
+      - product-analytics
+    useCaseBindings:
+      - finance-benefit-reconciliation
+      - enterprise-kpi-scorecard
+      - product-usage-funnel
+    productionGates:
+      - prod_environment_manifest_approved
+      - runtime_iac_deployed
+      - secrets_managed
+      - dr_test_passed
+    requiredEvidence:
+      - environment manifest
+      - runtime topology
+      - IaC module registry
+      - IaC plan and apply evidence
+      - service identity audit
+      - DR exercise report
+    evidenceArtifacts:
+      - path: platform/environments/prod/manifest.yaml
+        type: environment_manifest
+        purpose: Declares production runtime expectations and current readiness.
+        requiredForCurrentLevel: true
+      - path: platform/runtime/topology.yaml
+        type: runtime_topology
+        purpose: Declares product-agnostic runtime service topology, environment bindings, Dremio/TiDB phase gates and required controls.
+        requiredForCurrentLevel: true
+      - path: platform/runtime/iac-modules.yaml
+        type: iac_module_registry
+        purpose: Maps runtime services to local/staging/prod IaC profiles and module control requirements.
+        requiredForCurrentLevel: true
+      - path: platform/runtime/evidence/README.md
+        type: runtime_evidence_contract
+        purpose: Defines machine-readable plan, apply, drift, backup, DR and health evidence required for production-like runtime readiness.
+        requiredForCurrentLevel: true
+      - path: src/enterprise_dp/runtime.py
+        type: validator
+        purpose: Validates runtime topology/IaC metadata, verifies machine-readable evidence and emits runtime readiness reports without requiring cloud access.
+        requiredForCurrentLevel: true
+      - path: platform/orchestration/README.md
+        type: orchestration_standard
+        purpose: Defines orchestration ownership and runner model.
+        requiredForCurrentLevel: true
+    gaps:
+      - IaC profiles are skeletons and have not been applied to staging or production.
+      - HA, backup and disaster recovery tests are represented as required readiness gates, not live execution evidence.
+    nextMilestones:
+      - Replace skeleton IaC profiles with provider-backed OpenTofu/Terraform modules for P0 runtime services.
+      - Attach staging plan/apply, drift, backup and DR evidence to runtime readiness reports.
+      - Enforce production runtime gates through CI/CD and release promotion workflow.
+
+  - id: cost-usage-governance
+    name: Cost and Usage Governance
+    category: cost_finops
+    phase: P1
+    owner: data-platform-team
+    status: validated_as_code
+    currentLevel: L1
+    targetLevel: L2
+    productAgnostic: true
+    description: Attribute storage, processing and query cost by product, domain, use case and pipeline.
+    enterpriseOutcome: The group can scale data usage without uncontrolled cost or stale assets.
+    platformScope:
+      - cost attribution
+      - usage metrics
+      - stale asset cleanup
+      - capacity guardrails
+    referenceModels:
+      - datahub
+      - dagster-assets
+    domainBindings:
+      - enterprise-reporting
+      - finance
+      - product-analytics
+      - compliance
+    useCaseBindings:
+      - enterprise-kpi-scorecard
+      - finance-benefit-reconciliation
+      - product-usage-funnel
+    productionGates:
+      - cost_attribution_metrics_present
+      - owner_steward_assigned
+      - stale_asset_review_scheduled
+    requiredEvidence:
+      - observability metrics
+      - catalog ownership
+      - cost summary
+    evidenceArtifacts:
+      - path: src/enterprise_dp/observability.py
+        type: metrics_export
+        purpose: Exports data platform operations and cost attribution metrics.
+        requiredForCurrentLevel: true
+      - path: platform/observability/README.md
+        type: observability_standard
+        purpose: Defines operations signal ownership.
+        requiredForCurrentLevel: true
+    gaps:
+      - Real compute, query and storage billing feeds are not integrated.
+      - Cost budget alerts and chargeback workflow are not implemented.
+    nextMilestones:
+      - Add query usage and storage inventory ingest.
+      - Add product/domain cost dashboards over Gold operations data.

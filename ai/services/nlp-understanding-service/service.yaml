@@ -1,0 +1,45 @@
+version: 1
+service_id: nlp-understanding-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_nlp_understanding_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/nlp-understanding-access-policy.yaml
+observability:
+  metrics: in_memory_analysis_error_identifier_hitl_counters
+  tenant_safety: cross_tenant_nlp_understanding_forbidden
+routes:
+  - method: POST
+    path: /v1/nlp-understanding/analyze
+    scope: internal:ai-platform:nlp-understanding:analyze
+    purpose: intent_semantic_rubric_understanding
+  - method: GET
+    path: /v1/nlp-understanding/health
+    scope: internal:ai-platform:nlp-understanding:ops
+    purpose: nlp_understanding_health
+  - method: GET
+    path: /v1/nlp-understanding/metrics
+    scope: internal:ai-platform:nlp-understanding:ops
+    purpose: nlp_understanding_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/nlp_understanding_service.py
+  model_modules:
+    - models/llm/support_agent_assist/support_agent_assist.py
+  artifacts:
+    - contracts/models/support-agent-assist-model-io.v1.yaml
+    - platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+    - platform/governance/policies/nlp-understanding-access-policy.yaml
+promotion_guardrails:
+  - route_scopes_must_match_nlp_understanding_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - direct_learner_customer_contact_account_user_email_or_phone_identifiers_must_be_rejected
+  - rubric_feedback_and_support_outputs_must_require_human_review
+  - transformer_adapter_must_preserve_same_service_contract
+  - support_agent_assist_quality_gate_must_remain_green

@@ -1,0 +1,30 @@
+version: 1
+artifact_id: course-content-vector-index-baseline-v1-snapshot
+model_id: course-content-vector-index-baseline-v1
+algorithm: deterministic_hash_embedding_baseline_v1
+model_family: vector_search
+artifact_type: vector_index_snapshot
+status: accepted_contract_baseline
+owner: ai-platform
+product: lms-courseflow
+use_case_id: lms-rag-tutor
+created_at: "2026-06-16"
+artifact_uri: platform/artifacts/vector-indexes/course-content-vector-index-baseline-v1.json
+artifact_hash:
+  algorithm: sha256
+  value: 23d30998e8511637d3af495e5760cd0edf2d6c86abee178117380004ac591fec
+lineage:
+  corpus: platform/evaluation/corpora/course-content-corpus.yaml
+  collection_schema: platform/vector-store/collections/course-content.yaml
+  evaluation_report: platform/evaluation/reports/course-content-vector-index-v1-eval.yaml
+  shadow_evaluation_report: platform/evaluation/reports/course-content-hybrid-retrieval-v1-eval.yaml
+  builder: platform/src/courseflow_ai_platform/vector_index.py
+runtime:
+  package: courseflow-ai-platform
+  optional_extras: []
+  entrypoint: courseflow_ai_platform.vector_index:build_vector_index
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  tenant_isolation_required: true
+  rollback_supported: true
+  production_serving_status: shadow_only

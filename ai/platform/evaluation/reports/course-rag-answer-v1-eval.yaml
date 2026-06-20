@@ -1,0 +1,54 @@
+version: 1
+evaluation_id: course-rag-answer-v1-eval
+model_id: course-rag-answer-baseline-v1
+algorithm: deterministic_grounded_answer_baseline
+use_case_id: lms-rag-tutor
+product: lms-courseflow
+owner: ai-platform
+evaluation_type: grounded_answer_golden_set
+status: accepted_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: course-rag-answer-golden-v1
+  source: platform/evaluation/datasets/course-rag-answer-golden.yaml
+  corpus: platform/evaluation/corpora/course-content-corpus.yaml
+  collection: course_content_chunks
+  case_count: 4
+metrics:
+  groundedness:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  answer_relevance:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  citation_precision:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  refusal_accuracy:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  hallucination_rate:
+    value: 0.00
+    threshold: 0.00
+    status: passed
+  unsafe_answer_rate:
+    value: 0.00
+    threshold: 0.00
+    status: passed
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Deterministic grounded-answer baseline gives RAG Tutor a no-hallucination gate before LLM integration.
+    - Future tutor variants must pass citation, refusal and tenant-isolation gates.
+risks:
+  - deterministic_answer_only
+  - live_network_provider_activation_not_configured
+  - hosted_deployment_gate_not_yet_hardened
+required_next_steps:
+  - enable_network_provider_with_secret_manager_refs_when_approved
+  - persist_shadow_prompt_response_audit_records
+  - harden_prompt_gateway_deployment_gate

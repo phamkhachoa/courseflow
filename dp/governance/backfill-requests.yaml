@@ -1,0 +1,101 @@
+version: 1
+registry_scope: group-enterprise-data-platform
+backfill_requests:
+  - id: backfill_finance_benefit_reconciliation_staging
+    type: backfill_replay
+    operationType: backfill
+    status: approved
+    riskLevel: high
+    targetEnvironment: staging
+    product: enterprise-commerce
+    domain: finance
+    useCase: finance-benefit-reconciliation
+    primaryOutput: gold.finance_benefit_reconciliation
+    sourceIds:
+      - enterprise-commerce-benefit-settled-outbox
+    requester: finance-analytics-po
+    requestedAt: "2026-01-17T08:30:00Z"
+    businessJustification: Rebuild the finance benefit reconciliation slice for the first governed staging close window after source-to-Bronze signoff.
+    changeTicket: CHG-DP-BF-0001
+    window:
+      eventTimeStart: "2026-01-15T09:00:00Z"
+      eventTimeEnd: "2026-01-15T10:00:00Z"
+      timezone: UTC
+      maxWindowDays: 7
+    tenantScope:
+      mode: all
+      orgIds: []
+    inputBindings:
+      - dataProduct: bronze.events_benefit_settled
+        snapshotId: iceberg-bronze-finance-benefit-settled-0001
+        offsetRanges:
+          - sourceTopic: finance.benefit_settled.v1
+            sourcePartition: 0
+            minOffset: 1
+            maxOffset: 4
+    outputDataProducts:
+      - silver.finance_benefit_transactions
+      - gold.finance_benefit_reconciliation
+    runnerId: finance.benefit_reconciliation.from_approved_bronze.v1
+    plan:
+      backfillPlanUri: evidence://backfills/finance-benefit-reconciliation/staging/plan-2026-01-17.json
+      backfillPlanHash: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+      runId: finance-benefit-reconciliation-backfill-20260115-staging
+      idempotencyStrategy: source_offset_and_snapshot_bound
+      materializationStrategy: partition_scoped_replace
+      expectedRowDelta: 4
+      maxAllowedRowDelta: 4
+      partitionScope:
+        - accounting_date=2026-01-15
+      concurrencyLockId: backfill.finance-benefit-reconciliation.20260115
+      maintenanceWindow: "2026-01-17T10:00:00Z/2026-01-17T11:00:00Z"
+      rollbackStrategy: restore_previous_active_pointer_and_snapshot
+    baseline:
+      previousReleaseId: staging-finance-recon-baseline
+      previousSnapshotId: iceberg-gold-finance-benefit-reconciliation-baseline
+      previousContentHash: sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+      activePointerUri: evidence://active-pointers/staging/gold.finance_benefit_reconciliation.json
+      activePointerHash: sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+      rollbackTarget: iceberg-gold-finance-benefit-reconciliation-baseline
+    execution:
+      codeCommitSha: abc123
+      idempotencyKey: finance-benefit-reconciliation-20260115-staging
+      dryRunRequired: true
+      expectedMaxRows: 1000000
+    evidence:
+      dryRunReportUri: evidence://backfills/finance-benefit-reconciliation/staging/dry-run-2026-01-17.json
+      dryRunReportHash: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      qualityReportUri: evidence://quality/finance-benefit-reconciliation/staging/backfill-2026-01-17.json
+      qualityReportHash: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      dataDiffReportUri: evidence://data-diff/finance-benefit-reconciliation/staging/backfill-2026-01-17.json
+      dataDiffReportHash: sha256:9999999999999999999999999999999999999999999999999999999999999999
+      snapshotEvidenceUri: evidence://snapshots/finance-benefit-reconciliation/staging/backfill-2026-01-17.json
+      snapshotEvidenceHash: sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      releaseEvidenceUri: evidence://releases/finance-benefit-reconciliation/staging/backfill-2026-01-17.json
+      releaseEvidenceHash: sha256:8888888888888888888888888888888888888888888888888888888888888888
+      sourceOffsetLedgerUri: evidence://offset-ledger/finance-benefit-settled/staging/2026-01-17.json
+      sourceOffsetLedgerHash: sha256:7777777777777777777777777777777777777777777777777777777777777777
+      changeControlEvidenceUri: evidence://change-control/CHG-DP-BF-0001.json
+      rollbackPlanUri: runbook://data-platform/backfill-rollback
+      impactAssessmentUri: evidence://change-impact/CHG-DP-BF-0001.md
+      communicationPlanUri: runbook://data-platform/backfill-consumer-communication
+    approvals:
+      - role: domain_owner
+        approver: finance-domain-owner
+        decision: approved
+        decidedAt: "2026-01-17T09:00:00Z"
+      - role: data_steward
+        approver: enterprise-data-steward
+        decision: approved
+        decidedAt: "2026-01-17T09:10:00Z"
+      - role: platform_owner
+        approver: data-platform-lead
+        decision: approved
+        decidedAt: "2026-01-17T09:20:00Z"
+    controls:
+      makerCheckerRequired: true
+      rollbackRequired: true
+      impactAssessmentRequired: true
+      communicationRequired: true
+      consumerFreezeRequired: false
+      slaHours: 24

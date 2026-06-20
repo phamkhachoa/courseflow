@@ -1,0 +1,52 @@
+version: 1
+evaluation_id: support-knowledge-vector-index-v1-eval
+model_id: support-knowledge-vector-index-baseline-v1
+algorithm: deterministic_hash_embedding_baseline_v1
+use_case_id: support-agent-assist
+product: support-platform
+owner: ai-platform
+evaluation_type: vector_index_contract
+status: accepted_contract_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: support-knowledge-vector-index-contract-v1
+  source: platform/evaluation/datasets/support-knowledge-vector-index-golden.yaml
+  corpus: platform/evaluation/corpora/support-knowledge-corpus.yaml
+  collection: support_knowledge_articles
+  case_count: 5
+metrics:
+  chunk_coverage_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  dimension_conformance_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  metadata_conformance_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  tenant_scope_coverage_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  checksum_stable:
+    value: true
+    threshold: true
+    status: passed
+  embedding_dimensions:
+    value: 768
+quality_gate:
+  status: baseline_accepted
+  notes:
+    - Support knowledge chunks now have an executable vector index contract gate.
+    - Future support RAG retrievers must preserve safe tenant/public metadata and deterministic artifact evidence.
+risks:
+  - deterministic_hash_embedding_only
+  - no_ann_vector_store_runtime_yet
+  - no_production_semantic_embedding_model_yet
+required_next_steps:
+  - add_sentence_transformer_support_embedding_model
+  - promote_vector_index_artifact_to_object_store
+  - add_ann_runtime_latency_gate

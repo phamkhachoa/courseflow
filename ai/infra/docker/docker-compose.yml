@@ -1,0 +1,88 @@
+name: courseflow-ai-platform
+
+x-recommendation-ml-build: &recommendation-ml-build
+  context: ../../..
+  dockerfile: ai/services/recommendation-ml-service/Dockerfile
+
+x-recommendation-ml-env: &recommendation-ml-env
+  SERVER_PORT: 8080
+  RECOMMENDATION_ML_DB_URL: jdbc:postgresql://postgres:5432/cf_recommendation_ml
+  RECOMMENDATION_ML_DB_USERNAME: ${RECOMMENDATION_ML_DB_USERNAME:-courseflow_ai}
+  RECOMMENDATION_ML_DB_PASSWORD: ${RECOMMENDATION_ML_DB_PASSWORD:-courseflow_ai}
+  RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET: ${RECOMMENDATION_ML_PRINCIPAL_HASH_SECRET:-courseflow-local-recommendation-ml-principal-hash-secret-change-me-32}
+  RECOMMENDATION_ML_DOCS_ENABLED: ${RECOMMENDATION_ML_DOCS_ENABLED:-true}
+  RECOMMENDATION_ML_REQUIRE_ACTIVE_MODEL_READY: ${RECOMMENDATION_ML_REQUIRE_ACTIVE_MODEL_READY:-false}
+  RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS: ${RECOMMENDATION_ML_AUTO_ACTIVATE_TRAINED_MODELS:-true}
+  RECOMMENDATION_ML_SYNC_TRAINING_ENABLED: ${RECOMMENDATION_ML_SYNC_TRAINING_ENABLED:-true}
+  COURSEFLOW_INTERNAL_JWT_ALGORITHM: ${COURSEFLOW_INTERNAL_JWT_ALGORITHM:-HS256}
+  COURSEFLOW_INTERNAL_JWT_SECRET: ${COURSEFLOW_INTERNAL_JWT_SECRET:-courseflow-local-internal-jwt-secret-change-me-32}
+  COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY: ${COURSEFLOW_INTERNAL_JWT_PUBLIC_KEY:-}
+  COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE: ${COURSEFLOW_INTERNAL_JWT_VERIFICATION_MODE:-local}
+  COURSEFLOW_INTERNAL_JWT_JWKS_URI: ${COURSEFLOW_INTERNAL_JWT_JWKS_URI:-}
+  COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS: ${COURSEFLOW_INTERNAL_JWT_JWKS_CACHE_TTL_SECONDS:-300}
+  COURSEFLOW_INTERNAL_JWT_AUDIENCE: ${COURSEFLOW_INTERNAL_JWT_AUDIENCE:-courseflow-services}
+  COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS: ${COURSEFLOW_INTERNAL_JWT_MAX_TTL_SECONDS:-900}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: courseflow-ai-postgres
+    environment:
+      POSTGRES_USER: ${RECOMMENDATION_ML_DB_USERNAME:-courseflow_ai}
+      POSTGRES_PASSWORD: ${RECOMMENDATION_ML_DB_PASSWORD:-courseflow_ai}
+      POSTGRES_DB: cf_recommendation_ml
+    ports:
+      - "${AI_POSTGRES_PORT:-15434}:5432"
+    volumes:
+      - ai-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${RECOMMENDATION_ML_DB_USERNAME:-courseflow_ai} -d cf_recommendation_ml",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  recommendation-ml-service:
+    build: *recommendation-ml-build
+    container_name: courseflow-ai-recommendation-ml-service
+    environment:
+      <<: *recommendation-ml-env
+      RECOMMENDATION_ML_RUN_MIGRATIONS: ${RECOMMENDATION_ML_RUN_MIGRATIONS:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${RECOMMENDATION_ML_SERVICE_PORT:-18088}:8080"
+
+  recommendation-ml-worker:
+    build: *recommendation-ml-build
+    container_name: courseflow-ai-recommendation-ml-worker
+    profiles:
+      - worker
+    environment:
+      <<: *recommendation-ml-env
+      RECOMMENDATION_ML_RUN_MIGRATIONS: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["courseflow-ml", "worker", "--worker-id", "recommendation-ml-worker"]
+
+  recommendation-ml-migrator:
+    build: *recommendation-ml-build
+    container_name: courseflow-ai-recommendation-ml-migrator
+    profiles:
+      - migration
+    environment:
+      <<: *recommendation-ml-env
+      RECOMMENDATION_ML_RUN_MIGRATIONS: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+volumes:
+  ai-postgres-data:

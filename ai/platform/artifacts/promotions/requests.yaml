@@ -1,0 +1,111 @@
+version: 1
+owner: ai-platform
+policy:
+  allowed_statuses:
+    - ready_for_approval
+    - waiting_for_artifact
+    - waiting_for_evaluation
+    - waiting_for_privacy_review
+    - waiting_for_simulator
+    - rejected
+    - withdrawn
+  allowed_request_types:
+    - activate
+    - promote_to_shadow
+    - promote_to_approved_baseline
+    - promote_to_active_baseline
+  allowed_requested_stages:
+    - shadow
+    - approved_baseline
+    - active_baseline
+    - active
+  ready_statuses:
+    - ready_for_approval
+requests:
+  - request_id: support-agent-assist-active-request
+    request_type: activate
+    product: support-platform
+    use_case_id: support-agent-assist
+    artifact_id: support-agent-assist-baseline-v1-source-artifact
+    artifact_manifest: platform/artifacts/manifests/support-agent-assist-baseline-v1.yaml
+    source_promotion_id: support-agent-assist-baseline-approved
+    requested_stage: active
+    status: ready_for_approval
+    submitted_by: support-product
+    business_owner: support-product
+    submitted_at: "2026-06-16"
+    required_gates:
+      - platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+      - platform/evaluation/reports/support-rag-answer-v1-eval.yaml
+    notes:
+      - Approved support baseline is ready for Admin/Ops activation review.
+
+  - request_id: lms-at-risk-baseline-shadow-request
+    request_type: promote_to_shadow
+    product: lms-courseflow
+    use_case_id: lms-at-risk-prediction
+    artifact_id: lms-at-risk-baseline-v1-source-artifact
+    requested_stage: shadow
+    status: waiting_for_artifact
+    submitted_by: courseflow-product
+    business_owner: courseflow-product
+    submitted_at: "2026-06-16"
+    required_gates:
+      - platform/evaluation/reports/lms-at-risk-baseline-v1-eval.yaml
+    blockers:
+      - artifact_manifest_missing
+      - model_card_missing
+      - evaluation_gate_missing
+    notes:
+      - Classical baseline should land before sequence deep learning.
+
+  - request_id: finance-anomaly-shadow-request
+    request_type: promote_to_shadow
+    product: billing-finance
+    use_case_id: finance-anomaly-detection
+    artifact_id: finance-anomaly-baseline-v1-source-artifact
+    requested_stage: shadow
+    status: waiting_for_evaluation
+    submitted_by: finance-product
+    business_owner: finance-product
+    submitted_at: "2026-06-16"
+    required_gates:
+      - platform/evaluation/reports/finance-anomaly-baseline-v1-eval.yaml
+    blockers:
+      - evaluation_gate_missing
+      - governed_finance_snapshot_missing
+    notes:
+      - Non-LMS anomaly model needs offline precision and false-positive gate.
+
+  - request_id: finance-document-intelligence-privacy-request
+    request_type: promote_to_shadow
+    product: billing-finance
+    use_case_id: finance-document-intelligence
+    artifact_id: finance-document-intelligence-baseline-v1-source-artifact
+    artifact_manifest: platform/artifacts/manifests/finance-document-intelligence-baseline-v1.yaml
+    requested_stage: shadow
+    status: ready_for_approval
+    submitted_by: finance-product
+    business_owner: finance-product
+    submitted_at: "2026-06-16"
+    required_gates:
+      - platform/evaluation/reports/finance-document-intelligence-v1-eval.yaml
+      - platform/governance/reports/media-privacy-review-v1.yaml
+    notes:
+      - OCR-token baseline evidence exists; raw document/image processing has approved media privacy controls before promotion review.
+
+  - request_id: operations-routing-rl-simulator-request
+    request_type: promote_to_shadow
+    product: enterprise-operations
+    use_case_id: operations-routing-optimization
+    artifact_id: operations-routing-policy-simulator-v1-source-artifact
+    artifact_manifest: platform/artifacts/manifests/operations-routing-policy-simulator-v1.yaml
+    requested_stage: shadow
+    status: ready_for_approval
+    submitted_by: operations-product
+    business_owner: operations-product
+    submitted_at: "2026-06-16"
+    required_gates:
+      - platform/evaluation/reports/operations-routing-policy-v1-eval.yaml
+    notes:
+      - Simulator-backed offline policy gate exists; approval is required before shadow promotion.

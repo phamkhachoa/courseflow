@@ -1,0 +1,106 @@
+version: 1
+owner: ai-platform
+platform_product: ai-platform
+products:
+  - id: ai-platform
+    name: Enterprise AI Platform
+    type: platform
+    status: active
+    owner: ai-platform
+    mission: Reusable enterprise AI lifecycle, governance and serving platform for many product domains.
+    artifacts:
+      - products/ai-platform/README.md
+      - platform/capabilities/registry.yaml
+      - use-cases/registry.yaml
+      - platform/coverage/business-capability-coverage.yaml
+      - platform/coverage/reports/runtime-roadmap-v1.yaml
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/data-contracts/registry.yaml
+      - platform/data-contracts/reports/data-contract-coverage-v1.yaml
+      - platform/delivery/reports/delivery-backlog-v1.yaml
+      - platform/delivery/policies/sla-policy.yaml
+      - platform/delivery/reports/delivery-sla-v1.yaml
+      - platform/delivery/reports/delivery-owner-views-v1.yaml
+      - platform/product/reports/ai-platform-product-readiness-v1.yaml
+    ai_use_cases:
+      - platform-llm-safety-gateway
+      - platform-llm-adapter-shadow-gateway
+      - enterprise-knowledge-assistant
+
+  - id: lms-courseflow
+    name: CourseFlow LMS
+    type: product
+    status: onboarded
+    owner: courseflow-product
+    artifacts:
+      - products/lms-courseflow/README.md
+    ai_use_cases:
+      - lms-ai-mentor
+      - lms-related-course-recommendation
+      - lms-semantic-search
+      - lms-auto-grading
+      - lms-at-risk-prediction
+      - lms-rag-tutor
+      - lms-knowledge-tracing
+      - lms-adaptive-path
+      - lms-cohort-demand-forecasting
+      - lms-video-transcript-summary
+      - lms-document-vision-ingestion
+
+  - id: support-platform
+    name: Support Platform
+    type: product
+    status: candidate
+    owner: support-product
+    artifacts:
+      - products/support-platform/README.md
+    ai_use_cases:
+      - support-agent-assist
+      - support-sla-risk
+      - support-speech-quality-assurance
+
+  - id: billing-finance
+    name: Billing And Finance
+    type: product
+    status: candidate
+    owner: finance-product
+    ai_use_cases:
+      - finance-anomaly-detection
+      - finance-reconciliation-assistant
+      - finance-payment-fraud-scoring
+      - finance-document-intelligence
+
+  - id: identity-risk
+    name: Identity And Access Risk
+    type: product
+    status: candidate
+    owner: identity-platform
+    ai_use_cases:
+      - identity-access-risk-scoring
+
+  - id: enterprise-commerce
+    name: Enterprise Commerce
+    type: product
+    status: candidate
+    owner: commerce-product
+    ai_use_cases:
+      - commerce-personalization
+      - commerce-semantic-catalog-search
+
+  - id: hris-workforce
+    name: HRIS Workforce
+    type: product
+    status: candidate
+    owner: workforce-product
+    ai_use_cases:
+      - workforce-skill-intelligence
+
+  - id: enterprise-operations
+    name: Enterprise Operations
+    type: product
+    status: candidate
+    owner: operations-product
+    ai_use_cases:
+      - operations-demand-forecasting
+      - operations-visual-quality-inspection
+      - operations-routing-optimization

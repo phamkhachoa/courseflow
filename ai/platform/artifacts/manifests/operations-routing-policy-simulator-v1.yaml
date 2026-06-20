@@ -1,0 +1,31 @@
+version: 1
+artifact_id: operations-routing-policy-simulator-v1-source-artifact
+model_id: operations-routing-policy-simulator-v1
+algorithm: deterministic_constrained_routing_policy_simulator
+model_family: contextual_bandit
+artifact_type: source_algorithm
+status: runtime_library_baseline
+owner: ai-platform
+product: enterprise-operations
+use_case_id: operations-routing-optimization
+created_at: "2026-06-17"
+artifact_uri: models/bandit_rl/routing_policy_simulator/routing_policy_simulator.py
+artifact_hash:
+  algorithm: sha256
+  value: 1344f2a68069c06586a8613790af868e870be7bb9ccda47babbe9d711dbc6b82
+lineage:
+  model_code: models/bandit_rl/routing_policy_simulator/routing_policy_simulator.py
+  feature_contract: contracts/features/operations-routing-features.v1.yaml
+  model_io_contract: contracts/models/operations-routing-policy-model-io.v1.yaml
+  model_card: platform/model-registry/model-cards/operations-routing-policy-simulator-v1.md
+  evaluation_report: platform/evaluation/reports/operations-routing-policy-v1-eval.yaml
+runtime:
+  package: routing_policy_simulator
+  optional_extras: []
+  entrypoint: routing_policy_simulator:RoutingPolicySimulator
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  human_in_the_loop_required: true
+  safe_exploration_budget_required: true
+  online_policy_auto_activate_allowed: false
+  rollback_supported: true

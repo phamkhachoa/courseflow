@@ -1,0 +1,47 @@
+version: 1
+service_id: routing-policy-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_routing_policy_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/routing-policy-access-policy.yaml
+observability:
+  metrics: in_memory_recommendation_error_identifier_constraint_exploration_counters
+  tenant_safety: cross_tenant_routing_policy_forbidden
+routes:
+  - method: POST
+    path: /v1/routing-policy/recommend
+    scope: internal:ai-platform:routing-policy:recommend
+    purpose: constrained_routing_policy_recommendation
+  - method: GET
+    path: /v1/routing-policy/health
+    scope: internal:ai-platform:routing-policy:ops
+    purpose: routing_policy_health
+  - method: GET
+    path: /v1/routing-policy/metrics
+    scope: internal:ai-platform:routing-policy:ops
+    purpose: routing_policy_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/routing_policy_service.py
+  model_modules:
+    - models/bandit_rl/routing_policy_simulator/routing_policy_simulator.py
+  artifacts:
+    - contracts/features/operations-routing-features.v1.yaml
+    - contracts/models/operations-routing-policy-model-io.v1.yaml
+    - platform/evaluation/reports/operations-routing-policy-v1-eval.yaml
+    - platform/artifacts/manifests/operations-routing-policy-simulator-v1.yaml
+promotion_guardrails:
+  - route_scopes_must_match_routing_policy_access_policy
+  - principals_must_be_product_use_case_and_tenant_scoped
+  - direct_agent_customer_learner_or_contact_identifiers_must_be_rejected
+  - constraint_violations_must_require_human_review
+  - online_policy_activation_must_remain_forbidden
+  - safe_exploration_budget_must_remain_bounded
+  - routing_policy_quality_gate_must_remain_green

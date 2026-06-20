@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://enterprise.local/dp/contracts/events/customer.account.changed.v1.schema.json",
+  "title": "Customer Account Changed Event Payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventType",
+    "orgId",
+    "accountId",
+    "customerIdHash",
+    "externalAccountIdHash",
+    "accountType",
+    "lifecycleStage",
+    "accountStatus",
+    "marketSegment",
+    "regionCode",
+    "consentStatus",
+    "mrrCents",
+    "openOpportunityCount",
+    "openSupportCaseCount",
+    "productUsageScore",
+    "healthSignalScore",
+    "riskLevel",
+    "sourceSystemRecordIdHash",
+    "changedAt"
+  ],
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "enum": ["CUSTOMER_ACCOUNT_CHANGED"]
+    },
+    "orgId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "accountId": {
+      "type": "string",
+      "minLength": 6,
+      "maxLength": 120
+    },
+    "customerIdHash": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "externalAccountIdHash": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "accountType": {
+      "type": "string",
+      "enum": ["BUSINESS", "INDIVIDUAL", "PUBLIC_SECTOR", "PARTNER", "UNKNOWN"]
+    },
+    "lifecycleStage": {
+      "type": "string",
+      "enum": ["PROSPECT", "TRIAL", "ACTIVE_CUSTOMER", "EXPANSION", "RENEWAL", "DORMANT", "CHURNED"]
+    },
+    "accountStatus": {
+      "type": "string",
+      "enum": ["ACTIVE", "INACTIVE", "TRIAL", "AT_RISK", "CHURNED", "SUSPENDED"]
+    },
+    "marketSegment": {
+      "type": "string",
+      "enum": ["SMB", "MID_MARKET", "ENTERPRISE", "PUBLIC_SECTOR", "PARTNER", "UNKNOWN"]
+    },
+    "regionCode": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 32
+    },
+    "consentStatus": {
+      "type": "string",
+      "enum": ["OPTED_IN", "OPTED_OUT", "UNKNOWN", "NOT_APPLICABLE"]
+    },
+    "mrrCents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "openOpportunityCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "openSupportCaseCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "productUsageScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "healthSignalScore": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "riskLevel": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    },
+    "sourceSystemRecordIdHash": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128
+    },
+    "changedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlationTags": {
+      "type": ["object", "null"],
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "maxProperties": 30
+    }
+  }
+}

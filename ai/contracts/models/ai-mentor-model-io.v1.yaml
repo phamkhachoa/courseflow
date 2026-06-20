@@ -1,0 +1,91 @@
+version: 1
+contract: ai_mentor_model_io
+owner: ai-platform
+models:
+  recommendation:
+    input:
+      tenant_id: string
+      course_id: uuid
+      learner_context_optional: object
+      limit: integer
+    output:
+      recommendations:
+        type: array
+        item:
+          course_id: uuid
+          rank: integer
+          score: number
+          reason_code: string
+          model_version: string
+    sla:
+      p95_latency_ms: 500
+      fallback_required: true
+
+  semantic_search:
+    input:
+      tenant_id: string
+      query: string
+      learner_context_optional: object
+      limit: integer
+    output:
+      results:
+        type: array
+        item:
+          source_id: uuid
+          source_type: string
+          score: number
+          snippet: string
+          citation: string
+    sla:
+      p95_latency_ms: 800
+      fallback_required: true
+
+  rag_tutor:
+    input:
+      tenant_id: string
+      question: string
+      course_id: uuid
+      conversation_id: uuid
+    output:
+      answer: string
+      citations:
+        type: array
+      confidence: number
+      refusal_reason_optional: string
+    sla:
+      p95_latency_ms: 5000
+      fallback_required: true
+      require_citations: true
+
+  auto_grading:
+    input:
+      tenant_id: string
+      submission_id: uuid
+      rubric_id: uuid
+      answer_text: string
+    output:
+      suggested_score: number
+      confidence: number
+      rubric_breakdown: object
+      feedback: string
+      requires_human_review: boolean
+    sla:
+      p95_latency_ms: 10000
+      final_grade_write_allowed: false
+
+  at_risk_prediction:
+    input:
+      tenant_id: string
+      learner_principal_hash: string
+      course_id: uuid
+      feature_snapshot_at: timestamp
+    output:
+      risk_score: number
+      risk_band: string
+      reason_codes:
+        type: array
+      recommended_actions:
+        type: array
+    sla:
+      p95_latency_ms: 300
+      batch_refresh: daily

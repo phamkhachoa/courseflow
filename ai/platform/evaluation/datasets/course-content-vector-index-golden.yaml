@@ -1,0 +1,16 @@
+version: 1
+dataset_id: course-content-vector-index-contract-v1
+model_id: course-content-vector-index-baseline-v1
+collection: course_content_chunks
+product: lms-courseflow
+use_case_id: lms-rag-tutor
+corpus: platform/evaluation/corpora/course-content-corpus.yaml
+collection_schema: platform/vector-store/collections/course-content.yaml
+config:
+  index_id: course-content-vector-index-baseline-v1
+  algorithm: deterministic_hash_embedding_baseline_v1
+thresholds:
+  chunk_coverage_min: 1.00
+  dimension_conformance_min: 1.00
+  metadata_conformance_min: 1.00
+  tenant_scope_coverage_min: 1.00

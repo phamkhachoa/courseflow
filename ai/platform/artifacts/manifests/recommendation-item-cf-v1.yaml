@@ -1,0 +1,30 @@
+version: 1
+artifact_id: recommendation-item-cf-v1-source-artifact
+model_id: recommendation-item-cf-v1
+algorithm: IMPLICIT_ITEM_CF_V1
+model_family: recommender_systems
+artifact_type: source_algorithm
+status: active_baseline
+owner: ai-platform
+product: lms-courseflow
+use_case_id: lms-related-course-recommendation
+created_at: "2026-06-16"
+artifact_uri: services/recommendation-ml-service/src/courseflow_ml/training/implicit_cf.py
+artifact_hash:
+  algorithm: sha256
+  value: 882ddc2e11f03f9667afc6d4ede2c42c207136ec089337224b716317fdec29ed
+lineage:
+  service: services/recommendation-ml-service
+  feature_contract: contracts/features/lms-learning-features.v1.yaml
+  model_io_contract: contracts/models/ai-mentor-model-io.v1.yaml
+  model_card: platform/model-registry/model-cards/recommendation-item-cf-v1.md
+  evaluation_report: platform/evaluation/reports/recommendation-item-cf-v1-eval.yaml
+runtime:
+  package: courseflow-recommendation-ml-service
+  optional_extras: []
+  entrypoint: courseflow_ml.training.implicit_cf:ImplicitItemCfTrainer
+governance:
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
+  quality_gate: platform/evaluation/quality-gates/ai-mentor-gates.yaml
+  rollback_supported: true
+  human_in_the_loop_required: false

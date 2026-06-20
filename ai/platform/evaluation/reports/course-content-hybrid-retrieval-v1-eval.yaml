@@ -1,0 +1,50 @@
+version: 1
+evaluation_id: course-content-hybrid-retrieval-v1-eval
+model_id: course-content-hybrid-retriever-shadow-v1
+algorithm: lexical_plus_deterministic_vector_shadow
+use_case_id: lms-rag-tutor
+product: lms-courseflow
+owner: ai-platform
+evaluation_type: hybrid_retrieval_shadow
+status: accepted_shadow_baseline
+evaluated_at: "2026-06-16"
+dataset:
+  dataset_id: course-content-hybrid-retrieval-shadow-v1
+  source: platform/evaluation/datasets/course-content-hybrid-retrieval-golden.yaml
+  corpus: platform/evaluation/corpora/course-content-corpus.yaml
+  collection: course_content_chunks
+  case_count: 4
+metrics:
+  lexical_recall_at_3:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  vector_recall_at_3:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  hybrid_recall_at_3:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  hybrid_not_worse_than_lexical_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+  tenant_isolation_rate:
+    value: 1.00
+    threshold: 1.00
+    status: passed
+quality_gate:
+  status: shadow_baseline_accepted
+  notes:
+    - Hybrid course retrieval is evaluated beside lexical retrieval before production serving.
+    - Future semantic vector retrievers must be no worse than lexical on golden recall and tenant isolation.
+risks:
+  - deterministic_hash_vector_only
+  - no_ann_runtime_yet
+  - no_online_query_latency_gate_yet
+required_next_steps:
+  - add_sentence_transformer_course_embedding_model
+  - add_ann_runtime_latency_gate
+  - persist_course_hybrid_retriever_artifact

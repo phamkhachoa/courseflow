@@ -1,0 +1,108 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-release-governance-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  release_governance_status: enterprise_adoption_slo_release_governance_attached
+  slo_status: adoption_slo_published
+  adoption_status: adoption_monitored
+  enterprise_pattern_status: enterprise_pattern_expanded
+  adoption_pct: 100
+  target_adoption_pct: 100
+  objective_count: 5
+  met_objective_count: 5
+  failed_objective_count: 0
+  release_gate_count: 5
+  attached_release_gate_count: 5
+  failed_release_gate_count: 0
+  review_cadence_days: 30
+  non_lms_blueprint_count: 5
+  non_lms_product_count: 4
+  taxonomy_area_count: 9
+  evaluation_gate_count: 36
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  target_adoption_pct: 100
+  min_non_lms_blueprint_count: 5
+  min_non_lms_product_count: 4
+  min_taxonomy_area_count: 8
+  min_evaluation_gate_count: 30
+  max_raw_identifier_count: 0
+  release_governance_review_cadence_days: 30
+action_queue:
+  attached:
+  - enterprise-adoption-slo-published-release-governance-gate
+  - enterprise-adoption-slo-objectives-release-governance-gate
+  - enterprise-adoption-slo-enterprise-span-release-governance-gate
+  - enterprise-adoption-slo-owner-cadence-release-governance-gate
+  - enterprise-adoption-slo-tenant-safety-release-governance-gate
+  blocked: []
+  next_actions:
+  - exercise_enterprise_release_gate_pattern_adoption_slo_release_governance_drill
+release_gates:
+- gate_id: enterprise-adoption-slo-published-release-governance-gate
+  gate_type: slo_publication
+  owner_role: SA AI Platform + Admin/Ops
+  target: slo_status=adoption_slo_published
+  observed: slo_status=adoption_slo_published
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: enterprise-adoption-slo-objectives-release-governance-gate
+  gate_type: slo_objectives
+  owner_role: SA AI Platform + SA AI Engineer
+  target: met_objective_count == objective_count;failed_objective_count=0
+  observed: met=5/5;failed=0
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: enterprise-adoption-slo-enterprise-span-release-governance-gate
+  gate_type: enterprise_span
+  owner_role: PO/BA + SA AI Platform
+  target: non_lms_blueprint_count>=5;non_lms_product_count>=4;taxonomy_area_count>=8;evaluation_gate_count>=30
+  observed: non_lms_blueprint_count=5;non_lms_product_count=4;taxonomy_area_count=9;evaluation_gate_count=36
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: enterprise-adoption-slo-owner-cadence-release-governance-gate
+  gate_type: owner_cadence
+  owner_role: PO/BA + Admin/Ops
+  target: target_adoption_pct>=100;review_cadence_days<=30
+  observed: target_adoption_pct=100;review_cadence_days=30
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html
+- gate_id: enterprise-adoption-slo-tenant-safety-release-governance-gate
+  gate_type: tenant_safety
+  owner_role: Governance Reviewer
+  target: tenant_safe=true;raw_identifier_count=0
+  observed: tenant_safe=true;raw_identifier_count=0
+  attached: true
+  validation_errors: []
+  evidence_refs:
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-slo-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-adoption-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/operations/reports/admin-ops-dashboard-v1.html

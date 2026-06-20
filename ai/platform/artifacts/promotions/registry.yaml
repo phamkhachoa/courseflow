@@ -1,0 +1,83 @@
+version: 1
+owner: ai-platform
+policy:
+  maker_checker_required: true
+  readiness:
+    max_gate_age_days: 30
+    stale_gate_blocks_release: true
+    max_artifact_age_days: 90
+    stale_artifact_blocks_release: true
+  require_rollback_target_for:
+    - approved_baseline
+    - active_baseline
+    - active
+  allowed_stages:
+    - shadow
+    - approved_baseline
+    - active_baseline
+    - active
+    - deprecated
+    - rejected
+promotions:
+  - promotion_id: recommendation-item-cf-v1-active-baseline
+    artifact_id: recommendation-item-cf-v1-source-artifact
+    artifact_manifest: platform/artifacts/manifests/recommendation-item-cf-v1.yaml
+    product: lms-courseflow
+    use_case_id: lms-related-course-recommendation
+    stage: active_baseline
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: "2026-06-16"
+    rollback_target_artifact_id: recommendation-item-cf-v1-source-artifact
+    required_gates:
+      - platform/evaluation/reports/recommendation-item-cf-v1-eval.yaml
+    notes:
+      - Active baseline remains the rollback target until a stronger recommender candidate is approved.
+
+  - promotion_id: support-agent-assist-baseline-approved
+    artifact_id: support-agent-assist-baseline-v1-source-artifact
+    artifact_manifest: platform/artifacts/manifests/support-agent-assist-baseline-v1.yaml
+    product: support-platform
+    use_case_id: support-agent-assist
+    stage: approved_baseline
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: "2026-06-16"
+    rollback_target_artifact_id: support-agent-assist-baseline-v1-source-artifact
+    required_gates:
+      - platform/evaluation/reports/support-agent-assist-baseline-v1-eval.yaml
+      - platform/evaluation/reports/support-rag-answer-v1-eval.yaml
+    notes:
+      - Approved baseline requires human review and does not allow external auto-send.
+
+  - promotion_id: course-content-vector-index-shadow
+    artifact_id: course-content-vector-index-baseline-v1-snapshot
+    artifact_manifest: platform/artifacts/manifests/course-content-vector-index-baseline-v1.yaml
+    product: lms-courseflow
+    use_case_id: lms-rag-tutor
+    stage: shadow
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: "2026-06-16"
+    rollback_target_artifact_id: course-content-vector-index-baseline-v1-snapshot
+    required_gates:
+      - platform/evaluation/reports/course-content-vector-index-v1-eval.yaml
+      - platform/evaluation/reports/course-content-hybrid-retrieval-v1-eval.yaml
+    notes:
+      - Shadow only; not production serving until semantic embedding and ANN runtime gates exist.
+
+  - promotion_id: support-knowledge-vector-index-shadow
+    artifact_id: support-knowledge-vector-index-baseline-v1-snapshot
+    artifact_manifest: platform/artifacts/manifests/support-knowledge-vector-index-baseline-v1.yaml
+    product: support-platform
+    use_case_id: support-agent-assist
+    stage: shadow
+    requested_by: ai-engineering
+    approved_by: governance-reviewer
+    approved_at: "2026-06-16"
+    rollback_target_artifact_id: support-knowledge-vector-index-baseline-v1-snapshot
+    required_gates:
+      - platform/evaluation/reports/support-knowledge-vector-index-v1-eval.yaml
+      - platform/evaluation/reports/support-knowledge-hybrid-retrieval-v1-eval.yaml
+    notes:
+      - Shadow only; keeps non-LMS retrieval artifact on the same promotion path.

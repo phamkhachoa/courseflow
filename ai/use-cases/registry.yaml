@@ -1,0 +1,818 @@
+version: 1
+owner: ai-platform
+platform_product: ai-platform
+use_cases:
+  - id: platform-llm-safety-gateway
+    name: LLM Safety Gateway
+    status: baseline_implemented
+    phase: 1
+    product: ai-platform
+    model: prompt-safety-baseline-v1
+    model_family:
+      - llm
+      - genai
+      - rules
+      - evaluation
+      - deterministic_baseline
+    dependencies:
+      - contracts/prompts/llm-prompt-envelope.v1.yaml
+      - platform/prompt-safety/redaction-policy.yaml
+      - platform/evaluation/datasets/prompt-safety-golden.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    business_kpis:
+      - pii_leakage_findings
+      - unsafe_prompt_block_rate
+      - llm_cost_budget_adherence
+    capabilities:
+      - prompt_redaction
+      - tenant_context_filtering
+      - cost_budget_gate
+      - prompt_response_audit_policy
+      - governance_release_gate
+    governance:
+      human_in_the_loop: required_for_external_or_high_impact_outputs
+
+  - id: platform-llm-adapter-shadow-gateway
+    name: LLM Adapter Shadow Gateway
+    status: shadow_gate_implemented
+    phase: 1
+    product: ai-platform
+    model: llm-adapter-shadow-gateway-v1
+    model_family:
+      - llm
+      - genai
+      - rag
+      - evaluation
+      - deterministic_baseline
+    dependencies:
+      - platform/governance/policies/prompt-gateway-access-policy.yaml
+      - platform/evaluation/datasets/llm-adapter-shadow-gateway-golden.yaml
+      - platform/evaluation/reports/llm-adapter-shadow-gateway-v1-eval.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    business_kpis:
+      - prompt_gateway_pre_call_coverage
+      - blocked_generation_skip_rate
+      - grounded_shadow_answer_rate
+    capabilities:
+      - prompt_gateway_bound_adapter_shadow_eval
+      - blocked_prompt_generation_skip
+      - grounded_answer_after_gateway
+      - tenant_safe_context_filtering
+      - governance_shadow_release_gate
+    governance:
+      human_in_the_loop: required_for_all_shadow_outputs
+
+  - id: lms-ai-mentor
+    name: CourseFlow AI Mentor
+    status: proposed
+    phase: 0
+    type: umbrella
+    product: lms-courseflow
+    product_owner: courseflow-po
+    business_kpis:
+      - course_completion_rate
+      - recommendation_ctr
+      - search_success_rate
+      - dropout_rate
+      - grading_time_saved
+    modules:
+      - recommendation
+      - semantic_search
+      - at_risk_prediction
+      - knowledge_tracing
+      - adaptive_learning_path
+      - auto_grading
+      - rag_tutor
+      - content_generation
+      - speech_video_ai
+      - ai_governance
+
+  - id: lms-related-course-recommendation
+    name: Related Course Recommendation
+    status: active_baseline
+    phase: 0
+    product: lms-courseflow
+    service: services/recommendation-ml-service
+    model_family:
+      - classical_ml
+      - recommender_systems
+      - future_deep_learning
+    current_algorithm: IMPLICIT_ITEM_CF_V1
+    metrics:
+      - recall_at_k
+      - ndcg_at_k
+      - ctr
+      - enrollment_conversion
+
+  - id: lms-semantic-search
+    name: Semantic Search And Course Cold-start
+    status: service_integrated_baseline
+    phase: 1
+    product: lms-courseflow
+    service: services/nlp-understanding-service
+    model_family:
+      - embeddings
+      - vector_search
+      - nlp
+      - transformer
+    dependencies:
+      - contracts/features/lms-learning-features.v1.yaml
+      - platform/vector-store/collections/course-content.yaml
+      - services/nlp-understanding-service/service.yaml
+      - platform/governance/policies/nlp-understanding-access-policy.yaml
+      - services/retrieval-service/service.yaml
+
+  - id: lms-auto-grading
+    name: Auto-grading And Feedback
+    status: service_integrated_baseline
+    phase: 1
+    product: lms-courseflow
+    service: services/nlp-understanding-service
+    model_family:
+      - nlp
+      - transformer
+      - llm
+      - genai
+      - evaluation
+    dependencies:
+      - contracts/features/lms-learning-features.v1.yaml
+      - services/nlp-understanding-service/service.yaml
+      - platform/governance/policies/nlp-understanding-access-policy.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    capabilities:
+      - rubric_feedback
+      - semantic_answer_understanding
+      - human_reviewed_grading_assist
+      - governance_release_gate
+    governance:
+      human_in_the_loop: required_for_final_grade
+      direct_learner_identifier_submission: forbidden
+
+  - id: lms-at-risk-prediction
+    name: Learner At-risk Prediction
+    status: service_integrated_baseline
+    phase: 1
+    product: lms-courseflow
+    service: services/sequence-risk-service
+    model: sequence-risk-baseline-v1
+    model_family:
+      - classical_ml
+      - sequence_deep_learning
+    baseline_first: true
+    dependencies:
+      - contracts/features/lms-learning-features.v1.yaml
+      - contracts/models/sequence-risk-model-io.v1.yaml
+      - platform/evaluation/datasets/sequence-risk-baseline-golden.yaml
+      - platform/artifacts/manifests/sequence-risk-baseline-v1.yaml
+      - services/sequence-risk-service/service.yaml
+      - platform/governance/policies/sequence-risk-access-policy.yaml
+    business_kpis:
+      - dropout_rate
+      - intervention_acceptance_rate
+      - course_completion_rate
+    governance:
+      direct_learner_identifier_submission: forbidden
+      human_in_the_loop: required_for_medium_or_high_risk_intervention
+
+  - id: lms-rag-tutor
+    name: RAG AI Tutor
+    status: service_integrated_baseline
+    phase: 2
+    product: lms-courseflow
+    service: services/rag-answer-service
+    model_family:
+      - rag
+      - llm
+      - embeddings
+      - retrieval
+    dependencies:
+      - platform/vector-store/collections/course-content.yaml
+      - platform/evaluation/datasets/course-rag-answer-golden.yaml
+      - platform/evaluation/reports/course-rag-answer-v1-eval.yaml
+      - services/rag-answer-service/service.yaml
+      - platform/governance/policies/rag-answer-access-policy.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    requires:
+      - lms-semantic-search
+    business_kpis:
+      - grounded_answer_acceptance_rate
+      - citation_precision
+      - tutor_deflection_rate
+    capabilities:
+      - grounded_course_qa
+      - citation_enforcement
+      - insufficient_context_refusal
+      - human_reviewed_tutor_answer
+      - governance_release_gate
+    governance:
+      human_in_the_loop: required_for_baseline_answers
+      direct_learner_identifier_submission: forbidden
+      external_auto_send_allowed: false
+
+  - id: lms-knowledge-tracing
+    name: Knowledge Tracing
+    status: service_integrated_baseline
+    phase: 3
+    product: lms-courseflow
+    service: services/sequence-risk-service
+    model: sequence-risk-baseline-v1
+    model_family:
+      - deep_learning
+      - transformer
+      - edtech_ai
+    dependencies:
+      - contracts/features/lms-learning-features.v1.yaml
+      - contracts/models/sequence-risk-model-io.v1.yaml
+      - services/sequence-risk-service/service.yaml
+      - platform/governance/policies/sequence-risk-access-policy.yaml
+    data_gap:
+      - skill_level_question_attempts
+      - question_to_skill_mapping
+    governance:
+      direct_learner_identifier_submission: forbidden
+      human_in_the_loop: required_for_intervention
+
+  - id: lms-adaptive-path
+    name: Adaptive Learning Path
+    status: proposed
+    phase: 3
+    product: lms-courseflow
+    model_family:
+      - optimization
+      - contextual_bandit
+      - reinforcement_learning
+    dependency:
+      - lms-knowledge-tracing
+      - lms-related-course-recommendation
+
+  - id: lms-video-transcript-summary
+    name: Video Transcript And Lesson Summary
+    status: service_integrated_baseline
+    phase: 3
+    product: lms-courseflow
+    service: services/media-intelligence-service
+    model: speech-quality-baseline-v1
+    model_family:
+      - speech
+      - nlp
+      - llm
+      - multimodal
+    dependencies:
+      - contracts/features/speech-audio-features.v1.yaml
+      - contracts/models/speech-quality-model-io.v1.yaml
+      - services/media-intelligence-service/service.yaml
+      - platform/governance/policies/media-intelligence-access-policy.yaml
+      - platform/governance/reports/media-privacy-review-v1.yaml
+    business_kpis:
+      - transcript_coverage_rate
+      - lesson_search_success_rate
+      - accessibility_completion_rate
+    capabilities:
+      - automatic_speech_recognition
+      - transcript_chaptering
+      - lecture_summary
+      - searchable_video_segments
+    governance:
+      privacy_review: approved_for_transcript_segment_baseline
+      raw_audio_adapter_status: approved_controls_not_yet_implemented_as_service_route
+
+  - id: lms-document-vision-ingestion
+    name: Document Vision Ingestion
+    status: service_integrated_baseline
+    phase: 3
+    product: lms-courseflow
+    service: services/media-intelligence-service
+    model: finance-document-intelligence-baseline-v1
+    model_family:
+      - computer_vision
+      - multimodal
+      - nlp
+      - retrieval
+    dependencies:
+      - contracts/features/finance-document-intelligence-features.v1.yaml
+      - contracts/models/finance-document-intelligence-model-io.v1.yaml
+      - services/media-intelligence-service/service.yaml
+      - platform/governance/policies/media-intelligence-access-policy.yaml
+      - platform/governance/reports/media-privacy-review-v1.yaml
+    business_kpis:
+      - content_ingestion_time_saved
+      - ocr_quality_score
+      - instructor_content_reuse_rate
+    capabilities:
+      - ocr_for_course_materials
+      - diagram_and_slide_extraction
+      - visual_content_metadata
+      - grounded_document_retrieval
+    governance:
+      privacy_review: approved_for_bounded_ocr_token_baseline
+      raw_document_adapter_status: approved_controls_not_yet_implemented_as_service_route
+
+  - id: support-agent-assist
+    name: Support Agent Assist
+    status: baseline_implemented
+    phase: 1
+    product: support-platform
+    service: services/rag-answer-service
+    model: support-agent-assist-baseline-v1
+    model_family:
+      - llm
+      - rag
+      - classification
+      - deterministic_baseline
+    dependencies:
+      - contracts/features/support-case-features.v1.yaml
+      - contracts/models/support-agent-assist-model-io.v1.yaml
+      - platform/vector-store/collections/support-knowledge.yaml
+      - platform/evaluation/reports/support-rag-answer-v1-eval.yaml
+      - services/rag-answer-service/service.yaml
+      - platform/governance/policies/rag-answer-access-policy.yaml
+      - services/nlp-understanding-service/service.yaml
+      - platform/governance/policies/nlp-understanding-access-policy.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    business_kpis:
+      - first_response_time
+      - resolution_time
+      - agent_quality_score
+    capabilities:
+      - case_summary
+      - intent_classification
+      - suggested_reply
+      - knowledge_article_retrieval
+      - grounded_support_qa
+      - citation_enforcement
+      - nlp_intent_understanding
+      - governance_release_gate
+    governance:
+      human_in_the_loop: required_for_external_reply
+      external_auto_send_allowed: false
+
+  - id: support-sla-risk
+    name: Support SLA Risk Prediction
+    status: runtime_library_baseline
+    phase: 1
+    product: support-platform
+    model: support-sla-risk-baseline-v1
+    model_family:
+      - classical_ml
+      - sequence_deep_learning
+      - deterministic_baseline
+    dependencies:
+      - contracts/features/support-case-features.v1.yaml
+      - contracts/models/support-sla-risk-model-io.v1.yaml
+      - platform/evaluation/datasets/support-sla-risk-golden.yaml
+      - platform/artifacts/manifests/support-sla-risk-baseline-v1.yaml
+    business_kpis:
+      - sla_breach_rate
+      - escalation_precision
+    capabilities:
+      - breach_probability
+      - escalation_reason_codes
+      - next_best_action
+    governance:
+      human_in_the_loop: required_for_escalation
+
+  - id: finance-anomaly-detection
+    name: Finance Anomaly Detection
+    status: proposed
+    phase: 1
+    product: billing-finance
+    model_family:
+      - classical_ml
+      - anomaly_detection
+    business_kpis:
+      - anomaly_precision
+      - false_positive_rate
+      - reconciliation_time_saved
+    capabilities:
+      - transaction_anomaly_score
+      - reason_codes
+      - audit_evidence_link
+
+  - id: finance-reconciliation-assistant
+    name: Finance Reconciliation Assistant
+    status: proposed
+    phase: 2
+    product: billing-finance
+    model_family:
+      - llm
+      - retrieval
+      - rules
+    business_kpis:
+      - reconciliation_cycle_time
+      - manual_touch_reduction
+    capabilities:
+      - discrepancy_summary
+      - evidence_retrieval
+      - suggested_adjustment_draft
+    governance:
+      human_in_the_loop: required_for_financial_adjustment
+
+  - id: identity-access-risk-scoring
+    name: Identity Access Risk Scoring
+    status: proposed
+    phase: 2
+    product: identity-risk
+    model_family:
+      - graph_ml
+      - anomaly_detection
+      - classical_ml
+    business_kpis:
+      - risky_access_detection_precision
+      - access_review_time_saved
+    capabilities:
+      - entitlement_anomaly_score
+      - peer_group_outlier_detection
+      - access_review_reason_codes
+    governance:
+      human_in_the_loop: required_for_access_revocation
+
+  - id: commerce-personalization
+    name: Commerce Personalization
+    status: proposed
+    phase: 2
+    product: enterprise-commerce
+    model_family:
+      - recommender_systems
+      - contextual_bandit
+      - embeddings
+    business_kpis:
+      - click_through_rate
+      - conversion_rate
+      - average_order_value
+    capabilities:
+      - next_best_offer
+      - personalized_ranking
+      - exploration_budget
+
+  - id: commerce-semantic-catalog-search
+    name: Commerce Semantic Catalog Search
+    status: proposed
+    phase: 1
+    product: enterprise-commerce
+    model_family:
+      - embeddings
+      - vector_search
+      - nlp
+    business_kpis:
+      - search_success_rate
+      - zero_result_rate
+    capabilities:
+      - product_embedding_index
+      - semantic_query_retrieval
+      - synonym_and_intent_matching
+
+  - id: workforce-skill-intelligence
+    name: Workforce Skill Intelligence
+    status: proposed
+    phase: 3
+    product: hris-workforce
+    model_family:
+      - embeddings
+      - knowledge_graph
+      - recommendation
+    business_kpis:
+      - internal_mobility_match_rate
+      - skill_gap_closure_rate
+    capabilities:
+      - skill_inference
+      - role_skill_gap
+      - learning_path_recommendation
+
+  - id: enterprise-knowledge-assistant
+    name: Enterprise Knowledge Assistant
+    status: service_integrated_baseline
+    phase: 2
+    product: ai-platform
+    service: services/rag-answer-service
+    model_family:
+      - llm
+      - rag
+      - retrieval
+      - embeddings
+      - knowledge_graph
+      - rules
+    business_kpis:
+      - knowledge_lookup_time_saved
+      - grounded_answer_acceptance_rate
+      - policy_escalation_reduction
+    dependencies:
+      - services/rag-answer-service/service.yaml
+      - platform/governance/policies/rag-answer-access-policy.yaml
+      - platform/vector-store/collections/course-content.yaml
+      - platform/vector-store/collections/support-knowledge.yaml
+      - platform/evaluation/reports/course-rag-answer-v1-eval.yaml
+      - platform/evaluation/reports/support-rag-answer-v1-eval.yaml
+      - services/nlp-understanding-service/service.yaml
+      - platform/governance/policies/nlp-understanding-access-policy.yaml
+    capabilities:
+      - grounded_enterprise_qa
+      - citation_enforcement
+      - policy_relationship_reasoning
+      - human_review_for_high_impact_answers
+      - insufficient_context_refusal
+      - semantic_query_understanding
+    governance:
+      human_in_the_loop: required_for_high_impact_policy_or_financial_answers
+      direct_user_or_account_identifier_submission: forbidden
+      external_auto_send_allowed: false
+
+  - id: lms-cohort-demand-forecasting
+    name: LMS Cohort Demand Forecasting
+    status: service_integrated_baseline
+    phase: 2
+    product: lms-courseflow
+    service: services/forecasting-service
+    model: operations-demand-forecast-baseline-v1
+    model_family:
+      - time_series_forecasting
+      - causal_inference
+      - simulation
+    dependencies:
+      - contracts/models/operations-demand-forecast-model-io.v1.yaml
+      - services/forecasting-service/service.yaml
+      - platform/governance/policies/forecasting-access-policy.yaml
+    business_kpis:
+      - cohort_capacity_forecast_accuracy
+      - instructor_allocation_efficiency
+      - enrollment_plan_error_rate
+    capabilities:
+      - enrollment_forecast
+      - capacity_what_if_simulation
+      - campaign_lift_analysis
+    governance:
+      human_in_the_loop: required_for_staffing_or_sla_impacting_action
+      direct_learner_student_or_contact_ids: forbidden
+      automated_capacity_change_allowed: false
+
+  - id: lms-intervention-effectiveness
+    name: LMS Intervention Effectiveness
+    status: service_integrated_baseline
+    phase: 2
+    product: lms-courseflow
+    service: services/causal-uplift-service
+    model: causal-uplift-baseline-v1
+    model_family:
+      - causal_inference
+      - simulation
+      - evaluation
+      - classical_ml
+    dependencies:
+      - contracts/features/causal-experiment-features.v1.yaml
+      - contracts/models/causal-uplift-model-io.v1.yaml
+      - platform/evaluation/datasets/causal-uplift-golden.yaml
+      - platform/artifacts/manifests/causal-uplift-baseline-v1.yaml
+      - services/causal-uplift-service/service.yaml
+      - platform/governance/policies/causal-uplift-access-policy.yaml
+    business_kpis:
+      - intervention_outcome_lift
+      - course_completion_lift
+      - learner_guardrail_regression_rate
+    capabilities:
+      - treatment_control_uplift
+      - intervention_effectiveness_review
+      - guardrail_regression_stop
+      - human_review_for_learner_impact
+    governance:
+      human_in_the_loop: required_for_learner_impacting_rollout
+      direct_learner_student_customer_or_contact_ids: forbidden
+      online_activation_requires_shadow_review: true
+      automated_rollout_allowed: false
+
+  - id: support-speech-quality-assurance
+    name: Support Speech Quality Assurance
+    status: service_integrated_baseline
+    phase: 3
+    product: support-platform
+    service: services/media-intelligence-service
+    model: speech-quality-baseline-v1
+    model_family:
+      - speech
+      - nlp
+      - llm
+      - classification
+    dependencies:
+      - contracts/features/speech-audio-features.v1.yaml
+      - contracts/models/speech-quality-model-io.v1.yaml
+      - services/media-intelligence-service/service.yaml
+      - platform/governance/policies/media-intelligence-access-policy.yaml
+      - platform/governance/reports/media-privacy-review-v1.yaml
+      - services/nlp-understanding-service/service.yaml
+      - platform/governance/policies/nlp-understanding-access-policy.yaml
+    business_kpis:
+      - qa_review_time_saved
+      - compliance_finding_rate
+      - agent_coaching_acceptance_rate
+    capabilities:
+      - call_transcript
+      - speaker_diarization
+      - call_quality_summary
+      - compliance_phrase_detection
+    governance:
+      privacy_review: approved_for_transcript_segment_baseline
+      raw_audio_adapter_status: approved_controls_not_yet_implemented_as_service_route
+
+  - id: finance-payment-fraud-scoring
+    name: Finance Payment Fraud Scoring
+    status: service_integrated_baseline
+    phase: 2
+    product: billing-finance
+    service: services/payment-fraud-service
+    supporting_services:
+      - services/graph-entity-service
+    model: finance-payment-fraud-baseline-v1
+    model_family:
+      - classical_ml
+      - anomaly_detection
+      - graph_ml
+    dependencies:
+      - contracts/features/finance-payment-risk-features.v1.yaml
+      - contracts/models/finance-payment-fraud-model-io.v1.yaml
+      - platform/evaluation/datasets/finance-payment-fraud-golden.yaml
+      - platform/artifacts/manifests/finance-payment-fraud-baseline-v1.yaml
+      - services/payment-fraud-service/service.yaml
+      - services/graph-entity-service/service.yaml
+      - platform/governance/policies/payment-fraud-access-policy.yaml
+      - platform/governance/policies/graph-entity-access-policy.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    business_kpis:
+      - fraud_precision
+      - chargeback_loss_reduction
+      - false_positive_rate
+    capabilities:
+      - payment_risk_score
+      - fraud_reason_codes
+      - entity_link_analysis
+      - graph_evidence_triage
+      - governance_release_gate
+    governance:
+      human_in_the_loop: required_for_payment_hold_or_account_action
+      direct_payment_account_counterparty_device_ids: forbidden
+      direct_graph_entity_identifiers: forbidden
+      automated_adverse_payment_or_account_action: forbidden
+
+  - id: finance-document-intelligence
+    name: Finance Document Intelligence
+    status: service_integrated_baseline
+    phase: 2
+    product: billing-finance
+    service: services/media-intelligence-service
+    model: finance-document-intelligence-baseline-v1
+    model_family:
+      - computer_vision
+      - multimodal
+      - retrieval
+      - nlp
+    dependencies:
+      - contracts/features/finance-document-intelligence-features.v1.yaml
+      - contracts/models/finance-document-intelligence-model-io.v1.yaml
+      - platform/evaluation/datasets/finance-document-intelligence-golden.yaml
+      - platform/artifacts/manifests/finance-document-intelligence-baseline-v1.yaml
+      - services/media-intelligence-service/service.yaml
+      - platform/governance/policies/media-intelligence-access-policy.yaml
+      - platform/governance/reports/media-privacy-review-v1.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    business_kpis:
+      - invoice_extraction_accuracy
+      - reconciliation_cycle_time
+      - manual_document_touch_reduction
+    capabilities:
+      - invoice_ocr
+      - receipt_field_extraction
+      - evidence_linked_document_search
+      - exception_reason_codes
+      - governance_release_gate
+    governance:
+      privacy_review: approved_for_bounded_ocr_token_baseline
+      raw_document_processing: not_allowed_in_baseline
+      raw_document_adapter_status: approved_controls_not_yet_implemented_as_service_route
+      human_in_the_loop: required_for_financial_adjustment
+
+  - id: operations-demand-forecasting
+    name: Operations Demand Forecasting
+    status: service_integrated_baseline
+    phase: 2
+    product: enterprise-operations
+    service: services/forecasting-service
+    model: operations-demand-forecast-baseline-v1
+    model_family:
+      - time_series_forecasting
+      - causal_inference
+      - simulation
+    dependencies:
+      - contracts/features/operations-demand-features.v1.yaml
+      - contracts/models/operations-demand-forecast-model-io.v1.yaml
+      - platform/evaluation/datasets/operations-demand-forecast-golden.yaml
+      - platform/artifacts/manifests/operations-demand-forecast-baseline-v1.yaml
+      - services/forecasting-service/service.yaml
+      - platform/governance/policies/forecasting-access-policy.yaml
+    business_kpis:
+      - demand_forecast_accuracy
+      - staffing_plan_error_rate
+      - capacity_incident_reduction
+    capabilities:
+      - ticket_or_workload_forecast
+      - capacity_scenario_simulation
+      - intervention_lift_estimation
+    governance:
+      human_in_the_loop: required_for_staffing_or_sla_impacting_action
+      automated_capacity_change_allowed: false
+
+  - id: operations-visual-quality-inspection
+    name: Operations Visual Quality Inspection
+    status: proposed_optional
+    phase: 3
+    product: enterprise-operations
+    model_family:
+      - computer_vision
+      - multimodal
+      - anomaly_detection
+    business_kpis:
+      - defect_detection_precision
+      - inspection_time_saved
+      - false_alarm_rate
+    capabilities:
+      - image_quality_check
+      - defect_localization
+      - visual_anomaly_score
+    governance:
+      privacy_review: required_before_image_or_video_processing
+
+  - id: operations-routing-optimization
+    name: Operations Routing Optimization
+    status: service_integrated_baseline
+    phase: 3
+    product: enterprise-operations
+    service: services/routing-policy-service
+    model: operations-routing-policy-simulator-v1
+    model_family:
+      - optimization
+      - contextual_bandit
+      - reinforcement_learning
+      - simulation
+    dependencies:
+      - contracts/features/operations-routing-features.v1.yaml
+      - contracts/models/operations-routing-policy-model-io.v1.yaml
+      - platform/evaluation/datasets/operations-routing-policy-golden.yaml
+      - platform/artifacts/manifests/operations-routing-policy-simulator-v1.yaml
+      - services/routing-policy-service/service.yaml
+      - platform/governance/policies/routing-policy-access-policy.yaml
+      - services/governance-evaluation-service/service.yaml
+      - platform/governance/policies/governance-evaluation-access-policy.yaml
+    business_kpis:
+      - routing_success_rate
+      - average_handle_time
+      - intervention_outcome_lift
+    capabilities:
+      - next_best_queue
+      - constrained_assignment_policy
+      - offline_policy_evaluation
+      - safe_exploration_budget
+      - governance_release_gate
+    governance:
+      human_in_the_loop: required_for_constraint_violation_or_online_activation
+      direct_agent_customer_or_contact_ids: forbidden
+      online_policy_activation_allowed: false
+      simulator_required: true
+      simulator_baseline_available: true
+      online_activation_requires_shadow_review: true
+
+  - id: enterprise-experimentation-uplift
+    name: Enterprise Experimentation Uplift
+    status: service_integrated_baseline
+    phase: 2
+    product: ai-platform
+    service: services/causal-uplift-service
+    model: causal-uplift-baseline-v1
+    model_family:
+      - causal_inference
+      - simulation
+      - evaluation
+      - contextual_bandit
+    dependencies:
+      - contracts/features/causal-experiment-features.v1.yaml
+      - contracts/models/causal-uplift-model-io.v1.yaml
+      - platform/evaluation/datasets/causal-uplift-golden.yaml
+      - platform/artifacts/manifests/causal-uplift-baseline-v1.yaml
+      - services/causal-uplift-service/service.yaml
+      - platform/governance/policies/causal-uplift-access-policy.yaml
+    business_kpis:
+      - experiment_lift_confidence
+      - guardrail_regression_rate
+      - promotion_review_cycle_time
+    capabilities:
+      - cross_domain_ab_test_review
+      - uplift_decision_gate
+      - guardrail_stop_recommendation
+      - shadow_review_before_rollout
+    governance:
+      human_in_the_loop: required_for_high_impact_rollout
+      direct_learner_customer_user_or_contact_ids: forbidden
+      online_activation_requires_shadow_review: true
+      automated_rollout_allowed: false

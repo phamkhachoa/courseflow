@@ -1,0 +1,62 @@
+version: 1
+report_id: ai-platform-product-readiness-freshness-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+route:
+  path: /v1/model-serving/product-readiness
+  registered: true
+  runtime_status_code: 200
+summary:
+  freshness_status: current
+  static_snapshot_status: current
+  runtime_report_id: ai-platform-product-readiness-v1
+  runtime_generated_at: '2026-06-17'
+  runtime_readiness_status: stakeholder_ready_with_followups
+  static_report_id: ai-platform-product-readiness-v1
+  static_generated_at: '2026-06-17'
+  static_readiness_status: stakeholder_ready_with_followups
+  required_spectrum_count: 8
+  covered_required_spectrum_count: 8
+  extended_module_count: 6
+  runtime_serving_metrics_connected: true
+  runtime_serving_request_count: 1
+  runtime_serving_audit_record_count: 1
+  runtime_serving_error_count: 0
+  runtime_serving_audit_failure_count: 0
+  failed_check_count: 0
+source_reports:
+- platform/product/reports/ai-platform-product-readiness-v1.yaml
+- platform/coverage/reports/ai-module-catalog-v1.yaml
+- platform/coverage/reports/ai-capability-taxonomy-v1.yaml
+- services/model-serving-service/service.yaml
+checks:
+- check_id: static_snapshot_current
+  status: passed
+  reason: Checked-in product readiness snapshot is current.
+  evidence_refs:
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- check_id: runtime_route_reachable
+  status: passed
+  reason: /v1/model-serving/product-readiness returned 200 after probe invocation
+    200.
+  evidence_refs:
+  - platform/src/courseflow_ai_platform/model_serving_adapter.py
+  - services/model-serving-service/service.yaml
+- check_id: runtime_serving_metrics_live
+  status: passed
+  reason: 1 runtime requests, 1 audit records, 0 errors and 0 audit failures.
+  evidence_refs:
+  - platform/src/courseflow_ai_platform/model_audit.py
+  - platform/src/courseflow_ai_platform/model_serving.py
+- check_id: static_runtime_gate_alignment
+  status: passed
+  reason: Static and runtime readiness gate summaries align.
+  evidence_refs:
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+  - platform/src/courseflow_ai_platform/product_readiness.py
+- check_id: required_ai_spectrum_runtime_ready
+  status: passed
+  reason: 8/8 required spectrum areas covered; 6 extended modules.
+  evidence_refs:
+  - platform/coverage/reports/ai-module-catalog-v1.yaml
+  - platform/coverage/reports/ai-capability-taxonomy-v1.yaml

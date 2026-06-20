@@ -1,0 +1,44 @@
+version: 1
+control_id: raw-media-storage-boundary-v1
+status: accepted_control
+owner: ai-platform-governance
+applies_to_reviews:
+  - finance-document-raw-ocr-review
+  - speech-audio-raw-asr-diarization-review
+control_ids:
+  - raw_media_storage_boundary
+media_types:
+  - pdf_document
+  - document_image
+  - audio
+  - video
+requirements:
+  storage_boundary: governed_raw_media_workspace
+  tenant_isolation: required
+  encryption_at_rest: required
+  encryption_in_transit: required
+  direct_public_uri_storage: forbidden
+  derived_artifact_boundary: redacted_feature_store_only
+  retention_days_max: 30
+  deletion_export_impact_review: required
+allowed_access_roles:
+  - Governance Reviewer
+  - Data Platform Custodian
+  - Approved Product Operator
+audit:
+  event_required: true
+  fields:
+    - tenant_id
+    - product
+    - use_case_id
+    - review_id
+    - media_type
+    - processing_mode
+    - principal_hash
+    - retention_expires_at
+evidence_refs:
+  - platform/governance/policies/media-privacy-review-policy.yaml
+  - platform/governance/requests/media-privacy-review-requests.yaml
+  - contracts/features/finance-document-intelligence-features.v1.yaml
+  - contracts/features/speech-audio-features.v1.yaml
+

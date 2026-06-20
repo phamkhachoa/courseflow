@@ -1,0 +1,425 @@
+version: 1
+owner: ai-platform
+taxonomy: enterprise-ai-model-families
+families:
+  - id: classical_ml
+    name: Classical ML
+    category: predictive_ml
+    maturity: baseline_ready
+    methods:
+      - logistic_regression
+      - random_forest
+      - gradient_boosting
+      - xgboost_lightgbm
+      - calibrated_ensembles
+    use_cases:
+      - churn_or_dropout_prediction
+      - risk_scoring
+      - anomaly_triage
+      - tabular_classification
+
+  - id: recommender_systems
+    name: Recommender Systems
+    category: ranking_personalization
+    maturity: baseline_implemented
+    aliases:
+      - recommendation
+    methods:
+      - item_collaborative_filtering
+      - matrix_factorization
+      - bpr
+      - two_tower_retrieval
+      - sequential_recommendation
+    use_cases:
+      - course_recommendation
+      - next_best_offer
+      - learning_path_recommendation
+
+  - id: deep_learning
+    name: Deep Learning
+    category: representation_learning
+    maturity: planned
+    aliases:
+      - future_deep_learning
+    methods:
+      - multilayer_perceptron
+      - neural_collaborative_filtering
+      - representation_learning
+      - transfer_learning
+    use_cases:
+      - learner_behavior_modeling
+      - ranking
+      - multimodal_understanding
+
+  - id: sequence_deep_learning
+    name: Sequence Deep Learning
+    category: representation_learning
+    maturity: planned
+    methods:
+      - lstm
+      - gru
+      - temporal_cnn
+      - sequence_autoencoder
+    use_cases:
+      - clickstream_risk_prediction
+      - session_intent_prediction
+      - time_ordered_recommendation
+
+  - id: transformer
+    name: Transformer Models
+    category: foundation_architecture
+    maturity: planned
+    methods:
+      - encoder_transformer
+      - decoder_transformer
+      - sequence_to_sequence_transformer
+      - adapter_tuning
+    use_cases:
+      - knowledge_tracing
+      - text_understanding
+      - sequence_ranking
+
+  - id: nlp
+    name: NLP
+    category: language_ai
+    maturity: planned
+    methods:
+      - text_classification
+      - named_entity_recognition
+      - sentiment_analysis
+      - topic_modeling
+      - summarization
+    use_cases:
+      - semantic_search
+      - support_intent
+      - content_quality_review
+
+  - id: embeddings
+    name: Embeddings
+    category: retrieval_ai
+    maturity: planned
+    methods:
+      - sentence_embeddings
+      - document_embeddings
+      - product_embeddings
+      - multilingual_embeddings
+      - embedding_finetuning
+    use_cases:
+      - semantic_search
+      - cold_start_recommendation
+      - skill_matching
+
+  - id: vector_search
+    name: Vector Search
+    category: retrieval_ai
+    maturity: planned
+    methods:
+      - approximate_nearest_neighbor
+      - hybrid_search
+      - metadata_filtering
+      - reranking
+    use_cases:
+      - course_content_retrieval
+      - knowledge_base_retrieval
+      - catalog_search
+
+  - id: retrieval
+    name: Retrieval
+    category: retrieval_ai
+    maturity: planned
+    methods:
+      - keyword_search
+      - semantic_retrieval
+      - hybrid_retrieval
+      - reranking
+      - evidence_linking
+    use_cases:
+      - reconciliation_evidence
+      - agent_assist
+      - grounded_answers
+
+  - id: rag
+    name: Retrieval Augmented Generation
+    category: generative_ai
+    maturity: planned
+    methods:
+      - chunking
+      - retrieval_grounding
+      - reranked_context
+      - citation_enforcement
+      - answer_guardrails
+    use_cases:
+      - ai_tutor
+      - support_agent_assist
+      - policy_qa
+
+  - id: llm
+    name: Large Language Models
+    category: generative_ai
+    maturity: baseline_ready
+    methods:
+      - structured_prompting
+      - tool_calling
+      - function_calling
+      - fine_tuning
+      - eval_driven_prompting
+    use_cases:
+      - summarization
+      - drafting
+      - grading_feedback
+      - reasoning_assistants
+
+  - id: genai
+    name: Generative AI
+    category: generative_ai
+    maturity: baseline_ready
+    methods:
+      - text_generation
+      - rubric_generation
+      - quiz_generation
+      - synthetic_data_generation
+      - controlled_generation
+    use_cases:
+      - course_content_generation
+      - reply_drafting
+      - study_aid_generation
+
+  - id: computer_vision
+    name: Computer Vision
+    category: multimodal_ai
+    maturity: optional_privacy_review
+    methods:
+      - image_classification
+      - object_detection
+      - ocr
+      - document_vision
+      - video_event_detection
+    use_cases:
+      - document_extraction
+      - visual_quality_check
+      - proctoring_only_after_privacy_review
+
+  - id: speech
+    name: Speech AI
+    category: multimodal_ai
+    maturity: optional_privacy_review
+    methods:
+      - automatic_speech_recognition
+      - speaker_diarization
+      - speech_summarization
+      - text_to_speech
+    use_cases:
+      - lecture_transcript
+      - call_center_summary
+      - accessibility
+
+  - id: multimodal
+    name: Multimodal AI
+    category: multimodal_ai
+    maturity: planned
+    methods:
+      - vision_language_models
+      - audio_text_models
+      - document_understanding
+      - cross_modal_retrieval
+    use_cases:
+      - video_learning_assistant
+      - document_intelligence
+      - rich_support_diagnostics
+
+  - id: reinforcement_learning
+    name: Reinforcement Learning
+    category: decision_ai
+    maturity: simulator_required
+    methods:
+      - offline_rl
+      - policy_evaluation
+      - constrained_policy_learning
+      - safe_exploration
+    use_cases:
+      - adaptive_learning_path
+      - dynamic_intervention_policy
+      - resource_allocation
+
+  - id: contextual_bandit
+    name: Contextual Bandit
+    category: decision_ai
+    maturity: planned
+    methods:
+      - epsilon_greedy
+      - thompson_sampling
+      - ucb
+      - offline_policy_evaluation
+    use_cases:
+      - content_exploration
+      - next_best_action
+      - recommendation_exploration
+
+  - id: optimization
+    name: Optimization
+    category: decision_ai
+    maturity: planned
+    methods:
+      - linear_programming
+      - constraint_solver
+      - heuristic_search
+      - multi_objective_optimization
+    use_cases:
+      - learning_path_planning
+      - scheduling
+      - allocation
+
+  - id: anomaly_detection
+    name: Anomaly Detection
+    category: risk_ai
+    maturity: planned
+    methods:
+      - isolation_forest
+      - robust_statistics
+      - autoencoder
+      - graph_outlier_detection
+    use_cases:
+      - finance_anomaly_detection
+      - access_risk
+      - fraud_triage
+
+  - id: graph_ml
+    name: Graph ML
+    category: relational_ai
+    maturity: planned
+    methods:
+      - graph_features
+      - node_embeddings
+      - graph_neural_networks
+      - link_prediction
+    use_cases:
+      - entitlement_risk
+      - skill_network
+      - fraud_ring_detection
+
+  - id: knowledge_graph
+    name: Knowledge Graph
+    category: relational_ai
+    maturity: planned
+    methods:
+      - ontology
+      - entity_resolution
+      - graph_reasoning
+      - semantic_relationships
+    use_cases:
+      - skill_taxonomy
+      - course_prerequisites
+      - policy_relationships
+
+  - id: time_series_forecasting
+    name: Time Series Forecasting
+    category: forecasting_ai
+    maturity: planned
+    methods:
+      - arima
+      - prophet
+      - temporal_fusion_transformer
+      - probabilistic_forecasting
+    use_cases:
+      - demand_forecasting
+      - capacity_planning
+      - incident_volume_prediction
+
+  - id: causal_inference
+    name: Causal Inference
+    category: decision_science
+    maturity: planned
+    methods:
+      - uplift_modeling
+      - difference_in_differences
+      - causal_forest
+      - propensity_score_matching
+    use_cases:
+      - intervention_lift
+      - learning_program_effectiveness
+      - experiment_analysis
+
+  - id: simulation
+    name: Simulation
+    category: decision_science
+    maturity: planned
+    methods:
+      - synthetic_environment
+      - what_if_simulation
+      - monte_carlo
+      - policy_sandbox
+    use_cases:
+      - rl_safety_testing
+      - capacity_stress_test
+      - rollout_planning
+
+  - id: classification
+    name: Classification
+    category: task_pattern
+    maturity: baseline_ready
+    methods:
+      - rule_baseline
+      - supervised_classifier
+      - llm_classifier
+      - calibrated_thresholding
+    use_cases:
+      - support_intent
+      - risk_labeling
+      - content_moderation
+
+  - id: rules
+    name: Rules And Policy Engine
+    category: task_pattern
+    maturity: baseline_ready
+    methods:
+      - deterministic_rules
+      - policy_constraints
+      - guardrail_checks
+      - approval_workflow
+    use_cases:
+      - financial_adjustment_guardrails
+      - human_review_policy
+      - fallback_decisions
+
+  - id: deterministic_baseline
+    name: Deterministic Baseline
+    category: task_pattern
+    maturity: baseline_implemented
+    methods:
+      - keyword_baseline
+      - heuristic_baseline
+      - fixed_template
+      - golden_set_gate
+    use_cases:
+      - support_agent_assist_baseline
+      - quality_gate_reference
+      - migration_baseline
+
+  - id: evaluation
+    name: AI Evaluation
+    category: platform_capability
+    maturity: active_as_tooling
+    methods:
+      - golden_dataset
+      - offline_metric
+      - llm_judge_future
+      - regression_gate
+      - source_manifest
+    use_cases:
+      - model_promotion
+      - prompt_regression
+      - evidence_governance
+
+  - id: edtech_ai
+    name: EdTech AI
+    category: domain_ai
+    maturity: planned
+    methods:
+      - knowledge_tracing
+      - mastery_estimation
+      - prerequisite_graph
+      - adaptive_practice
+    use_cases:
+      - learner_mastery
+      - adaptive_learning
+      - skill_gap_detection

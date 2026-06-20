@@ -1,5 +1,6 @@
 package edu.courseflow.analytics.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -111,6 +112,60 @@ public final class RecommendationDtos {
             Instant generatedAt,
             String engine,
             String fallbackReason
+    ) {
+    }
+
+    public record MaterializeRecommendationArtifactRequestDto(
+            @Valid @NotNull RecommendationArtifactDto artifact,
+            Boolean forceReplace
+    ) {
+    }
+
+    public record RecommendationArtifactDto(
+            Integer artifactVersion,
+            @NotBlank String artifactType,
+            @NotBlank String modelVersion,
+            @NotBlank String status,
+            @NotBlank String algorithm,
+            @NotNull Instant generatedAt,
+            RecommendationArtifactDpSnapshotDto dpSnapshot,
+            RecommendationArtifactMetricsDto metrics,
+            @NotEmpty List<@Valid RecommendationArtifactRowDto> recommendations
+    ) {
+    }
+
+    public record RecommendationArtifactDpSnapshotDto(
+            List<String> snapshotIds,
+            String trainingPath,
+            String trainingContentHash,
+            String manifestPath,
+            String manifestContentHash,
+            Integer rowCount,
+            Integer acceptedInteractionCount,
+            Integer rejectedRowCount
+    ) {
+    }
+
+    public record RecommendationArtifactMetricsDto(
+            Integer eventCount,
+            Integer principalCount,
+            Integer courseCount,
+            Integer pairCount,
+            Double qualityScore,
+            Integer minSupport,
+            Integer maxRelatedPerCourse
+    ) {
+    }
+
+    public record RecommendationArtifactRowDto(
+            @NotNull UUID courseId,
+            @NotNull UUID relatedCourseId,
+            Integer rank,
+            double score,
+            double similarity,
+            int supportCount,
+            String reasonCode,
+            String modelVersion
     ) {
     }
 }

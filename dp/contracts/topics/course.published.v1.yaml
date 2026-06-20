@@ -1,0 +1,51 @@
+contractVersion: 1
+topic:
+  name: course.published.v1
+  domain: workforce
+  product: lms-courseflow
+  domainOwner: lms-domain-council
+  ownerTeam: data-platform
+  dataSteward: enterprise-data-steward
+  sourceServices:
+    - course-service
+  description: Course publication events emitted when a course becomes available in the catalog.
+  status: ACTIVE
+
+schema:
+  format: JSON_SCHEMA
+  compatibility: BACKWARD_TRANSITIVE
+  envelopeSchema: contracts/event-envelope.v1.schema.json
+  payloadSchema: contracts/events/course.published.v1.schema.json
+
+privacy:
+  classification: INTERNAL
+  dataResidency: REGION_CONTROLLED
+  containsPii: false
+  tenantIsolation: REQUIRED
+  retentionDays: 1095
+  erasureSupported: false
+  subjectKeys: []
+  erasureMode: NONE
+  legalHoldPolicy: standard_legal_hold_check
+  rawPayloadPolicy: NON_PERSONAL_RAW_PAYLOAD
+
+ingestion:
+  bronzeTarget: bronze.events_course_published
+  partitionStrategy: event_date/source_service/org_id
+
+quality:
+  freshnessSloMinutes: 15
+  checks:
+    - name: event_id_not_null
+      type: not_null
+      column: eventId
+    - name: event_type_allowed
+      type: accepted_values
+      column: eventType
+      values: [course.published.v1]
+    - name: source_offset_unique
+      type: unique
+      columns: [topic, partition, offset]
+    - name: no_sensitive_payload
+      type: no_sensitive_payload
+      column: payload

@@ -1,0 +1,189 @@
+version: 1
+report_id: product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-enterprise-pattern-v1
+owner: ai-platform
+generated_at: '2026-06-17'
+summary:
+  expansion_status: enterprise_pattern_expanded
+  release_gate_effectiveness_status: effectiveness_monitored
+  release_gate_signal_count: 5
+  release_gate_effective_signal_count: 5
+  blueprint_count: 6
+  ready_blueprint_count: 6
+  non_lms_blueprint_count: 5
+  product_count: 5
+  non_lms_product_count: 4
+  taxonomy_area_count: 9
+  target_module_count: 13
+  executable_module_count: 13
+  evaluation_gate_count: 36
+  assigned_use_case_count: 6
+  blocked_assignment_count: 0
+  tenant_safe: true
+  raw_identifier_count: 0
+thresholds:
+  min_non_lms_blueprint_count: 5
+  min_non_lms_product_count: 4
+  min_taxonomy_area_count: 8
+action_queue:
+  assigned:
+  - enterprise-knowledge-assistant-discovery-release-gate-pattern
+  - lms-at-risk-prediction-baseline-release-gate-pattern
+  - support-sla-risk-discovery-release-gate-pattern
+  - finance-document-intelligence-discovery-release-gate-pattern
+  - operations-routing-optimization-simulator-release-gate-pattern
+  - finance-payment-fraud-scoring-discovery-release-gate-pattern
+  blocked: []
+  next_actions:
+  - monitor_enterprise_release_gate_pattern_adoption
+assignments:
+- assignment_id: enterprise-knowledge-assistant-discovery-release-gate-pattern
+  request_id: enterprise-knowledge-assistant-discovery
+  product: ai-platform
+  use_case_id: enterprise-knowledge-assistant
+  use_case_name: Enterprise Knowledge Assistant
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  target_module_count: 3
+  executable_module_count: 3
+  evaluation_gate_count: 13
+  taxonomy_areas:
+  - nlp_transformers
+  - genai_llm
+  - rag
+  pattern_controls:
+  - release_gate_drill_status
+  - scenario_pass_rate
+  - blocked_queue_cleanliness
+  - tenant_safety
+  - evidence_completeness
+  expansion_ready: true
+  validation_errors: []
+  evidence_refs:
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- assignment_id: lms-at-risk-prediction-baseline-release-gate-pattern
+  request_id: lms-at-risk-prediction-baseline
+  product: lms-courseflow
+  use_case_id: lms-at-risk-prediction
+  use_case_name: Learner At-risk Prediction
+  is_non_lms: false
+  blueprint_status: ready_for_solution_design
+  target_module_count: 2
+  executable_module_count: 2
+  evaluation_gate_count: 4
+  taxonomy_areas:
+  - classical_ml
+  - deep_learning
+  pattern_controls:
+  - release_gate_drill_status
+  - scenario_pass_rate
+  - blocked_queue_cleanliness
+  - tenant_safety
+  - evidence_completeness
+  expansion_ready: true
+  validation_errors: []
+  evidence_refs:
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- assignment_id: support-sla-risk-discovery-release-gate-pattern
+  request_id: support-sla-risk-discovery
+  product: support-platform
+  use_case_id: support-sla-risk
+  use_case_name: Support SLA Risk Prediction
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  target_module_count: 2
+  executable_module_count: 2
+  evaluation_gate_count: 4
+  taxonomy_areas:
+  - classical_ml
+  - deep_learning
+  pattern_controls:
+  - release_gate_drill_status
+  - scenario_pass_rate
+  - blocked_queue_cleanliness
+  - tenant_safety
+  - evidence_completeness
+  expansion_ready: true
+  validation_errors: []
+  evidence_refs:
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- assignment_id: finance-document-intelligence-discovery-release-gate-pattern
+  request_id: finance-document-intelligence-discovery
+  product: billing-finance
+  use_case_id: finance-document-intelligence
+  use_case_name: Finance Document Intelligence
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  target_module_count: 2
+  executable_module_count: 2
+  evaluation_gate_count: 9
+  taxonomy_areas:
+  - computer_vision
+  - rag
+  pattern_controls:
+  - release_gate_drill_status
+  - scenario_pass_rate
+  - blocked_queue_cleanliness
+  - tenant_safety
+  - evidence_completeness
+  expansion_ready: true
+  validation_errors: []
+  evidence_refs:
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- assignment_id: operations-routing-optimization-simulator-release-gate-pattern
+  request_id: operations-routing-optimization-simulator
+  product: enterprise-operations
+  use_case_id: operations-routing-optimization
+  use_case_name: Operations Routing Optimization
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  target_module_count: 1
+  executable_module_count: 1
+  evaluation_gate_count: 1
+  taxonomy_areas:
+  - reinforcement_learning
+  pattern_controls:
+  - release_gate_drill_status
+  - scenario_pass_rate
+  - blocked_queue_cleanliness
+  - tenant_safety
+  - evidence_completeness
+  expansion_ready: true
+  validation_errors: []
+  evidence_refs:
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml
+- assignment_id: finance-payment-fraud-scoring-discovery-release-gate-pattern
+  request_id: finance-payment-fraud-scoring-discovery
+  product: billing-finance
+  use_case_id: finance-payment-fraud-scoring
+  use_case_name: Finance Payment Fraud Scoring
+  is_non_lms: true
+  blueprint_status: ready_for_solution_design
+  target_module_count: 3
+  executable_module_count: 3
+  evaluation_gate_count: 5
+  taxonomy_areas:
+  - classical_ml
+  - anomaly_fraud_risk
+  - graph_knowledge
+  pattern_controls:
+  - release_gate_drill_status
+  - scenario_pass_rate
+  - blocked_queue_cleanliness
+  - tenant_safety
+  - evidence_completeness
+  expansion_ready: true
+  validation_errors: []
+  evidence_refs:
+  - platform/intake/reports/use-case-blueprints-v1.yaml
+  - platform/operations/reports/product-readiness-freshness-response-slo-drift-suppression-policy-coverage-release-gate-effectiveness-v1.yaml
+  - platform/product/reports/ai-platform-product-readiness-v1.yaml

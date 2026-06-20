@@ -1,0 +1,58 @@
+version: 1
+owner: ai-platform
+policy_id: media-intelligence-access-policy-v1
+defaults:
+  wildcard_scopes_allowed: false
+  tenant_isolation_required: true
+  raw_uri_submission_allowed: false
+scope_aliases:
+  document_analyze: internal:ai-platform:media-intelligence:document:analyze
+  speech_assess: internal:ai-platform:media-intelligence:speech:assess
+  ops: internal:ai-platform:media-intelligence:ops
+principals:
+  - principal_id: service:ai-platform-media-ops
+    owner_role: Admin/Ops
+    product: ai-platform
+    scopes:
+      - ops
+    tenant_ids: []
+    product_ids: []
+    use_case_ids: []
+
+  - principal_id: service:billing-finance-media
+    owner_role: Billing/Finance service
+    product: billing-finance
+    scopes:
+      - document_analyze
+    tenant_ids:
+      - tenant-finance
+    product_ids:
+      - billing-finance
+    use_case_ids:
+      - finance-document-intelligence
+
+  - principal_id: service:support-platform-media
+    owner_role: Support Platform service
+    product: support-platform
+    scopes:
+      - speech_assess
+    tenant_ids:
+      - tenant-support
+    product_ids:
+      - support-platform
+    use_case_ids:
+      - support-speech-quality-assurance
+
+  - principal_id: service:lms-courseflow-media
+    owner_role: CourseFlow LMS service
+    product: lms-courseflow
+    scopes:
+      - document_analyze
+      - speech_assess
+    tenant_ids:
+      - tenant-lms
+    product_ids:
+      - lms-courseflow
+    use_case_ids:
+      - lms-document-vision-ingestion
+      - lms-video-transcript-summary

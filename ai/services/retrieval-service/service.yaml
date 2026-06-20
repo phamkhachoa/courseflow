@@ -1,0 +1,49 @@
+version: 1
+service_id: retrieval-service
+owner: ai-platform
+status: service_package_ready
+runtime:
+  language: python
+  entrypoint: courseflow_retrieval_service.cli:main
+  dockerfile: Dockerfile
+security:
+  default_auth: policy_enforced
+  policy:
+    - platform/governance/policies/ai-governance-policy.yaml
+    - platform/governance/policies/retrieval-access-policy.yaml
+observability:
+  metrics: in_memory_request_search_error_counters
+  tenant_safety: cross_tenant_retrieval_forbidden
+routes:
+  - method: GET
+    path: /v1/retrieval/collections
+    scope: internal:ai-platform:retrieval:catalog
+    purpose: collection_catalog
+  - method: POST
+    path: /v1/retrieval/search
+    scope: internal:ai-platform:retrieval:search
+    purpose: lexical_vector_hybrid_search
+  - method: GET
+    path: /v1/retrieval/health
+    scope: internal:ai-platform:retrieval:ops
+    purpose: retrieval_health
+  - method: GET
+    path: /v1/retrieval/metrics
+    scope: internal:ai-platform:retrieval:ops
+    purpose: retrieval_metrics
+dependencies:
+  platform_modules:
+    - platform/src/courseflow_ai_platform/retrieval_service.py
+    - platform/src/courseflow_ai_platform/vector_index.py
+  artifacts:
+    - platform/artifacts/manifests/course-content-vector-index-baseline-v1.yaml
+    - platform/artifacts/manifests/support-knowledge-vector-index-baseline-v1.yaml
+    - platform/evaluation/corpora/course-content-corpus.yaml
+    - platform/evaluation/corpora/support-knowledge-corpus.yaml
+    - platform/vector-store/collections/course-content.yaml
+    - platform/vector-store/collections/support-knowledge.yaml
+promotion_guardrails:
+  - route_scopes_must_match_retrieval_access_policy
+  - principals_must_be_collection_and_tenant_scoped
+  - tenant_private_chunks_must_not_cross_tenant_boundary
+  - hybrid_search_must_not_regress_lexical_recall_shadow_gate

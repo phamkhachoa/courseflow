@@ -1,0 +1,40 @@
+version: 1
+dataset_id: course-content-retrieval-golden-v1
+owner: ai-platform
+product: lms-courseflow
+use_case_id: lms-rag-tutor
+model_id: course-content-retrieval-baseline-v1
+collection: course_content_chunks
+corpus: platform/evaluation/corpora/course-content-corpus.yaml
+description: Golden course-content retrieval queries for semantic search and RAG tutor grounding.
+config:
+  k: 3
+thresholds:
+  recall_at_k_min: 1.00
+  hit_rate_at_k_min: 1.00
+  citation_precision_at_k_min: 0.60
+  tenant_isolation_rate_min: 1.00
+queries:
+  - query_id: course-retrieval-001
+    tenant_id: tenant-a
+    query: Python for loops while loops break continue
+    expected_chunk_ids:
+      - course-python-loops-lesson
+
+  - query_id: course-retrieval-002
+    tenant_id: tenant-a
+    query: SQL left join inner join analytics tables
+    expected_chunk_ids:
+      - course-sql-join-lesson
+
+  - query_id: course-retrieval-003
+    tenant_id: tenant-a
+    query: item collaborative filtering implicit learner course interactions
+    expected_chunk_ids:
+      - course-recsys-collaborative-filtering
+
+  - query_id: course-retrieval-004
+    tenant_id: tenant-a
+    query: RAG grounded answers citations retrieval confidence
+    expected_chunk_ids:
+      - course-rag-grounded-answer

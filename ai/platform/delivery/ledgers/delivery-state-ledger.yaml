@@ -1,0 +1,51 @@
+version: 1
+owner: ai-platform
+ledger_id: delivery-state-ledger-v1
+transitions:
+  - transition_id: serving-access-policy-applier-started-20260617
+    action_id: serving_access_governance:run_controlled_policy_applier:lms-sequence-risk-sandbox-tenant-apply-20260617
+    target_status: in_progress
+    updated_at: "2026-06-17T11:15:00Z"
+    updated_by: adminops-ai-platform
+    reason: Admin/Ops started the controlled apply handoff for the approved LMS sandbox serving-access policy proposal.
+    evidence_refs:
+      - platform/governance/reports/model-serving-access-policy-apply-report-v1.yaml
+      - platform/governance/reports/model-serving-access-policy-reconciliation-v1.yaml
+  - transition_id: governance-evaluation-alert-drill-accepted-20260617
+    action_id: governance_evaluation_ops:run_governance_evaluation_release_gate_alert_drill:governance-evaluation-service-v1
+    target_status: accepted
+    updated_at: "2026-06-17T14:30:00Z"
+    updated_by: adminops-ai-platform
+    reason: Admin/Ops accepted the Governance Evaluation release-gate alert drill after verifying approved, review-required, blocked and privacy-rejection paths are observable.
+    evidence_refs:
+      - platform/governance/reports/governance-evaluation-service-v1.yaml
+      - platform/operations/reports/operating-cockpit-v1.yaml
+      - platform/delivery/reports/delivery-backlog-v1.yaml
+      - platform/delivery/reports/delivery-owner-views-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+  - transition_id: governance-evaluation-response-runbook-drill-accepted-20260617
+    action_id: governance_evaluation_response_drill:accept_governance_evaluation_incident_response_runbook_drill:governance-evaluation-incident-response-drill-v1
+    target_status: accepted
+    updated_at: "2026-06-17T15:30:00Z"
+    updated_by: adminops-ai-platform
+    reason: Admin/Ops accepted the Governance Evaluation incident response runbook drill after verifying P0/P1 repeated-failure scenarios, runbook steps and tenant-safe evidence.
+    evidence_refs:
+      - platform/operations/runbooks/governance-evaluation-incident-response-v1.yaml
+      - platform/operations/reports/governance-evaluation-incident-response-drill-v1.yaml
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+      - docs/team/council-meetings/0084-governance-evaluation-response-runbook-drill.md
+  - transition_id: product-readiness-freshness-response-drill-accepted-20260617
+    action_id: product_readiness_freshness_response_drill:accept_product_readiness_freshness_incident_response_drill_state:product-readiness-freshness-incident-response-drill-v1
+    target_status: accepted
+    updated_at: "2026-06-17T16:10:00Z"
+    updated_by: adminops-ai-platform
+    reason: Admin/Ops accepted the Product Readiness Freshness incident response drill after verifying stale report, route outage, static snapshot, runtime error and audit-gap scenarios with tenant-safe evidence.
+    evidence_refs:
+      - platform/operations/runbooks/product-readiness-freshness-incident-response-v1.yaml
+      - platform/operations/reports/product-readiness-freshness-incident-response-drill-v1.yaml
+      - platform/governance/reports/product-readiness-freshness-incident-export-v1.yaml
+      - runbooks/product-readiness-freshness-incident-response.md
+      - platform/operations/reports/admin-ops-dashboard-v1.html
+      - platform/operations/reports/admin-ops-dashboard-freshness-v1.yaml
+      - docs/team/council-meetings/0092-product-readiness-freshness-response-state-acceptance.md

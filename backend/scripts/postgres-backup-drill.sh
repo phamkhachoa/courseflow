@@ -19,7 +19,6 @@ DATABASES=(
   cf_notification
   cf_media
   cf_analytics
-  cf_recommendation_ml
   cf_gradebook
   cf_quiz
   cf_certificate
@@ -43,13 +42,10 @@ Environment:
   RESTORE_DRILL_REF    Optional restore drill reference written to restore-check evidence
   RESTORE_DRILL_EVIDENCE_FILE
                       Optional restore-check evidence JSON path
-  RECOMMENDATION_ML_EXPECTED_MIGRATION_REVISION
-                      Expected ML Alembic revision for cf_recommendation_ml restore probes
 
 Examples:
   scripts/postgres-backup-drill.sh backup
   scripts/postgres-backup-drill.sh restore-check backups/postgres/20260612T120000Z cf_promotion
-  scripts/postgres-backup-drill.sh restore-check backups/postgres/20260612T120000Z cf_recommendation_ml
 USAGE
 }
 
@@ -116,7 +112,6 @@ EOF_MANIFEST
 
   echo "Backup complete: $backup_dir"
   echo "Run restore check: scripts/postgres-backup-drill.sh restore-check $backup_dir cf_promotion"
-  echo "Run ML restore check: scripts/postgres-backup-drill.sh restore-check $backup_dir cf_recommendation_ml"
 }
 
 restore_probe() {

@@ -1,0 +1,239 @@
+contractVersion: 1
+dataProduct:
+  name: silver.finance_billing_transactions
+  layer: SILVER
+  domain: finance
+  product: billing-platform
+  domainOwner: finance-domain-council
+  ownerTeam: data-platform
+  businessOwner: finance-analytics-po
+  technicalOwner: senior-data-platform
+  dataSteward: enterprise-data-steward
+  description: Normalized billing transaction grain used by enterprise revenue intelligence pipelines.
+  status: ACTIVE
+  deprecationPolicy: 180_day_notice_and_dual_publish_for_breaking_changes
+
+source:
+  upstream:
+    - name: bronze.events_billing_transaction_settled
+      type: lakehouse_table
+      contractVersion: 1
+  ingestionMode: batch
+  eventTimeColumn: settled_at
+
+schema:
+  columns:
+    - name: transaction_id
+      type: string
+      nullable: false
+      pii: false
+      description: Deterministic transaction id derived from source event and billing identity.
+    - name: product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Product that owns the source billing event.
+    - name: source_product_id
+      type: string
+      nullable: false
+      pii: false
+      description: Business product that originated the billed product or service.
+    - name: org_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Organization boundary used for tenant isolation.
+    - name: account_id
+      type: string
+      nullable: false
+      pii: false
+      description: Billing account identifier scoped by organization.
+    - name: customer_id_hash
+      type: string
+      nullable: false
+      pii: true
+      description: Tokenized customer subject identifier for governed finance workflows.
+    - name: billing_transaction_id
+      type: string
+      nullable: false
+      pii: false
+      description: Billing ledger transaction identifier.
+    - name: invoice_id
+      type: string
+      nullable: false
+      pii: false
+      description: Invoice identifier related to the transaction.
+    - name: payment_id
+      type: string
+      nullable: true
+      pii: false
+      description: Payment or settlement identifier when available.
+    - name: subscription_id
+      type: string
+      nullable: true
+      pii: false
+      description: Subscription identifier when revenue is recurring.
+    - name: contract_id
+      type: string
+      nullable: true
+      pii: false
+      description: Contract lifecycle identifier when available.
+    - name: order_id
+      type: string
+      nullable: true
+      pii: false
+      description: Upstream order identifier when billing originates from commerce.
+    - name: product_line
+      type: string
+      nullable: false
+      pii: false
+      description: Finance product line or revenue stream grouping.
+    - name: offering_id
+      type: string
+      nullable: true
+      pii: false
+      description: Product offering, plan or bundle identifier.
+    - name: sku_id
+      type: string
+      nullable: true
+      pii: false
+      description: SKU identifier when available.
+    - name: currency
+      type: string
+      nullable: false
+      pii: false
+      description: ISO-4217 currency code.
+    - name: gross_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Gross billing amount in minor currency units.
+    - name: discount_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Discount amount in minor currency units.
+    - name: tax_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Tax amount in minor currency units.
+    - name: refund_amount_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Refund amount in minor currency units.
+    - name: net_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Net revenue in minor currency units after discounts and refunds.
+    - name: recognized_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Revenue recognized for the accounting date in minor currency units.
+    - name: deferred_revenue_cents
+      type: long
+      nullable: false
+      pii: false
+      description: Revenue deferred beyond the accounting date in minor currency units.
+    - name: transaction_status
+      type: string
+      nullable: false
+      pii: false
+      description: Settlement state from the billing source of truth.
+      allowedValues: [SETTLED, PENDING, FAILED, REFUNDED, CHARGEBACK, REVERSED]
+    - name: revenue_recognition_status
+      type: string
+      nullable: false
+      pii: false
+      description: Revenue recognition state for this transaction.
+      allowedValues: [RECOGNIZED, DEFERRED, PARTIAL, REVERSED, PENDING]
+    - name: billing_period_start
+      type: date
+      nullable: true
+      pii: false
+      description: Start date of the billed service period.
+    - name: billing_period_end
+      type: date
+      nullable: true
+      pii: false
+      description: End date of the billed service period.
+    - name: accounting_date
+      type: date
+      nullable: false
+      pii: false
+      description: Finance accounting date used for revenue reporting.
+    - name: settled_at
+      type: timestamp
+      nullable: false
+      pii: false
+      description: Settlement business timestamp.
+    - name: source_system_record_id_hash
+      type: string
+      nullable: false
+      pii: false
+      description: Tokenized source record identifier for support and replay.
+    - name: reason_code
+      type: string
+      nullable: true
+      pii: false
+      description: Optional upstream reason code for known revenue status.
+    - name: source_event_id
+      type: uuid
+      nullable: false
+      pii: false
+      description: Original source event id for traceability.
+    - name: source_record_hash_sha256
+      type: string
+      nullable: false
+      pii: false
+      description: Source record hash from Bronze evidence.
+
+quality:
+  freshnessSloMinutes: 120
+  checks:
+    - name: transaction_id_not_null
+      type: not_null
+      column: transaction_id
+    - name: transaction_id_unique
+      type: unique
+      columns: [transaction_id]
+    - name: billing_transaction_id_not_null
+      type: not_null
+      column: billing_transaction_id
+    - name: accounting_date_not_null
+      type: not_null
+      column: accounting_date
+    - name: transaction_status_allowed
+      type: accepted_values
+      column: transaction_status
+      values: [SETTLED, PENDING, FAILED, REFUNDED, CHARGEBACK, REVERSED]
+
+privacy:
+  classification: SENSITIVE
+  dataResidency: REGION_CONTROLLED
+  containsPii: true
+  tenantIsolation: REQUIRED
+  retentionDays: 2555
+  erasureSupported: true
+  subjectKeys:
+    - name: customer_id_hash
+      column: customer_id_hash
+      type: tokenized_subject_id
+      required: true
+  erasureMode: REGULATED_SUBJECT_DELETE
+  legalHoldPolicy: regulated_legal_hold_check
+  rawPayloadPolicy: NO_RAW_PAYLOAD
+
+serving:
+  consumers: [DataPlatform, BI, Compliance]
+  accessPolicy: row_level_org_isolation
+  accessPersonas: [DataPlatformOperator, DomainDataOwner, ApprovedBIConsumer, ComplianceConsumer]
+  consumerContract: catalog_registered_access_request_required
+  publicationGate: quality_checks_must_pass
+
+lineage:
+  catalog: DataHub
+  lineageRequired: true

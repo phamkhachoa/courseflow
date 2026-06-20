@@ -1,0 +1,54 @@
+version: 1
+contract: finance_payment_fraud_model_io
+owner: ai-platform
+product: billing-finance
+use_case: finance-payment-fraud-scoring
+model_id: finance-payment-fraud-baseline-v1
+input:
+  tenant_id: string
+  payment_id: string
+  account_hash: string
+  counterparty_hash: string
+  amount_minor: integer
+  currency: string
+  payment_method: string
+  country_code: string
+  device_fingerprint_hash: string
+  velocity_1h: integer
+  velocity_24h: integer
+  prior_failed_attempts_7d: integer
+  account_age_days: integer
+  verified_payment_methods_count: integer
+  linked_account_count: integer
+  shared_counterparty_count: integer
+  prior_chargeback_count: integer
+  risk_review_outcome: string
+output:
+  model_id: string
+  risk_score: number
+  risk_band: string
+  reason_codes:
+    type: array
+  entity_link_evidence:
+    type: array
+    fields:
+      - link_type
+      - source_entity
+      - target_entity
+      - strength
+      - reason_code
+  recommended_actions:
+    type: array
+  requires_human_review: boolean
+  automated_adverse_action_allowed: boolean
+sla:
+  p95_latency_ms: 250
+  fallback_required: true
+  batch_refresh: hourly
+governance:
+  tenant_isolation_required: true
+  raw_account_identifier_allowed: false
+  raw_counterparty_identifier_allowed: false
+  human_review_required_for_payment_hold_or_account_action: true
+  automated_adverse_action_allowed: false
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml

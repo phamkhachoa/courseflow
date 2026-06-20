@@ -1,0 +1,67 @@
+version: 1
+dataset_id: recommendation-item-cf-golden-v1
+owner: ai-platform
+product: lms-courseflow
+use_case_id: lms-related-course-recommendation
+model_id: recommendation-item-cf-v1
+description: Golden implicit-feedback interactions for executable item-CF ranking evaluation.
+config:
+  min_support: 1
+  max_related_per_course: 5
+  k: 10
+thresholds:
+  recall_at_k_min: 0.80
+  ndcg_at_k_min: 0.80
+  catalog_coverage_min: 1.00
+interactions:
+  - principal_id: learner-001
+    course_id: "30000000-0000-0000-0000-000000000001"
+    event_type: ENROLLMENT
+  - principal_id: learner-001
+    course_id: "30000000-0000-0000-0000-000000000002"
+    event_type: ENROLLMENT
+  - principal_id: learner-001
+    course_id: "30000000-0000-0000-0000-000000000003"
+    event_type: ENROLLMENT
+  - principal_id: learner-002
+    course_id: "30000000-0000-0000-0000-000000000001"
+    event_type: ENROLLMENT
+  - principal_id: learner-002
+    course_id: "30000000-0000-0000-0000-000000000002"
+    event_type: ENROLLMENT
+  - principal_id: learner-003
+    course_id: "30000000-0000-0000-0000-000000000001"
+    event_type: ENROLLMENT
+  - principal_id: learner-003
+    course_id: "30000000-0000-0000-0000-000000000002"
+    event_type: ENROLLMENT
+  - principal_id: learner-004
+    course_id: "30000000-0000-0000-0000-000000000001"
+    event_type: ENROLLMENT
+  - principal_id: learner-004
+    course_id: "30000000-0000-0000-0000-000000000003"
+    event_type: ENROLLMENT
+  - principal_id: learner-005
+    course_id: "30000000-0000-0000-0000-000000000002"
+    event_type: ENROLLMENT
+  - principal_id: learner-005
+    course_id: "30000000-0000-0000-0000-000000000003"
+    event_type: ENROLLMENT
+  - principal_id: learner-006
+    course_id: "30000000-0000-0000-0000-000000000004"
+    event_type: ENROLLMENT
+  - principal_id: learner-006
+    course_id: "30000000-0000-0000-0000-000000000005"
+    event_type: ENROLLMENT
+queries:
+  - course_id: "30000000-0000-0000-0000-000000000001"
+    relevant_course_ids:
+      - "30000000-0000-0000-0000-000000000002"
+      - "30000000-0000-0000-0000-000000000003"
+  - course_id: "30000000-0000-0000-0000-000000000002"
+    relevant_course_ids:
+      - "30000000-0000-0000-0000-000000000001"
+      - "30000000-0000-0000-0000-000000000003"
+  - course_id: "30000000-0000-0000-0000-000000000004"
+    relevant_course_ids:
+      - "30000000-0000-0000-0000-000000000005"

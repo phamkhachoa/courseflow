@@ -1,0 +1,37 @@
+version: 1
+contract: sequence_risk_model_io
+owner: ai-platform
+product: lms-courseflow
+use_case: lms-at-risk-prediction
+model_id: sequence-risk-baseline-v1
+input:
+  tenant_id: string
+  learner_principal_hash: string
+  course_id: string
+  feature_snapshot_at: timestamp
+  events:
+    type: array
+    item:
+      event_type: string
+      days_ago: integer
+      score_optional: number
+      engagement_minutes_optional: integer
+output:
+  model_id: string
+  risk_score: number
+  risk_band: string
+  reason_codes:
+    type: array
+  recommended_actions:
+    type: array
+  hidden_state: number
+sla:
+  p95_latency_ms: 300
+  fallback_required: true
+  batch_refresh: daily
+governance:
+  tenant_isolation_required: true
+  learner_principal_hash_required: true
+  no_automated_adverse_action: true
+  human_review_required_for_intervention: true
+  activation_policy: platform/governance/policies/ai-governance-policy.yaml
